@@ -65,7 +65,6 @@ trait Collection t e of Iterable t e :
 
 # Ordered collection
 trait Sequence t e of Collection t e :
-  # See seq.txt
 
 # Not sure if these should be in Sequence to allow custom implementations
 # Implement these by sorting the items from iter, then using collect

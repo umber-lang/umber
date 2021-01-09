@@ -1,106 +1,106 @@
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/basics.expected tokens/basics.out))))
+ (action (no-infer (diff tokens/Basics.expected tokens/Basics.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/basics.expected ast/basics.out))))
+ (action (no-infer (diff ast/Basics.expected ast/Basics.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/classics.expected tokens/classics.out))))
+ (action (no-infer (diff tokens/Classics.expected tokens/Classics.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/classics.expected ast/classics.out))))
+ (action (no-infer (diff ast/Classics.expected ast/Classics.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/empty.expected tokens/empty.out))))
+ (action (no-infer (diff tokens/Empty.expected tokens/Empty.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/empty.expected ast/empty.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action
-  (no-infer
-   (diff tokens/errorDuplicateLet.expected tokens/errorDuplicateLet.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action
-  (no-infer (diff ast/errorDuplicateLet.expected ast/errorDuplicateLet.out))))
+ (action (no-infer (diff ast/Empty.expected ast/Empty.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
-   (diff tokens/errorDuplicateVal.expected tokens/errorDuplicateVal.out))))
+   (diff tokens/ErrorDuplicateLet.expected tokens/ErrorDuplicateLet.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
-  (no-infer (diff ast/errorDuplicateVal.expected ast/errorDuplicateVal.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/functions.expected tokens/functions.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/functions.expected ast/functions.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/imports.expected tokens/imports.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/imports.expected ast/imports.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/letPattern.expected tokens/letPattern.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/letPattern.expected ast/letPattern.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/modules.expected tokens/modules.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/modules.expected ast/modules.out))))
+  (no-infer (diff ast/ErrorDuplicateLet.expected ast/ErrorDuplicateLet.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
-   (diff tokens/mutualRecursion.expected tokens/mutualRecursion.out))))
+   (diff tokens/ErrorDuplicateVal.expected tokens/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
-  (no-infer (diff ast/mutualRecursion.expected ast/mutualRecursion.out))))
+  (no-infer (diff ast/ErrorDuplicateVal.expected ast/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/operators.expected tokens/operators.out))))
+ (action (no-infer (diff tokens/Functions.expected tokens/Functions.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/operators.expected ast/operators.out))))
+ (action (no-infer (diff ast/Functions.expected ast/Functions.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/option.expected tokens/option.out))))
+ (action (no-infer (diff tokens/Imports.expected tokens/Imports.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/option.expected ast/option.out))))
+ (action (no-infer (diff ast/Imports.expected ast/Imports.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/text.expected tokens/text.out))))
+ (action (no-infer (diff tokens/LetPattern.expected tokens/LetPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/text.expected ast/text.out))))
+ (action (no-infer (diff ast/LetPattern.expected ast/LetPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/traits.expected tokens/traits.out))))
+ (action (no-infer (diff tokens/Modules.expected tokens/Modules.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/traits.expected ast/traits.out))))
+ (action (no-infer (diff ast/Modules.expected ast/Modules.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
-  (no-infer (diff tokens/typeChecking.expected tokens/typeChecking.out))))
+  (no-infer
+   (diff tokens/MutualRecursion.expected tokens/MutualRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/typeChecking.expected ast/typeChecking.out))))
+ (action
+  (no-infer (diff ast/MutualRecursion.expected ast/MutualRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/types.expected tokens/types.out))))
+ (action (no-infer (diff tokens/Operators.expected tokens/Operators.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/types.expected ast/types.out))))
+ (action (no-infer (diff ast/Operators.expected ast/Operators.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Option.expected tokens/Option.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Option.expected ast/Option.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Text.expected tokens/Text.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Text.expected ast/Text.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Traits.expected tokens/Traits.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Traits.expected ast/Traits.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff tokens/TypeChecking.expected tokens/TypeChecking.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/TypeChecking.expected ast/TypeChecking.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Types.expected tokens/Types.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Types.expected ast/Types.out))))
 
