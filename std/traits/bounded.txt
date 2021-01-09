@@ -1,0 +1,3 @@
+module :
+  trait Bounded a :
+    val min_bound, max_bound : a

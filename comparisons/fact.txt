@@ -1,0 +1,4 @@
+module :
+  val fact : Nat -> Natural
+
+let fact n = fold ~init:1 ~f:(*) (2..n)

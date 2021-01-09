@@ -1,0 +1,10 @@
+module :
+  val fst : (a, b) -> a
+  val snd : (a, b) -> b
+  val curry : ((a, b) -> c) -> a -> b -> c
+  val uncurry : (a -> b -> c) -> (a, b) -> c
+
+let fst (x, _) = x
+let snd (_, y) = y
+let curry f x y = f (x, y)
+let uncurry f (x, y) = f x y

@@ -1,0 +1,35 @@
+module :
+  trait Convert a b :
+    val convert : a -> b  # Error handling? Exn? ConvertFail? TryConvert?
+
+  # Could have some macros like:
+    - `@to:String 5` is the same as `(convert (5) : String)`
+    - `@of:String "5"` is the same as `(convert ("5" : String))` (maybe not as useful)
+
+  # Question: how to represent a trait like ToString? (partially apply the second type argument)
+    Might want to use something like To and From (/Of) like Rust does:
+      https://doc.rust-lang.org/stable/rust-by-example/conversion/from_into.html
+
+  # Side note: consider orphan rules for multi-parameter type classes:
+    https://qfpl.io/posts/orphans-and-fundeps/index.html
+
+    Can use functional dependencies instead of Rust's existential type thing
+    e.g.
+    ```
+    trait Iterable t a | t -> a :
+      val iter : t -> Iterator a
+    ```
+    instead of
+    ```
+    trait Iterable t :
+      type Item
+      val iter : t -> Iterator Item
+    ```
+    or
+    ```
+    trait Iterable t a :
+      val iter : t a -> Iterator a
+    ```
+
+impl Convert Int String =
+  

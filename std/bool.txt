@@ -1,0 +1,14 @@
+module :
+  type Bool = False | True # TODO: deriving (should be like Eq, Ord, Hash, etc.)
+  # Could maybe make a Std or Data trait which just extends all of those for convenience
+
+  val not : Bool -> Bool
+  val (&&), (||) : Bool -> lazy Bool -> Bool
+  # TODO: xor etc.
+
+let not x = if x then False else True
+
+# (lazy b) here? might be nice if laziness is just purely handled by the compiler with type annotations
+# ^ this could have transparency issues though
+let (&&) a b = if a then b else False  # Maybe this should be externally implemented?
+let (||) a b = if a then True else b

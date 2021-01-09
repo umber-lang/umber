@@ -1,0 +1,29 @@
+module :
+  type Option a =
+    | None
+    | Some a
+    # TODO: deriving
+
+  val is_some : Option a -> a
+  val is_none : Option a -> a
+  val default : a -> Option a -> a
+  val unwrap : Option a -> <Panic> a
+  val try : (() -> <Panic, Exn _> a) -> a
+  val some_if : Bool -> a -> Option a
+
+# Could be like `let is_some x = x @matches?(Some _)`
+let is_some = match
+  | Some _ -> True
+  | None -> False
+
+let is_none = not . is_some
+
+let default value = match
+  | Some x -> x
+  | None -> value
+
+let try f =
+  handle Some (f ())
+  | <Panic> | <Exn _> -> None
+
+let some_if cond x = if cond then Some x else None

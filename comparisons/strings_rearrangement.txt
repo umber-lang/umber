@@ -1,0 +1,16 @@
+let strings_rearrangement =
+  any (all (uncurry (differ_by 1) . pairs)) . permutations
+
+let differ_by n seq1 seq2 =
+  match (n, seq1, seq2)
+  | (n, [], []) -> n == 0
+  | (_, [], _) | (_, _, []) -> False
+  | (n, )
+
+let pairs list =
+  match List.tail list
+  | None -> []
+  | Some tail -> zip list tail
+
+# Actually, why not do something with a lazy type like Seq, Sequence, Stream?
+# Laziness is a big help for a task like this

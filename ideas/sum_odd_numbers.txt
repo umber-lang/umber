@@ -1,0 +1,28 @@
+let main () =
+  let sum_odd_numbers up_to =
+    let mut acc = 0
+	for i in 0..<up_to
+	  let addition = match i % 2 == 1
+	    | true -> i
+		| false -> continue
+	  acc += addition
+	acc
+	
+# or, more idiomatically
+let main () =
+  let sumOddNumbers upTo =
+    fold 1,3..(upTo-1) ~init:0 ~f:(+)
+	# considering: labelled arguments, range syntax
+	
+# again
+let main () =
+  let sum_odd_numbers up_to =
+    let acc = Ref 0  # difference between mutable variables and mutable objects -- get it straight
+	iter (1 .. up_to - 1) ~f:(fun i -> acc += i)
+	
+# Note: (+=) : Num a => Ref a -> a -> () 
+type Ref a = {< mut contents : a >}
+
+# Regular reference to a mutable array?
+let array_copy_set (arr : [|a|]) (i : a) : ([|a|], [|a|]) =
+  let copy = copy arr

@@ -1,0 +1,26 @@
+import Date
+
+trait Eq a :
+  val (==) : a -> a -> Bool
+
+type Person = {
+  name : String,
+  dob : Date 
+} # TODO: see if I can remove the DEDENT generated here
+
+let (p : Person) = {  # TODO: try and get this to parse without parens
+  name = "Bob",
+  dob = Date.of_string "2020-10-11",
+}
+
+impl Eq Person =
+  let (==) p1 p2 = p1.name == p2.name && p1.dob == p2.dob
+
+impl (Eq a, Eq b) => Eq (a, b) = let (==) (a, b) (c, d) = a == c && d == d
+
+let _x = (
+  1, 2)
+let _y = (
+  1, 2
+)
+let () = assert ((x, x) == (y, y,))# Trailing commas work

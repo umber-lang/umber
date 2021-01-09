@@ -1,0 +1,17 @@
+# Messings around with traits
+
+trait Equate a =
+  # Problem: how to combine effects and traits/interfaces
+  # e.g. should we force Equate to be total like this:
+  (==) : a -> a -> Bool
+  # or allow any effect like this:
+  # (==) : a -> a -> <_> Bool
+
+  # In this case, equality have no effects seems like something very desirable
+  # Maybe it should be able to diverge or raise exceptions, though
+  # <Pure> then?
+  (==) : a -> a -> <Pure> Bool
+
+# Should traits be able to be parametrised with effects?
+trait Of a b =
+  of : a -> <Pure> b

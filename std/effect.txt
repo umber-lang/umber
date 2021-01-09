@@ -1,0 +1,34 @@
+module :
+  # Panics are for immediately crashing when an invalid state has been reached or there
+    is nothing which can be done with the inputs, but a type like `Option` or `Result` is
+    not being used. (Unrecoverable errors)
+  # TODO: add string variables or something to allow for error messages
+  effect Panic :
+    val panic : () -> Never
+
+  # Exceptions are for handling possibly rare but not unrecoverable errors.
+    They allow for the continuation to be called.
+  effect Exn a :
+    val raise : () -> a
+
+  effect Alloc h : ...
+  effect Read h : ...
+  effect Write h : ...
+  # Could freeing be an effect? Probably not if I want to keep things transparent
+  
+  effect Heap h = Alloc h | Read h | Write h
+  # Can `h` be related to `mut` arguments?
+  # Note: Koka calls `Alloc` `heap` and `Heap` `st`
+
+  # Note: not using the `div` effect from Koka (don't really see the point)
+    could potentially have some use though (?)
+    Not sure if it makes sense as effects are supposed to be things you call, not just
+    things that happen.
+
+  # TODO: effects for iteration and async stuff
+  # Also: iteration and async combined? (streaming multiple values)
+
+# Toplevel handling for Panic and Alloc (at least)
+  Those should probably be able to be implicit (the rest definitely not though)
+
+handle Panic with ... # `handle_panic` or `\() -> ...` I think

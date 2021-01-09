@@ -1,0 +1,6 @@
+module :
+  type Result a =
+    | Ok a
+    | Err of Error # TODO: decide on Error type
+
+  # TODO: fill out functions

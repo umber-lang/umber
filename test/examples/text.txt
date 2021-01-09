@@ -1,0 +1,24 @@
+# String and character literals
+let c = 'a'
+let hello = "hello world!"
+
+# Escaping
+# TODO: add comprehensive tests for all kinds of escapes
+let spacing = "line 1\r\n\t line 2"
+let dec_code_exclam = "\033"
+
+#[here's a nice bracket comment (yeah, except bracket comments are gone)]#
+
+val (++) : String -> String -> String  # should later be defined on Seq
+let _ = "hello\n" ++ "\bworld!"
+#watch out for the spaces ....   
+
+    
+
+     
+      
+let (a, b) =
+  let empty = ""
+  # TODO: Tuple patterns shouldn't need parens
+  ('a', 'b')
+let _UNICODE_WORKS_TOO = "ジェームズ"

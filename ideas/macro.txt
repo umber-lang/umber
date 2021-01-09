@@ -1,0 +1,67 @@
+# Syntax: `macro <optional exp to bind>@<symbols/pattern to catch>`
+# Can apply to expr, type, etc. (maybe you have to import macro utils for this?
+  i.e. they would be pre-defined patterns)
+# Could also do something like let@macro
+
+macro $expr@?$any = Option.try (\() -> expr@any)
+
+macro $expr@[$(index:expr)] = Seq.get expr index
+
+# So these two can be combined like `arr@?[5]`
+
+# See: https://doc.rust-lang.org/reference/macros.html
+# Maybe a better syntax: ... idk
+
+# Macros should be named! Something like
+  (expr or type, whatever)@(lower/upper name or operator symbols)[{(stuff in brackets)}]
+  Otherwise, we'll run into issues with the ordering in which macros should be
+  applied being ambiguous.
+
+# This way, we specify pattern matches in the order to apply them
+macro =  # Note: The macro with no name
+  | $seq:expr @ [$($start:expr)? .. $($end:expr)?] ->
+    # This wouldn't really work since the option is at the macro level, not at runtime
+    Seq.slice
+      $seq
+      (Option.default 0 $start)
+      (Option.default (Seq.length seq - 1) $end)
+  | $seq:expr @ [$index:expr] -> Seq.get $seq $index
+
+# Instead of a keyword `macro`, may want to use a macro itself
+  e.g. `let@macro my_macro = ...`
+  Maybe the empty macro is called `_`?
+  This might make it difficult to define nice matching syntax
+  (or it could force me to make the syntax more verbose but less cryptic)
+
+# Problem: how to handle optional values with this syntax/style (and in general)
+let@macro _ =
+  | (seq : Expr) @ Brackets (Option (start : Expr), Operator "..", Option (end : Expr)) ->
+    # maybe just forget `Option` and make it you have to define separate patterns?
+  | (seq : Expr) @ Brackets (index : Expr) -> Seq.get seq index
+
+# Might want to focus more on procedural macros over declarative macros
+  (that work on the AST (or in Rust, `TokenStream`s, a more stable interface), instead of tokens directly)
+  also see https://github.com/rust-lang/rfcs/blob/master/text/1584-macros.md
+# Deriving is really the big win here (the rest is just window-dressing)
+# Just pattern matching on a token tree (https://doc.rust-lang.org/proc_macro/enum.TokenTree.html)
+  might be nice enough tbh
+
+# Macros on types maybe shouldn't be able to delete stuff, just add
+# Macros on expressions definitely need to be able to replace what they take in though
+let@macro add_useless_field =
+  # Notes:
+    - Need to account for optional final commas
+    - Define new "macro frag specs"? or maybe just more macros
+    - Refer to part of a pattern by name? (instead of having to copy-paste it)
+  | {$(($field:name) : ($t:ty)),+} @ -> {$(($field:name) : ($t:ty)),+ useless : Never}
+
+# Could maybe just be @macro instead of let@macro
+# ^ also maybe allow macros to take in indented blocks as well as parenthesized things
+  so the syntax could be like:
+
+@macro add_useless_field # `=` here? syntax is definitely work in progress
+  | ...
+# ^ also might have to be more like `@macro(add_useless_field)`
+
+# Maybe macros and regex could share syntax?
+# Similar purpose (creating simple parsers) although macros are more specialized

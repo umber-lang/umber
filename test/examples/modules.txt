@@ -1,0 +1,20 @@
+module A :
+  val foo : Int
+  =
+  let foo = 5
+
+  module B :
+    module C :
+      trait D :
+        val d : Nat
+
+    module D :
+      val wow : a -> a
+    =
+    module D = let wow x = x
+
+    type Bacon = Delicious
+
+let () = match A.B.Delicious | A.B.Delicious -> ()
+let _ = match A.B.Delicious | Delicious -> True
+let _ = match Delicious : A.B.Bacon | Delicious -> "yep" # TODO: cnstr name inference

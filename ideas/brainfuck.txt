@@ -1,0 +1,12 @@
+# A Brainfuck interpreter
+
+let tape_length = 30000
+
+let interpret program =
+  let tape = Array.fill 0 ~len:tape_length
+  let tape_pos = 0  # mut? ref?
+  let stack = Stack.create ()
+  let' loop i = match Array.get tape i with
+    | '>' -> tape_pos += 1
+    | '<' -> tape_pos -= 1
+    | '.' -> # ... TODO

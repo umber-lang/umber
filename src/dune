@@ -1,0 +1,10 @@
+(library
+ (name umber)
+ (libraries core_kernel sedlex menhirLib)
+ (preprocess
+  (staged_pps ppx_import sedlex.ppx ppx_jane)))
+
+(menhir
+ (modules parser)
+ (flags --table --inspection)
+ (infer true))

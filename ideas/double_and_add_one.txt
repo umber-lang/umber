@@ -1,0 +1,12 @@
+let double_and_add_one (xs: [Int]) =
+  map ((+1) . (*2)) xs
+  # compared to:
+  # map (fun x -> 2 * x + 1) xs (ok I this is fine too but I like my composition too much)
+  
+  # Haskell, sort a list of tuples by their second values: sortBy (compare `on` snd)
+  # Might want to follow Rust and support both sort_by and sort_by_key/sort_by_cached_key
+    (sometimes you just want to sort by an expensive transformation
+     rather than a custom comparison function)
+  # Also should include unstable but faster sorts
+    (maybe a ?(stable = True) optional argument?)
+  # on :: (b -> b -> c) -> (a -> b) -> a -> a -> c

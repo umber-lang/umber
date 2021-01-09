@@ -1,0 +1,23 @@
+module :
+  # Probably not actually how this will work (e.g. := would be a constructor)
+  val (!) : Mut a -> a
+  val (:=) : Mut a -> a -> ()
+
+  type Mut a  # might want to call this Ref
+
+  effect Mut :
+    mut : a -> Mut a
+    get : Mut a -> a
+    set : Mut a -> a -> ()
+
+# Syntax and implementation (everything really) is very experimental
+
+type Mut a = |  # implemented externally? Not sure what's happening here
+
+# Example usage
+let sum_up_to_n n =
+  let sum = ref 0  # or maybe var sum = 0
+  for (1 .. n) ~f:(i ->
+    set sum (sum + i))  # sum := sum + i or sum += i
+  sum
+  

@@ -1,0 +1,83 @@
+# Temporary mock-up for testing purposes
+module :
+  # Types like Bool, Int, etc. are given in Core (automatically pre-loaded)
+  # (might want to rename Core to Primitives, Builtins, etc.)
+
+  module List :
+    type List a = Nil | Cons a (List a)
+  import List with *  # TODO: remove (should see a type List as List.List)
+
+  module Operators :
+    val (.) (infixr 9) : () => (b -> c) -> (a -> b) -> a -> c
+    # `() =>` is a hack for the parser as it confuses the `(` in `(b -> c)` as the start
+      of a trait bound (it would need arbitrary lookahead or some other trickery to
+      avoid doing so)
+
+    val (^) (infixr 8) : Int -> Int -> Int
+    #val (^^) (infixr 8) : Float -> Int -> Float
+    #val (**) (infixr 8) : Float -> Float -> Float
+
+    val (*) (infixl 7) : Int -> Int -> Int
+    #val (/) (infixl 7) : Float -> Float -> Float
+    #val (//) (infixl 7) : Int -> Int -> Int  # Same as quot (not div)
+    #val (%) (infixl 7) : Int -> Int -> Int  # Same as rem (not mod)
+
+    val (+) (infixl 6) : Int -> Int -> Int
+    val (-) (infixl 6) : Int -> Int -> Int
+
+    val (::) (infixr 5) : a -> List a -> List a
+    
+    val not : Bool -> Bool
+    val (==) (infix 4) : a -> a -> Bool
+    #val (!=) (infix 4) : a -> a -> Bool
+    #val (<) (infix 4) : a -> a -> Bool
+    #val (<=) (infix 4) : a -> a -> Bool
+    #val (>) (infix 4) : a -> a -> Bool
+    #val (>=) (infix 4) : a -> a -> Bool
+
+    val (&&) (infixl 3) : Bool -> Bool -> Bool
+    
+    val (||) (infixl 2) : Bool -> Bool -> Bool
+
+    #val (>>=) (infixl 1) : (Monad m) => m a -> (a -> m b) -> m b
+
+    val (|>) (infixl 0) : a -> (a -> b) -> b
+
+  import Operators with *
+  # FIXME: why aren't these getting imported??
+
+  val sqrt : Int -> Float
+
+# TODO: implement public/private distinction for modules
+
+#
+  import Bool with *
+  import Fun
+  # TODO: need some kind of syntax for re-exporting things easily
+  # Idea: just put the imports inside `module :` (could work)
+    Perhaps nicer: just use `include` instead of `import`
+    - or some variant of `import` e.g. `import'`, `import!`
+    - I think `include` is nice as it's more intuitive
+
+  # see https://hackage.haskell.org/package/base-4.14.0.0/docs/src/Prelude.html
+    as a starting point
+
+  # TODO: Char, Int, Integer, Float, etc.
+    - different sizes (actually, if the overhead isn't that large,
+      could just use arbitrary-length integers by default)
+    - numeric traits
+    - arithmetic functions (Math module)
+
+  # TODO: collections e.g. Iterable, Collection, Seq, Array, List, Map, HashMap, TreeMap, Set, HashSet, TreeSet
+
+  # TODO: semigroups, monoids (eh...), functors, monads, applicatives
+
+  # TODO: IO e.g. reading to/writing from stdin/stdout/stderr and files
+
+  # TODO: effects and errors
+
+  # TODO: Sys/Os handling (syscals: file interactions, time, misc.)
+
+  # TODO: macro support
+
+  # TODO: randomness

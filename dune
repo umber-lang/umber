@@ -1,0 +1,5 @@
+(executable
+ (name run)
+ (libraries core umber)
+ (preprocess
+  (pps ppx_jane)))

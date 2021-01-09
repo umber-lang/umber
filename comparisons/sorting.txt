@@ -1,0 +1,11 @@
+val merge_sort : (Seq t, Ord a) => t a -> t a
+let rec merge_sort = match
+  | [] | [_] as xs -> xs  # Brackets needed? e.g. `([] | [_]) as xs`?
+  | xs ->
+    let half_len = Seq.length xs // 2
+    let rec merge xs ys = match (xs, ys)
+      | [], xs | xs, [] -> xs
+      | x :: xs, y :: ys ->
+        if x <= y then x :: y :: merge xs ys  # How does :: work for e.g. arrays? should it just be for lists?
+        else y :: x :: merge xs ys
+    merge (merge_sort (Seq.take half_len xs)) (merge_sort (Seq.drop half_len xs))

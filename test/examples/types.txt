@@ -1,0 +1,41 @@
+# Type annotations
+let n = 1 : Int
+
+# Simple variant types and pattern matching
+type Direction = North | South | East | West
+
+let north_is_north = match North | North -> True | _ -> False
+
+val first_letter : Direction -> Char
+let first_letter = match
+  | North -> 'N'
+  | South -> 'S'
+  | East -> 'E'
+  | West -> 'W'
+
+# Tuples
+let magnitude (x, y) = sqrt (x^2 + y^2)
+
+# Record types
+type Rectangle = { length : Int, width : Int }
+
+let area rect = rect.length * rect.width
+let double_length { length, width } = { length = length * 2, width }
+let double_width rect = { rect with width = rect.width * 2 }
+let double_dimensions = double_length . double_width
+
+type Option a =
+  | Some a
+  | None
+
+# TODO: labelled arguments
+val value : Option a -> a -> a
+let value opt default = match opt
+  | Some x -> x
+  | None -> default
+
+# Type aliases
+type alias MyInt = Int
+type alias Pair x y = (x, y)
+
+# TODO: Subtyping on variants/row polymorphism for record types

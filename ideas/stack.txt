@@ -1,0 +1,43 @@
+# usage: import Stack with Stack (to give Stack.stuff methods and the Stack type)
+module
+  type Stack a
+  let create : () -> Stack a
+  pop : Stack a -> Maybe a # pop : Stack a -> a | StackUnderflow ??
+  push : Stack a -> a -> ()
+  peek : Stack a -> Maybe a
+  size : Stack a -> Int
+
+type Stack a = [|a|]  # or Array a
+
+let create () = [||]
+
+# does pattern matching on arrays really make sense? idk
+  let peek = match
+    | [||] -> Nothing
+    | [| .., last|] -> Just last  # or array -> Just (array[-1])
+  
+# Alternatively:
+let peek stack = stack[-1]  # <- if this returns an option
+  
+let push = (:+)  # `array :+ item` appends item to array
+
+let pop stack =
+  let top = peek stack
+  Array.remove stack (-1)
+  top
+  
+# note: size is already defined for array, I guess (decide on size vs length)
+
+#
+  Should infix constructors have to start with : ? (like in Haskell -- probably yes since there needs to be a difference)
+  No precedence allowed for infix operators maybe? (other than being less than function application)
+  
+  Array type:
+  
+  type Array a = Empty | 
+  
+  and with the sugar: (able to be defined for type expressions/pattern matches (handled together?) and regular values)
+  type Array a = [||] |  
+  
+  
+  

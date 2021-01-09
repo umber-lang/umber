@@ -1,0 +1,64 @@
+# Take inspiration from Efekt's effects:
+  https://effekt-lang.org/docs/concepts/effect-handlers
+  They're similar to Frank's in that they have the concept of contexts having
+  specific capabilities. I think it's much nicer than requiring explicit effect
+  polymorphism annotations on almost all higher-order function types.
+
+# If we're going to include algebraic effects, we should probably go all out
+  and try to do as much as possible with them (if only to test the bounds and
+  efficacy of the idea) e.g. iterators, error handling, and much more.
+
+trait Iterable t :
+   val iter : t a -> <Yield a> ()  # or: `Iterator t a`
+   # other stuff e.g. (probably optional) val size_hint : t a -> (Nat, Option Nat)
+   # see https://doc.rust-lang.org/std/iter/trait.Iterator.html
+   =
+   let size_hint _ = (0, None)
+
+effect Yield a :
+  val yield : a -> ()
+# Could also just be effect Yield a : a -> ()
+
+type Iterator t b = t a -> <Yield b> ()  # probably?
+# might need to be `() -> <Yield a> ()` with `val iter : t a -> Iterator t a`
+# that would probably make more sense
+
+impl Iterator (Iterator _) =  # does this type-check?
+  let iter = id
+
+val for_each : Iterable t => t a -> ~f:(a -> ()) -> ()
+let for_each itr ~f = match iter itr
+  | <yield item> k -> f item; k ()
+  | () -> ()
+
+# TODO: Consider: the [] pattern could be generic across all Sequences and then
+  this would work for all of them
+impl Iterable LinkedList =
+  # TODO: Decide: do I want to force the rec keyword? Some OCaml patterns aren't
+  # as nice if you are always recursive e.g. let x = x + 1 but it's kind of a
+  # pain point (slightly ugly and I often forget it)
+  # What about this: [let] works like [let rec],
+    and [let'] works like [let] (nonrec)?
+  # Also, in modules, all functions are defined as if with let ... and ...
+    (i.e. mutually recursively) by default
+  let iter = match
+    | [] -> ()
+    | x :: xs -> yield x; iter xs
+  # Note, if I use [] as a sequence pattern, then this will not be how this is
+    defined (since the Sequence trait inherits from Iterator) 
+
+# Note: unresumable effects should be a thing
+# Option 1:
+effect Panic = val panic : ()
+# Option 2:
+effect Panic = val panic : () -> Never  # or Impossible, Void, !, etc.
+# ^ should probably be some kind of error type (string, lazy string?) to give
+  error information, but whatever
+
+effect Exn a = val raise : Error -> a
+# Ideas:
+  - Implement panics as `effect Panic = Exn Never`
+  - Make the effect declaration syntax similar to variant types e.g.
+    effect State a =
+      | get : () -> a
+      | set : a -> ()

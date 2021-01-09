@@ -1,0 +1,10 @@
+# TODO: see ideas
+# PROBLEM: Other sub-modules want to access the Collection trait or other functions defined here, right?
+  They can't do that because this module also needs to re-export all submodules
+  Might want to think about changing the automatic folder module signature to picking a file name like _,
+  not a file name matching the name of the folder
+  - (Then again, maybe it's just fine? Can define stuff in another module e.g. Common and import from there)
+  - Another option, can just define all the trait instances here
+
+trait Collection t a | t -> a =
+  

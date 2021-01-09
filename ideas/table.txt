@@ -1,0 +1,4 @@
+trait Table t k v :
+  val get : t -> k -> Maybe v 
+
+pattern ($table [ $index ]) -> get $table $index

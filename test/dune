@@ -1,0 +1,39 @@
+(data_only_dirs examples tokens ast)
+
+(executables
+ (names test gen_dune)
+ (libraries core_kernel umber)
+ (preprocess
+  (pps ppx_jane)))
+
+(rule
+ (alias runtest)
+ (target test.dummy)
+ (deps
+  (universe) ; cop-out: see https://dune.readthedocs.io/en/stable/concepts.html#deps-field
+  (glob_files examples/*)
+  (glob_files tokens/*.expected)
+  (glob_files ast/*.expected))
+ (action
+  (progn
+   (ignore-stderr
+    (with-accepted-exit-codes
+     (or 0 1)
+     (system "mkdir ast tokens")))
+   (run %{dep:test.exe}) ; does this do anything different to just ./test.exe ? (adds it as a dependency)
+   (system "echo \"Tests run at $(date)\" > %{target}"))))
+
+(include dune.inc)
+
+(rule
+ (deps
+  (glob_files examples/*))
+ (action
+  (with-stdout-to
+   dune.inc.gen
+   (run ./gen_dune.exe))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff dune.inc dune.inc.gen)))

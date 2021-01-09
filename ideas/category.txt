@@ -1,0 +1,81 @@
+trait Functor t :
+  val map : t a -> f:(a -> <e> b) -> <e> t b  # <e> should be able to be left implicit
+
+val (>>|) : Functor t => t a -> (a -> <e> b) -> <e> t b
+let (>>|) t f = map t ~f
+
+trait Applicative t of Functor t :
+  val lift : a -> t a  # `pure`, not `lift`? Actually, maybe lift is best (pure has other meanings)
+  val (<*>) : t (a -> <e> b) -> t a -> <e> t b  # This operation should be named too: `apply`?
+  # liftA2?
+
+# *> ignores the left argument
+
+val forever : (Applicative f) => f a -> f Never # f b?? f _?
+let rec forever f = f *> forever f
+#?? This won't work without laziness right? If *> is lazy in its right arg it might be ok
+
+# Also might want <$> to lift and apply at the same time
+# See https://stackoverflow.com/questions/7103864/what-are-practical-uses-of-applicative-style
+# e.g. `(++) <$> getLine <*> getLine`
+# how's it different to `getLine >>= (\l1 -> getLine >>| \l2 -> l1 ++ l2)`?
+  or `getLine >>= (\l1 -> getLine >>| (++) l1)`?
+
+trait Monad t of Applicative t :
+  val bind : t a -> f:(a -> t b) -> t b
+  val join : t (t a) -> t a
+  # ^ In Haskell, this is outside of the trait -> what to do?
+    I guess letting you define either operation seems fine
+    (Although you can define both and have them not agree! not great...)
+  =
+  let bind t ~f = join . map t ~f
+  let join = bind ~f:Fun.id
+
+val (>>=) : t a -> (a -> <e> t b) -> <e> t b
+let (>>=) t f = bind t ~f
+
+# Filter can work on any monad (?)! -- no, actually not quite
+  Hmm, maybe Iterables should inherit from Monad? (Would that work?)
+  Or maybe there should be instance from Iterable to Monad
+# https://hackage.haskell.org/package/base-4.14.0.0/docs/Control-Monad.html#v:mfilter
+  ^ this uses MonadPlus which is Monad combined with Alternative
+  Alternative is Monoid defined on Applicatives
+  (You need the ability to concatenate: the identity (empty element) and the ++)
+val filter : (Concat t, Monad t) => t a -> f:(a -> Bool) -> t a
+let filter t ~f = t >>= \x -> if f x then pure x else empty
+
+trait Concat t :  # Same as Monoid, but maybe getting the idea across better?
+  val empty : t
+  val (++) : t -> t -> t
+
+# Help for me: 
+impl Monad List =
+  let bind t ~f = match t
+    | x :: xs -> f x ++ bind xs ~f
+    | [] -> []
+
+impl (Iterable t) => Monad t =
+  # ???
+
+# Semigroups: types with an associative binary operation
+# Point of this? - useful for some operations like fast squaring e.g.
+  https://hackage.haskell.org/package/base-4.14.0.0/docs/Data-Semigroup.html#v:stimes
+  `stimes :: Integral b => b -> a -> a` can calculate powers e.g. x^n very efficiently
+  for any associative operation
+  Counterpoint: you can just pass the operation in? (seems clearer)
+  Having multiple valid/reasonable implementations should be avoided when possible
+  (where does that leave Applicative, though? I read you can use a non-Monad-compatible
+   definition to do error handling (two-way aggregating of results/errors))
+trait Semigroup a =
+  val (<>) : a -> a -> a
+
+trait Monoid a of Semigroup a =
+  identity : a  # mempty? empty? just id is probably fine too, since we have `Fun.id` namespaced
+
+trait Alternative f of Applicative f =
+  # A monoid on applicative functors:
+  # https://hackage.haskell.org/package/base-4.14.0.0/docs/Control-Applicative.html#t:Alternative
+  # Also have the Alt type as a monoid under this operation
+  # https://hackage.haskell.org/package/base-4.14.0.0/docs/Data-Monoid.html#t:Alt
+  # Use is to get some, many or one/none solutions
+  # e.g. return the first Some variant in a list

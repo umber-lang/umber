@@ -1,0 +1,166 @@
+let
+  list = [1, 2, 3]
+  empty_list = []
+  array = [|1, 2, 3|]
+  empty_array = [||]
+
+  let map = {1: 'a', 2: 'b'}
+  let empty_map = {}
+  let table = {|1: 'a', 2: 'b'|}
+  let empty_table = {||}
+  
+  let set = {1, 2}
+  let empty_set = TreeSet.({}) # or TreeSet.empty ? can the syntax TreeSet.{} exist without special-casing?
+  let mut_set = {|1, 2|}
+  let empty_mut_set = HashSet.({||})
+  
+  # another possibility is saving the {} for objects and using something like Array.[], HashMap.[], etc.
+  # or maybe sets get something like < ... > and <| ... |> ? -- or even give that to dicts?
+
+  # Or..... how about {:} for empty dicts -- like what Nim does. This is very simple and seems nice.
+
+#
+  Sequence: List, Array
+  Map: TreeMap, HashMap
+  Set: TreeSet, HashSet
+  
+  note: range should be something like (3 .. 5) and then add a function like step_by or by to either range or something kind of Iterator trait
+
+# Took some inspiration from Kotlin collections: https://kotlinlang.org/api/latest/jvm/stdlib/kotlin.collections/-collection/
+
+trait Iterable t :
+  val iter : t e -> <Yield e> ()
+  =
+  let sort = # insert some default sort implementation
+
+type Iterator e = () -> <State h> Option e  # probably hide this?
+# Maybe a record with a single function `next`?
+
+val next : Iterator e -> <State h> Option e
+# let next itr = itr ()
+
+impl Iterable (Iterator e) e = let iter = Fun.id
+
+val for_each : Iterable t e => t e -> f:(e -> ()) -> ()
+val all, any : Iterable t e => t e -> f:(e -> Bool) -> Bool
+val find : Iterable t e => t e -> f:(e -> Bool) -> Option e
+val findi, count : Iterable t e => t e -> f:(e -> Bool) -> Nat
+val find_map : Iterable t e => t e -> f:(e -> Option a) -> Option a
+val sum, product : Iterable t e, Number e => t e -> e
+val filter : Iterable t e => t e -> f:(e -> Bool) -> t e
+
+val filter' : Iterator e => t e -> f:(e -> Bool) -> Iterator e
+
+impl Functor Iterator =
+  let map { next } ~f = { next = next >>| f }
+
+# (Not necessarily ordered) finite collection of elements
+trait Collection t e of Iterable t e :
+  val length : t e -> Nat
+  val in : Eq e => e -> t e
+  val is_empty : t e -> Bool
+  val collect : Iterable t e => t e
+  =
+  let is_empty t = length t == 0
+
+# Ordered collection
+trait Sequence t e of Collection t e :
+  # See seq.txt
+
+# Not sure if these should be in Sequence to allow custom implementations
+# Implement these by sorting the items from iter, then using collect
+val sorted : Iterable t e, Ord e => t e -> t e
+val reversed : Iterable t e => t e -> t e 
+
+trait MutSequence t e of Sequence t e =
+  val set : t e -> Int -> e -> ()
+  val delete : t e -> Int -> ()
+
+trait Set t e of Collection t e =
+  val union, intersection : t e -> t e -> t e
+
+trait Map t e
+
+type Range a = { start : a, stop : Option a, step : Int }
+
+# Mutation is a heap effect? - nope, state is held in the continuation
+# Panics??
+impl Iterator Range =
+  let iter { start, stop, step } =
+    let done at = match stop
+      | None -> False
+      | Some stop -> at == stop
+    match
+      # Note: `val until : a -> (a -> Bool) -> do:(a -> a) -> a`
+      # Could probably write this better as a loop rec with 2 step vars
+      until start done ~do:\at ->
+        yield at
+        let next_adj, step_dir =
+          match Math.sign step
+          | Pos -> succ, -1
+          | Neg -> pred, 1
+          | Zero -> panic "Range step must be non-zero"
+        let rec next at step =
+          if step == 0 then Some at
+          else next_adj at >>= \at ->
+            if done at then None
+            else next at (step + step_diff)
+        match next at
+        | Some at -> at
+        | None -> break  # `break ()`?
+    | <break _> | _ -> ()
+
+trait Enum a of Ord a :
+  val succ, pred : a -> Option a
+  # conversions to and from Nat maybe?
+  
+  val range : start:a -> ?stop:a -> ?step:Int -> Range a
+  
+  # TODO: precedence
+  val (..) : a -> a -> Range a
+  let (..) start stop = range ~start ~stop:stop ~step:1
+  
+  val (..<) : a -> a -> Range a
+  let (..<) start stop = range ~start ?stop:(pred stop) ~step:1
+
+  # Allow syntax like `2 .. 10 :step_by: 2`
+  val step_by : Range a -> Int -> Range a
+  let step_by r step = { r with step = step }
+  
+  # not sure if this stuff should be in range and not here
+  # (I guess it just depends if you want the behavior to be overridden/optimized)
+  # probably take it out of the trait definition
+  =
+  let range ~start ~stop ~step = { start, stop, step }
+
+# inheriting from Sequence kinda ruins it right?
+# Not even sure if you want `in` from collection
+# Also, mutability?
+trait (Collection t) => Stack t :
+  val push : t e -> e -> ()
+  val pop : t e -> Option e  # Maybe should default to `<Exn e> e` (better error messages)
+  # ^ what if it was like Stack.Exn or something?
+  # Maybe `Exn` is like an exception trait?
+    e.g.
+      `
+      effect trait Exn a :  # does this really need to be a trait? what's the point?
+        val raise : String -> a
+
+      module Stack =
+        ...
+        effect Exn a of Exn a  # effect subtyping? kinda like extending a variant type?
+      `
+    we already have union types like effect Heap h = Alloc h | Read h | Write h
+      ^ maybe heap types can link into memory management (?)
+    effect traits can be the parallel system for ad-hoc polymorphism rather than expressing cases
+    hmmm, or what about effect subtyping?
+    e.g. `val pop : Stack e -> <Stack.Exn e> e`
+    so catching Exn catches everything, but you can also just catch Stack.Exn ?
+
+trait (Collection t) => Queue t :
+  val enqueue : t e -> e -> ()
+  val dequeue : t e -> Option e
+
+trait (Queue t, Stack t) => Deque t
+# ^ maybe naming is bad (can't exactly tell which is front/back)
+# Maybe stack is on the back and queue is on the front?

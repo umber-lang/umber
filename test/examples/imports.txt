@@ -1,0 +1,18 @@
+import Math
+import Math with abs
+type Cool =
+    | You_can_define_types_in_between_imports ()
+    | Bad_style_though (Option ())
+import Number.Int with *
+import Number.Float without pi
+import Number with (*)
+
+module :
+  val (*) : (Num a) => a -> a -> a
+
+# TODO: should the value (*) automatically get re-exported or do you have to write this:
+# Maybe there could be a compiler directive at the top of the file to switch re-exports
+  on, but have them off by default (seems like good behavior)
+# Actually, I should just be able to use `include` instead of import: seems good
+  Signatures can still be changed by adding them under `module :`
+let (*) = (*)

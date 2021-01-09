@@ -1,0 +1,35 @@
+module :
+  type Dfa st sym = private {  # `private type`? `type@private`? `type-private`? `type@[private]`?
+    states : [st],  # [] means dynamic (immutable by default) array?
+    alphabet : [sym],  # what's the point of storing the alphabet again?
+    transitions : Map (st, sym) st,  # TreeMap/HashMap/Map or Map/Table/Mapping? ?
+    start_state : st,
+    accept_states : [st],
+  }
+
+  val and, or :
+    (Enum st, Enum st', Enum sym) =>
+    Dfa st sym -> Dfa st' sym -> Dfa (st, st') sym
+
+let and dfa dfa' =
+  let
+    # Cross both DFAs and accept only when both accept
+    # Should Iter functions be usuable unqualified in the Prelude?
+    states = Iter.cross dfa.states dfa'.states |> Iter.collect
+    alphabet = intersection dfa.alphabet dfa'.alphabet  # union? # maybe these should just be sets
+    transitions = Iter.fold alphabet ~init:Map.empty ~f:(\transitions sym ->
+      # for each state in transitions for this symbol, cross product this with the states in the other one
+        and add all of those to the map
+      let filter_items map = Map.items map |> Iter.filter ~f:((==sym) . snd . fst)
+      Iter.fold (filter_items dfa.transitions) ~init:transitions ~f:(\transitions ((st1, _) st2) ->
+        Iter.fold (filter_items dfa'.transitions) ~init:transitions ~f:(\transitions ((st1', _), st2') ->
+          Map.add transitions ~key:((st1, st1'), sym) ~value:(st2, st2')
+        )
+      )
+    )
+    # ^ this could probably be done more nicely (lots of code duplication from those nested folds)
+    # The algo probably needs work too, the complexity is gonna be pretty bad
+    start_state = (dfa.start_state, dfa'.start_state)
+    accept_states = intersection dfa.accept_states dfa'.accept_states
+
+  { states, alphabet, transitions, start_state, accept_states }

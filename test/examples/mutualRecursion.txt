@@ -1,0 +1,27 @@
+# Mutual recursion within a module is allowed for both types and let-bindings
+
+# Types can be used before being defined
+val f : Forest a
+let f = Nil
+
+let sum_forest =
+  let' loop acc = match
+    # TODO: syntactic sugar for lists and other sequences
+    | Nil -> acc
+    | Cons x xs -> loop (acc + x) xs
+  loop 0
+
+let sum_tree = match
+  | Leaf -> 0
+  | Node x forest -> x + sum_forest forest
+
+type alias Forest a = List (Tree a)
+type Tree a =
+  | Leaf
+  | Node a (Forest a)
+
+let even x = if x == 0 then True else odd (x - 1)
+let odd x = if x == 0 then False else even (x - 1)
+
+# TODO: add tests mutual recursion with submodules
+  e.g. imports to/from, usage between the parent and child

@@ -1,0 +1,7 @@
+dir=$(dirname "$0")
+for path in "$dir"/examples/*; do
+    file=$(basename "$path")
+    expected="${file%.*}.expected"
+    touch "$dir/tokens/$expected"
+    touch "$dir/ast/$expected"
+done

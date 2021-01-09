@@ -1,0 +1,29 @@
+module :
+  # Sorted constraint? Oh, what if the `find` function on sorted sequences just
+    automatically uses binary search (fuaah)
+    - ^ This does kind of assume that the sequence has constant-time lookup though
+      (wouldn't really work well for linked lists)
+
+  #trait (Seq t) => Sorted t  # wait, this doesn't work (constraint is on the type, but should be on the value)
+  # Can't be a trait -- needs to be a wrapper type
+
+  type Sorted t a  # `(Seq t, Ord a) => Sorted t a`?  # `type Sorted t a = private t a`?
+
+  impl (Seq t) => Seq (Sorted t)
+
+  # `Seq t` should have a method `sorted : t -> Sorted t`
+
+  val assert_sorted : (Seq t) => t -> Sorted t
+  val assert_sorted_unchecked : (Seq t) => t -> Sorted t
+
+type Sorted t = t
+
+let assert_sorted seq = if is_sorted seq then seq else panic "not sorted!"
+let assert_sorted_unchecked seq = seq
+
+impl (Seq t) => Seq (Sorted Array) =  # Note Array instead of t
+  let find seq ~f = # binary search (?)
+
+impl (Seq t) => Seq (Sorted t)  # All others just left (e.g. List)
+
+# Maybe there could be a trait for constant-time lookup e.g. `ArrayLike`

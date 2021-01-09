@@ -1,0 +1,17 @@
+# TODO: decide on `Std.Traits.Ord` vs just `Std.Ord`
+  not sure whether nested or flat is better
+import Eq
+
+module :
+  type Ordering =
+    | Less
+    | Equal
+    | Greater
+
+  trait (Eq a) => Ord a :
+    val compare : a -> a -> Ordering
+
+  # TODO: should these be in the trait definition? What benefits are there to being able
+    to redefine them? Some kind of performance speedups?
+  val (<), (<=), (>), (>=) : (Ord a) => a -> a -> Bool
+  val min, max : (Ord a) => a -> a -> a

@@ -1,0 +1,53 @@
+module :
+  val selection_sort : (Seq t, Ord e) => t e -> t e
+
+  module Mut :
+    val selection_sort : (Seq t, Ord e) => t e -> <Panic, St h> ()
+
+module Mut :
+  # Note: `xs@[i]` expands to `Seq.get xs i`
+    which has signature `get : (Seq t) => t e -> Nat -> <Panic> e`
+    - Wait, what about the `xs@[i] := x` syntax? How's that gonna work?
+      `:=` could be some special syntax, and then maybe @[] could work
+      differently when in a pattern rather than an expression
+    - Also, what about things like hash tables/maps? Actually I think we need an
+      trait like :
+      `
+      trait Index t k v :
+        val get : t -> k -> v
+        val set : mut t -> k -> v -> ()  # mut? what effect should this have?
+
+      impl (Hash k) => Index (HashMap k v) k v = ...
+      impl (Ord k) => Index (TreeMap k v) k v = ...
+      impl (Seq t) => Index (t e) Nat e = ...
+      `
+      # hmmm, getting something similar to this working in Haskell took a lot of
+        extensions: FlexibleInstances, MultiParamTypeClasses, FlexibleContexts,
+        AllowAmbiguousTypes
+        - class Index t k v where get :: t -> k -> v
+          - instance Index [e] Int e where get = (!!)
+          - instance Index (Map k v) k v where get t k = fromJust $ Map.lookup k t
+        - class Index t k where get :: t v -> k -> v  # (Maybe better?)
+          - instance Index [] Int where get = (!!)
+          - instance Index (Map k) k where get t k = fromJust $ Map.lookup k t
+        - class Index t where get :: t k v -> k -> v
+      # we probably want the last type to specified within the trait itself like in Rust:
+        https://doc.rust-lang.org/std/ops/trait.Index.html
+      
+      # Could allow multiple impls like: (using the second definition here)
+      `
+      trait Index t k :
+        val get : t v -> k -> v
+      impl (Seq t) => Index t Nat = Seq.get
+      impl (Seq t) => Index t (Range Nat) = Seq.slice
+      # ^ ah, doesn't work because of the t v and v correspondence
+        (can't return a slice, you have to return v)
+      `
+
+  # `xs@[i..j]` expands to `Seq.slice xs i j`
+    which has signature `slice : (Seq t) => t e -> Nat -> Nat -> Slice t e`
+  let selection_sort xs =
+    let swap xs i j =
+      xs@[i], xs@[j] := (xs@[j], xs@[i])
+    for' xs ~do:\_ i ->  # `for'` should maybe be `for_eachi` or `for_each'`
+      swap xs i (snd . minimum' xs@[i+1..length xs])

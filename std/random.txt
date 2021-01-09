@@ -1,0 +1,18 @@
+module :
+  effect Random : () -> Nat
+  # could also be:
+    ```
+    effect Random a :
+      val random : () -> a  # a? Randomize a?
+    ```
+  
+  trait Random a :
+    val random : () -> a  # Seems a bit redundant
+
+# Suppose `rand` is implemented as a system call or something
+# see https://github.com/ocaml/ocaml/blob/trunk/stdlib/random.ml
+val rand : () -> Nat
+val rand_max : Nat
+
+#impl Randomize Bool :
+  let random 

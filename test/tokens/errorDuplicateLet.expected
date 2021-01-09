@@ -1,0 +1,10 @@
+LET
+(LOWER_NAME number)
+EQUALS
+(INT 1)
+LINE_SEP
+LET
+(LOWER_NAME number)
+EQUALS
+(INT 2)
+EOF

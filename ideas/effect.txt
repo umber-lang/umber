@@ -1,0 +1,94 @@
+#
+  module :
+    # <e1> vs 'e1 ? Also, what about name clashes between regular type variables
+    # and effect types? Is that just fine? I guess effects are types too?
+    # Are effects first-class values you can pass around then? That seems weird
+    val while : (() -> <e> Bool) -> (() -> <e> ()) -> <Div|e> ()
+
+    # https://koka-lang.github.io/koka/doc/kokaspec.html#sec-effect-types
+    # What about <Div|e> instead of <e> ? might be necessary for ease of
+    # implementation
+
+    effect Read a : a
+    effect Write a : a -> ()
+
+  # Replace reads with a custom function
+  val redirect : get:(() -> <e> a) -> f:(() -> <Read|e> ()) -> <e> ()
+  let redirect ~get ~f = handle f ()
+    | Read -> resume (get ())
+
+  val iter : Collection t => t a -> f:(a -> <Break,Continue> ()) -> ()
+  let iter t ~f = ... # TODO: use fold or something?
+  # What functions does Collection have?
+
+# Forget everything above, I read this paper:
+# https://arxiv.org/pdf/1611.09259.pdf and it changed my life. We can rely on
+# the "ambient ability" and implicitly pass through effect parameters instead of
+# having to write them out explicitly. This solves the problems of type
+# signature verbosity and restrictive interfaces.
+
+# TODO: think about (() -> a) vs some other syntax like {a} or {() -> a},
+# maybe even |() -> a|. I just don't like the repeated parentheses.
+# In Frank, they use the postfix operator ! to force suspensions...
+# Hmmm, this also kind of doubles as syntactic support for laziness.
+
+# Random note: optional arguments should not be able to be partially applied
+# They should just be elided upon application if not given immediately
+# (hmmm, actually I'm not sure about this. TODO: decide)
+
+module :
+  # One option:
+  val if : Bool -> ~then:{a} -> ~else:{a} -> a
+  val while : {Bool} -> {()} -> <Diverge> ()
+
+  effect State a :
+    val get : a  # Note: this is the same as {a}. Do top-level values exist in this syntax?
+    val put : a -> ()
+
+  # Another option:
+  # TODO: consider allowing a 'lazy' option to avoid evaluating the other branch
+  val if : Bool -> ~then:(() -> a) -> ~else:(() -> a) -> a
+  val while : (() -> Bool) -> (() -> ()) -> <Diverge> ()
+
+  effect State a :
+    val get : () -> a
+    val put : a -> ()
+
+  effect Break :
+    val break : ()
+
+  # TODO: think if effects can some nice syntax alternatives to function piping |> or composition .
+  val for : Iterable t a => t -> ~f:(a -> <Break> ()) -> ()
+
+let for itr =
+  let next = iter itr
+  let loop () = match next ()
+    | None -> ()
+    | Some x -> match f x
+      | () -> loop ()
+      | <Break -> _> -> ()
+  loop ()
+
+# Tbh, that's overkill, here's a nicer way
+type IterResult = Continue | Break
+
+val iter : Iterator t a => t -> ~f:(a -> IterResult) -> ()
+# with the obvious definition
+
+# The other option, with an effect
+# Could there be an Int argument to allow multiple levels of breaking?
+# Maybe not the best idea to encourage that
+effect IterFlow =
+  continue : () -> ()
+  break : () -> ()
+
+val for_each : Iterable t a => t -> ~f:(a -> <IterFlow> ()) -> ()
+
+# TODO: consider iter vs for_each as a name
+# Maybe iter can be used to get an iterator from something (e.g. Iterable)
+# Problem: how can Iterable work without boxing of the output?
+# Maybe it returns a function? A record with next in it?
+
+# Does State need to be parametrised by the heap h?
+# This should probably just be a function, but I wanted to show the name
+type Iterator a = { next : () -> <State h> Option a }

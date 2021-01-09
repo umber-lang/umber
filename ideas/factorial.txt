@@ -1,0 +1,45 @@
+# Various factorial implementations
+
+# Naive recursive approach 
+let factRec :: Integer -> Integer = match  # note: kinda want to write Int -> Integer but it wouldn't work nicely
+  | 0 | 1 -> 1
+  | n -> n * factRec (n-1)
+
+# Naive iterative approach
+let factIter (n :: Integer) :: Integer =
+  let mut prod = 1
+  for i in 2..n
+    prod *= i
+  prod
+
+# Functional iteration (fold)
+factFold :: Integer -> Integer
+let factFold n = fold (*) 1 (2..n)
+
+# Recursive approach with memoization
+let factMemo n =
+  #let cache = [|0|] * (n+1)  # or `Array 0 (n+1)`? probably nah, these are both kinda meh
+  let cache :: Array Integer = repeat 0 (n+1)  # say the trait Sequence has this function
+  #let cache = Array.repeat 0 (n+1)  # what does this syntax mean if I don't have classes ?? -- probably doesn't make sense
+  match
+  | 0 | 1 -> 1
+  | n ->
+    if n+1 > cache.size then cache.ensure (n+1) else ()   # make else optional? semicolon necessary?
+    if cache[n] != 0 then cache[n]
+    else n * factMemo (n-1)
+
+# ^ note that size is a property
+
+# --- REDONE AFTER THIS POINT ---
+# TODO: cleanup
+
+val fact_memo : Nat -> <?> Natural # What effect? Heap?
+let fact_memo =
+  let cache = [|0, 1|]  # Array type? Array.Dyn? Sequence syntax??
+  fun n ->
+    match Array.get cache n  # Maybe `cache.[n]`? `cache@[n]`? (kinda ugly)
+    | Some m -> acc * m
+    | None ->
+      Array.Dyn.ensure_capacity cache n ~f:(fun _ -> 0);
+      let ans = loop (n - 1)
+      Array.set cache n ans  # Maybe `cache.[n] <- ans`? `:=`?

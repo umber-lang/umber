@@ -1,0 +1,52 @@
+import Iced with Button, Column, Sandbox, Settings, Text
+
+let main = run Settings.default
+
+type Counter = {
+  value : mut Int,  # mut in type or binding?
+  increment_button, decrement_button : mut Button.State,
+} @deriving(Default)
+
+type Message =
+  | IncrementPressed
+  | DecrementPressed
+  @deriving(Debug)
+
+impl Sandbox Counter Message =
+  # Could also put the type in here
+
+  #let new = Default.default
+  let title _ = "Counter - Iced"
+
+  let update (mut counter) = match  # mut needed here?
+    | IncrementPressed -> counter.value $= (+1)  # `+=`? `:=`? `+@=`?
+    | DecrementPressed -> counter.value $= (-1)
+
+  # Mutable vs immutable in the update^ - ?
+
+  # Or:
+    let update (mut counter) msg = counter.value $= match
+      | IncrementPressed -> (+1)
+      | DecrementPressed -> (-1)
+  
+  #val view : Counter -> Element Message
+   # (where element is some trait that Button, Text, etc. implement)
+  let view counter =
+    Column.new
+      ~padding:20
+      ~align_items:Center
+      [
+        Button.new
+          counter.increment_button  # mut needed here? Also, should the ref be explicit?
+          (Text.new "Increment")
+          ~on_press:IncrementPressed,
+        Text.new (@to:String counter.value) ~size:50, # Commas needed? Maybe good to have
+        Button.new
+          counter.decrement_button
+          (Text.new "Decrement")
+          ~on_press:DecrementPressed,
+        
+        # Could also try something like:
+          { Button.new counter.decrement_button (Text.new "Decrement")
+            with on_press = DecrementPressed }
+      ]

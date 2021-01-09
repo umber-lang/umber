@@ -1,0 +1,44 @@
+module :
+  type Option a =
+    | None
+    | Some a
+    impl Functor, Applicative, Monad
+
+  val exists : Option a -> Bool
+  val default : Option a -> a -> a
+  val value : Option a -> <Missing a> a
+
+  # Maybe allow some prefix operators e.g. ~ ! ? and no postfix?
+  # Allowing arbitrary patterns to be defined sounds like a headache for
+  # everyone involved
+  # pattern ($Option ?) -> value $Option
+
+  # What if prefix/infix/suffix symbolic functions are just determined
+    by whitespace? e.g. +a vs a+ vs a + or + a
+  # Won't work for things like array[i]
+  # ^ maybe stuff like that can just be built in, it's ok
+  # syntactic sugar has to be paid for
+  
+  effect Missing a =
+    supply : a -> ()
+
+  val try : (() -> <Panic, Exn _>)
+
+  val (?) : Option a -> <Missing a> a
+
+  # Maybe just drop the pattern idea and use Rust's strategy of built-in traits
+  # for operator overloading/other sugar (e.g. indexing, collection literals)
+
+let bind t ~f = match t
+  | Nothing -> Nothing
+  | Just x -> f x
+
+let map t ~f = bind t ~f:(Just . f)
+
+impl Applicative Option =
+  let lift = Just
+  # Does this make any sense?
+  let (<*>) f x = f >>| (x >>|)
+
+impl Functor Option
+impl Monad Option

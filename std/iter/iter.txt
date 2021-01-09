@@ -1,0 +1,202 @@
+import Fun
+import Option with None
+
+module :
+  # inspiration: https://doc.rust-lang.org/std/iter/trait.Iterator.html
+  trait Iterable t :
+    val iter : t a -> Iterator a
+    
+    val size_hint : t -> (Nat, Option Nat) # Maybe this should work on Iterators or something?
+
+    val head : t a -> Option a
+    val tail : t a -> Option (Iterator a)
+    val last : t a -> Option a
+    val nth : t a -> n:Nat -> Option a
+    # TODO: consider using custom types like in Rust, rather than Iterator
+      - Benefits are getting to implement stuff like `size_hint` for e.g. zip
+      - Cons: more complex, API is harder to read (lots more types, probably more boilerplate)
+      - Maybe some kind of existential type e.g. a GADT can do this?
+        Could also resort to dynamic dispatch (e.g. like Java) but that's probably a bit much
+        GADT?:
+        `
+        #type Iterator t a = Iterator : t a -> Iterator # ???? where's the function?
+        #type Iterator a = Iter : t a -> 
+        `
+    # Could have an Iterator trait and replace Iterable with some kind of implicit conversion trait (ImplicitTo Iterator)
+
+    val enumerate : t a -> Iterator (Nat, a)
+    val step_by : t a -> n:Nat -> Iterator a  # want to be able to override this e.g. on Range
+    val take : t a -> n:Nat -> Iterator a
+    val take_while : t a -> f:(a -> Bool) -> Iterator a
+    val drop : t a -> n:Nat -> Iterator a
+    val drop_while : t a -> f:(a -> Bool) -> Iterator
+
+    val filter : t a -> f:(a -> Bool) -> Iterator a
+    val find : t a -> f:(a -> Bool) -> Maybe a
+    val length : t a -> Nat
+    val count : t a -> f:(a -> Bool) -> Nat
+    val all : t a -> f:(a -> Bool) -> Bool
+    val any : t a -> f:(a -> Bool) -> Bool
+
+    val map : t a -> f:(a -> b) -> Iterator b
+    val for_each : t a -> f:(a -> ()) -> ()
+    val inspect_each : t a -> f:(a -> ()) -> Iterator a
+    
+    val filter_map : t a -> f:(a -> Option b) -> Iterator b
+    val flat_map : (Iterable t2) => t a -> ~f:(a -> t2 b) -> Iterator b
+    # ^ might be able to be done with some monadic trickery instead
+    val fold : t a -> init:accum -> f:(accum -> a -> accum) -> accum
+    # ^ consider adding a DoubleEndedIterator with fold_right
+    # TODO: consider making fold/for_each accept a `break : a -> Never` effect
+    # could have `val reduce : t a -> f:(a -> a -> a) -> Option a` as a foldl1/fold_first replacement
+    val scan : t a -> init:accum -> f:(accum -> a -> accum) -> Iterator accum
+    val fold_map : t a -> init:accum -> f:(accum -> a -> (accum, a)) -> (accum, Iterator a)
+    # ^ is this necessary? also the strictness may not be ideal
+
+    # Might need to make this collect (how can the iterators communicate lazily?)
+    val partition : t a -> f:(a -> Bool) -> (Iterator a, Iterator a)
+    #let partition itr ~f = ... ?
+
+  type Iterator a = () -> <Yield a> ()
+
+  effect Yield a :
+    val yield : a -> ()
+
+  # Problem: can't write something like `(Iterable t) => t a` using the `Item` type
+    The `Item` approach seems to give the most flexibility, but syntax is a little weird
+  # Maybe `String` can just be exposed as something like `Array Char`
+  # Another option: adding another type parameter like `Iterable t a` (not ideal)
+  #val filter : (Iterable t) => t -> f:(t.Item -> Bool) -> Iterator t.Item
+
+  val chain : (Iterable t1, Iterable t2) => t1 a -> t2 a -> Iterator a
+  val zip : (Iterable t1, Iterable t2) => t1 a -> t2 b -> Iterator (a, b)
+  # TODO: for bigger zips, maybe use a macro to generate the size a.g. @zip:3
+  val cycle : (Iterable t) => t a -> Iterator a
+
+  val yield_from : (Iterable t) => t a -> <Yield a> ()
+
+  # Can also just call it max and use it like Iter.max
+  val maximum : (Iterable t, Ord a) => t a -> Option a # Should this start with an effect?
+  val minimum : (Iterable t, Ord a) => t a -> Option a 
+
+  # TODO: max_by, max_by_key, etc., sort, sort_by, sort_by_key
+
+  # As many functions as possible should live in `Iterable` so that they can be chained
+  # Alternatively, the pattern could just be to collect to a Collection and then do some
+    other operations e.g. sorting 
+
+trait Iterable t =
+  let size_hint _ = (0, None)
+
+  let head = nth ~n:0
+
+  let tail itr =
+    match iter itr ()
+    | <yield _> k -> Some k  # What's the type of the continuation in general?
+    | () -> None
+
+  let last = fold ~init:None ~f:(\_ x -> Some x)
+
+  let nth itr ~n =
+    let rec loop next i =
+      match next ()
+      | <yield x> k -> if i == 0 then Some x else loop k (i - 1)
+      | () -> None
+    loop (iter itr) n
+
+  #let enumerate = snd . fold_map ~init:0 ~f:(\i x -> (i + 1, (i, x)))
+  # ^ strict, won't be nice
+  let enumerate itr () =
+    let rec loop next i =
+      handle next ()
+      | <yield x> k ->
+        yield (i, x);
+        loop k (i + 1)
+    loop (iter itr) 0
+  # Much better way:
+  let enumerate itr () = fold ~init:0 ~f:(\i x -> yield i x; i + 1)
+
+  let step_by itr ~n () =
+    let rec loop next i =
+      handle next ()
+      | <yield x> k ->
+        if i == 0 then
+          yield x;
+          loop k n
+        else loop k (i - 1)
+    loop (iter itr) 0
+
+  let take itr ~n () = #...
+
+  # The same generic way:
+  let filter itr ~f () =
+    let rec loop next =
+      handle next ()
+      | <yield x> k ->
+        if f x then yield x;
+        loop k
+    loop (iter itr)
+  # Or, with `for_each`:
+  let filter itr ~f () = for_each itr ~f:(\x -> if f x then yield x)
+
+  let find itr ~f = head (filter itr ~f)
+
+  let length itr = fold itr ~init:0 ~f:(\i _ -> i)
+
+  let count itr ~f = length (filter itr ~f)
+
+  #let any itr ~f = fold itr ~f:(\x -> if f x then break True) #??
+  let any itr ~f = Option.is_some (head (filter itr ~f))
+
+  # Probably shouldn't support the $ operator
+  # Other options are parens and |>
+  let all itr ~f = not $ Option.is_some $ head $ filter itr ~f:(not . f)
+
+  let map itr ~f () = for_each itr ~f:(\x -> yield (f x))
+
+  let for_each itr ~f () = fold itr ~init:() ~f:(\() x -> f x)
+
+  let inspect_each itr ~f () =
+    # TODO: decide on how bracketing for lambdas is gonna work
+    for_each itr ~f:\x ->
+      f x;
+      yield x
+
+  let fold itr ~init ~f () =
+    let rec loop next accum =
+      match next ()
+      | <yield x> k -> loop k (f accum x)
+      | () -> accum
+    loop (iter itr) init 
+
+  let flat_map itr ~f () = for_each itr ~f:yield_from
+
+  let scan itr ~init ~f () =
+    fold itr ~init ~f:\acc x ->
+      let acc = f x
+      yield acc;
+      acc
+
+impl Iterable Iterator =
+  let iter = Fun.id
+
+let yield_from itr = for_each itr ~f:yield
+
+let chain itr itr' () =
+  yield_from itr;
+  yield_from itr'
+
+# The default zip probably doesn't care about mismatched lengths
+# Maybe make another zip that panics or something when that happens
+let zip itr itr' () =
+  let rec loop next next' =
+    match (next (), next' ())
+    # TODO: decide if parens are needed in tuple patterns
+    | <yield x> k, <yield x'> k' ->
+      yield (x, x');
+      loop k k'
+    | _ -> ()
+
+let rec cycle itr () =
+  yield_from itr;
+  cycle itr ()

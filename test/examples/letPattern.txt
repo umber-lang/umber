@@ -1,0 +1,20 @@
+let catch_all = (False,)  # This is the same as `False` or `(False)` as 1-tuples are not allowed
+let 1 = 1  # Refutable pattern should parse/type fine, but trigger a warning later
+
+type Thing = Thing1 Int | Thing2 Int
+let Thing1 one = Thing1 1
+let make_thing = match
+  | 1 -> Thing1 1
+  | 2 -> Thing2 2
+  | n -> Thing1 n # TODO: recursion, or something like if n % 2 == 0 then ... else ...
+let (Thing1 n | Thing2 n) = make_thing 7
+
+type Triple a b c = Triple a b c 
+let _ = Triple "s" 1 2
+let _ = ("s'", -1, -2)
+let ((Triple x 5 y) | (Triple x y 5)) = Triple "Weird stuff" 5 7
+let ((u, -5, v) | (u, v, -20)) = ("Weird tuples", 0, 1)
+
+let a = ANewThing
+val a : NewThing
+type NewThing = ANewThing

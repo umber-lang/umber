@@ -1,0 +1,13 @@
+module :
+  type String  # `= Array Char`? `= [|Char|]`? (yeah probably not)
+  # ^ `Array Char` wouldn't really work as string data should be stored in a packed UTF8
+    format, where the data for each character is a variable number of bytes
+    (so it couldn't be a proper array)
+    - bytes/chars should let you iterate over bytes/chars (actually just iterate over chars by default maybe)
+    - oh, what if strings can implement collections/iterables as both Byte and Char?
+      (that could be an actual use case for Iterable t e)
+  # FIXME: Want this to be a `Collection`, but only of `Char`
+    - guess I need to add a type parameter to `Collection`?
+      seems not ideal
+    - can try following Rust's approach where traits can contain types
+      so for each trait implementation, the type is determined and can't be varied freely

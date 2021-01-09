@@ -1,0 +1,17 @@
+module :
+  val (==) (infix 4) : a -> a -> Bool
+
+  module Arith :
+    val (+) (infixl 6) : Int -> Int -> Int
+    val mod (infixl 7) : Int -> Int -> Int
+  
+  val (::) (infixr 5) : a -> List a -> List a  # Sequence? []?
+  #val (×) : List a -> List b -> List (a, b)
+
+let _ = Arith.(2 + 11 :mod: 3 == 4)
+let four = Arith.(+) 2 2
+let one = 5 :Arith.mod: 2 
+
+let left_section = (2+)
+let right_section = (*5)
+let unicode_my_dudes = ["damn", "ok"] × ["cartesian", "product", "maybe?"]

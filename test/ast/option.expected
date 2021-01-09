@@ -1,0 +1,4 @@
+(Option
+ ((Common_sig
+   (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a)))))))))
+ ())

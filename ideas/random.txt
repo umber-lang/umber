@@ -1,0 +1,25 @@
+module :
+  # Should be using Nat probably
+  # Take inspiration from Python/OCaml for the functions needed
+  val int : Int -> <Ndet> Int  # show probably call the effect Rand to be more intuitive
+  val between : Int -> <Ndet> Int
+
+  # Seq (sequences) are sequences of data that support indexing, length, etc.
+  val choice : Seq a -> <Ndet> a
+  # another possible syntax:
+  val choice : Seq a -> 'Ndet a
+
+# ...
+
+let choice seq = seq[int seq.length]
+
+# What if the @ character (or something else) distinguished macro patterns?
+# Or what about the . for patterns with scope?
+# Instead of proper patterns, maybe stuff like indexing can just be a
+# postfix operator? (actually, probably not, and we need patterns for literals)
+
+# Or, what if backticks do it? - e.g. inside the backticks is an expr?
+# - actually, this wouldn't really work
+
+# What about . for scoped patterns, but a pattern is really just a thing in
+# some kind of parentheses?

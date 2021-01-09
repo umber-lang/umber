@@ -1,0 +1,32 @@
+import Collection with AvlTree, HashTable
+
+module :
+  type (Ord a) => Set a impl Collection
+  
+  #val empty : Set a
+  #val singleton : (Ord a) => a -> Set a
+  #val of_iter : (Iterable t, Ord a) => t a -> Set a
+  
+  val union, (|) : (Ord a) => Set a -> Set a -> Set a
+  val intersection, (&) : (Ord a) => Set a -> Set a -> Set a
+  val difference, (-) : (Ord a) => Set a -> Set a -> Set a
+
+  module Mut :
+    type (Hash a) => Mut a impl Collection.Mut  # May be able to just be Collection
+    
+    #val create : () -> Mut a
+    #val singleton : (Ord a) => a -> Mut a
+    #val of_iter : (Iterable t, Ord a) => t a -> Mut a
+
+    val union : (Ord a) => Mut a -> Mut a -> ()
+    val intersection : (Ord a) => Mut a -> Mut a -> ()
+    val difference : (Ord a) => Mut a -> Mut a -> ()
+
+type (Ord a) => Set a = AvlTree 
+# see https://ocaml.janestreet.com/ocaml-core/latest/doc/base/Base/Avltree/index.html
+# actually, Base seems to use its own tree for Map, and Avltree is used for Hashtbl only
+# TODO: look at the performance considerations
+
+impl Collection Set =
+  let 
+  

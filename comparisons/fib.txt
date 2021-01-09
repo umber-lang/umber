@@ -1,0 +1,28 @@
+module :
+  val fib : Nat -> Natural
+
+# Might be nice to implement a macro similar to Python's `@lru_cache` annotation
+# e.g. `let@memoized ...`
+# A macro could probably handle replacing recursive calls with calls to the memoized wrapper
+
+# Option 1: Passing in the recursive function as a parameter
+
+let fib =
+  let fib f = match
+    | 0 | 1 -> 1
+    | n -> f (n - 1) + f (n - 2)  # Problem: Nat type checking (maybe it notices the > 1 constraint?)
+  memoize fib
+
+val memoize : ((a -> b) -> a -> b) -> a -> b
+let memoize f =
+  let cache = HashMap.create ()
+  let rec memoized_f x =
+    match cache@[x]  # Could use `handle cache@?[x]` instead
+    | Some result -> result
+    | None ->
+      let result = f memoized_f x
+      cache@[x] := result  # or something like `HashMap.set ~key:x ~value:result`
+      result
+  memoized_f
+
+# Option 2: Could do the same thing but replace the `f` parameter with an effect call

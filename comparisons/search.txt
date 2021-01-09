@@ -1,0 +1,29 @@
+module :
+  val linear_search : (Seq t) => t a -> a -> Maybe Nat
+  val binary_search : (Seq t, Ord a) => t a -> a -> Maybe Nat
+
+let linear_search xs x =
+  match for_each (enumerate xs) ~f:(\(i, x') -> if x' == x then break i)
+  | <break i> _ -> Some i
+  | () -> None
+
+let linear_search xs x =
+  let rec loop i = match
+    | x' :: xs -> if x' == x then Some i else loop (i + 1) xs
+    | [] -> None
+  loop 0 xs
+
+let linear_search xs x =
+  let rec loop = match
+    | (i, x') :: xs -> if x' == x then Some i else loop xs
+    | [] -> None
+  loop (enumerate xs)
+
+let rec binary_search xs x =
+  if is_empty xs then None
+  else
+    let mid = length xs // 2  # Favors the right e.g. 2 in [1, 2]. - 1 to favor the left
+    match compare x xs@?[mid]
+    | Equal -> Some mid
+    | Less -> binary_search xs@[..<mid]
+    | Greater -> binary_search xs@[mid+1..]

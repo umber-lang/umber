@@ -1,0 +1,23 @@
+# Patterns to support:
+  - collection literals for lists, arrays, maps, sets, etc.
+    e.g. [1, 2, 3], [| 1, 2, 3 |], {:}, {}, {1, 2}, {1: 2}
+  - pattern matching on literals too if possible (hard since they can
+    probably run arbitrary code -- this is separate?)
+  - get indexing e.g. array[5], with default: array[5|0]
+  - update indexing e.g. array[5] := 6 (returns a ref in context)
+    (error handling may be confusing too)
+  - also literals for objects/structs/records (probably with {})
+    -- may need to handle the clash by pushing map/set to [] too
+
+  Could use a character like @, &, !, %, $ to signify a macro pattern
+  e.g. $[1, 2, 3], array$[5]
+  so the syntax is like $ with no space before some brackets ( [ {
+  and it terminates once all the brackets are closed } ] )
+
+  maybe it could also work with string interpolation? so quotes count too
+  e.g. $"python style {"inter" ++ "polation"}"
+  not sure about problems with parsing inner quotes
+
+  ---
+  - infix operators could possibly come under this or be a separate feature
+  - string interpolation? (f-strings)

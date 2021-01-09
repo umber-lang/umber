@@ -1,0 +1,29 @@
+trait Number a =
+  val (+), (*) : a -> a -> a
+  val of_nat : Nat -> a  # Natural?
+
+trait Signed a of Number a =
+  val (-) : a -> a -> a
+  val negate, abs, sign : a -> a
+  val of_int : Int -> a
+
+trait Real a of Signed a, Ord a =
+  val to_rational : a -> Rational
+
+trait Integral a of Real a, Enum a =
+  # Can Natural get these as well?
+  val quot, rem, div, mod : a -> a -> a
+  val quot_rem, div_mod : a -> a -> (a, a)
+
+trait Fractional a of Number a =
+  val (/) : a -> a -> a
+  val of_rational : Rational -> a
+
+trait Floating a of Fractional a =
+  val pi : a
+  val exp, sqrt, (**) : a -> a -> a
+  val log : ?base:a -> a -> a
+  val sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, ascosh, atanh : a -> a
+
+# Issues with exponentiation: (^), (^^), and (**)
+# See https://stackoverflow.com/questions/6400568/exponentiation-in-haskell 

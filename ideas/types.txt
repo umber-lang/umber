@@ -1,0 +1,18 @@
+type Maybe a = Nothing | Just a
+
+trait Functor f =
+  map : (a -> b) -> f a -> f b
+  
+trait Eq a =
+  (==) : a -> a -> Bool
+  (!=) : a -> a -> Bool
+  (!=) a b = not (a == b)
+
+trait Ord a of Eq a =
+  type Comparison = Lower | Higher | Equal
+  
+  compare : a -> a -> Comparison
+  (<) : a -> a -> Bool
+  (>): a -> a -> Bool
+  (<=) : a -> a -> Bool
+  (>=) : a -> a -> Bool

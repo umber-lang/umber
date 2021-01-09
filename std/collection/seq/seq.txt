@@ -1,0 +1,45 @@
+module :
+  trait (Collection t) => Seq t :
+    val get : t e -> Nat -> e  # Strongly consider: `val get : t -> Nat -> t.Item`
+    val get_back : t e -> Nat -> e
+    val sorted : (Ord e) => t e -> t e
+    # Doesn't this^ allocate, which is an effect?
+      Maybe we consider Alloc to be an implicit effect (like Panic?)
+      and so it doesn't have to be annotated (?)
+    
+    val set : mut t e -> Nat -> <St h> ()
+    val set_back : mut t e -> Nat -> <St h> ()
+    val sort : (Ord e) => mut t e -> <St h> ()
+    # Do the `mut` vals get ignored automatically for "immutable" types?
+      (maybe immutable types could be written like `type imm MyType = ...`?)
+      (or maybe type@imm ?)
+    # Otherwise this could be written as `trait (Seq t) => Seq.Mut t`
+
+  module Slice :
+    type Slice t e
+
+trait (Collection t) => Seq t =
+  let get_back seq i = get seq (length seq - i)
+  let set_back seq i = set seq (length seq - i)
+
+  let sorted seq =
+    let seq = copy seq
+    sort seq
+    seq
+
+module Slice :
+  type Slice t e = { seq : t e, start : Nat, stop : Nat }
+
+  impl Iterable Slice =
+    let iter { seq, start, stop } =
+      let rec loop i =
+        # `exp@?` expands to `Option.try (\() -> exp)`
+          signature: `try : (() -> <Panic, Exn _> a) -> Option a`
+        # `exp@?!!(stuff)` expands to `Option.try (\() -> exp@!!(stuff))`
+        if i >= stop then ()
+        else match seq@?[i]
+          | None -> ()
+          | Some x ->
+            yield x
+            loop (i + 1)
+      loop start

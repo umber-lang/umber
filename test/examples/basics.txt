@@ -1,0 +1,19 @@
+# This is a comment. P = NP 
+
+let false = False
+let True = True
+
+let _ = if false then 1.0 else 2.5
+
+type Bottom = |
+
+type Color = Red | Blue
+type ExpandedColor = Green | Yellow | Purple
+
+type GeneralColor =
+  | Regular Color
+  | Expanded ExpandedColor
+
+type Point3 = Point3 Int Int Int
+
+let xyz = Point3 1 2 3

@@ -1,0 +1,31 @@
+module :
+  # Float definitions (float is a 64-bit IEEE754 floating-point number with no Infinity or NaN)
+  type Float
+
+  # Float.OrInfinite includes regular values, Infinity and Neg_infinity
+    (not sure if they should be represented together or as a sum type)
+  # Would be nice if you could pattern-match on it as if it was this sum type
+    but it was still represented as a single unboxed (?) float value
+  module OrInfinite :
+    type OrInfinite = Infinity | Neg_infinity | Finite Float
+
+  # Float.General includes NaN and infinite values, so it's a full IEEE754-compliant float
+    Experimental syntax: (could also use :> or <: or something totally different)
+  module General :
+    type General of OrInfinite = NaN
+  # Because of weird behaviour with NaN, this can't implement Eq or Ord without violating
+    rules such as the reflectivity of (==)
+
+type Float = # ? external definition?
+
+module OrInfinite =
+  type OrInfinite = Float
+
+  # Experimental features : define the constructors manually?
+    (then the match gets turned into If statements using Eq?)
+    Seems like a very sketchy way of doing things
+    Might want to think about defining custom patterns as a different approach
+    Exhaustiveness checking might be impossible anyway, so this could work
+    -> iirc there's a GHC extension for this
+  let Infinity = # ...
+  let Neg_infinity = -Infinity

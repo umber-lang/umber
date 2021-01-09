@@ -1,0 +1,26 @@
+module :
+  # Finite, immutable collections of elements
+  trait (Iterable t) => Collection t :
+    val length : t e -> Nat
+    val in : (Eq e) => e -> t e
+    val is_empty : t e -> Bool
+    val singleton : e -> t e
+    val collect : (Iterable i) => i e -> t e
+    =
+    let is_empty t = length t == 0
+
+  module Im :
+    trait (Collection t) => Im t :
+      val empty : t e
+
+  module Mut :
+    trait (Collection t) => Mut t :
+      val create : () -> t e
+      #val copy : t e -> <???> t e
+
+      # Copy may want to be a super-generic function like
+      # val copy : mut a -> <Some_kind_of_effect_idk> a
+      # (this relies on mut being a built-in modifier)
+      # (although that may not even be necessary tbh)
+
+  # It may be possible to unify these interfaces using effects

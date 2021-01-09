@@ -1,0 +1,18 @@
+module :
+  val count_letters : String -> HashMap Char Nat  # deliberately narrowed
+  val frequencies : (Iterable t, Hash e) => t e -> HashMap e Nat
+
+# Original (adapted directly from OCaml)
+let count_letters str =
+  let freqs = HashMap.create ()
+  for_each str ~f:\c ->  # maybe requiring parens is just good
+    HashMap.update freqs c ~f:match
+      | Some n -> n + 1
+      | None -> 1
+  freqs
+
+# Revised
+let frequencies xs =
+  let freqs = HashMap.create ()
+  for_each xs ~f:(HashMap.update freqs ~f:((+1) . Option.default 0))  # or `Option.default 1 . map (+1)`
+  freqs

@@ -1,0 +1,7 @@
+module :
+  trait Eq a :
+    val (==) : a -> a -> Bool
+
+  val (!=) : a -> -> a -> Bool
+
+let (!=) x y = not (x == y)

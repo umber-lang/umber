@@ -1,0 +1,13 @@
+module
+  module Helper :
+    print_int : Int -> ()
+
+module Helper :
+  print_int : Int -> ()
+  internal_debug : Int -> ()
+  =
+  let print_int = print
+  
+  let internal_debug info i =
+    print_int i;
+	print s

@@ -1,0 +1,9 @@
+module :
+  val id : a -> a
+  val (.) : (b -> c) -> (a -> b) -> a -> c
+
+  # e.g. `sort_by (compare :on: length)`
+  val on : (b -> b -> c) -> (a -> b) -> a -> a -> c
+
+let id x = x
+let on f g x y = f (g x) (g y)
