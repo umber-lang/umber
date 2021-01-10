@@ -54,27 +54,29 @@ module Expr = struct
     (* FIXME: this should probably create a new unused name
        Another option is the empty string gets picked up and added later,
        when we have a Name_bindings.t as context *)
-    let name = Value_name.of_string_exn "" in
+    let name = Value_name.of_string_unchecked "" in
     Lambda (Pattern.Catch_all (Some name), Match (Name ([], name), branches))
   ;;
 
   let qualified (path, expr) =
     match path with
     | [] -> expr
-    | _ -> Qualified (Module_path.of_ustrings path, expr)
+    | _ -> Qualified (Module_path.of_ustrings_unchecked path, expr)
   ;;
 
   let op_section_right op expr =
-    let op = Value_name.Qualified.of_ustrings op in
+    let op = Value_name.Qualified.of_ustrings_unchecked op in
     (* TODO: Refer uses of the empty string like to a value like Value_name.empty *)
-    let left_var = Value_name.of_string_exn "" in
+    let left_var = Value_name.of_string_unchecked "" in
     let left_var_qualified = Value_name.Qualified.with_path [] left_var in
     Lambda
       ( Pattern.Catch_all (Some left_var)
       , Fun_call (Fun_call (Name op, Name left_var_qualified), expr) )
   ;;
 
-  let op_section_left expr op = Fun_call (Name (Value_name.Qualified.of_ustrings op), expr)
+  let op_section_left expr op =
+    Fun_call (Name (Value_name.Qualified.of_ustrings_unchecked op), expr)
+  ;;
 end
 
 module Module = struct

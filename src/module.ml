@@ -28,13 +28,12 @@ and ('pat, 'expr) def =
 (* TODO: couldn't ^this be simplified with Type.Expr.Bounded.t ? *)
 [@@deriving sexp]
 
-let with_filename m filename =
-  Tuple3.map_fst m ~f:(fun _ ->
-    (* FIXME: this probably breaks for some unicode cases e.g. capitalization 
-       and it doesn't handle symbolic characters.
-       Should add a proper conversion check to a valid UPPER_NAME *)
-    let filename =
-      Filename.basename filename |> Filename.split_extension |> fst |> String.capitalize
-    in
-    Module_name.of_string_exn filename)
+let with_filename (_, sigs, defs) filename =
+  let module_name =
+    Filename.basename filename
+    |> Filename.split_extension
+    |> fst
+    |> Module_name.of_string_lenient_exn
+  in
+  module_name, sigs, defs
 ;;

@@ -5,8 +5,8 @@ open Names
    refer to types like Int as Std.Prelude.Int since Std could be shadowed - they need a
    special primitive representation *)
 
-let prelude_module_name = Module_name.of_string_exn "Prelude"
-let prelude_module_path = [ Module_name.of_string_exn "Std"; prelude_module_name ]
+let prelude_module_name = Module_name.of_string_unchecked "Prelude"
+let prelude_module_path = [ Module_name.of_string_unchecked "Std"; prelude_module_name ]
 
 module type Type = sig
   val name : Type_name.t
@@ -25,9 +25,9 @@ module Make_variants (T : sig
   val name : string
   val cnstrs : string list
 end) : Variants = struct
-  let name = Type_name.of_string_exn T.name
+  let name = Type_name.of_string_unchecked T.name
   let typ = Type.Expr.Type_app (([], name), [])
-  let cnstrs = List.map T.cnstrs ~f:Cnstr_name.of_string_exn
+  let cnstrs = List.map T.cnstrs ~f:Cnstr_name.of_string_unchecked
   let decl = [], Type.Decl.Variants (List.map cnstrs ~f:(fun name -> name, []))
 end
 
@@ -36,7 +36,7 @@ module type Abstract = Type
 module Make_abstract (T : sig
   val name : string
 end) : Abstract = struct
-  let name = Type_name.of_string_exn T.name
+  let name = Type_name.of_string_unchecked T.name
   let decl = [], Type.Decl.Abstract
   let typ = Type.Expr.Type_app (([], name), [])
 end

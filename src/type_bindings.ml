@@ -1,5 +1,4 @@
 open Import
-open Names
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
      GADTs (local type equality/type narrowing)

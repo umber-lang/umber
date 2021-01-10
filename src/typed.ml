@@ -259,7 +259,7 @@ module Expr = struct
         Type_bindings.unify ~names ~types b1_type b2_type;
         let prelude_cnstr name =
           Pattern.Cnstr_appl
-            ((Core.prelude_module_path, Cnstr_name.of_string_exn name), [])
+            ((Core.prelude_module_path, Cnstr_name.of_string_unchecked name), [])
         in
         Match (cond, [ prelude_cnstr "True", b1; prelude_cnstr "False", b2 ]), b1_type
       | Match (expr, branches) ->

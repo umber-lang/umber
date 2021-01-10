@@ -13,10 +13,10 @@ val index : t -> elt -> int option
 val index_exn : t -> elt -> int
 val sub : (t, t) Blit.sub
 val subo : (t, t) Blit.subo
-val to_string : t -> string
 val of_array_unsafe : Uchar.t array -> t
 val of_string_exn : string -> t
 val of_ustring : t -> t
+val to_string : t -> string
 val to_ustring : t -> t
 val add_to_buffer : Buffer.t -> t -> unit
 val add_substring_to_buffer : Buffer.t -> t -> pos:int -> len:int -> unit

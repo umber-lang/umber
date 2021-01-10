@@ -19,8 +19,7 @@ let run file debug lex_only print_types print_names no_std parent backtrace () =
         let names =
           match parent with
           | Some str ->
-            (* TODO: add actual validation of the module name here *)
-            Name_bindings.into_module names (Ast.Module_name.of_string_exn str)
+            Name_bindings.into_module names (Ast.Module_name.of_string_lenient_exn str)
           | None -> names
         in
         let%map names, ast = Ast.Typed.Module.of_untyped ?backtrace ~names ast in

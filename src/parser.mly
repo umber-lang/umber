@@ -115,7 +115,7 @@ literal:
   | s = STRING { Literal.String s }
 
 pattern_name:
-  | name = val_name { Some (Value_name.of_ustring name) }
+  | name = val_name { Some (Value_name.of_ustring_unchecked name) }
   | UNDERSCORE { None }
 
 (* TODO: Make parens optional in tuple patterns only: do after adding sequence literal patterns *)
@@ -126,13 +126,13 @@ pattern_term:
   | l = literal { Pattern.Constant l }
   | name = pattern_name { Pattern.Catch_all name }
   | name = qualified(UPPER_NAME)
-    { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings name, []) }
+    { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings_unchecked name, []) }
   | fields = braces(record_literal_fields(pattern)) { Pattern.Record fields }
 
 pattern:
   | p = pattern_term { p }
   | cnstr = qualified(UPPER_NAME); args = nonempty_list(pattern_term)
-    { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings cnstr, args) }
+    { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings_unchecked cnstr, args) }
   | left = pattern; PIPE; right = pattern { Pattern.Union (left, right) }
   | annot = type_annot_bounded(pattern)
     { Pattern.Type_annotation (fst annot, snd annot) }
@@ -146,10 +146,10 @@ expr_term:
     { Expr.qualified (fst e, single_or_list Expr.tuple (snd e)) }
   | op = qualified(parens(operator))
     { let path1, (path2, op) = op in
-      Expr.Name (Value_name.Qualified.of_ustrings (path1 @ path2, op)) }
+      Expr.Name (Value_name.Qualified.of_ustrings_unchecked (path1 @ path2, op)) }
   | op_section = qualified(parens(op_section)) { Expr.qualified op_section }
   | name = qualified(either(LOWER_NAME, UPPER_NAME))
-    { Expr.Name (Value_name.Qualified.of_ustrings name) }
+    { Expr.Name (Value_name.Qualified.of_ustrings_unchecked name) }
   | l = literal { Expr.Literal l }
   | items = brackets(block_items(expr)) { Expr.Seq_literal items }
   | fields = braces(record_literal_fields(expr)) { Expr.Record_literal fields }
@@ -163,7 +163,7 @@ expr_term:
   | L_BRACE; record = expr; WITH; fields = record_literal_fields(expr); R_BRACE
     { Expr.Record_update (record, fields) }
   | record = expr_term; PERIOD; field = LOWER_NAME
-    { Expr.Record_field_access (record, Value_name.of_ustring field) }
+    { Expr.Record_field_access (record, Value_name.of_ustring_unchecked field) }
 
 expr_fun_call:
   | f = expr_term; arg = expr_term { Expr.Fun_call (f, arg) }
@@ -178,9 +178,9 @@ expr_op_term:
 
 expr_op_tree:
   | left = expr_op_term; op = operator; right = expr_op_term
-    { Btree.Node (Value_name.Qualified.of_ustrings op, Leaf left, Leaf right) }
+    { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, Leaf left, Leaf right) }
   | left = expr_op_tree; op = operator; right = expr_op_term
-    { Btree.Node (Value_name.Qualified.of_ustrings op, left, Leaf right) }
+    { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, left, Leaf right) }
 
 let_or_rec:
   | LET { false }
@@ -210,18 +210,18 @@ expr:
 type_record:
   | fields = braces(block_items_nonempty(type_annot(LOWER_NAME)))
     { Type.Decl.Record (List.map fields ~f:(fun (name, typ) ->
-        Value_name.of_ustring name, typ)) }
+        Value_name.of_ustring_unchecked name, typ)) }
 
 type_term:
   | e = tuple(type_expr) { single_or_list Type.Expr.tuple e }
   | cnstr = qualified(UPPER_NAME)
-    { Type.Expr.Type_app (Type_name.Qualified.of_ustrings cnstr, []) }
-  | param = LOWER_NAME { Type.Expr.Var (Type_param_name.of_ustring param) }
+    { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, []) }
+  | param = LOWER_NAME { Type.Expr.Var (Type_param_name.of_ustring_unchecked param) }
 
 type_non_func:
   | t = type_term { t }
   | cnstr = qualified(UPPER_NAME); args = nonempty_list(type_term)
-    { Type.Expr.Type_app (Type_name.Qualified.of_ustrings cnstr, args) }
+    { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, args) }
 
 type_expr:
   | t = type_non_func { t }
@@ -232,15 +232,15 @@ type_expr:
   | bounds = parens(block_items(pair(UPPER_NAME, nonempty_list(LOWER_NAME))));
     FAT_ARROW
     { List.map bounds ~f:(fun (trait, params) ->
-        Trait_name.of_ustring trait,
-        List.map params ~f:Type_param_name.of_ustring) }
+        Trait_name.of_ustring_unchecked trait,
+        List.map params ~f:Type_param_name.of_ustring_unchecked) }
 
 %inline type_expr_bounded:
   | bound = loption(trait_bound); t = type_expr { (bound, t) }
 
 type_cnstr_decl:
   | cnstr = UPPER_NAME; args = list(type_term)
-    { Cnstr_name.of_ustring cnstr, args }
+    { Cnstr_name.of_ustring_unchecked cnstr, args }
 
 type_decl:
   | PIPE { Type.Decl.Variants [] }
@@ -248,7 +248,7 @@ type_decl:
   | r = block(type_record) { r }
 
 %inline type_param_list:
-  | params = list(LOWER_NAME) { List.map ~f:Type_param_name.of_ustring params }
+  | params = list(LOWER_NAME) { List.map ~f:Type_param_name.of_ustring_unchecked params }
 
 val_name:
   | name = LOWER_NAME { name }
@@ -260,13 +260,14 @@ fixity:
   | INFIXR; n = INT { Fixity.(of_decl_exn Right n) }
 
 %inline import_module_path:
-  | IMPORT; path = separated_nonempty_list(PERIOD, UPPER_NAME) { Module_path.of_ustrings path }
+  | IMPORT; path = separated_nonempty_list(PERIOD, UPPER_NAME)
+    { Module_path.of_ustrings_unchecked path }
 
 %inline import_item:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
 import_stmt:
-  | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring name) }
+  | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
   | path = import_module_path; WITH; ASTERISK { Module.Import_with (path, []) }
   | path = import_module_path; WITH; items = nonempty_list(import_item)
     { Module.Import_with (path, items) }
@@ -276,21 +277,23 @@ import_stmt:
 stmt_common:
   | VAL; name = val_name; fix = parens(fixity)?; colon;
     t = block(type_expr_bounded)
-    { Module.Val (Value_name.of_ustring name, fix, t) }
+    { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
   | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(equals, type_decl)?
     { Module.Type_decl (
-        Type_name.of_ustring name, (params, Option.value decl ~default:Abstract)) }
+        Type_name.of_ustring_unchecked name,
+        (params, Option.value decl ~default:Abstract)) }
   | TYPE; ALIAS; name = UPPER_NAME; params = type_param_list; equals; e = type_expr
-    { Module.Type_decl (Type_name.of_ustring name, (params, Type.Decl.Alias e)) }
+    { Module.Type_decl (
+        Type_name.of_ustring_unchecked name, (params, Type.Decl.Alias e)) }
   | TRAIT; name = UPPER_NAME; params = type_param_list; colon;
     sig_ = block(nonempty_lines(stmt_sig))
-    { Module.Trait_sig (Trait_name.of_ustring name, params, sig_) }
+    { Module.Trait_sig (Trait_name.of_ustring_unchecked name, params, sig_) }
   | import = import_stmt { import }
 
 stmt_sig:
   | s = stmt_common { Module.Common_sig s }
   | MODULE; name = UPPER_NAME; colon; stmts = block(lines(stmt_sig))
-    { Module.Module_sig (Module_name.of_ustring name, stmts) }
+    { Module.Module_sig (Module_name.of_ustring_unchecked name, stmts) }
 
 %inline def:
   (* TODO: try removing EQUALS_ONLY_LINE: allow sig to end in LINE_SEP? *)
@@ -319,12 +322,12 @@ stmt:
     { let expr = List.fold_right args ~init:expr ~f:Expr.lambda in
       Module.Let (Pattern.Catch_all fun_name, expr) }
   | MODULE; name = UPPER_NAME; body = optional_sig_def
-    { Module.Module (Module_name.of_ustring name, fst body, snd body) }
+    { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
   | TRAIT; name = UPPER_NAME; params = type_param_list; body = optional_sig_def
-    { Module.Trait (Trait_name.of_ustring name, params, fst body, snd body) }
+    { Module.Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body) }
   | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; typ = type_expr;
     def = def
-    { Module.Impl (bound, Trait_name.of_ustring trait, typ, def) }
+    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, typ, def) }
 
 %inline file_module_sig:
   | sig_ = loption(preceded(FILE_MODULE, block(lines(stmt_sig)))) { sig_ }
@@ -332,7 +335,7 @@ stmt:
 prog:
   | def1 = flexible_optional_list(LINE_SEP, stmt); sig_ = file_module_sig;
     def2 = lines(stmt); EOF
-    { Module_name.of_string_exn "", sig_, def1 @ def2 }
+    { Module_name.of_string_unchecked "", sig_, def1 @ def2 }
 
 %inline lines(X): x = separated_list(LINE_SEP?, X) { x }
 %inline nonempty_lines(X): x = separated_nonempty_list(LINE_SEP?, X) { x }
@@ -349,7 +352,8 @@ pipe_branches(X):
     { branches }
 
 %inline record_field_equals(X):
-  | field = LOWER_NAME; x = preceded(EQUALS, X)? { (Value_name.of_ustring field, x) }
+  | field = LOWER_NAME; x = preceded(EQUALS, X)?
+    { (Value_name.of_ustring_unchecked field, x) }
 
 %inline record_literal_fields(X):
   | fields = block_items_nonempty(record_field_equals(X)) { fields }
