@@ -206,8 +206,8 @@ module Scheme = struct
      into also seems highly desirable *)
   type nonrec t = Param.t Expr.t [@@deriving compare, hash, equal, sexp]
 
-  let instantiate ?(map_name = Fn.id) typ =
-    let params = Param.Env_to_vars.create () in
+  let instantiate ?(map_name = Fn.id) ?params typ =
+    let params = option_or_default params ~f:Param.Env_to_vars.create in
     Expr.map_vars typ ~f:(Param.Env_to_vars.find_or_add params)
     |> Expr.map ~f:(function
          | Type_app (name, args) -> `Defer (Expr.Type_app (map_name name, args))
@@ -215,9 +215,9 @@ module Scheme = struct
   ;;
 
   (* TODO: handle trait bounds *)
-  let instantiate_bounded ?map_name typ =
+  let instantiate_bounded ?map_name ?params typ =
     match typ with
-    | [], typ -> instantiate ?map_name typ
+    | [], typ -> instantiate ?map_name ?params typ
     | _ -> raise_s [%message "Trait bounds not yet implemented"]
   ;;
 end

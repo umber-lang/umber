@@ -83,11 +83,13 @@ module Scheme : sig
 
   val instantiate
     :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
+    -> ?params:Param.Env_to_vars.t
     -> t
     -> Var_id.t Expr.t
 
   val instantiate_bounded
     :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
+    -> ?params:Param.Env_to_vars.t
     -> Expr.Bounded.t
     -> Var_id.t Expr.t
 end
