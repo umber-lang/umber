@@ -15,4 +15,9 @@ module :
   on, but have them off by default (seems like good behavior)
 # Actually, I should just be able to use `include` instead of import: seems good
   Signatures can still be changed by adding them under `module :`
+# Probably the best behavior:
+  - When there is no `module :`, imports are not re-exported
+  - When there is a `module :`, imports are re-exported if listed in the signature
+  What about something like the Prelude?
+  Maybe something like `import@export`?
 let (*) = (*)

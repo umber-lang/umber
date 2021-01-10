@@ -11,7 +11,7 @@
 %token THEN
 %token ELSE
 %token LET
-%token LET_REC
+%token LET_NONREC
 %token MATCH
 %token WITH
 %token WITHOUT
@@ -182,9 +182,9 @@ expr_op_tree:
   | left = expr_op_tree; op = operator; right = expr_op_term
     { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, left, Leaf right) }
 
-let_or_rec:
-  | LET { false }
-  | LET_REC { true }
+let_rec:
+  | LET { true }
+  | LET_NONREC { false }
 
 expr:
   | e = delimited(INDENT, expr, DEDENT) { e }
@@ -199,9 +199,9 @@ expr:
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; LINE_SEP?; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
-  | rec_ = let_or_rec; pat = pattern; equals; expr = expr; LINE_SEP; body = expr
+  | rec_ = let_rec; pat = pattern; equals; expr = expr; LINE_SEP; body = expr
     { Expr.Let { rec_; pat; expr; body } }
-  | rec_ = let_or_rec; fun_name = pattern_name; args = nonempty_list(pattern_term);
+  | rec_ = let_rec; fun_name = pattern_name; args = nonempty_list(pattern_term);
     equals; expr = expr; body = expr
     { let expr = List.fold_right args ~init:expr ~f:Expr.lambda in
       Expr.Let { rec_; pat = Pattern.Catch_all fun_name; expr; body } }

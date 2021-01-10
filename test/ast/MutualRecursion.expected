@@ -42,4 +42,12 @@
     (If (Op_tree ((() ==) (((Name (() x))) ((Literal (Int 0))))))
      (Name (() False))
      (Fun_call (Name (() even))
-      (Op_tree ((() -) (((Name (() x))) ((Literal (Int 1))))))))))))
+      (Op_tree ((() -) (((Name (() x))) ((Literal (Int 1))))))))))
+  (Let (Catch_all (number))
+   (Let
+    ((rec_ true) (pat (Catch_all (number))) (expr (Literal (Int 5)))
+     (body
+      (Let
+       ((rec_ false) (pat (Catch_all (number)))
+        (expr (Op_tree ((() +) (((Name (() number))) ((Name (() number)))))))
+        (body (Name (() number)))))))))))

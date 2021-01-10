@@ -18,7 +18,7 @@
     (Type_app (() String) ())))
   (Let (Tuple ((Catch_all (a)) (Catch_all (b))))
    ((Let
-     ((rec_ false) (pat (Catch_all (empty))) (expr (Literal (String "")))
+     ((rec_ true) (pat (Catch_all (empty))) (expr (Literal (String "")))
       (body (Tuple ((Literal (Char a)) (Literal (Char b)))))))
     (Tuple ((Type_app (() Char) ()) (Type_app (() Char) ())))))
   (Let (Catch_all (_UNICODE_WORKS_TOO))

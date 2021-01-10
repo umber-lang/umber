@@ -333,7 +333,7 @@ let read =
     | "if" -> IF
     | "then" -> THEN
     | "else" -> ELSE
-    | "let'" -> LET_REC (* TODO: rename to LET_NONREC *)
+    | "let'" -> LET_NONREC
     | "let" -> LET
     | "match" -> MATCH
     | "with" -> WITH
