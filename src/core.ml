@@ -41,10 +41,15 @@ end) : Abstract = struct
   let typ = Type.Expr.Type_app (([], name), [])
 end
 
-module Bool = Make_variants (struct
-  let name = "Bool"
-  let cnstrs = [ "False"; "True" ]
-end)
+module Bool = struct
+  include Make_variants (struct
+    let name = "Bool"
+    let cnstrs = [ "False"; "True" ]
+  end)
+
+  let false_ = [], List.hd_exn cnstrs
+  let true_ = [], List.nth_exn cnstrs 1
+end
 
 module Int = Make_abstract (struct
   let name = "Int"

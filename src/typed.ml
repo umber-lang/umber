@@ -257,11 +257,10 @@ module Expr = struct
           of_untyped ~names ~types b1, of_untyped ~names ~types b2
         in
         Type_bindings.unify ~names ~types b1_type b2_type;
-        let prelude_cnstr name =
-          Pattern.Cnstr_appl
-            ((Core.prelude_module_path, Cnstr_name.of_string_unchecked name), [])
-        in
-        Match (cond, [ prelude_cnstr "True", b1; prelude_cnstr "False", b2 ]), b1_type
+        (* TODO: should really be referring to Bool as a primitive of some kind
+           Could have it be qualified like `_Primitives.Bool` *)
+        let cnstr name = Pattern.Cnstr_appl (name, []) in
+        Match (cond, [ cnstr Core.Bool.true_, b1; cnstr Core.Bool.false_, b2 ]), b1_type
       | Match (expr, branches) ->
         let expr, expr_type = of_untyped ~names ~types expr in
         let branches, branch_types =
