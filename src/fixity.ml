@@ -1,7 +1,12 @@
 open Import
 
 module Level = struct
-  type t = int [@@deriving compare, equal, hash, sexp]
+  module T = struct
+    type t = int [@@deriving compare, equal, hash, sexp]
+  end
+
+  include T
+  include Comparable.Infix (T)
 
   let min = 0
   let max = 9

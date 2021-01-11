@@ -1,7 +1,7 @@
 # Let bindings can be given as a group
 let
 	a = 1
-	fun n = n ^ 2 - 2 #+ n + n * (n - 8) * 5  # FIXME: associativity
+	fun n = n ^ 2 - 2 + n + n * (n - 8) * 5
 	b = a + 6
 
 # This works in expressions as well
@@ -9,6 +9,7 @@ let _ =
 	let
 		() = ()
 		_ = fun
+		list = "a" :: "list" :: "of" :: "words" :: Nil
 	1 == 2 || 3 == 4 
 
 # This allows for mutual recursion between local let bindings in expressions

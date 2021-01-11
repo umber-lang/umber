@@ -4,9 +4,21 @@
     ((Catch_all (fun))
      ((Lambda (Catch_all (n))
        (Fun_call
-        (Fun_call (Name (() -))
-         (Fun_call (Fun_call (Name (() ^)) (Name (() n))) (Literal (Int 2))))
-        (Literal (Int 2))))
+        (Fun_call (Name (() +))
+         (Fun_call
+          (Fun_call (Name (() +))
+           (Fun_call
+            (Fun_call (Name (() -))
+             (Fun_call (Fun_call (Name (() ^)) (Name (() n)))
+              (Literal (Int 2))))
+            (Literal (Int 2))))
+          (Name (() n))))
+        (Fun_call
+         (Fun_call (Name (() *))
+          (Fun_call (Fun_call (Name (() *)) (Name (() n)))
+           (Fun_call (Fun_call (Name (() -)) (Name (() n)))
+            (Literal (Int 8)))))
+         (Literal (Int 5)))))
       (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))
     ((Catch_all (b))
      ((Fun_call (Fun_call (Name (() +)) (Name (() a))) (Literal (Int 6)))
@@ -15,7 +27,14 @@
    (((Catch_all ())
      ((Let
        ((rec_ true)
-        (bindings (((Tuple ()) (Tuple ())) ((Catch_all ()) (Name (() fun)))))
+        (bindings
+         (((Tuple ()) (Tuple ())) ((Catch_all ()) (Name (() fun)))
+          ((Catch_all (list))
+           (Fun_call (Fun_call (Name (() ::)) (Literal (String a)))
+            (Fun_call (Fun_call (Name (() ::)) (Literal (String list)))
+             (Fun_call (Fun_call (Name (() ::)) (Literal (String of)))
+              (Fun_call (Fun_call (Name (() ::)) (Literal (String words)))
+               (Name (() Nil)))))))))
         (body
          (Fun_call
           (Fun_call (Name (() ||))

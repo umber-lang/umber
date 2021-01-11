@@ -36,3 +36,9 @@ let rotate_clockwise_exn = function
     | Node (left_data, left_grandchild, right_grandchild) ->
       Node (left_data, left_grandchild, Node (root_data, right_grandchild, right_child)))
 ;;
+
+module Rotation = struct
+  type t =
+    | Clockwise
+    | Anticlockwise
+end

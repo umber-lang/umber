@@ -1,6 +1,10 @@
+open Import
+
 module Level : sig
   (** A number from 0-9 representing the precedence level (higher is tighter) *)
   type t = private int [@@deriving compare, equal, hash, sexp]
+
+  include Comparable.Infix with type t := t
 
   val min : t
   val max : t
