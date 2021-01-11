@@ -21,7 +21,7 @@ and sig_ =
 and ('pat, 'expr) def =
   | Common_def of common
   | Module of ('pat, 'expr) t
-  | Let of 'pat * 'expr
+  | Let of ('pat * 'expr) list
   | Trait of Trait_name.t * Type.Param.t list * sig_ list * ('pat, 'expr) def list
   | Impl of
       Trait_bound.t * Trait_name.t * Type.Param.t Type.Expr.t * ('pat, 'expr) def list
@@ -37,3 +37,5 @@ let with_filename (_, sigs, defs) filename =
   in
   module_name, sigs, defs
 ;;
+
+let let_ bindings = Let bindings

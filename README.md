@@ -13,6 +13,7 @@ Umber is an ML-style functional programming language. It is modelled after OCaml
 - First-class support for laziness
 - Proper handling of unicode, both in the source code and in the standard library's `String` type
 - Proper handling of nested module namespaces
+- No ml/mli file distinction eliminating duplication of type/module declarations
 - Whitespace-sensitive syntax eliminating syntactic noise like `begin` and `end` or extra parentheses
 - An import style similar to Python which discourages importing entire modules unqualified
 

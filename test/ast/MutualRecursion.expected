@@ -1,29 +1,35 @@
 (MutualRecursion ()
- ((Common_def (Val f () (() (Type_app (() Forest) ((Var a))))))
-  (Let (Catch_all (f)) (Name (() Nil)))
-  (Let (Catch_all (sum_forest))
-   (Let
-    ((rec_ true) (pat (Catch_all (loop)))
-     (expr
-      (Lambda (Catch_all (acc))
-       (Lambda (Catch_all (""))
-        (Match (Name (() ""))
-         (((Cnstr_appl (() Nil) ()) (Name (() acc)))
-          ((Cnstr_appl (() Cons) ((Catch_all (x)) (Catch_all (xs))))
-           (Fun_call
-            (Fun_call (Name (() loop))
-             (Op_tree ((() +) (((Name (() acc))) ((Name (() x)))))))
-            (Name (() xs)))))))))
-     (body (Fun_call (Name (() loop)) (Literal (Int 0)))))))
-  (Let (Catch_all (sum_tree))
-   (Lambda (Catch_all (""))
-    (Match (Name (() ""))
-     (((Cnstr_appl (() Leaf) ()) (Literal (Int 0)))
-      ((Cnstr_appl (() Node) ((Catch_all (x)) (Catch_all (forest))))
-       (Op_tree
-        ((() +)
-         (((Name (() x)))
-          ((Fun_call (Name (() sum_forest)) (Name (() forest))))))))))))
+ ((Let (((Catch_all (f0)) (Name (() f1)))))
+  (Let (((Catch_all (f1)) (Fun_call (Name (() f0)) (Name (() False))))))
+  (Common_def (Val f () (() (Type_app (() Forest) ((Var a))))))
+  (Let (((Catch_all (f)) (Name (() Nil)))))
+  (Let
+   (((Catch_all (sum_forest))
+     (Let
+      ((rec_ true)
+       (bindings
+        (((Catch_all (loop))
+          (Lambda (Catch_all (acc))
+           (Lambda (Catch_all (""))
+            (Match (Name (() ""))
+             (((Cnstr_appl (() Nil) ()) (Name (() acc)))
+              ((Cnstr_appl (() Cons)
+                ((Catch_all (tree)) (Catch_all (trees))))
+               (Fun_call
+                (Fun_call (Name (() loop))
+                 (Op_tree
+                  ((() +)
+                   (((Name (() acc)))
+                    ((Fun_call (Name (() sum_tree)) (Name (() tree))))))))
+                (Name (() trees)))))))))))
+       (body (Fun_call (Name (() loop)) (Literal (Int 0)))))))))
+  (Let
+   (((Catch_all (sum_tree))
+     (Lambda (Catch_all (""))
+      (Match (Name (() ""))
+       (((Cnstr_appl (() Leaf) ()) (Literal (Int 0)))
+        ((Cnstr_appl (() Node) ((Catch_all (x)) (Catch_all (forest))))
+         (Name (() x)))))))))
   (Common_def
    (Type_decl Forest
     ((a) (Alias (Type_app (() List) ((Type_app (() Tree) ((Var a)))))))))
@@ -31,23 +37,28 @@
    (Type_decl Tree
     ((a)
      (Variants ((Leaf ()) (Node ((Var a) (Type_app (() Forest) ((Var a))))))))))
-  (Let (Catch_all (even))
-   (Lambda (Catch_all (x))
-    (If (Op_tree ((() ==) (((Name (() x))) ((Literal (Int 0))))))
-     (Name (() True))
-     (Fun_call (Name (() odd))
-      (Op_tree ((() -) (((Name (() x))) ((Literal (Int 1))))))))))
-  (Let (Catch_all (odd))
-   (Lambda (Catch_all (x))
-    (If (Op_tree ((() ==) (((Name (() x))) ((Literal (Int 0))))))
-     (Name (() False))
-     (Fun_call (Name (() even))
-      (Op_tree ((() -) (((Name (() x))) ((Literal (Int 1))))))))))
-  (Let (Catch_all (number))
-   (Let
-    ((rec_ true) (pat (Catch_all (number))) (expr (Literal (Int 5)))
-     (body
-      (Let
-       ((rec_ false) (pat (Catch_all (number)))
-        (expr (Op_tree ((() +) (((Name (() number))) ((Name (() number)))))))
-        (body (Name (() number)))))))))))
+  (Let
+   (((Catch_all (even))
+     (Lambda (Catch_all (x))
+      (If (Op_tree ((() ==) (((Name (() x))) ((Literal (Int 0))))))
+       (Name (() True))
+       (Fun_call (Name (() odd))
+        (Op_tree ((() -) (((Name (() x))) ((Literal (Int 1))))))))))))
+  (Let
+   (((Catch_all (odd))
+     (Lambda (Catch_all (x))
+      (If (Op_tree ((() ==) (((Name (() x))) ((Literal (Int 0))))))
+       (Name (() False))
+       (Fun_call (Name (() even))
+        (Op_tree ((() -) (((Name (() x))) ((Literal (Int 1))))))))))))
+  (Let
+   (((Catch_all (number))
+     (Let
+      ((rec_ true) (bindings (((Catch_all (number)) (Literal (Int 5)))))
+       (body
+        (Let
+         ((rec_ false)
+          (bindings
+           (((Catch_all (number))
+             (Op_tree ((() +) (((Name (() number))) ((Name (() number)))))))))
+          (body (Name (() number)))))))))))))

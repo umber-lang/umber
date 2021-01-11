@@ -2,8 +2,7 @@ open Import
 
 type ('pat, 'expr) t =
   { rec_ : bool
-  ; pat : 'pat
-  ; expr : 'expr
+  ; bindings : ('pat * 'expr) list
   ; body : 'expr
   }
 [@@deriving sexp]

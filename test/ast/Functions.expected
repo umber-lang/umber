@@ -1,10 +1,13 @@
 (Functions ()
- ((Let (Catch_all (id))
-   ((Lambda (Catch_all (x)) (Name (() x))) (Function (Var a) (Var a))))
-  (Let (Catch_all (zero)) ((Literal (Float 0)) (Type_app (() Float) ())))
-  (Let (Catch_all (still_zero_wow))
-   ((Fun_call (Name (() id)) (Name (() zero))) (Type_app (() Float) ())))
-  (Let (Catch_all (sqr))
-   ((Lambda (Catch_all (x))
-     (Fun_call (Fun_call (Name (() *)) (Name (() x))) (Name (() x))))
-    (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))))
+ ((Let
+   (((Catch_all (id))
+     ((Lambda (Catch_all (x)) (Name (() x))) (Function (Var a) (Var a))))))
+  (Let (((Catch_all (zero)) ((Literal (Float 0)) (Type_app (() Float) ())))))
+  (Let
+   (((Catch_all (still_zero_wow))
+     ((Fun_call (Name (() id)) (Name (() zero))) (Type_app (() Float) ())))))
+  (Let
+   (((Catch_all (sqr))
+     ((Lambda (Catch_all (x))
+       (Fun_call (Fun_call (Name (() *)) (Name (() x))) (Name (() x))))
+      (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))))))

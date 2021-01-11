@@ -11,4 +11,4 @@
   (Common_def (Import_with (Number Int) ()))
   (Common_def (Import_without (Number Float) (pi)))
   (Common_def (Import_with (Number) (*)))
-  (Let (Catch_all (*)) (Name (() *)))))
+  (Let (((Catch_all (*)) (Name (() *)))))))

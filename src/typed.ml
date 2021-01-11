@@ -114,7 +114,7 @@ module Pattern = struct
   let of_untyped_into ~names ~types pattern =
     of_untyped_with_names ~names ~types pattern
     |> Tuple2.map_fst
-         ~f:(Name_bindings.merge_names names ~combine:(fun _ _ new_val -> new_val))
+         ~f:(Name_bindings.merge_names names ~combine:(fun _ _ new_entry -> new_entry))
   ;;
 
   let rec generalize ~names ~types pat_type =
@@ -171,7 +171,7 @@ module Expr = struct
     | Fun_call of t * t
     | Lambda of Pattern.t * t
     | Match of t * (Pattern.t * t) list
-    | Let of (Pattern.t, t) Let_binding.t
+    | Let of (Pattern.t, t) Let_binding.t (* TODO: should also have the type here, probably *)
     | Tuple of t list
     | Record_literal of (Value_name.t * t option) list
     | Record_update of t * (Value_name.t * t option) list
@@ -276,13 +276,34 @@ module Expr = struct
           iter_pairs branch_types ~f:(Type_bindings.unify ~names ~types);
           Match (expr, branches), branch_type
         | [] -> raise_s [%message "Empty match"])
-      | Let { rec_; pat; expr; body } ->
-        (* FIXME: handle recursion? *)
-        let expr, expr_type = of_untyped ~names ~types expr in
-        let names, (pat, pat_type) = Pattern.of_untyped_into ~names ~types pat in
-        Type_bindings.unify ~names ~types expr_type pat_type;
+      | Let { rec_; bindings; body } ->
+        (* FIXME: handle recursion? - should be good here *)
+        let names, bindings =
+          if rec_
+          then (
+            (* Process all bindings at once, allowing mutual recursion *)
+            let names, bindings =
+              List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
+                let names, pat_typed = Pattern.of_untyped_into ~names ~types pat in
+                names, (pat_typed, expr))
+            in
+            let bindings =
+              List.map bindings ~f:(Tuple2.map_snd ~f:(of_untyped ~names ~types))
+            in
+            List.iter bindings ~f:(fun ((_, pat_type), (_, expr_type)) ->
+              Type_bindings.unify ~names ~types pat_type expr_type);
+            (* TODO: should probably also return the types here, so they can be listed in the AST *)
+            names, List.map bindings ~f:(fun ((pat, _), (expr, _)) -> pat, expr))
+          else
+            (* Process bindings in order without any recursion *)
+            List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
+              let names, (pat, pat_type) = Pattern.of_untyped_into ~names ~types pat in
+              let expr, expr_type = of_untyped ~names ~types expr in
+              Type_bindings.unify ~names ~types pat_type expr_type;
+              names, (pat, expr))
+        in
         let body, body_type = of_untyped ~names ~types body in
-        Let { rec_; pat; expr; body }, body_type
+        Let { rec_; bindings; body }, body_type
       | Tuple items ->
         let items, types = List.map items ~f:(of_untyped ~names ~types) |> List.unzip in
         Tuple items, Tuple types
@@ -310,25 +331,7 @@ module Module = struct
   type nonrec t = (Pattern.t, Expr.t * Type.Scheme.t) t [@@deriving sexp]
   type nonrec def = (Pattern.t, Expr.t * Type.Scheme.t) def [@@deriving sexp]
 
-  (* Handling order:
-     1. Imports
-     2. Type/trait declarations (in sigs or defs)
-     3. Trait impls (TODO: allow them in sigs) - not the bodies, just the fact they exist
-     4. Val statements + Let statement patterns (unify if val is after let)
-     5. Let statement/trait impl bodies (expressions)
-     
-     1-2 can be handled by filtering the sigs/defs and handing to gather_module_names (?)
-     3 we'll skip for now
-     4 can be done again by gather_module names
-     5 is done by type_defs
-     
-     TODO: also need to consider combingin multiple declarations e.g.
-     ```
-     module :
-       type T
-     type alias T = Int  # What about `type T = alias Int`?
-     ```
-     Or even more advanced ideas like property-like record representations e.g.
+  (* TODO: should consider advanced ideas like property-like record representations e.g.
      ```
      module :
        type TimeSpan = { seconds, minutes, hours, days, weeks, months, years : Int }
@@ -355,60 +358,20 @@ module Module = struct
       | Let _ | Trait _ | Impl _ -> names)
   ;;
 
-  (* FIXME: decide what I'm doing with resolution order here:
-     imports can't just be first, because imports can refer to local submodules,
-     which would require full handling (?) to import the names for values/types
-     
-     I might just be making things much harder than necessary for myself
-     
-     Alternative: when importing, instead of copying, write a reference to the originally
-     imported type e.g. (Imported_from Std.Prelude) 
-     - Then imports can just refer to the names
-     - Bound names also need gathering then? Although patterns can't be typed yet...
-       -> Extracting just the names is fine to do
-       -> I could type the patterns if I require type declarations to be before the use
-          (which seems fine)
-       -> so that would make the resolution steps:
-          1. Imports, type/trait decls, reading val bindings, typing patterns
-          2. Type the expressions
-             - so let definitions can be in any order, but types and imports must be
-               before their usage
-             - this would effectively force submodules to be at the top of their parent
-               modules, since types defined in submodules can't be used until after
-           
-      What does GHC probably do? (very, very roughly)
-      1. Read imports and type decls
-      2. Handle bindings
-      No submodules so imports don't rely on typing other modules right now
-      The problem is mutual recursion, effectively
-
-      How about this - everything just works like in OCaml, except as if all the let
-      statements were in a massive let rec/and block?
-      So order matters for imports/type decls
-      - Sub module handling? Do the let statements occur before or after?
-        Split into sections?
-      - I think this ends up being a bit confusing/weird
-
-      -----
-      Different idea for steps
-      1. Read all bound names in the module and submodules, and assign them fresh type variables
-         - this doesn't require knowing anything - just read all the Catch_all names
-         - Also read the types in somehow with placeholder values - maybe Abstract? - or just an option with None
-         - This allows local imports to check properly
-         - TODO: really only need to do sigs, and then defs if there are no sigs
-      2. Read imports
-         - Don't copy anything - use Imported_from
-      3. Read type/trait declarations
-         - mutual recursion in types is handled somehow
-      4. (not yet (?)) Look for trait impls (just the fact they exist)
-         - Needs to be done after knowing about types/traits 
-      5. Handle val/let bindings
-      6. Handle let/impl expressions
-
-      In summary, everything is as done now, but with an extra step at the start to read
-      names/types, and imports are not just copied as values.
-      -----
-      *)
+  (* Name/type resolution steps
+     1. Read all bound names in the module and submodules, and assign them fresh type variables
+        - this doesn't require knowing anything - just read all the Catch_all names
+        - Also read the types in somehow with placeholder values - maybe Abstract? - or just an option with None
+        - This allows local imports to check properly
+        - (* TODO: really only need to do sigs, and then defs if there are no sigs *)
+     2. Read imports
+        - Don't copy anything - use Imported_from
+     3. Read type/trait declarations
+        - mutual recursion in types is handled somehow
+     4. (not yet (?)) Look for trait impls (just the fact they exist)
+        - Needs to be done after knowing about types/traits 
+     5. Handle val/let bindings
+     6. Handle let/impl expressions *)
 
   (** Gather placeholders for all declared names and types.
       (Needed for imports of submodules to work.) *)
@@ -420,15 +383,16 @@ module Module = struct
         | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names)
     in
     List.fold defs ~init:names ~f:(fun names -> function
-      | Let (pat, _) ->
-        Name_bindings.merge_names
-          names
-          (Pattern.gather_names pat)
-          ~combine:(fun name entry1 entry2 ->
-          match entry1.type_source, entry2.type_source with
-          | Val_declared, Val_declared | Let_inferred, Let_inferred ->
-            Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
-          | _ -> entry1)
+      | Let bindings ->
+        List.fold bindings ~init:names ~f:(fun names (pat, _) ->
+          Name_bindings.merge_names
+            names
+            (Pattern.gather_names pat)
+            ~combine:(fun name entry1 entry2 ->
+            match entry1.type_source, entry2.type_source with
+            | Val_declared, Val_declared | Let_inferred, Let_inferred ->
+              Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
+            | _ -> entry1))
       | _ -> names)
   ;;
 
@@ -456,17 +420,19 @@ module Module = struct
         | Type_decl _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ -> names)
     in
     List.fold_map defs ~init:names ~f:(fun names -> function
-      | Let (pat, expr) ->
-        (* FIXME: handle recursion *)
-        let pat_names, pat = Pattern.of_untyped_with_names ~names ~types pat in
-        let names =
-          (* Unify pattern bindings with local type information (e.g. val declarations) *)
-          Name_bindings.merge_names names pat_names ~combine:(fun _ entry entry' ->
-            let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
-            Type_bindings.unify ~names ~types typ typ';
-            entry)
-        in
-        names, Let (pat, expr)
+      | Let bindings ->
+        (* FIXME: handle recursion? - probably fine I think *)
+        List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
+          let pat_names, pat = Pattern.of_untyped_with_names ~names ~types pat in
+          let names =
+            (* Unify pattern bindings with local type information (e.g. val declarations) *)
+            Name_bindings.merge_names names pat_names ~combine:(fun _ entry entry' ->
+              let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
+              Type_bindings.unify ~names ~types typ typ';
+              entry)
+          in
+          names, (pat, expr))
+        |> Tuple2.map_snd ~f:let_
       | Module (module_name, sigs, defs) ->
         let names = Name_bindings.into_module names module_name in
         let names, defs = handle_value_bindings ~names ~types sigs defs in
@@ -475,6 +441,8 @@ module Module = struct
       | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls")
   ;;
 
+  (* TODO: need to insert a step here to re-group let bindings *)
+
   (** Type-check the expressions (definitions) for each let binding and trait implementation.
       Performs let-generalization on free variables in let statement bindings.
       (Let-generalization is not currently done for local let bindings within expressions.)
@@ -482,12 +450,21 @@ module Module = struct
   let rec type_defs ~names ~types =
     List.fold_map ~init:names ~f:(fun names -> function
       | Common_def _ as def -> names, def
-      | Let ((pat, pat_type), expr) ->
+      | Let bindings ->
         (* FIXME: handle recursion *)
-        let expr, expr_type = Expr.of_untyped ~names ~types expr in
-        Type_bindings.unify ~names ~types pat_type expr_type;
-        let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
-        names, Let (pat, (expr, scheme))
+        (* At this point, let bindings have been optimally re-grouped so that
+           generalization can be done after type-checking each group in order *)
+        let bindings =
+          List.map bindings ~f:(fun ((pat, pat_type), expr) ->
+            let expr, expr_type = Expr.of_untyped ~names ~types expr in
+            (* TODO: unification like this was done before as well - are both needed? *)
+            Type_bindings.unify ~names ~types pat_type expr_type;
+            (pat, pat_type), expr)
+        in
+        List.fold_map bindings ~init:names ~f:(fun names ((pat, pat_type), expr) ->
+          let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
+          names, (pat, (expr, scheme)))
+        |> Tuple2.map_snd ~f:let_
       | Module (module_name, sigs, defs) ->
         let names, defs =
           type_defs ~names:(Name_bindings.into_module names module_name) ~types defs

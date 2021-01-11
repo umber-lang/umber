@@ -1,14 +1,30 @@
 # Mutual recursion within a module is allowed for both types and let-bindings
 
+# See https://www.reddit.com/r/haskell/comments/cifmns/inferring_types_for_mutually_recursive_definitions/
+let f0 = f1
+let f1 = f0 False
+
 # Types can be used before being defined
 val f : Forest a
 let f = Nil
 
+# FIXME: likely problem is generalizing too early - need to generalize them together, probably (?)
+  Should see how Haskell does this
+  May need to group mutually recursive functions together and generalize them at once
+    => dependency graph?
+# TODO: Fix by grouping let statements into binding groups which are mutually recursive
+  Topological sort of the strongly connected components of the variable call graph:
+  - https://jeremymikkola.com/posts/2019_01_11_type_inference_for_haskell_part_11.html
+  - https://www.projectrhea.org/rhea/index.php/Topological_Sort_and_Strongly_Connected_Components_Old_Kiwi
+# NOTE: this is not allowed in OCaml with the error:
+  > This kind of expression is not allowed as right-hand side of `let rec'
+  It works if the `forest` argument to `sum_forest` is written explicitly.
+  (`let rec` can only be followed by a function definition, a constructor, or the `lazy` keyword.)
 let sum_forest =
   let loop acc = match
     # TODO: syntactic sugar for lists and other sequences
     | Nil -> acc
-    | Cons x xs -> loop (acc + x) xs
+    | Cons tree trees -> loop (acc + sum_tree tree) trees
   loop 0
 
 let sum_tree = match
@@ -31,3 +47,4 @@ let number =
 
 # TODO: add tests for mutual recursion with submodules
   e.g. imports to/from, usage between the parent and child
+  ^ make the above module `Tree` and have mutual usage with the parent
