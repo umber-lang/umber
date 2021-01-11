@@ -165,65 +165,20 @@ module Pattern = struct
 end
 
 module Expr = struct
-  type t =
+  type 'typ expr =
     | Literal of Untyped.Literal.t
     | Name of Value_name.Qualified.t
-    | Fun_call of t * t
-    | Lambda of Pattern.t * t
-    | Match of t * (Pattern.t * t) list
-    | Let of (Pattern.t, t) Let_binding.t (* TODO: should also have the type here, probably *)
-    | Tuple of t list
-    | Record_literal of (Value_name.t * t option) list
-    | Record_update of t * (Value_name.t * t option) list
-    | Record_field_access of t * Value_name.t
+    | Fun_call of 'typ expr * 'typ expr
+    | Lambda of Pattern.t * 'typ expr
+    | Match of 'typ expr * (Pattern.t * 'typ expr) list
+    | Let of (Pattern.t * 'typ, 'typ expr) Let_binding.t
+    | Tuple of 'typ expr list
+    | Record_literal of (Value_name.t * 'typ expr option) list
+    | Record_update of 'typ expr * (Value_name.t * 'typ expr option) list
+    | Record_field_access of 'typ expr * Value_name.t
   [@@deriving sexp]
 
-  (*let reassociate_op_tree =
-    let rec reassociate_op_tree ~names = function
-      | Btree.Node (op_name, left_child, right_child) as root ->
-        let op_assoc, op_level = Name_bindings.find_fixity names op_name in
-        (match left_child with
-        | Node (left_name, _, _) ->
-          let left_assoc, left_level = Name_bindings.find_fixity names left_name in
-          (match Ordering.of_int (Fixity.Level.compare op_level left_level) with
-          | Less ->
-            (* Top is looser, this is good - now check the right child *)
-            check_right_child ~names root op_name op_assoc op_level left_child right_child
-          | Greater ->
-            (* Top is tigher, rotate to fix *)
-            reassociate_op_tree ~names (Btree.rotate_clockwise_exn root)
-          | Equal ->
-            (* Fixity tie - check associativity *)
-            (* This the left child, so they should both be right-associative *)
-            (*FIXME: equal level - also, ^ what is this reasoning up here? *)
-            (match op_assoc, left_assoc with
-            | Fixity.Assoc.(Right, Right) ->
-              Btree.Node (op_name, reassociate_op_tree ~names left_child, right_child)
-            | _ -> type_error_msg "Associativity error"))
-        | Leaf _ ->
-          check_right_child ~names root op_name op_assoc op_level left_child right_child)
-      | Leaf _ as leaf -> leaf
-    and check_right_child ~names root op_name op_assoc op_level left_child right_child =
-      match right_child with
-      | Btree.Node (right_name, _, _) ->
-        let right_assoc, right_level = Name_bindings.find_fixity names right_name in
-        (match Ordering.of_int (Fixity.Level.compare op_level right_level) with
-        | Less ->
-          (* FIXME: we still have to do something here, right?
-             - we need to reassociate the children, and the rotations may not work *)
-          root
-        | Greater -> reassociate_op_tree ~names (Btree.rotate_anticlockwise_exn root)
-        | Equal ->
-          (match op_assoc, right_assoc with
-          | Fixity.Assoc.(Left, Left) ->
-            (* FIXME: this doesn't seem right, as I think you may have to come back up the tree sometimes
-               Also, what happens to the left child here? *)
-            Node (op_name, left_child, reassociate_op_tree ~names right_child)
-          | _ -> type_error_msg "Associativity error"))
-      | Leaf _ -> (* FIXME: do something here *) root
-    in
-    reassociate_op_tree
-  ;;*)
+  type t = Type.Scheme.t expr [@@deriving sexp]
 
   module Op_tree = struct
     let rec fix_precedence ~names = function
@@ -401,15 +356,16 @@ module Expr = struct
             in
             List.iter bindings ~f:(fun ((_, pat_type), (_, expr_type)) ->
               Type_bindings.unify ~names ~types pat_type expr_type);
-            (* TODO: should probably also return the types here, so they can be listed in the AST *)
-            names, List.map bindings ~f:(fun ((pat, _), (expr, _)) -> pat, expr))
+            ( names
+            , List.map bindings ~f:(fun ((pat, pat_type), (expr, _)) ->
+                (pat, pat_type), expr) ))
           else
             (* Process bindings in order without any recursion *)
             List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
               let names, (pat, pat_type) = Pattern.of_untyped_into ~names ~types pat in
               let expr, expr_type = of_untyped ~names ~types expr in
               Type_bindings.unify ~names ~types pat_type expr_type;
-              names, (pat, expr))
+              names, ((pat, pat_type), expr))
         in
         let body, body_type = of_untyped ~names ~types body in
         Let { rec_; bindings; body }, body_type
@@ -431,6 +387,36 @@ module Expr = struct
         expr, t1
     in
     of_untyped ~names ~types expr |> Tuple2.map_snd ~f:(Type_bindings.substitute types)
+  ;;
+
+  let generalize_let_bindings ~names ~types =
+    let rec loop ~names ~types = function
+      | Let { rec_; bindings; body; _ } ->
+        let bindings =
+          List.map bindings ~f:(fun ((pat, pat_type), expr) ->
+            let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
+            (pat, scheme), loop ~names ~types expr)
+        in
+        Let { rec_; bindings; body = loop ~names ~types body }
+      | (Literal _ | Name (_, _)) as expr -> expr
+      | Fun_call (f, body) -> Fun_call (loop ~names ~types f, loop ~names ~types body)
+      | Lambda (arg, body) -> Lambda (arg, loop ~names ~types body)
+      | Match (expr, branches) ->
+        Match
+          ( loop ~names ~types expr
+          , List.map branches ~f:(Tuple2.map_snd ~f:(loop ~names ~types)) )
+      | Tuple fields -> Tuple (List.map fields ~f:(loop ~names ~types))
+      | Record_literal fields ->
+        Record_literal
+          (List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(loop ~names ~types))))
+      | Record_update (expr, fields) ->
+        Record_update
+          ( loop ~names ~types expr
+          , List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(loop ~names ~types))) )
+      | Record_field_access (record, field) ->
+        Record_field_access (loop ~names ~types record, field)
+    in
+    loop ~names ~types
   ;;
 end
 
@@ -506,7 +492,7 @@ module Module = struct
   ;;
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
-      Also type the patterns in each let binding and assign the names fresh type variables *)
+      Also type the patterns in each let binding and assign the names fresh type variables. *)
   let rec handle_value_bindings ~names ~types sigs defs =
     let names =
       gather_names ~names sigs defs ~handle_common:(fun names -> function
@@ -561,6 +547,8 @@ module Module = struct
         in
         List.fold_map bindings ~init:names ~f:(fun names ((pat, pat_type), expr) ->
           let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
+          (* Generalize local let bindings just after the parent binding *)
+          let expr = Expr.generalize_let_bindings ~names ~types expr in
           names, (pat, (expr, scheme)))
         |> Tuple2.map_snd ~f:let_
       | Module (module_name, sigs, defs) ->

@@ -12,6 +12,7 @@ module Primitive : sig
 end
 
 module Param : sig
+  (* TODO: consider adding support for weak type variables here *)
   type t = Type_param_name.t [@@deriving compare, equal, hash, sexp]
 
   module Env_to_vars : sig

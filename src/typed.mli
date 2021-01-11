@@ -25,24 +25,26 @@ module Pattern : sig
 end
 
 module Expr : sig
-  type t =
+  type 'typ expr =
     | Literal of Untyped.Literal.t
     | Name of Value_name.Qualified.t
-    | Fun_call of t * t
-    | Lambda of Pattern.t * t
-    | Match of t * (Pattern.t * t) list
-    | Let of (Pattern.t, t) Let_binding.t
-    | Tuple of t list
-    | Record_literal of (Value_name.t * t option) list
-    | Record_update of t * (Value_name.t * t option) list
-    | Record_field_access of t * Value_name.t
+    | Fun_call of 'typ expr * 'typ expr
+    | Lambda of Pattern.t * 'typ expr
+    | Match of 'typ expr * (Pattern.t * 'typ expr) list
+    | Let of (Pattern.t * 'typ, 'typ expr) Let_binding.t
+    | Tuple of 'typ expr list
+    | Record_literal of (Value_name.t * 'typ expr option) list
+    | Record_update of 'typ expr * (Value_name.t * 'typ expr option) list
+    | Record_field_access of 'typ expr * Value_name.t
   [@@deriving sexp]
+
+  type t = Type.Scheme.t expr [@@deriving sexp]
 
   val of_untyped
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Expr.t
-    -> t * Type.t
+    -> Type.t expr * Type.t
 
   module Op_tree : sig
     (** Re-associate the operator tree through tree rotations.

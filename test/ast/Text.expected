@@ -23,7 +23,10 @@
   (Let
    (((Tuple ((Catch_all (a)) (Catch_all (b))))
      ((Let
-       ((rec_ true) (bindings (((Catch_all (empty)) (Literal (String "")))))
+       ((rec_ true)
+        (bindings
+         ((((Catch_all (empty)) (Type_app (() String) ()))
+           (Literal (String "")))))
         (body (Tuple ((Literal (Char a)) (Literal (Char b)))))))
       (Tuple ((Type_app (() Char) ()) (Type_app (() Char) ())))))))
   (Let
