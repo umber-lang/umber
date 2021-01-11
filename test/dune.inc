@@ -47,6 +47,15 @@
  (action (no-infer (diff ast/Imports.expected ast/Imports.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/LetBindingGroups.expected tokens/LetBindingGroups.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/LetBindingGroups.expected ast/LetBindingGroups.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/LetPattern.expected tokens/LetPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)

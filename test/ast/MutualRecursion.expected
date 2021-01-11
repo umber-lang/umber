@@ -29,7 +29,10 @@
       (Match (Name (() ""))
        (((Cnstr_appl (() Leaf) ()) (Literal (Int 0)))
         ((Cnstr_appl (() Node) ((Catch_all (x)) (Catch_all (forest))))
-         (Name (() x)))))))))
+         (Op_tree
+          ((() +)
+           (((Name (() x)))
+            ((Fun_call (Name (() sum_forest)) (Name (() forest))))))))))))))
   (Common_def
    (Type_decl Forest
     ((a) (Alias (Type_app (() List) ((Type_app (() Tree) ((Var a)))))))))

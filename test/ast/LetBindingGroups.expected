@@ -1,0 +1,31 @@
+(LetBindingGroups ()
+ ((Let
+   (((Catch_all (a)) ((Literal (Int 1)) (Type_app (() Int) ())))
+    ((Catch_all (fun))
+     ((Lambda (Catch_all (n))
+       (Fun_call (Fun_call (Name (() ^)) (Name (() n))) (Literal (Int 2))))
+      (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))
+    ((Catch_all (b))
+     ((Fun_call (Fun_call (Name (() +)) (Name (() a))) (Literal (Int 6)))
+      (Type_app (() Int) ())))))
+  (Let
+   (((Tuple ())
+     ((Let
+       ((rec_ true)
+        (bindings (((Tuple ()) (Tuple ())) ((Catch_all ()) (Name (() fun)))))
+        (body (Tuple ()))))
+      (Tuple ())))))
+  (Let
+   (((Catch_all (bottom))
+     ((Let
+       ((rec_ true)
+        (bindings
+         (((Catch_all (bottom_again))
+           (Let
+            ((rec_ true)
+             (bindings
+              (((Catch_all (go_left)) (Name (() go_right)))
+               ((Catch_all (go_right)) (Name (() go_left)))))
+             (body (Name (() go_left))))))))
+        (body (Name (() bottom_again)))))
+      (Var a)))))))

@@ -67,6 +67,9 @@ PIPE
 (LOWER_NAME forest)
 ARROW
 (LOWER_NAME x)
+(OPERATOR +)
+(LOWER_NAME sum_forest)
+(LOWER_NAME forest)
 DEDENT
 TYPE
 ALIAS

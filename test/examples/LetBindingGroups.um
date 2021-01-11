@@ -1,0 +1,21 @@
+# Let bindings can be given as a group
+let
+	a = 1
+	fun n = n ^ 2 #- 2 * n + n * (n - 8) * 5  # FIXME: associativity
+	b = a + 6
+
+# This works in expressions as well
+let () =
+	let
+		() = ()
+		_ = fun
+	()
+
+# This allows for mutual recursion between local let bindings in expressions
+let bottom =
+	let bottom_again =
+		let
+			go_left = go_right
+			go_right = go_left
+		go_left
+	bottom_again
