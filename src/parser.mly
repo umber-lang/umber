@@ -176,6 +176,8 @@ expr_op_term:
 %inline match_branches:
   | branches = pipe_branches(separated_pair(pattern, ARROW, expr)) { branches }
 
+(* Expressions with binary operators are first parsed as if all operators were
+   left-associative with the same precedence. This operator tree is later re-associated. *)
 expr_op_tree:
   | left = expr_op_term; op = operator; right = expr_op_term
     { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, Leaf left, Leaf right) }

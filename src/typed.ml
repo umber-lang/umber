@@ -178,50 +178,64 @@ module Expr = struct
     | Record_field_access of t * Value_name.t
   [@@deriving sexp]
 
-  (* Re-associate the tree through rotations until each operator has fixity less
-     than its children's fixities *)
-  let rec reassociate_op_tree ~names = function
-    | Btree.Node (op_name, left_child, right_child) as root ->
-      let op_assoc, op_level = Name_bindings.find_fixity names op_name in
-      (match left_child with
-      | Node (left_name, _, _) ->
-        let left_assoc, left_level = Name_bindings.find_fixity names left_name in
-        let comp = Fixity.Level.compare op_level left_level in
-        if comp < 0
-        then (* Top is lower (looser), this is good *)
-             (* FIXME: do something here *)
+  (** Re-associate the operator tree through tree rotations.
+      These constraints must hold on the finished tree:
+        1. Every node has precedence less than or equal to both its childrens' precedence.
+        2. When a node has precedence equal to that of one or both or its children,
+           they must all share the same associativity:
+           a. In the case of left associativity, rotating anticlockwise must result in a
+              tree which violates constraint 1.
+           b. In the case of right associativity, rotating clockwise must result in a tree
+              which violates constraint 1.
+           c. The case of no associativity is not allowed.
+
+      TODO: should operators with the same precedence all be put into the same node?
+        - this might simplify things a bit *)
+  let reassociate_op_tree =
+    let rec reassociate_op_tree ~names = function
+      | Btree.Node (op_name, left_child, right_child) as root ->
+        let op_assoc, op_level = Name_bindings.find_fixity names op_name in
+        (match left_child with
+        | Node (left_name, _, _) ->
+          let left_assoc, left_level = Name_bindings.find_fixity names left_name in
+          (match Ordering.of_int (Fixity.Level.compare op_level left_level) with
+          | Less ->
+            (* Top is looser, this is good - now check the right child *)
+            check_right_child ~names root op_name op_assoc op_level left_child right_child
+          | Greater ->
+            (* Top is tigher, rotate to fix *)
+            reassociate_op_tree ~names (Btree.rotate_clockwise_exn root)
+          | Equal ->
+            (* Fixity tie - check associativity *)
+            (* This the left child, so they should both be right-associative *)
+            (*FIXME: equal level - also, ^ what is this reasoning up here? *)
+            (match op_assoc, left_assoc with
+            | Fixity.Assoc.(Right, Right) ->
+              Btree.Node (op_name, reassociate_op_tree ~names left_child, right_child)
+            | _ -> type_error_msg "Associativity error"))
+        | Leaf _ ->
+          check_right_child ~names root op_name op_assoc op_level left_child right_child)
+      | Leaf _ as leaf -> leaf
+    and check_right_child ~names root op_name op_assoc op_level left_child right_child =
+      match right_child with
+      | Btree.Node (right_name, _, _) ->
+        let right_assoc, right_level = Name_bindings.find_fixity names right_name in
+        (match Ordering.of_int (Fixity.Level.compare op_level right_level) with
+        | Less ->
+          (* FIXME: we still have to do something here, right?
+             - we need to reassociate the children, and the rotations may not work *)
           root
-        else if comp > 0
-        then
-          (* Top is higher (tigher), rotate to fix *)
-          reassociate_op_tree ~names (Btree.rotate_clockwise_exn root)
-        else (
-          (* Equal level - check associativity *)
-          (* This the left child, so they should both be right-associative *)
-          (*FIXME: equal level*)
-          match op_assoc, left_assoc with
-          | Fixity.Assoc.(Right, Right) ->
-            Node (op_name, reassociate_op_tree ~names left_child, right_child)
-          | _ -> type_error_msg "Associativity error")
-      | Leaf _ ->
-        (match right_child with
-        | Node (right_name, _, _) ->
-          let right_assoc, right_level = Name_bindings.find_fixity names right_name in
-          let comp = Fixity.Level.compare op_level right_level in
-          if comp < 0
-          then (* FIXME: we still have to do something here, right? *)
-            root
-          else if comp > 0
-          then reassociate_op_tree ~names (Btree.rotate_anticlockwise_exn root)
-          else (
-            match op_assoc, right_assoc with
-            | Fixity.Assoc.(Left, Left) ->
-              (* FIXME: this doesn't seem right, as I think you may have to come back up the tree sometimes
-                 Also, what happens to the left child here? *)
-              Node (op_name, left_child, reassociate_op_tree ~names right_child)
-            | _ -> type_error_msg "Associativity error")
-        | Leaf _ -> (* FIXME: do something here *) root))
-    | Leaf _ as leaf -> leaf
+        | Greater -> reassociate_op_tree ~names (Btree.rotate_anticlockwise_exn root)
+        | Equal ->
+          (match op_assoc, right_assoc with
+          | Fixity.Assoc.(Left, Left) ->
+            (* FIXME: this doesn't seem right, as I think you may have to come back up the tree sometimes
+               Also, what happens to the left child here? *)
+            Node (op_name, left_child, reassociate_op_tree ~names right_child)
+          | _ -> type_error_msg "Associativity error"))
+      | Leaf _ -> (* FIXME: do something here *) root
+    in
+    reassociate_op_tree
   ;;
 
   let of_untyped ~names ~types expr =

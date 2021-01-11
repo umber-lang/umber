@@ -43,8 +43,6 @@ module Expr : sig
     -> types:Type_bindings.t
     -> Untyped.Expr.t
     -> t * Type.t
-
-  (* TODO: consider making the return types Result.t's *)
 end
 
 module Module : sig

@@ -18,7 +18,13 @@
     (()
      (Function (Var a)
       (Function (Type_app (() List) ((Var a)))
-       (Type_app (() List) ((Var a)))))))))
+       (Type_app (() List) ((Var a))))))))
+  (Common_sig
+   (Val "\195\151" ()
+    (()
+     (Function (Type_app (() List) ((Var a)))
+      (Function (Type_app (() List) ((Var b)))
+       (Type_app (() List) ((Tuple ((Var a) (Var b)))))))))))
  ((Let
    (((Catch_all ())
      (Qualified (Arith)
