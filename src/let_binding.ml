@@ -5,4 +5,4 @@ type ('pat, 'expr) t =
   ; bindings : ('pat * 'expr) list
   ; body : 'expr
   }
-[@@deriving sexp]
+[@@deriving equal, compare, hash, sexp]

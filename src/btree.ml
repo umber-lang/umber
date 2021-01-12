@@ -3,6 +3,7 @@ open Import
 type ('node, 'leaf) t =
   | Node of 'node * ('node, 'leaf) t * ('node, 'leaf) t
   | Leaf of 'leaf
+[@@deriving equal, compare, hash]
 
 let rec sexp_of_t sexp_of_node sexp_of_leaf = function
   | Leaf data -> Sexp.List [ sexp_of_leaf data ]

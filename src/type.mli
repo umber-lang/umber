@@ -41,13 +41,12 @@ module Expr : sig
     | Tuple of 'var t list
   [@@deriving compare, equal, hash, sexp, variants]
 
-  val map_vars : 'a t -> f:('a -> 'b) -> 'b t
-
   val map
     :  'a t
     -> f:('a t -> [< `Halt of 'a t | `Defer of 'a t | `Retry of 'a t ])
     -> 'a t
 
+  val map_vars : 'a t -> f:('a -> 'b) -> 'b t
   val fold_vars : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc) -> 'acc
   val for_all_vars : 'a t -> f:('a -> bool) -> bool
 

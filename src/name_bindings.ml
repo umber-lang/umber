@@ -221,12 +221,18 @@ let absolutify_path t path =
     ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
 ;;
 
-(* TODO: this should be able to be removed - absolutify_path should be good enough *)
 let absolutify_type_name =
   find
     ~f:(fun path bindings name ->
       Option.some_if (Map.mem bindings.types name) (path, name))
     ~to_ustring:Type_name.Qualified.to_ustring
+;;
+
+let absolutify_value_name =
+  find
+    ~f:(fun path bindings name ->
+      Option.some_if (Map.mem bindings.names name) (path, name))
+    ~to_ustring:Value_name.Qualified.to_ustring
 ;;
 
 (* TODO: how do I fill in foreign modules?
@@ -425,3 +431,5 @@ let merge_names t new_names ~combine =
           Local (combine key entry1 entry2))
     })
 ;;
+
+let current_path = fst

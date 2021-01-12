@@ -101,11 +101,20 @@ module Module_name : Name = Upper_name
 module Module_path : sig
   type t = Module_name.t list [@@deriving compare, equal, hash, sexp]
 
+  include Comparable.S with type t := t
+  include Hashable.S with type t := t
+
   val of_ustrings_unchecked : Ustring.t list -> t
   val of_ustrings_exn : Ustring.t list -> t
   val to_ustring : t -> Ustring.t
 end = struct
-  type t = Module_name.t list [@@deriving compare, equal, hash, sexp]
+  module T = struct
+    type t = Module_name.t list [@@deriving compare, equal, hash, sexp]
+  end
+
+  include T
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let of_ustrings_unchecked = List.map ~f:Module_name.of_ustring_unchecked
   let of_ustrings_exn = List.map ~f:Module_name.of_ustring_exn

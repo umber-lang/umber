@@ -57,10 +57,14 @@ val find_absolute_decl : t -> Type_name.Qualified.t -> Type.Decl.t
 (** Convert a qualified type name to one with an absolute module path *)
 val absolutify_type_name : t -> Type_name.Qualified.t -> Type_name.Qualified.t
 
+(** Convert a qualiied value name to one with an absolute module path *)
+val absolutify_value_name : t -> Value_name.Qualified.t -> Value_name.Qualified.t
+
 (* Scope handling *)
 val into_module : t -> Module_name.t -> t
 val into_parent : t -> t
 val with_submodule : t -> Module_name.t -> f:(t -> t) -> t
+val current_path : t -> Module_path.t
 
 (* AST handling *)
 (* TODO: rename Import -> Common, and split into Import.t with:

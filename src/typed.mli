@@ -25,33 +25,33 @@ module Pattern : sig
 end
 
 module Expr : sig
-  type 'typ expr =
+  type 'typ t =
     | Literal of Untyped.Literal.t
     | Name of Value_name.Qualified.t
-    | Fun_call of 'typ expr * 'typ expr
-    | Lambda of Pattern.t * 'typ expr
-    | Match of 'typ expr * (Pattern.t * 'typ expr) list
-    | Let of (Pattern.t * 'typ, 'typ expr) Let_binding.t
-    | Tuple of 'typ expr list
-    | Record_literal of (Value_name.t * 'typ expr option) list
-    | Record_update of 'typ expr * (Value_name.t * 'typ expr option) list
-    | Record_field_access of 'typ expr * Value_name.t
+    | Fun_call of 'typ t * 'typ t
+    | Lambda of Pattern.t * 'typ t
+    | Match of 'typ t * (Pattern.t * 'typ t) list
+    | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
+    | Tuple of 'typ t list
+    | Record_literal of (Value_name.t * 'typ t option) list
+    | Record_update of 'typ t * (Value_name.t * 'typ t option) list
+    | Record_field_access of 'typ t * Value_name.t
   [@@deriving sexp]
-
-  type t = Type.Scheme.t expr [@@deriving sexp]
 
   val of_untyped
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Expr.t
-    -> Type.t expr * Type.t
+    -> Type.t t * Type.t
 end
 
 module Module : sig
   include module type of Module
 
-  type nonrec t = (Pattern.t, Expr.t * Type.Scheme.t) t [@@deriving sexp]
-  type nonrec def = (Pattern.t, Expr.t * Type.Scheme.t) def [@@deriving sexp]
+  type nonrec t = (Pattern.t, Type.Scheme.t Expr.t * Type.Scheme.t) t [@@deriving sexp]
+
+  type nonrec def = (Pattern.t, Type.Scheme.t Expr.t * Type.Scheme.t) def
+  [@@deriving sexp]
 
   val of_untyped
     :  ?backtrace:bool

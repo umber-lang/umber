@@ -75,32 +75,26 @@ module Expr = struct
     | Tuple of 'var t list
   [@@deriving compare, equal, hash, sexp, variants]
 
-  let rec map_vars typ ~f =
-    match typ with
-    | Var var -> Var (f var)
-    | Primitive _ as typ -> typ
-    | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map_vars ~f))
-    | Tuple fields -> Tuple (List.map fields ~f:(map_vars ~f))
-    | Function (arg, body) ->
-      (* Ensure functions are evaluated left-to-right for consistency*)
-      let arg = map_vars ~f arg in
-      Function (arg, map_vars ~f body)
-  ;;
-
-  let rec map typ ~f =
+  let rec map typ ~f ~var =
     match f typ with
     | `Halt typ -> typ
-    | `Retry typ -> map typ ~f
+    | `Retry typ -> map typ ~f ~var
     | `Defer typ ->
       (match typ with
-      | Var _ | Primitive _ -> typ
-      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f))
-      | Tuple fields -> Tuple (List.map fields ~f:(map ~f))
+      | Var v -> Var (var v)
+      | Primitive _ as typ -> typ
+      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var))
+      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var))
       | Function (arg, body) ->
         (* Ensure functions are evaluated left-to-right for consistency*)
-        let arg = map ~f arg in
-        Function (arg, map ~f body))
+        let arg = map ~f ~var arg in
+        Function (arg, map ~f ~var body))
   ;;
+
+  let map_vars typ ~f = map typ ~f:(fun typ -> `Defer typ) ~var:f
+
+  (* TODO: make a functor or something to be able to used the more general map *)
+  let map = map ~var:Fn.id
 
   let rec fold_vars typ ~init ~f =
     match typ with
