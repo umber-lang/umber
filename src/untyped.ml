@@ -56,7 +56,8 @@ module Pattern = struct
         | Union (pat, _) ->
           (* Both branches bind the same names, so only one need be considered *)
           loop acc ~f pat
-        | Constant _ | Catch_all None | Type_annotation _ -> acc
+        | Type_annotation (pat, _) -> loop acc ~f pat
+        | Constant _ | Catch_all None -> acc
       in
       loop init ~f pat
     ;;

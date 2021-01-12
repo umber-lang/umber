@@ -508,6 +508,10 @@ module Module = struct
   (** Reintegrate the re-ordered binding groups from [extract_binding_groups] back into
       the AST. *)
   let reintegrate_binding_groups path other_defs binding_groups =
+    (* TODO: we could get back close to the original order (for easier testing, at least)
+       by sorting by line number/position in the original file
+       Adding original file positions is also a good opportunity to get better error
+       reporting *)
     (* NOTE: As we disallow cross-module mutual recursion, binding groups will always be
        contained within a single module and can just be put back into the AST *)
     let binding_table = Module_path.Table.create () in
