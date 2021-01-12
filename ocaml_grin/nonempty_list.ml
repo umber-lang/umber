@@ -1,5 +1,7 @@
 type 'a t = 'a list
 
+let cons hd tl = hd :: tl
+
 let of_list = function
   | [] -> None
   | xs -> Some xs

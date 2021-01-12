@@ -70,5 +70,3 @@ module Prog = struct
   (* TODO: to_bigstring, or something like that: write to an existing bigstring?
      What did I do for Ocaml Pickle? *)
 end
-
-type t = Prog.t

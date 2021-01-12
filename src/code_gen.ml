@@ -1,5 +1,6 @@
 (* TODO: consider using GRIN for codegen https://github.com/grin-compiler/grin *)
-(* Generating LLVM IR for the AST *)
+(* Generating LLVM IR for the AST
+   see https://llvm.org/docs/tutorial/OCamlLangImpl3.html *)
 
 (*
 open Import

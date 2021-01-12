@@ -123,5 +123,3 @@ end
 module Prog : sig
   type t = Binding.t Nonempty_list.t
 end
-
-type t = Prog.t
