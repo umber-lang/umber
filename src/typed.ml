@@ -510,8 +510,14 @@ module Module = struct
   let reintegrate_binding_groups path other_defs binding_groups =
     (* TODO: we could get back close to the original order (for easier testing, at least)
        by sorting by line number/position in the original file
-       Adding original file positions is also a good opportunity to get better error
-       reporting *)
+       - Adding original file positions is also a good opportunity to get better error
+       reporting
+       - Possible approach:
+         - We store the token stream, which has file positions (line/column)
+         - Each AST node knows which tokens it came from in the stream (indexes?) *)
+    (* More on error reporting:
+       See this guy's blog: https://arzg.github.io/lang/
+       Error tokens should be a thing if possible - that can probably wait for a rewrite *)
     (* NOTE: As we disallow cross-module mutual recursion, binding groups will always be
        contained within a single module and can just be put back into the AST *)
     let binding_table = Module_path.Table.create () in
@@ -562,12 +568,13 @@ module Module = struct
       Ok (Name_bindings.into_parent names, (module_name, sigs, defs))
     with
     | exn ->
-      let exn_msg = Exn.to_string exn in
-      let full_msg =
+      let msg =
         if backtrace
-        then exn_msg ^ "\n" ^ Backtrace.(to_string (Exn.most_recent ()))
-        else exn_msg
+        then (
+          let backtrace = Backtrace.(to_string (Exn.most_recent ())) in
+          Exn.to_string exn ^ "\n" ^ backtrace)
+        else Exn.to_string exn
       in
-      Error (Ustring.of_string_exn full_msg)
+      Error (Ustring.of_string_exn msg)
   ;;
 end
