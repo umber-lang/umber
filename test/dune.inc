@@ -35,6 +35,18 @@
   (no-infer (diff ast/ErrorDuplicateVal.expected ast/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorPolymorphicRecursion.expected
+    tokens/ErrorPolymorphicRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorPolymorphicRecursion.expected
+    ast/ErrorPolymorphicRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Functions.expected tokens/Functions.out))))
 
 (rule (alias runtest) (deps test.dummy)

@@ -1,0 +1,2 @@
+(src/type_bindings.ml.Type_error "Occurs check failed"
+  (((Function (Type_app (() Bool) ()) (Var 37)) (Var 37))))
