@@ -1,9 +1,5 @@
 # Mutual recursion within a module is allowed for both types and let-bindings
 
-# See https://www.reddit.com/r/haskell/comments/cifmns/inferring_types_for_mutually_recursive_definitions/
-let f0 = f1
-let f1 = f0 False
-
 # Types can be used before being defined
 val f : Forest a
 let f = Nil
