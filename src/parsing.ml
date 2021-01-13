@@ -55,6 +55,7 @@ let parse ?print_tokens_to ?(full_lex = false) lexbuf =
     match checkpoint with
     | I.InputNeeded _env ->
       let token = Lexer.read lexer lexbuf in
+      (* TODO: see if we can get the span information here *)
       Option.iter print_tokens_to ~f:(fun out -> sexp_of_token token |> fprint_s ~out);
       let start_pos, end_pos = Sedlexing.lexing_positions lexbuf in
       let checkpoint = I.offer checkpoint (token, start_pos, end_pos) in

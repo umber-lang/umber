@@ -324,14 +324,15 @@ optional_sig_def:
   | args = nonempty_list(X); equals; body = expr { args, body }*)
 
 stmt:
-  | s = stmt_common { Module.Common_def s }
-  | LET; binding = let_binding { Module.Let [binding] }
-  | LET; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding); DEDENT
-    { Module.Let bindings }
-  | MODULE; name = UPPER_NAME; body = optional_sig_def
-    { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
-  | TRAIT; name = UPPER_NAME; params = type_param_list; body = optional_sig_def
-    { Module.Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body) }
+  (* FIXME: attempting a rewrite of the parser at this point just to support spans seems
+     inadvisable *)
+  | s = stmt_common { Module.common_def s }
+  | s = LET; binding = let_binding { Module.let_ s [binding] }
+  | s = LET; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding); DEDENT
+    { Module.let_ s bindings }
+  | s = MODULE; name = UPPER_NAME; body = optional_sig_def { Module.module_ s name body }
+  | s = TRAIT; name = UPPER_NAME; params = type_param_list; body = optional_sig_def
+    { Module.trait s name params, body }
   (* TODO: support multiple type parameters in trait impls
      Should probably change `type_expr` to `nonempty_list(type_term)` *)
   | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; typ = type_expr;
