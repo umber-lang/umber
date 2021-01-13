@@ -296,10 +296,12 @@ stmt_common:
     { Module.Trait_sig (Trait_name.of_ustring_unchecked name, params, sig_) }
   | import = import_stmt { import }
 
-stmt_sig:
+stmt_sig_:
   | s = stmt_common { Module.Common_sig s }
   | MODULE; name = UPPER_NAME; colon; stmts = block(lines(stmt_sig))
     { Module.Module_sig (Module_name.of_ustring_unchecked name, stmts) }
+
+%inline stmt_sig: s = with_loc(stmt_sig_) { s }
 
 %inline def:
   (* TODO: try removing EQUALS_ONLY_LINE: allow sig to end in LINE_SEP? *)
@@ -314,7 +316,7 @@ optional_sig_def:
     { args, body }
   | args = nonempty_list(X); equals; body = expr { args, body }*)
 
-stmt:
+stmt_:
   | s = stmt_common { Module.Common_def s }
   | LET; binding = let_binding { Module.Let [binding] }
   | LET; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding); DEDENT
@@ -329,6 +331,8 @@ stmt:
     def = def
     { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, typ, def) }
 
+%inline stmt: s = with_loc(stmt_) { s }
+
 %inline file_module_sig:
   | sig_ = loption(preceded(FILE_MODULE, block(lines(stmt_sig)))) { sig_ }
 
@@ -336,6 +340,8 @@ prog:
   | def1 = flexible_optional_list(LINE_SEP, stmt); sig_ = file_module_sig;
     def2 = lines(stmt); EOF
     { Module_name.of_string_unchecked "", sig_, def1 @ def2 }
+
+%inline with_loc(X): node = X { { Node.node ; span = Span.of_loc $loc } }
 
 %inline lines(X): x = separated_list(LINE_SEP?, X) { x }
 %inline nonempty_lines(X): x = separated_nonempty_list(LINE_SEP?, X) { x }

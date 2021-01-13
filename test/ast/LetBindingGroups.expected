@@ -1,7 +1,11 @@
 (LetBindingGroups ()
  ((Let
-   (((Catch_all (a)) ((Literal (Int 1)) (Type_app (() Int) ())))
-    ((Catch_all (fun))
+   (((Catch_all (b))
+     ((Fun_call (Fun_call (Name (() +)) (Name (() a))) (Literal (Int 6)))
+      (Type_app (() Int) ())))))
+  (Let (((Catch_all (a)) ((Literal (Int 1)) (Type_app (() Int) ())))))
+  (Let
+   (((Catch_all (fun))
      ((Lambda (Catch_all (n))
        (Fun_call
         (Fun_call (Name (() +))
@@ -19,10 +23,7 @@
            (Fun_call (Fun_call (Name (() -)) (Name (() n)))
             (Literal (Int 8)))))
          (Literal (Int 5)))))
-      (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))
-    ((Catch_all (b))
-     ((Fun_call (Fun_call (Name (() +)) (Name (() a))) (Literal (Int 6)))
-      (Type_app (() Int) ())))))
+      (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))))
   (Let
    (((Catch_all ())
      ((Let

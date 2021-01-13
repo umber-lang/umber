@@ -42,3 +42,5 @@ let with_filename (_, sigs, defs) filename =
   in
   module_name, sigs, defs
 ;;
+
+let let_ bindings = Let bindings

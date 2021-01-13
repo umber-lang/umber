@@ -1,7 +1,5 @@
 (MutualRecursion ()
- ((Let (((Catch_all (f0)) (Name (() f1)))))
-  (Let (((Catch_all (f1)) (Fun_call (Name (() f0)) (Name (() False))))))
-  (Common_def (Val f () (() (Type_app (() Forest) ((Var a))))))
+ ((Common_def (Val f () (() (Type_app (() Forest) ((Var a))))))
   (Let (((Catch_all (f)) (Name (() Nil)))))
   (Let
    (((Catch_all (sum_forest))

@@ -37,8 +37,6 @@ open Parser
    should lex as (LET (LOWER_NAME _) EQUALS L_PAREN ... ???) (where am I going with this?)
  *)
 
-
-
 let lexeme = lexeme >> Ustring.of_array_unsafe
 let lexeme_str = lexeme >> Ustring.to_string
 
@@ -109,9 +107,9 @@ let create () =
   }
 ;;
 
-exception Syntax_error of Span.t * Ustring.t [@@deriving sexp]
+exception Syntax_error of Span.Pos.t * Ustring.t [@@deriving sexp]
 
-let span = Span.of_lexing_positions << lexing_positions
+let span = Span.of_loc << lexing_positions
 
 let syntax_error ?msg lexbuf =
   let msg =
@@ -119,7 +117,7 @@ let syntax_error ?msg lexbuf =
     | None -> lexeme lexbuf
     | Some str -> Ustring.of_string_exn (sprintf "%s after `%s`" str (lexeme_str lexbuf))
   in
-  raise (Syntax_error (span lexbuf, msg))
+  raise (Syntax_error ((span lexbuf).start, msg))
 ;;
 
 let line_sep = [%sedlex.regexp? '\n' | "\r\n"]
@@ -136,10 +134,7 @@ let operator_symbol =
 (* FIXME: stray '\r's may cause issues with indentation parsing
    '\r' should just always be ignored, I think *)
 let line_comment = [%sedlex.regexp? '#', Star (Compl (Chars "\r\n")), Plus line_sep]
-
-let unescape _ =
-  raise (Syntax_error ((-1, -1), Ustring.of_string_exn "Escapes not implemented yet"))
-;;
+let unescape _ = failwith "Escapes not implemented yet"
 
 (*let prefix_matches lexbuf s =
   mark lexbuf 0;

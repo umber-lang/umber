@@ -23,13 +23,10 @@ end
 
 let handle_syntax_error f =
   try Ok (f ()) with
-  | Lexer.Syntax_error (loc, msg) ->
+  | Lexer.Syntax_error ({ line; col }, msg) ->
     Error
-      (match loc with
-      | -1, -1 -> Ustring.(of_string_exn "Syntax error: " ^ msg)
-      | line, pos ->
-        let err = sprintf "Syntax error at line %d, position %d: " line pos in
-        Ustring.(of_string_exn err ^ msg))
+      (let err = sprintf "Syntax error at line %d, column %d: " line col in
+       Ustring.(of_string_exn err ^ msg))
 ;;
 
 let rec lex ~print_tokens_to lexbuf lexer =
@@ -44,6 +41,41 @@ let try_lex ~print_tokens_to lexbuf lexer =
   handle_syntax_error (fun () -> lex ~print_tokens_to lexbuf lexer)
 ;;
 
+(*let stmt_starter = function
+  | LET | MODULE | TRAIT | IMPL | VAL | TYPE | IMPORT -> true
+  | _ -> false
+;;
+
+type state =
+  | Default
+  | In_let of state * Span.t
+  | In_other_stmt of state * Span.t
+  | Finished_stmt of state * Span.t
+
+let advance_state state token lexuf =
+  let enter_stmt state token lexbuf =
+    match token with
+    | LET -> In_let (state, Lexer.span lexbuf)
+    | _ when stmt_starter token -> In_other_stmt (state, Lexer.span lexbuf)
+    | _ -> state
+  in
+  match state with
+  | Default -> enter_stmt state token lexbuf
+  | In_let span ->
+    (match token with
+    | LET -> state
+    | _ -> if stmt_starter token then In_other_stmt (state, Lexer.span lexbuf) else state)
+  | In_other_stmt span -> enter_stmt state token lexbuf
+  | Finished_stmt _ -> raise_s [%message "Parsing.advance_state got Finished_stmt"]
+;;
+
+let global_state = ref state
+
+let consume_finished_stmt () =
+  match !global_state with
+  | Finished_stmt (parent_state, _) -> ()
+;;*)
+
 let parse ?print_tokens_to ?(full_lex = false) lexbuf =
   let lex_remaining ~print_tokens_to lexbuf lexer =
     match print_tokens_to with
@@ -55,7 +87,6 @@ let parse ?print_tokens_to ?(full_lex = false) lexbuf =
     match checkpoint with
     | I.InputNeeded _env ->
       let token = Lexer.read lexer lexbuf in
-      (* TODO: see if we can get the span information here *)
       Option.iter print_tokens_to ~f:(fun out -> sexp_of_token token |> fprint_s ~out);
       let start_pos, end_pos = Sedlexing.lexing_positions lexbuf in
       let checkpoint = I.offer checkpoint (token, start_pos, end_pos) in
@@ -68,6 +99,7 @@ let parse ?print_tokens_to ?(full_lex = false) lexbuf =
       let checkpoint = I.resume checkpoint in
       parse ?print_tokens_to last_token lexbuf checkpoint lexer
     | I.HandlingError env ->
+      (* TODO: you can actually resume the parser here, should look into that *)
       let error () =
         lex_remaining ~print_tokens_to lexbuf lexer;
         let state = I.current_state_number env in

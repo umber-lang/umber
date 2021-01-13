@@ -471,10 +471,9 @@ module Module = struct
     let binding_table = Module_path.Table.create () in
     List.iter binding_groups ~f:(fun (def, path) ->
       Hashtbl.add_multi binding_table ~key:path ~data:def);
-    (* TODO: sort by spans *)
     let rec loop binding_table path defs =
-      Hashtbl.find_multi binding_table path
-      @ List.map
+      let defs =
+        List.map
           defs
           ~f:
             (Node.map ~f:(function
@@ -488,6 +487,11 @@ module Module = struct
                       (bindings
                         : (Pattern.t * (Type.Scheme.t Expr.t * Type.Scheme.t)) list)]
               | _ as def -> def))
+      in
+      (* Sort defs by span to get them back into their original order *)
+      List.sort
+        (Hashtbl.find_multi binding_table path @ defs)
+        ~compare:(fun def def' -> Span.compare def.span def'.span)
     in
     loop binding_table path other_defs
   ;;
