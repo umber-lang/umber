@@ -1,37 +1,45 @@
 (Text ()
- ((Let (((Catch_all (c)) ((Literal (Char a)) (Type_app (() Char) ())))))
-  (Let
-   (((Catch_all (hello))
-     ((Literal (String "hello world!")) (Type_app (() String) ())))))
-  (Let
-   (((Catch_all (spacing))
-     ((Literal (String  "line 1\r\
-                       \n\t line 2")) (Type_app (() String) ())))))
-  (Let
-   (((Catch_all (dec_code_exclam))
-     ((Literal (String !)) (Type_app (() String) ())))))
-  (Common_def
-   (Val ++ ()
-    (()
-     (Function (Type_app (() String) ())
-      (Function (Type_app (() String) ()) (Type_app (() String) ()))))))
-  (Let
-   (((Catch_all ())
-     ((Fun_call (Fun_call (Name (() ++)) (Literal (String "hello\n")))
-       (Literal (String "\bworld!")))
-      (Type_app (() String) ())))))
-  (Let
-   (((Tuple ((Catch_all (a)) (Catch_all (b))))
-     ((Let
-       ((rec_ true)
-        (bindings
-         ((((Catch_all (empty)) (Type_app (() String) ()))
-           (Literal (String "")))))
-        (body (Tuple ((Literal (Char a)) (Literal (Char b)))))))
-      (Tuple ((Type_app (() Char) ()) (Type_app (() Char) ())))))))
-  (Let
-   (((Catch_all (_UNICODE_WORKS_TOO))
-     ((Literal
-       (String
-        "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186"))
-      (Type_app (() String) ())))))))
+ ((2:1-2:12
+   (Let (((Catch_all (c)) ((Literal (Char a)) (Type_app (() Char) ()))))))
+  (3:1-3:27
+   (Let
+    (((Catch_all (hello))
+      ((Literal (String "hello world!")) (Type_app (() String) ()))))))
+  (7:1-7:36
+   (Let
+    (((Catch_all (spacing))
+      ((Literal (String  "line 1\r\
+                        \n\t line 2")) (Type_app (() String) ()))))))
+  (8:1-8:29
+   (Let
+    (((Catch_all (dec_code_exclam))
+      ((Literal (String !)) (Type_app (() String) ()))))))
+  (12:1-12:38
+   (Common_def
+    (Val ++ ()
+     (()
+      (Function (Type_app (() String) ())
+       (Function (Type_app (() String) ()) (Type_app (() String) ())))))))
+  (13:1-13:32
+   (Let
+    (((Catch_all ())
+      ((Fun_call (Fun_call (Name (() ++)) (Literal (String "hello\n")))
+        (Literal (String "\bworld!")))
+       (Type_app (() String) ()))))))
+  (20:1-24:1
+   (Let
+    (((Tuple ((Catch_all (a)) (Catch_all (b))))
+      ((Let
+        ((rec_ true)
+         (bindings
+          ((((Catch_all (empty)) (Type_app (() String) ()))
+            (Literal (String "")))))
+         (body (Tuple ((Literal (Char a)) (Literal (Char b)))))))
+       (Tuple ((Type_app (() Char) ()) (Type_app (() Char) ()))))))))
+  (24:1-24:33
+   (Let
+    (((Catch_all (_UNICODE_WORKS_TOO))
+      ((Literal
+        (String
+         "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186"))
+       (Type_app (() String) ()))))))))

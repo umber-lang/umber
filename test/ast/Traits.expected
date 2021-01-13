@@ -1,49 +1,60 @@
 (Traits ()
- ((Common_def (Import Date))
-  (Common_def
-   (Trait_sig Eq (a)
-    ((Common_sig
-      (Val == ()
-       (() (Function (Var a) (Function (Var a) (Type_app (() Bool) ())))))))))
-  (Common_def
-   (Type_decl Person
-    (()
-     (Record
-      ((name (Type_app (() String) ())) (dob (Type_app (() Date) ())))))))
-  (Let
-   (((Type_annotation (Catch_all (p)) (() (Type_app (() Person) ())))
-     (Record_literal
-      ((name ((Literal (String Bob))))
-       (dob
-        ((Fun_call (Name ((Date) of_string)) (Literal (String 2020-10-11))))))))))
-  (Impl () Eq (Type_app (() Person) ())
-   ((Let
-     (((Catch_all (==))
-       (Lambda (Catch_all (p1))
-        (Lambda (Catch_all (p2))
-         (Op_tree
-          ((() ==)
-           (((() &&)
-             (((() ==)
-               (((Record_field_access (Name (() p1)) name))
-                ((Record_field_access (Name (() p2)) name))))
-              ((Record_field_access (Name (() p1)) dob))))
-            ((Record_field_access (Name (() p2)) dob))))))))))))
-  (Impl ((Eq (a)) (Eq (b))) Eq (Tuple ((Var a) (Var b)))
-   ((Let
-     (((Catch_all (==))
-       (Lambda (Tuple ((Catch_all (a)) (Catch_all (b))))
-        (Lambda (Tuple ((Catch_all (c)) (Catch_all (d))))
-         (Op_tree
-          ((() ==)
-           (((() &&)
-             (((() ==) (((Name (() a))) ((Name (() c))))) ((Name (() d)))))
-            ((Name (() d)))))))))))
-    (Let (((Catch_all (_y)) (Tuple ((Literal (Int 1)) (Literal (Int 2)))))))
-    (Let
-     (((Tuple ())
-       (Fun_call (Name (() assert))
-        (Op_tree
-         ((() ==)
-          (((Tuple ((Name (() x)) (Name (() x)))))
-           ((Tuple ((Name (() y)) (Name (() y))))))))))))))))
+ ((1:1-1:12 (Common_def (Import Date)))
+  (3:1-6:1
+   (Common_def
+    (Trait_sig Eq (a)
+     ((4:3-4:28
+       (Common_sig
+        (Val == ()
+         (() (Function (Var a) (Function (Var a) (Type_app (() Bool) ())))))))))))
+  (6:1-9:2
+   (Common_def
+    (Type_decl Person
+     (()
+      (Record
+       ((name (Type_app (() String) ())) (dob (Type_app (() Date) ()))))))))
+  (11:1-14:2
+   (Let
+    (((Type_annotation (Catch_all (p)) (() (Type_app (() Person) ())))
+      (Record_literal
+       ((name ((Literal (String Bob))))
+        (dob
+         ((Fun_call (Name ((Date) of_string)) (Literal (String 2020-10-11)))))))))))
+  (16:1-20:1
+   (Impl () Eq (Type_app (() Person) ())
+    ((18:3-18:58
+      (Let
+       (((Catch_all (==))
+         (Lambda (Catch_all (p1))
+          (Lambda (Catch_all (p2))
+           (Op_tree
+            ((() ==)
+             (((() &&)
+               (((() ==)
+                 (((Record_field_access (Name (() p1)) name))
+                  ((Record_field_access (Name (() p2)) name))))
+                ((Record_field_access (Name (() p1)) dob))))
+              ((Record_field_access (Name (() p2)) dob))))))))))))))
+  (20:1-27:36
+   (Impl ((Eq (a)) (Eq (b))) Eq (Tuple ((Var a) (Var b)))
+    ((20:34-20:75
+      (Let
+       (((Catch_all (==))
+         (Lambda (Tuple ((Catch_all (a)) (Catch_all (b))))
+          (Lambda (Tuple ((Catch_all (c)) (Catch_all (d))))
+           (Op_tree
+            ((() ==)
+             (((() &&)
+               (((() ==) (((Name (() a))) ((Name (() c))))) ((Name (() d)))))
+              ((Name (() d))))))))))))
+     (24:1-26:2
+      (Let
+       (((Catch_all (_y)) (Tuple ((Literal (Int 1)) (Literal (Int 2))))))))
+     (27:1-27:36
+      (Let
+       (((Tuple ())
+         (Fun_call (Name (() assert))
+          (Op_tree
+           ((() ==)
+            (((Tuple ((Name (() x)) (Name (() x)))))
+             ((Tuple ((Name (() y)) (Name (() y))))))))))))))))))

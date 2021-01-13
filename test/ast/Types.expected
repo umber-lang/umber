@@ -1,79 +1,95 @@
 (Types ()
- ((Let
-   (((Catch_all (n))
-     (Type_annotation (Literal (Int 1)) (() (Type_app (() Int) ()))))))
-  (Common_def
-   (Type_decl Direction
-    (() (Variants ((North ()) (South ()) (East ()) (West ()))))))
-  (Let
-   (((Catch_all (north_is_north))
-     (Match (Name (() North))
-      (((Cnstr_appl (() North) ()) (Name (() True)))
-       ((Catch_all ()) (Name (() False))))))))
-  (Common_def
-   (Val first_letter ()
-    (() (Function (Type_app (() Direction) ()) (Type_app (() Char) ())))))
-  (Let
-   (((Catch_all (first_letter))
-     (Lambda (Catch_all (""))
-      (Match (Name (() ""))
-       (((Cnstr_appl (() North) ()) (Literal (Char N)))
-        ((Cnstr_appl (() South) ()) (Literal (Char S)))
-        ((Cnstr_appl (() East) ()) (Literal (Char E)))
-        ((Cnstr_appl (() West) ()) (Literal (Char W)))))))))
-  (Let
-   (((Catch_all (magnitude))
-     (Lambda (Tuple ((Catch_all (x)) (Catch_all (y))))
-      (Fun_call (Name (() sqrt))
+ ((2:1-2:16
+   (Let
+    (((Catch_all (n))
+      (Type_annotation (Literal (Int 1)) (() (Type_app (() Int) ())))))))
+  (5:1-5:45
+   (Common_def
+    (Type_decl Direction
+     (() (Variants ((North ()) (South ()) (East ()) (West ())))))))
+  (7:1-7:62
+   (Let
+    (((Catch_all (north_is_north))
+      (Match (Name (() North))
+       (((Cnstr_appl (() North) ()) (Name (() True)))
+        ((Catch_all ()) (Name (() False)))))))))
+  (9:1-9:37
+   (Common_def
+    (Val first_letter ()
+     (() (Function (Type_app (() Direction) ()) (Type_app (() Char) ()))))))
+  (10:1-16:1
+   (Let
+    (((Catch_all (first_letter))
+      (Lambda (Catch_all (""))
+       (Match (Name (() ""))
+        (((Cnstr_appl (() North) ()) (Literal (Char N)))
+         ((Cnstr_appl (() South) ()) (Literal (Char S)))
+         ((Cnstr_appl (() East) ()) (Literal (Char E)))
+         ((Cnstr_appl (() West) ()) (Literal (Char W))))))))))
+  (17:1-17:40
+   (Let
+    (((Catch_all (magnitude))
+      (Lambda (Tuple ((Catch_all (x)) (Catch_all (y))))
+       (Fun_call (Name (() sqrt))
+        (Op_tree
+         ((() ^)
+          (((() +)
+            (((() ^) (((Name (() x))) ((Literal (Int 2))))) ((Name (() y)))))
+           ((Literal (Int 2))))))))))))
+  (20:1-20:47
+   (Common_def
+    (Type_decl Rectangle
+     (()
+      (Record
+       ((length (Type_app (() Int) ())) (width (Type_app (() Int) ()))))))))
+  (22:1-22:41
+   (Let
+    (((Catch_all (area))
+      (Lambda (Catch_all (rect))
        (Op_tree
-        ((() ^)
-         (((() +)
-           (((() ^) (((Name (() x))) ((Literal (Int 2))))) ((Name (() y)))))
-          ((Literal (Int 2)))))))))))
-  (Common_def
-   (Type_decl Rectangle
-    (()
-     (Record
-      ((length (Type_app (() Int) ())) (width (Type_app (() Int) ())))))))
-  (Let
-   (((Catch_all (area))
-     (Lambda (Catch_all (rect))
+        ((() *)
+         (((Record_field_access (Name (() rect)) length))
+          ((Record_field_access (Name (() rect)) width))))))))))
+  (23:1-23:69
+   (Let
+    (((Catch_all (double_length))
+      (Lambda (Record ((length ()) (width ())))
+       (Record_literal
+        ((length
+          ((Op_tree ((() *) (((Name (() length))) ((Literal (Int 2))))))))
+         (width ()))))))))
+  (24:1-24:61
+   (Let
+    (((Catch_all (double_width))
+      (Lambda (Catch_all (rect))
+       (Record_update (Name (() rect))
+        ((width
+          ((Op_tree
+            ((() *)
+             (((Record_field_access (Name (() rect)) width))
+              ((Literal (Int 2)))))))))))))))
+  (25:1-25:53
+   (Let
+    (((Catch_all (double_dimensions))
       (Op_tree
-       ((() *)
-        (((Record_field_access (Name (() rect)) length))
-         ((Record_field_access (Name (() rect)) width)))))))))
-  (Let
-   (((Catch_all (double_length))
-     (Lambda (Record ((length ()) (width ())))
-      (Record_literal
-       ((length
-         ((Op_tree ((() *) (((Name (() length))) ((Literal (Int 2))))))))
-        (width ())))))))
-  (Let
-   (((Catch_all (double_width))
-     (Lambda (Catch_all (rect))
-      (Record_update (Name (() rect))
-       ((width
-         ((Op_tree
-           ((() *)
-            (((Record_field_access (Name (() rect)) width))
-             ((Literal (Int 2))))))))))))))
-  (Let
-   (((Catch_all (double_dimensions))
-     (Op_tree
-      ((() .) (((Name (() double_length))) ((Name (() double_width)))))))))
-  (Common_def
-   (Type_decl Option ((a) (Variants ((Some ((Var a))) (None ()))))))
-  (Common_def
-   (Val value ()
-    (()
-     (Function (Type_app (() Option) ((Var a))) (Function (Var a) (Var a))))))
-  (Let
-   (((Catch_all (value))
-     (Lambda (Catch_all (opt))
-      (Lambda (Catch_all (default))
-       (Match (Name (() opt))
-        (((Cnstr_appl (() Some) ((Catch_all (x)))) (Name (() x)))
-         ((Cnstr_appl (() None) ()) (Name (() default))))))))))
-  (Common_def (Type_decl MyInt (() (Alias (Type_app (() Int) ())))))
-  (Common_def (Type_decl Pair ((x y) (Alias (Tuple ((Var x) (Var y)))))))))
+       ((() .) (((Name (() double_length))) ((Name (() double_width))))))))))
+  (27:1-31:1
+   (Common_def
+    (Type_decl Option ((a) (Variants ((Some ((Var a))) (None ())))))))
+  (32:1-32:31
+   (Common_def
+    (Val value ()
+     (()
+      (Function (Type_app (() Option) ((Var a))) (Function (Var a) (Var a)))))))
+  (33:1-37:1
+   (Let
+    (((Catch_all (value))
+      (Lambda (Catch_all (opt))
+       (Lambda (Catch_all (default))
+        (Match (Name (() opt))
+         (((Cnstr_appl (() Some) ((Catch_all (x)))) (Name (() x)))
+          ((Cnstr_appl (() None) ()) (Name (() default)))))))))))
+  (38:1-38:23
+   (Common_def (Type_decl MyInt (() (Alias (Type_app (() Int) ()))))))
+  (39:1-39:29
+   (Common_def (Type_decl Pair ((x y) (Alias (Tuple ((Var x) (Var y))))))))))

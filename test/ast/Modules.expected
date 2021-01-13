@@ -1,30 +1,45 @@
 (Modules ()
- ((Module
-   (A ((Common_sig (Val foo () (() (Type_app (() Int) ())))))
-    ((Let (((Catch_all (foo)) (Literal (Int 5)))))
-     (Module
-      (B
-       ((Module_sig C
-         ((Common_sig
-           (Trait_sig D ()
-            ((Common_sig (Val d () (() (Type_app (() Nat) ())))))))))
-        (Module_sig D
-         ((Common_sig (Val wow () (() (Function (Var a) (Var a))))))))
-       ((Module
-         (D ()
-          ((Let (((Catch_all (wow)) (Lambda (Catch_all (x)) (Name (() x))))))
-           (Common_def (Type_decl Bacon (() (Variants ((Delicious ())))))))))))))))
-  (Let
-   (((Tuple ())
-     (Match (Name ((A B) Delicious))
-      (((Cnstr_appl ((A B) Delicious) ()) (Tuple ())))))))
-  (Let
-   (((Catch_all ())
-     (Match (Name ((A B) Delicious))
-      (((Cnstr_appl (() Delicious) ()) (Name (() True))))))))
-  (Let
-   (((Catch_all ())
-     (Match
-      (Type_annotation (Name (() Delicious))
-       (() (Type_app ((A B) Bacon) ())))
-      (((Cnstr_appl (() Delicious) ()) (Literal (String yep))))))))))
+ ((1:1-18:1
+   (Module
+    (A ((2:3-2:16 (Common_sig (Val foo () (() (Type_app (() Int) ()))))))
+     ((4:3-4:14 (Let (((Catch_all (foo)) (Literal (Int 5))))))
+      (6:3-18:1
+       (Module
+        (B
+         ((7:5-11:5
+           (Module_sig C
+            ((8:7-11:5
+              (Common_sig
+               (Trait_sig D ()
+                ((9:9-9:20
+                  (Common_sig (Val d () (() (Type_app (() Nat) ()))))))))))))
+          (11:5-13:5
+           (Module_sig D
+            ((12:7-12:23
+              (Common_sig (Val wow () (() (Function (Var a) (Var a))))))))))
+         ((14:5-16:27
+           (Module
+            (D ()
+             ((14:16-14:29
+               (Let
+                (((Catch_all (wow)) (Lambda (Catch_all (x)) (Name (() x)))))))
+              (16:5-16:27
+               (Common_def
+                (Type_decl Bacon (() (Variants ((Delicious ())))))))))))))))))))
+  (18:1-18:51
+   (Let
+    (((Tuple ())
+      (Match (Name ((A B) Delicious))
+       (((Cnstr_appl ((A B) Delicious) ()) (Tuple ()))))))))
+  (19:1-19:48
+   (Let
+    (((Catch_all ())
+      (Match (Name ((A B) Delicious))
+       (((Cnstr_appl (() Delicious) ()) (Name (() True)))))))))
+  (20:1-20:57
+   (Let
+    (((Catch_all ())
+      (Match
+       (Type_annotation (Name (() Delicious))
+        (() (Type_app ((A B) Bacon) ())))
+       (((Cnstr_appl (() Delicious) ()) (Literal (String yep)))))))))))
