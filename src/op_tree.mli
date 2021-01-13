@@ -2,6 +2,8 @@ open Names
 
 type t = (Value_name.Qualified.t, Untyped.Expr.t) Btree.t
 
+(* TODO: add more tests for this *)
+
 (** Re-associate the operator tree through tree rotations.
     These constraints hold on the finished tree:
     1. Every node has precedence less than or equal to both its childrens' precedence.

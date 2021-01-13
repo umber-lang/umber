@@ -253,13 +253,7 @@ module Expr = struct
     | `Retry expr -> map ~f ~var expr
     | `Defer expr ->
       (match expr with
-      | Let { rec_; bindings; body } ->
-        var rec_ bindings body
-        (*let bindings =
-          List.map bindings ~f:(fun ((pat, pat_type), expr) ->
-            (pat, var pat pat_type), map ~f ~var expr)
-        in
-        Let { rec_; bindings; body = map ~f ~var body }*)
+      | Let bindings -> Let (var bindings)
       | (Literal _ | Name (_, _)) as expr -> expr
       | Fun_call (func, body) -> Fun_call (map ~f ~var func, map ~f ~var body)
       | Lambda (arg, body) -> Lambda (arg, map ~f ~var body)
@@ -277,72 +271,16 @@ module Expr = struct
         Record_field_access (map ~f ~var record, field))
   ;;
 
-  (*let rec map_bindings expr ~f =
-    match expr with
-    | Let { rec_; bindings; body } ->
-      let bindings =
-        List.map bindings ~f:(fun ((pat, typ), expr) ->
-          (pat, f typ), map_bindings ~f expr)
-      in
-      Let { rec_; bindings; body = map_bindings ~f body }
-    | (Literal _ | Name (_, _)) as expr -> expr
-    | Fun_call (func, body) -> Fun_call (map_bindings ~f func, map_bindings ~f body)
-    | Lambda (arg, body) -> Lambda (arg, map_bindings ~f body)
-    | Match (expr, branches) ->
-      Match
-        (map_bindings ~f expr, List.map branches ~f:(Tuple2.map_snd ~f:(map_bindings ~f)))
-    | Tuple fields -> Tuple (List.map fields ~f:(map_bindings ~f))
-    | Record_literal fields ->
-      Record_literal
-        (List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map_bindings ~f))))
-    | Record_update (expr, fields) ->
-      Record_update
-        ( map_bindings ~f expr
-        , List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map_bindings ~f))) )
-    | Record_field_access (record, field) ->
-      Record_field_access (map_bindings ~f record, field)
-  ;;*)
-
   let map_bindings expr ~f = map expr ~f:(fun expr -> `Defer expr) ~var:f
 
-  (*let generalize_let_bindings ~names ~types =
-    let rec loop ~names ~types = function
-      | Let { rec_; bindings; body; _ } ->
-        let bindings =
-          List.map bindings ~f:(fun ((pat, pat_type), expr) ->
-            let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
-            (pat, scheme), loop ~names ~types expr)
-        in
-        Let { rec_; bindings; body = loop ~names ~types body }
-      | (Literal _ | Name (_, _)) as expr -> expr
-      | Fun_call (f, body) -> Fun_call (loop ~names ~types f, loop ~names ~types body)
-      | Lambda (arg, body) -> Lambda (arg, loop ~names ~types body)
-      | Match (expr, branches) ->
-        Match
-          ( loop ~names ~types expr
-          , List.map branches ~f:(Tuple2.map_snd ~f:(loop ~names ~types)) )
-      | Tuple fields -> Tuple (List.map fields ~f:(loop ~names ~types))
-      | Record_literal fields ->
-        Record_literal
-          (List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(loop ~names ~types))))
-      | Record_update (expr, fields) ->
-        Record_update
-          ( loop ~names ~types expr
-          , List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(loop ~names ~types))) )
-      | Record_field_access (record, field) ->
-        Record_field_access (loop ~names ~types record, field)
-    in
-    loop ~names ~types
-  ;;*)
-
   let rec generalize_let_bindings ~names ~types =
-    map_bindings ~f:(fun rec_ bindings body ->
+    map_bindings ~f:(fun { rec_; bindings; body } ->
       let bindings =
         List.map bindings ~f:(fun ((pat, pat_type), expr) ->
           let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
           (pat, scheme), generalize_let_bindings ~names ~types expr)
       in
-      Let { rec_; bindings; body = generalize_let_bindings ~names ~types body })
+      { rec_; bindings; body = generalize_let_bindings ~names ~types body })
   ;;
 end
 
