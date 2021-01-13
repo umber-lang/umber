@@ -41,41 +41,6 @@ let try_lex ~print_tokens_to lexbuf lexer =
   handle_syntax_error (fun () -> lex ~print_tokens_to lexbuf lexer)
 ;;
 
-(*let stmt_starter = function
-  | LET | MODULE | TRAIT | IMPL | VAL | TYPE | IMPORT -> true
-  | _ -> false
-;;
-
-type state =
-  | Default
-  | In_let of state * Span.t
-  | In_other_stmt of state * Span.t
-  | Finished_stmt of state * Span.t
-
-let advance_state state token lexuf =
-  let enter_stmt state token lexbuf =
-    match token with
-    | LET -> In_let (state, Lexer.span lexbuf)
-    | _ when stmt_starter token -> In_other_stmt (state, Lexer.span lexbuf)
-    | _ -> state
-  in
-  match state with
-  | Default -> enter_stmt state token lexbuf
-  | In_let span ->
-    (match token with
-    | LET -> state
-    | _ -> if stmt_starter token then In_other_stmt (state, Lexer.span lexbuf) else state)
-  | In_other_stmt span -> enter_stmt state token lexbuf
-  | Finished_stmt _ -> raise_s [%message "Parsing.advance_state got Finished_stmt"]
-;;
-
-let global_state = ref state
-
-let consume_finished_stmt () =
-  match !global_state with
-  | Finished_stmt (parent_state, _) -> ()
-;;*)
-
 let parse ?print_tokens_to ?(full_lex = false) lexbuf =
   let lex_remaining ~print_tokens_to lexbuf lexer =
     match print_tokens_to with

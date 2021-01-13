@@ -199,7 +199,6 @@ module Expr = struct
           Match (expr, branches), branch_type
         | [] -> raise_s [%message "Empty match"])
       | Let { rec_; bindings; body } ->
-        (* FIXME: handle recursion? - should be good here *)
         let names, bindings =
           if rec_
           then (
@@ -369,7 +368,6 @@ module Module = struct
     List.fold_map defs ~init:names ~f:(fun names ->
       Node.fold_map ~f:(function
         | Let bindings ->
-          (* FIXME: handle recursion? - probably fine I think *)
           List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
             let pat_names, pat = Pattern.of_untyped_with_names ~names ~types pat in
             let names =
@@ -423,9 +421,6 @@ module Module = struct
   ;;
 
   let type_binding_group ~names ~types bindings =
-    (* FIXME: handle recursion *)
-    (* At this point, let bindings have been optimally re-grouped so that
-       generalization can be done after type-checking each group in order *)
     (* NOTE: This takes the span of the first binding and ignores the rest. 
        An alternative could be to keep a span for each binding.
        Another option would be to forgo spans on the new binding group (as they can never
@@ -456,16 +451,6 @@ module Module = struct
   (** Reintegrate the re-ordered binding groups from [extract_binding_groups] back into
       the AST. *)
   let reintegrate_binding_groups path other_defs binding_groups =
-    (* TODO: we could get back close to the original order (for easier testing, at least)
-       by sorting by line number/position in the original file
-       - Adding original file positions is also a good opportunity to get better error
-       reporting
-       - Possible approach:
-         - We store the token stream, which has file positions (line/column)
-         - Each AST node knows which tokens it came from in the stream (indexes?) *)
-    (* More on error reporting:
-       See this guy's blog: https://arzg.github.io/lang/
-       Error tokens should be a thing if possible - that can probably wait for a rewrite *)
     (* NOTE: As we disallow cross-module mutual recursion, binding groups will always be
        contained within a single module and can just be put back into the AST *)
     let binding_table = Module_path.Table.create () in

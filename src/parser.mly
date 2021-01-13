@@ -311,11 +311,6 @@ optional_sig_def:
   | colon; body = block(pair(lines(stmt_sig), def)) { body }
   | def = def { [], def }
 
-(*function_def(X):
-  | INDENT; args = flexible_nonempty_list(LINE_SEP, X); equals; body = expr; DEDENT
-    { args, body }
-  | args = nonempty_list(X); equals; body = expr { args, body }*)
-
 stmt_:
   | s = stmt_common { Module.Common_def s }
   | LET; binding = let_binding { Module.Let [binding] }
