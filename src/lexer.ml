@@ -37,7 +37,7 @@ open Parser
    should lex as (LET (LOWER_NAME _) EQUALS L_PAREN ... ???) (where am I going with this?)
  *)
 
-let lexeme = Sedlexing.lexeme >> Ustring.of_array_unsafe
+let lexeme = lexeme >> Ustring.of_array_unsafe
 let lexeme_str = lexeme >> Ustring.to_string
 
 type indent_type =
@@ -64,16 +64,18 @@ module Bracket_type = struct
     | Brace -> '}'
   ;;
 
-  let to_token_left = function
-    | Paren -> L_PAREN
-    | Bracket -> L_BRACKET
-    | Brace -> L_BRACE
+  let to_token_left bracket_type span =
+    match bracket_type with
+    | Paren -> L_PAREN span
+    | Bracket -> L_BRACKET span
+    | Brace -> L_BRACE span
   ;;
 
-  let to_token_right = function
-    | Paren -> R_PAREN
-    | Bracket -> R_BRACKET
-    | Brace -> R_BRACE
+  let to_token_right bracket_type span =
+    match bracket_type with
+    | Paren -> R_PAREN span
+    | Bracket -> R_BRACKET span
+    | Brace -> R_BRACE span
   ;;
 end
 
@@ -107,12 +109,9 @@ let create () =
   }
 ;;
 
-exception Syntax_error of (int * int) * Ustring.t [@@deriving sexp]
+exception Syntax_error of Span.t * Ustring.t [@@deriving sexp]
 
-let line_and_pos lexbuf =
-  let _, info = Sedlexing.lexing_positions lexbuf in
-  info.pos_lnum, info.pos_cnum - info.pos_bol + 1
-;;
+let span = Span.of_lexing_positions << lexing_positions
 
 let syntax_error ?msg lexbuf =
   let msg =
@@ -120,7 +119,7 @@ let syntax_error ?msg lexbuf =
     | None -> lexeme lexbuf
     | Some str -> Ustring.of_string_exn (sprintf "%s after `%s`" str (lexeme_str lexbuf))
   in
-  raise (Syntax_error (line_and_pos lexbuf, msg))
+  raise (Syntax_error (span lexbuf, msg))
 ;;
 
 let line_sep = [%sedlex.regexp? '\n' | "\r\n"]
@@ -137,20 +136,17 @@ let operator_symbol =
 (* FIXME: stray '\r's may cause issues with indentation parsing
    '\r' should just always be ignored, I think *)
 let line_comment = [%sedlex.regexp? '#', Star (Compl (Chars "\r\n")), Plus line_sep]
-
-let unescape _ =
-  raise (Syntax_error ((-1, -1), Ustring.of_string_exn "Escapes not implemented yet"))
-;;
+let unescape _ = failwith "TODO: Escapes not implemented yet"
 
 (*let prefix_matches lexbuf s =
-  Sedlexing.mark lexbuf 0;
+  mark lexbuf 0;
   let rec loop lexbuf s i =
     if i >= Ustring.length s then true
-    else match Sedlexing.next lexbuf with
+    else match next lexbuf with
       | Some c ->
         if Uchar.equal c (Ustring.get s i) then loop lexbuf s (i + 1)
         else (
-          ignore (Sedlexing.backtrack lexbuf : int);
+          ignore (backtrack lexbuf : int);
           false)
       | None -> syntax_error ~msg:"Unexpected end of file" lexbuf
   in
@@ -270,7 +266,7 @@ let read =
         | _ ->
           (match%sedlex lexbuf with
           | '#' ->
-            Sedlexing.rollback lexbuf;
+            rollback lexbuf;
             read_after_indent t lexbuf
           | '=', Star inline_space, Plus line_sep -> EQUALS_ONLY_LINE
           | _ ->
@@ -298,7 +294,7 @@ let read =
       in
       read_indent t lexbuf ~on_indent:ignore_block
     | '#', Star (Compl '\n'), eof -> handle_eof t
-    | '=', Star inline_space, Plus line_sep -> EQUALS_ONLY_LINE
+    | '=', Star inline_space, Plus line_sep -> EQUALS_ONLY_LINE (span lexbuf)
     | _ -> read_inline t lexbuf
   and read_before_indent t lexbuf =
     (* [read_before_indent] handles indentation at the beginning of a line *)
@@ -318,54 +314,55 @@ let read =
        Look into how Haskell does it (though might not want to copy, Num is
        notoriously overloaded with functionaltiy) *)
     (* Int *)
-    | Opt '-', Plus digit -> INT (Int.of_string (Ustring.to_string (lexeme lexbuf)))
+    | Opt '-', Plus digit ->
+      INT (Int.of_string (Ustring.to_string (lexeme lexbuf)), span lexbuf)
     (* Float *)
     | Opt '-', Plus digit, (exp | frac) ->
-      FLOAT (Float.of_string (Ustring.to_string (lexeme lexbuf)))
+      FLOAT (Float.of_string (Ustring.to_string (lexeme lexbuf)), span lexbuf)
     (* Char *)
-    | '\'', Compl (Chars "'\n\r"), '\'' -> CHAR (lexeme_char lexbuf 1)
-    | "'\\''" -> CHAR (Uchar.of_char '\'')
+    | '\'', Compl (Chars "'\n\r"), '\'' -> CHAR (lexeme_char lexbuf 1, span lexbuf)
+    | "'\\''" -> CHAR (Uchar.of_char '\'', span lexbuf)
     | "'\\", Plus (Compl (Chars "'\n\r")), '\'' ->
-      CHAR (unescape (sub_lexeme lexbuf 2 (lexeme_length lexbuf)))
+      CHAR (unescape (sub_lexeme lexbuf 2 (lexeme_length lexbuf)), span lexbuf)
     (* String literals *)
-    | '"' -> STRING (read_string lexbuf)
+    | '"' -> STRING (read_string lexbuf, span lexbuf)
     (* Keywords *)
-    | "if" -> IF
-    | "then" -> THEN
-    | "else" -> ELSE
-    | "let'" -> LET_NONREC
-    | "let" -> LET
-    | "match" -> MATCH
-    | "with" -> WITH
-    | "without" -> WITHOUT
-    | "type" -> TYPE
-    | "alias" -> ALIAS
-    | "val" -> VAL
-    | "infix" -> INFIX
-    | "infixl" -> INFIXL
-    | "infixr" -> INFIXR
-    | "module", Star inline_space, ":" -> FILE_MODULE
-    | "module" -> MODULE
-    | "trait" -> TRAIT
-    | "impl" -> IMPL
-    | "import" -> IMPORT
+    | "if" -> IF (span lexbuf)
+    | "then" -> THEN (span lexbuf)
+    | "else" -> ELSE (span lexbuf)
+    | "let'" -> LET_NONREC (span lexbuf)
+    | "let" -> LET (span lexbuf)
+    | "match" -> MATCH (span lexbuf)
+    | "with" -> WITH (span lexbuf)
+    | "without" -> WITHOUT (span lexbuf)
+    | "type" -> TYPE (span lexbuf)
+    | "alias" -> ALIAS (span lexbuf)
+    | "val" -> VAL (span lexbuf)
+    | "infix" -> INFIX (span lexbuf)
+    | "infixl" -> INFIXL (span lexbuf)
+    | "infixr" -> INFIXR (span lexbuf)
+    | "module", Star inline_space, ":" -> FILE_MODULE (span lexbuf)
+    | "module" -> MODULE (span lexbuf)
+    | "trait" -> TRAIT (span lexbuf)
+    | "impl" -> IMPL (span lexbuf)
+    | "import" -> IMPORT (span lexbuf)
     (* Special symbols *)
-    | '=' -> EQUALS
-    | '|' -> PIPE
-    | ':', Plus inline_space -> COLON_SPACED
-    | ':' -> COLON
-    | ',' -> COMMA
-    | '\\' -> BACKSLASH
-    | '*' -> ASTERISK
+    | '=' -> EQUALS (span lexbuf)
+    | '|' -> PIPE (span lexbuf)
+    | ':', Plus inline_space -> COLON_SPACED (span lexbuf)
+    | ':' -> COLON (span lexbuf)
+    | ',' -> COMMA (span lexbuf)
+    | '\\' -> BACKSLASH (span lexbuf)
+    | '*' -> ASTERISK (span lexbuf)
     (* Need to support: `f . g`, `(. f)`, `(f .)`, and `(.)` as an operator *)
-    | '.', Plus inline_space -> OPERATOR (Ustring.of_string_exn ".")
+    | '.', Plus inline_space -> OPERATOR (Ustring.of_string_exn ".", span lexbuf)
     | ".)" ->
-      Sedlexing.rollback lexbuf;
-      ignore (Sedlexing.next lexbuf : Uchar.t option);
-      OPERATOR (Ustring.of_string_exn ".")
-    | '.' -> PERIOD
-    | "->" -> ARROW
-    | "=>" -> FAT_ARROW
+      rollback lexbuf;
+      ignore (next lexbuf : Uchar.t option);
+      OPERATOR (Ustring.of_string_exn ".", span lexbuf)
+    | '.' -> PERIOD (span lexbuf)
+    | "->" -> ARROW (span lexbuf)
+    | "=>" -> FAT_ARROW (span lexbuf)
     (* Brackets *)
     | Chars "([{" ->
       let bracket_type =
@@ -373,7 +370,7 @@ let read =
       in
       Stack.push t.brackets bracket_type;
       t.ignoring_indents <- true;
-      Bracket_type.to_token_left bracket_type
+      Bracket_type.to_token_left bracket_type (span lexbuf)
     | Chars ")]}" ->
       let actual = lexeme_str lexbuf in
       (match Stack.pop t.brackets with
@@ -382,7 +379,7 @@ let read =
         if String.(of_char expected = actual)
         then (
           if Stack.is_empty t.brackets then t.ignoring_indents <- false;
-          Bracket_type.to_token_right bracket_type)
+          Bracket_type.to_token_right bracket_type (span lexbuf))
         else (
           let msg =
             sprintf "Mismatched brackets: expected `%c` but got `%s`" expected actual
@@ -390,12 +387,15 @@ let read =
           syntax_error lexbuf ~msg)
       | None -> syntax_error ~msg:(sprintf "Unexpected `%s`" actual) lexbuf)
     (* Names *)
-    | lowercase, Star (digit | alphabetic | '\'' | '_') -> LOWER_NAME (lexeme lexbuf)
-    | '_', Plus (digit | alphabetic | '\'' | '_') -> LOWER_NAME (lexeme lexbuf)
-    | '_' -> UNDERSCORE
-    | uppercase, Star (digit | alphabetic | '\'' | '_') -> UPPER_NAME (lexeme lexbuf)
+    | lowercase, Star (digit | alphabetic | '\'' | '_') ->
+      LOWER_NAME (lexeme lexbuf, span lexbuf)
+    | '_', Plus (digit | alphabetic | '\'' | '_') ->
+      LOWER_NAME (lexeme lexbuf, span lexbuf)
+    | '_' -> UNDERSCORE (span lexbuf)
+    | uppercase, Star (digit | alphabetic | '\'' | '_') ->
+      UPPER_NAME (lexeme lexbuf, span lexbuf)
     (* Symbolic Operators (any unicode punctuation/symbol) *)
-    | Plus operator_symbol -> OPERATOR (lexeme lexbuf)
+    | Plus operator_symbol -> OPERATOR (lexeme lexbuf, span lexbuf)
     (* Misc. *)
     | eof -> handle_eof t
     | _ -> syntax_error ~msg:"Invalid character(s)" lexbuf
@@ -472,8 +472,8 @@ let read =
     | (INDENT | DEDENT | LINE_SEP) when t.ignoring_indents -> read t lexbuf
     | token ->
       (match token with
-      | EQUALS | COLON | ARROW -> t.ignoring_indents <- false
-      | COMMA -> t.ignoring_indents <- true
+      | EQUALS _ | COLON _ | ARROW _ -> t.ignoring_indents <- false
+      | COMMA _ -> t.ignoring_indents <- true
       | _ -> ());
       handle token
   in

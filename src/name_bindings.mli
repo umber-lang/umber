@@ -67,7 +67,7 @@ val with_submodule : t -> Module_name.t -> f:(t -> t) -> t
 val current_path : t -> Module_path.t
 
 (* AST handling *)
-(* TODO: rename Import -> Common, and split into Import.t with:
+(* TODO: rename the existing module Import to Common, and split into Import.t with:
    `val import : t -> Import.t -> t` *)
 val import : t -> Module_name.t -> t
 val import_with : t -> Module_path.t -> Unidentified_name.t list -> t
