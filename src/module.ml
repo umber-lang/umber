@@ -42,32 +42,3 @@ let with_filename (_, sigs, defs) filename =
   in
   module_name, sigs, defs
 ;;
-
-let sigs_defs_span span (sigs_spans, defs_spans) =
-  let sigs = List.map ~f:fst sigs_spans in
-  let defs, def_spans = List.unzip defs_spans in
-  sigs, defs, Span.first_to_last span def_spans
-;;
-
-let common_def (common, span) = { Node.node = Common_def common; span }
-
-let module_ span name body =
-  let sigs, defs, span = sigs_defs_span span body in
-  Module (Module_name.of_ustring_unchecked name, sigs, defs), span
-;;
-
-let let_ span bindings_spans =
-  let bindings, spans = List.unzip bindings_spans in
-  Let bindings, Span.first_to_last span spans
-;;
-
-let trait span name params_spans body =
-  let sigs, defs, span = sigs_defs_span span body in
-  Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body), span
-;;
-
-let impl span (bound, _) name typ defs =
-  let defs, spans = List.unzip defs in
-  let span = Span.first_to_last span spans in
-  Impl (bound, Trait_name.of_ustring_unchecked name, typ, defs), span
-;;

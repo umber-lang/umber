@@ -7,72 +7,63 @@
   [@@@ocaml.warning "-3"]
 %}
 
-(* Keywords *)
-%token <Span.t>
-  IF
-  THEN
-  ELSE
-  LET
-  LET_NONREC
-  MATCH
-  WITH
-  WITHOUT
-  TYPE
-  ALIAS
-  VAL
-  INFIX
-  INFIXL
-  INFIXR
-  MODULE
-  FILE_MODULE
-  TRAIT
-  IMPL
-  IMPORT
+%token IF
+%token THEN
+%token ELSE
+%token LET
+%token LET_NONREC
+%token MATCH
+%token WITH
+%token WITHOUT
+%token TYPE
+%token ALIAS
+%token VAL
+%token INFIX
+%token INFIXL
+%token INFIXR
+%token MODULE
+%token FILE_MODULE
+%token TRAIT
+%token IMPL
+%token IMPORT
 
-(* Symbols *)
-%token <Span.t>
-  EQUALS
-  EQUALS_ONLY_LINE
-  PIPE
-  COLON
-  COLON_SPACED
-  COMMA
-  BACKSLASH
-  ASTERISK
-  PERIOD
-  ARROW
-  FAT_ARROW
-  L_PAREN
-  R_PAREN
-  L_BRACKET
-  R_BRACKET
-  L_BRACE
-  R_BRACE
-  UNDERSCORE
+%token EQUALS
+%token EQUALS_ONLY_LINE
+%token PIPE
+%token COLON
+%token COLON_SPACED
+%token COMMA
+%token BACKSLASH
+%token ASTERISK
+%token PERIOD
+%token ARROW
+%token FAT_ARROW
+%token L_PAREN
+%token R_PAREN
+%token L_BRACKET
+%token R_BRACKET
+%token L_BRACE
+%token R_BRACE
+
+%token <int> INT
+%token <float> FLOAT
+%token <Uchar.t> CHAR
+%token <Ustring.t> STRING
+
+%token UNDERSCORE
 (* TODO: prevent underscore being used as a variable with a name_error, and create patterns
-  using a new catch_all creator. Want to be able to parse it as a LOWER_NAME to use as 
-  the previous evaluated thing in the interpreter (as seen in Python, or similar to
-  `it` in ghci)
-  Another option: could just use `it` for the previous purpose and use `_` for gaps (partial application) *)
+   using a new catch_all creator. Want to be able to parse it as a LOWER_NAME to use as 
+   the previous evaluated thing in the interpreter (as seen in Python, or similar to
+   `it` in ghci)
+   Another option: could just use `it` for the previous purpose and use `_` for gaps (partial application) *)
+%token <Ustring.t> LOWER_NAME
+%token <Ustring.t> UPPER_NAME
+%token <Ustring.t> OPERATOR
 
-(* Literals *)
-%token <int * Span.t> INT
-%token <float * Span.t> FLOAT
-%token <Uchar.t * Span.t> CHAR
-%token <Ustring.t * Span.t> STRING
-
-(* Names *)
-%token <Ustring.t * Span.t>
-  LOWER_NAME
-  UPPER_NAME
-  OPERATOR
-
-(* Whitespace *)
-%token
-  INDENT
-  DEDENT
-  LINE_SEP
-  EOF
+%token INDENT
+%token DEDENT
+%token LINE_SEP
+%token EOF
 
 (* TODO: Make sure all desirable forms of indentation are supported. 
    e.g. some from http://people.csail.mit.edu/mikelin/ocaml+twt/quick_reference.pdf
@@ -324,15 +315,14 @@ optional_sig_def:
   | args = nonempty_list(X); equals; body = expr { args, body }*)
 
 stmt:
-  (* FIXME: attempting a rewrite of the parser at this point just to support spans seems
-     inadvisable *)
-  | s = stmt_common { Module.common_def s }
-  | s = LET; binding = let_binding { Module.let_ s [binding] }
-  | s = LET; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding); DEDENT
-    { Module.let_ s bindings }
-  | s = MODULE; name = UPPER_NAME; body = optional_sig_def { Module.module_ s name body }
-  | s = TRAIT; name = UPPER_NAME; params = type_param_list; body = optional_sig_def
-    { Module.trait s name params, body }
+  | s = stmt_common { Module.Common_def s }
+  | LET; binding = let_binding { Module.Let [binding] }
+  | LET; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding); DEDENT
+    { Module.Let bindings }
+  | MODULE; name = UPPER_NAME; body = optional_sig_def
+    { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
+  | TRAIT; name = UPPER_NAME; params = type_param_list; body = optional_sig_def
+    { Module.Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body) }
   (* TODO: support multiple type parameters in trait impls
      Should probably change `type_expr` to `nonempty_list(type_term)` *)
   | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; typ = type_expr;
