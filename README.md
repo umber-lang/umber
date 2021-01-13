@@ -10,23 +10,25 @@ Umber is an ML-style functional programming language. It is modelled after OCaml
 
 - Algebraic effects for tracking function side effects at the type level while also providing convenience and flexibility in creating custom control flow
 - Better support for ad-hoc polymorphism with traits
-- First-class support for laziness
 - Proper handling of unicode, both in the source code and in the standard library's `String` type
-- Proper handling of nested module namespaces
-- No ml/mli file distinction eliminating duplication of type/module declarations
-- Whitespace-sensitive syntax eliminating syntactic noise like `begin` and `end` or extra parentheses
+- Support for nested module namespaces at the file/folder level
+- No ml/mli file distinction, eliminating duplication of type/module declarations
+- Treating value constructors as regular curried functions, not a special construct
+- Whitespace-sensitive syntax, eliminating syntactic noise like `begin` and `end` or extra parentheses
 - An import style similar to Python which discourages importing entire modules unqualified
 
 Some other planned features include:
 
+- Tracking mutability in the type system
+- Support for implicit laziness
 - Better support for concurrent programming (async/await at least can be implemented with effects)
 - A macro system
 
 ### (Very) Rough Roadmap
 - [x] Lexing
 - [x] Parsing
-- [ ] Name resolution
-- [ ] Basic type inference and checking
+- [ ] (in progress) Name resolution
+- [ ] (in progress) Basic type inference and checking
 - [ ] Record types
 - [ ] Traits
 - [ ] Effects
