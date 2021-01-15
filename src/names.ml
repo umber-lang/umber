@@ -4,6 +4,7 @@ module type General_name = sig
   type t = private Ustring.t [@@deriving compare, equal, hash, sexp]
 
   include Comparable.S with type t := t
+  include Hashable.S with type t := t
 
   val to_ustring : t -> Ustring.t
 end
@@ -137,6 +138,7 @@ module type Name_qualified = sig
     type t = Module_path.t * name [@@deriving compare, equal, hash, sexp]
 
     include Comparable.S with type t := t
+    include Hashable.S with type t := t
 
     val with_path : Module_path.t -> name -> t
     val of_ustrings_unchecked : Ustring.t list * Ustring.t -> t
@@ -157,6 +159,7 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
 
     include T
     include Comparable.Make (T)
+    include Hashable.Make (T)
 
     let with_path path name = path, name
 

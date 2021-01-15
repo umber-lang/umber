@@ -5,6 +5,7 @@ type elt = Uchar.t
 
 include Container.S0 with type t := t with type elt := elt
 include Comparable.S with type t := t
+include Hashable.S with type t := t
 
 val empty : t
 val ( ^ ) : t -> t -> t
