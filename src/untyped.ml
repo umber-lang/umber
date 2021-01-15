@@ -23,6 +23,7 @@ module Pattern = struct
   type t =
     | Constant of Literal.t
     | Catch_all of Value_name.t option
+    | As of t * Value_name.t
     | Cnstr_appl of Cnstr_name.Qualified.t * t list
     | Tuple of t list
     | Record of (Value_name.t * t option) list
@@ -34,20 +35,25 @@ module Pattern = struct
     type t = Name_bindings.Name_entry.t Value_name.Map.t [@@deriving sexp]
 
     (* TODO: consider making this a map to types directly, since let_inferred is always used *)
-    let add_fresh_name pat_names name =
-      let var = Type.fresh_var () in
-      let name_entry = Name_bindings.Name_entry.let_inferred var in
+    let add_name pat_names name typ =
+      let name_entry = Name_bindings.Name_entry.let_inferred typ in
       match Map.add pat_names ~key:name ~data:name_entry with
-      | `Ok pat_names -> pat_names, var
+      | `Ok pat_names -> pat_names
       | `Duplicate ->
         Name_bindings.name_error_msg
           "Duplicate name in pattern: "
           (Value_name.to_ustring name)
     ;;
 
+    let add_fresh_name pat_names name =
+      let var = Type.fresh_var () in
+      add_name pat_names name var, var
+    ;;
+
     let fold pat ~init ~f =
       let rec loop acc ~f = function
         | Catch_all (Some name) -> f acc name
+        | As (pat, name) -> loop (f acc name) ~f pat
         | Cnstr_appl (_, items) | Tuple items -> List.fold items ~init:acc ~f:(loop ~f)
         | Record fields ->
           List.fold fields ~init:acc ~f:(fun acc -> function

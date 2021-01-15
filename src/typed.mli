@@ -5,6 +5,7 @@ module Pattern : sig
   type t =
     | Constant of Untyped.Literal.t
     | Catch_all of Value_name.t option
+    | As of t * Value_name.t
     | Cnstr_appl of Cnstr_name.Qualified.t * t list
     | Tuple of t list
     | Record of (Value_name.t * t option) list

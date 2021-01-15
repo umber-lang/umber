@@ -332,6 +332,7 @@ let read =
     | "match" -> MATCH
     | "with" -> WITH
     | "without" -> WITHOUT
+    | "as" -> AS
     | "type" -> TYPE
     | "alias" -> ALIAS
     | "val" -> VAL

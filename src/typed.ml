@@ -7,6 +7,7 @@ module Pattern = struct
   type t =
     | Constant of Untyped.Literal.t
     | Catch_all of Value_name.t option
+    | As of t * Value_name.t
     | Cnstr_appl of Cnstr_name.Qualified.t * t list
     | Tuple of t list
     | Record of (Value_name.t * t option) list
@@ -84,6 +85,10 @@ module Pattern = struct
         if not (Map.equal (fun _ _ -> true) pat_names1 pat_names2)
         then type_error_msg "Pattern unions must define the same names";
         pat_names1, (Union (pat1, pat2), typ1)
+      | As (pat, name) ->
+        let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
+        let pat_names = Untyped.Pattern.Names.add_name pat_names name typ in
+        pat_names, (As (pat, name), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
           Type.Scheme.instantiate_bounded
@@ -106,11 +111,16 @@ module Pattern = struct
          ~f:(Name_bindings.merge_names names ~combine:(fun _ _ new_entry -> new_entry))
   ;;
 
+  (* TODO: really should be able to do this externally with a lot less fuss
+     - just keep the pat_names got earlier and map over it: don't look at the pattern *)
   let rec generalize ~names ~types pat_and_type =
     match (pat_and_type : t * Type.t) with
     | (Catch_all None | Constant _), typ -> names, Type_bindings.generalize types typ
     | Catch_all (Some name), typ ->
       let scheme = Type_bindings.generalize types typ in
+      Name_bindings.set_scheme names name scheme, scheme
+    | As (pat, name), typ ->
+      let names, scheme = generalize ~names ~types (pat, typ) in
       Name_bindings.set_scheme names name scheme, scheme
     | Cnstr_appl (cnstr, args), typ ->
       let rec loop ~names ~types = function

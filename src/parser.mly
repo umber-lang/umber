@@ -15,6 +15,7 @@
 %token MATCH
 %token WITH
 %token WITHOUT
+%token AS
 %token TYPE
 %token ALIAS
 %token VAL
@@ -85,17 +86,6 @@
 %start <Untyped.Module.t> prog
 %%
 
-(* TODO: Idea: Apply a handler to all statements in the module.
-  effect UPPER_NAME with VALUE_NAME
-  e.g.
-  [effect Random with System.random]
-  
-  This would be a good place to use a [handle] keyword.
-  Could also do [by] instead of [with].
-  
-  I like having handle be the same as match but with a default branch that says
-  | x -> x (so it's like try/except basically) *)
-
 val_operator:
   | op = OPERATOR { op }
   | ASTERISK { Ustring.of_string_exn "*" }
@@ -114,6 +104,7 @@ literal:
   | c = CHAR { Literal.Char c }
   | s = STRING { Literal.String s }
 
+(* TODO: probably get rid of this and make undescore its own thing at some point *)
 pattern_name:
   | name = val_name { Some (Value_name.of_ustring_unchecked name) }
   | UNDERSCORE { None }
@@ -134,6 +125,8 @@ pattern:
   | cnstr = qualified(UPPER_NAME); args = nonempty_list(pattern_term)
     { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings_unchecked cnstr, args) }
   | left = pattern; PIPE; right = pattern { Pattern.Union (left, right) }
+  | pat = pattern; AS; name = val_name
+    { Pattern.As (pat, Value_name.of_ustring_unchecked name) }
   | annot = type_annot_bounded(pattern)
     { Pattern.Type_annotation (fst annot, snd annot) }
 
