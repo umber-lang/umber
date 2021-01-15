@@ -24,6 +24,7 @@ let names_sexp = {|
             (+ (Imported ((Std Prelude Operators) +)))
             (- (Imported ((Std Prelude Operators) -)))
             (. (Imported ((Std Prelude Operators) .)))
+            (";" (Imported ((Std Prelude Operators) ";")))
             (^ (Imported ((Std Prelude Operators) ^)))
             (&& (Imported ((Std Prelude Operators) &&)))
             (:: (Imported ((Std Prelude Operators) ::)))
@@ -101,6 +102,11 @@ let names_sexp = {|
                       (Function (Function (Var a) (Var b))
                        (Function (Var a) (Var c))))))
                    (type_source Val_declared) (fixity ((Right 9))))))
+                (";"
+                 (Local
+                  ((typ
+                    (Scheme (Function (Tuple ()) (Function (Var a) (Var a)))))
+                   (type_source Val_declared) (fixity ((Left 0))))))
                 (^
                  (Local
                   ((typ
