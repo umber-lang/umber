@@ -1,4 +1,10 @@
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/AsPattern.expected tokens/AsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/AsPattern.expected ast/AsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Basics.expected tokens/Basics.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -24,6 +30,18 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer (diff ast/ErrorDuplicateLet.expected ast/ErrorDuplicateLet.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorDuplicateNameAsPattern.expected
+    tokens/ErrorDuplicateNameAsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorDuplicateNameAsPattern.expected
+    ast/ErrorDuplicateNameAsPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action

@@ -1,0 +1,8 @@
+let ((one, two) as pair) = (1, 2)
+
+let iter_pairs f lst =
+  match lst
+    | Nil | Cons _ Nil -> ()
+    | Cons a (Cons b (_ as rest)) ->
+      # TODO: support semicolon syntax properly, allowing LINE_SEP in between
+      f a b; iter_pairs f rest

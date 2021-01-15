@@ -1,0 +1,26 @@
+(AsPattern ()
+ ((1:1-1:34
+   (Let
+    (((As (Tuple ((Catch_all (one)) (Catch_all (two)))) pair)
+      ((Tuple ((Literal (Int 1)) (Literal (Int 2))))
+       (Tuple ((Type_app (() Int) ()) (Type_app (() Int) ()))))))))
+  (3:1-8:31
+   (Let
+    (((Catch_all (iter_pairs))
+      ((Lambda (Catch_all (f))
+        (Lambda (Catch_all (lst))
+         (Match (Name (() lst))
+          (((Union (Cnstr_appl (() Nil) ())
+             (Cnstr_appl (() Cons) ((Catch_all ()) (Cnstr_appl (() Nil) ()))))
+            (Tuple ()))
+           ((Cnstr_appl (() Cons)
+             ((Catch_all (a))
+              (Cnstr_appl (() Cons)
+               ((Catch_all (b)) (As (Catch_all ()) rest)))))
+            (Fun_call
+             (Fun_call (Name (() ";"))
+              (Fun_call (Fun_call (Name (() f)) (Name (() a))) (Name (() b))))
+             (Fun_call (Fun_call (Name (() iter_pairs)) (Name (() f)))
+              (Name (() rest)))))))))
+       (Function (Function (Var a) (Function (Var a) (Tuple ())))
+        (Function (Type_app ((Std Prelude List) List) ((Var a))) (Tuple ()))))))))))
