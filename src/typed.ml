@@ -154,6 +154,8 @@ module Expr = struct
     | Record_field_access of 'typ t * Value_name.t
   [@@deriving sexp]
 
+  type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp]
+
   let of_untyped ~names ~types expr =
     let rec of_untyped ~names ~types expr =
       match (expr : Untyped.Expr.t) with
@@ -288,10 +290,8 @@ end
 module Module = struct
   include Module
 
-  type nonrec t = (Pattern.t, Type.Scheme.t Expr.t * Type.Scheme.t) t [@@deriving sexp]
-
-  type nonrec def = (Pattern.t, Type.Scheme.t Expr.t * Type.Scheme.t) def
-  [@@deriving sexp]
+  type nonrec t = (Pattern.t, Expr.generalized) t [@@deriving sexp]
+  type nonrec def = (Pattern.t, Expr.generalized) def [@@deriving sexp]
 
   let rec gather_names ~names sigs defs ~handle_common =
     let names =
@@ -470,8 +470,7 @@ module Module = struct
                 compiler_bug
                   [%message
                     "Dangling let binding in other_defs"
-                      (bindings
-                        : (Pattern.t * (Type.Scheme.t Expr.t * Type.Scheme.t)) list)]
+                      (bindings : (Pattern.t * Expr.generalized) list)]
               | _ as def -> def))
       in
       (* Sort defs by span to get them back into their original order *)

@@ -38,6 +38,8 @@ module Expr : sig
     | Record_field_access of 'typ t * Value_name.t
   [@@deriving sexp]
 
+  type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp]
+
   val of_untyped
     :  names:Name_bindings.t
     -> types:Type_bindings.t
@@ -48,10 +50,8 @@ end
 module Module : sig
   include module type of Module
 
-  type nonrec t = (Pattern.t, Type.Scheme.t Expr.t * Type.Scheme.t) t [@@deriving sexp]
-
-  type nonrec def = (Pattern.t, Type.Scheme.t Expr.t * Type.Scheme.t) def
-  [@@deriving sexp]
+  type nonrec t = (Pattern.t, Expr.generalized) t [@@deriving sexp]
+  type nonrec def = (Pattern.t, Expr.generalized) def [@@deriving sexp]
 
   val of_untyped
     :  ?backtrace:bool
