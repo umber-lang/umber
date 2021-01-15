@@ -1,0 +1,4 @@
+find . -name '*.coverage' | xargs rm -f
+dune runtest --instrument-with bisect_ppx --force
+echo ''
+bisect-ppx-report html

@@ -2,7 +2,9 @@
  (name umber)
  (libraries core_kernel sedlex menhirLib ocamlgraph)
  (preprocess
-  (staged_pps ppx_import sedlex.ppx ppx_jane)))
+  (staged_pps ppx_import sedlex.ppx ppx_jane))
+ (instrumentation
+  (backend bisect_ppx)))
 
 (menhir
  (modules parser)
