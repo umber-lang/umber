@@ -2,15 +2,6 @@ open Import
 open Names
 module Var_id : module type of Unique_id.Int ()
 
-module Primitive : sig
-  type t =
-    | Int
-    | Float
-    | Char
-    | String
-  [@@deriving compare, equal, hash, sexp]
-end
-
 module Param : sig
   (* TODO: consider adding support for weak type variables here *)
   type t = Type_param_name.t [@@deriving compare, equal, hash, sexp]
@@ -36,7 +27,6 @@ module Expr : sig
   type 'var t =
     | Var of 'var
     | Type_app of Type_name.Qualified.t * 'var t list
-    | Primitive of Primitive.t
     | Function of 'var t * 'var t
     | Tuple of 'var t list
   [@@deriving compare, equal, hash, sexp, variants]
@@ -68,10 +58,6 @@ module Decl : sig
   val arity : t -> int
   val map_exprs : t -> f:(Param.t Expr.t -> Param.t Expr.t) -> t
   val no_free_params : t -> bool
-end
-
-module Val_anot : sig
-  type t = Fixity.t option * Expr.Bounded.t [@@deriving compare, equal, hash, sexp]
 end
 
 type t = Var_id.t Expr.t [@@deriving compare, hash, equal, sexp]

@@ -17,7 +17,6 @@ let create () = { vars = Type.Var_id.Table.create () }
 
 let rec occurs_in id = function
   | Type.Expr.Var id2 -> Type.Var_id.(id = id2)
-  | Primitive _ -> false
   | Type_app (_, fields) | Tuple fields -> List.exists fields ~f:(occurs_in id)
   | Function (arg, body) -> occurs_in id arg || occurs_in id body
 ;;
@@ -40,8 +39,6 @@ let rec unify ~names ~types t1 t2 =
   | _, Var id2 when is_bound id2 -> unify ~names ~types t1 (get_type id2)
   | Var id1, _ -> set_type id1 t2
   | _, Var id2 -> set_type id2 t1
-  | Primitive p1, Primitive p2 ->
-    if not (Type.Primitive.equal p1 p2) then type_error "Primitive type mismatch" t1 t2
   | Type_app (name1, args1), Type_app (name2, args2) ->
     let instantiate_alias param_list expr =
       let params = Type.Param.Env_to_vars.create () in

@@ -2,19 +2,6 @@ open Import
 open Names
 module Var_id = Unique_id.Int ()
 
-module Primitive = struct
-  type t =
-    | Int
-    | Float
-    | Char
-    | String
-  (* TODO: decide what's going on with this. Ideally I'd probably want to delete it
-     to stop these types being special-cased (just define them in the prelude
-     and if necessary, using external definitions e.g. C)
-     Yeah, these should eventually go the same way as Bool *)
-  [@@deriving compare, equal, hash, sexp]
-end
-
 module Param = struct
   (* TODO: need variance for type parameters (e.g. covariant, contravariant)
      Can probably wait a bit though -- it's needed for subtyping
@@ -70,7 +57,6 @@ module Expr = struct
   type 'var t =
     | Var of 'var
     | Type_app of Type_name.Qualified.t * 'var t list
-    | Primitive of Primitive.t
     | Function of 'var t * 'var t
     | Tuple of 'var t list
   [@@deriving compare, equal, hash, sexp, variants]
@@ -82,7 +68,6 @@ module Expr = struct
     | `Defer typ ->
       (match typ with
       | Var v -> Var (var v)
-      | Primitive _ as typ -> typ
       | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var))
       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var))
       | Function (arg, body) ->
@@ -99,7 +84,6 @@ module Expr = struct
   let rec fold_vars typ ~init ~f =
     match typ with
     | Var var -> f init var
-    | Primitive _ -> init
     | Type_app (_, fields) | Tuple fields ->
       List.fold fields ~init ~f:(fun init -> fold_vars ~init ~f)
     | Function (arg, body) -> fold_vars body ~f ~init:(fold_vars arg ~init ~f)
@@ -108,7 +92,6 @@ module Expr = struct
   let rec for_all_vars typ ~f =
     match typ with
     | Var var -> f var
-    | Primitive _ -> true
     | Type_app (_, fields) | Tuple fields -> List.for_all fields ~f:(for_all_vars ~f)
     | Function (arg, body) -> for_all_vars arg ~f && for_all_vars body ~f
   ;;
@@ -156,41 +139,7 @@ module Decl = struct
   ;;
 end
 
-module Val_anot = struct
-  type t = Fixity.t option * Expr.Bounded.t [@@deriving compare, equal, hash, sexp]
-end
-
-(* TODO: what about type names? types which are physically the same but nominally different shouldn't be equal *)
-type t =
-  (* TODO: a type variable shouldn't be a type -- right? I want some kind of like unique ID with an already set type
-     All base types need:
-     - A name (fully qualified)
-     - A list of type parameters
-     - Public/private type definitions (depends on scope, hmm...)
-       - Private can be left out if not different to public
-       - Definitions can be:
-         - Abstract
-         - Primitive
-         - Variants of some value constructors
-         - Record
-         - Function
-         - Tuple
-         (Primitive, Function and Tuple are typed structurally, while
-         Record, Variant and Abstract are typed nominally)
-          => May want some support later for structural typing of variants/records
-             e.g. subtyping: extending or specifying previous types
-     - An actual representation (like TypeRep?)
-     - Functions (with more than 2 arguments? exactly 2?) also need a fixity
-     - Let's look a OCaml's Typedtree for help:
-       https://docs.mirage.io/ocaml/Typedtree/index.html#type-type_declaration
-
-     Types may be applied by specifying their parameters
-     So types are really type constructors (functions for creating types)
-       ^ Probably need to distinguish between type constructors and fully applied types 
-       
-     A type as used in type inference may not have a name or a proper definition (?) *)
-  Var_id.t Expr.t
-[@@deriving compare, hash, equal, sexp]
+type t = Var_id.t Expr.t [@@deriving compare, hash, equal, sexp]
 
 let fresh_var () = Expr.Var (Var_id.create ())
 

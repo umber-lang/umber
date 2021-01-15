@@ -20,24 +20,6 @@ let rec t_of_sexp node_of_sexp leaf_of_sexp = function
   | _ -> raise_s [%message "Btree.t_of_sexp: parse failed"]
 ;;
 
-let rotate_anticlockwise_exn = function
-  | Leaf _ as leaf -> leaf
-  | Node (root_data, left_child, right_child) ->
-    (match right_child with
-    | Leaf _ -> raise_s [%message "Cannot rotate leaf anticlockwise into a node"]
-    | Node (right_data, left_grandchild, right_grandchild) ->
-      Node (right_data, Node (root_data, left_child, left_grandchild), right_grandchild))
-;;
-
-let rotate_clockwise_exn = function
-  | Leaf _ as leaf -> leaf
-  | Node (root_data, left_child, right_child) ->
-    (match left_child with
-    | Leaf _ -> raise_s [%message "Cannot rotate leaf clockwise into a node"]
-    | Node (left_data, left_grandchild, right_grandchild) ->
-      Node (left_data, left_grandchild, Node (root_data, right_grandchild, right_child)))
-;;
-
 module Rotation = struct
   type t =
     | Clockwise

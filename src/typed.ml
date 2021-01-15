@@ -199,7 +199,7 @@ module Expr = struct
         | branch_type :: _ ->
           iter_pairs branch_types ~f:(Type_bindings.unify ~names ~types);
           Match (expr, branches), branch_type
-        | [] -> raise_s [%message "Empty match"])
+        | [] -> compiler_bug [%message "Empty match"])
       | Let { rec_; bindings; body } ->
         let names, bindings =
           if rec_
