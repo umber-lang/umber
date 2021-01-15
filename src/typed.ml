@@ -118,6 +118,8 @@ module Pattern = struct
           let names, _ = generalize ~names ~types (arg, arg_type) in
           loop ~names ~types (body_type, args)
         | body_type, [] ->
+          (* TODO: is this necessary? Hasn't this already been done already in
+             of_untyped_with_names? *)
           Type_bindings.unify ~names ~types body_type typ;
           names, Type_bindings.generalize types body_type
         | _ -> compiler_bug [%message "Constructor arg number mismatch"]
@@ -431,10 +433,9 @@ module Module = struct
       | None -> compiler_bug [%message "Empty binding group"]
     in
     let bindings =
-      (* TODO: can this be moved into the fold_map below? *)
+      (* First, generalize the toplevel bindings *)
       List.map bindings ~f:(fun { info = (pat, pat_type), expr, _; _ } ->
         let expr, expr_type = Expr.of_untyped ~names ~types expr in
-        (* TODO: unification like this was done before as well - are both needed? *)
         Type_bindings.unify ~names ~types pat_type expr_type;
         pat, pat_type, expr)
     in

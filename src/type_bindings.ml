@@ -64,8 +64,8 @@ let rec unify ~names ~types t1 t2 =
       (match get_decl names name2 args2 with
       | params, Alias expr -> unify ~names ~types t1 (instantiate_alias params expr)
       | decl2 ->
-        if not (phys_equal decl1 decl2) then type_error "Type application mismatch" t1 t2);
-      iter2 args1 args2 ~f:(unify ~names ~types))
+        if not (phys_equal decl1 decl2) then type_error "Type application mismatch" t1 t2;
+        iter2 args1 args2 ~f:(unify ~names ~types)))
   | Function (arg1, res1), Function (arg2, res2) ->
     unify ~names ~types arg1 arg2;
     unify ~names ~types res1 res2

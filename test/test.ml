@@ -5,10 +5,7 @@ let concat_current dir = Filename.(concat (concat current_dir_name dir))
 
 (* These tests are currently for parsing only as their related type system features have
    not yet been implemented. *)
-let parse_only_tests =
-  [ "Imports"; "Modules"; "MutualRecursion"; "Operators"; "Traits"; "Types" ]
-;;
-
+let parse_only_tests = [ "Imports"; "Modules"; "Operators"; "Traits"; "Types" ]
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)
 
 let run_tests () =

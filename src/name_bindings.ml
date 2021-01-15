@@ -294,36 +294,6 @@ let absolutify_type_expr t =
   map_type_expr_names ~f:(fun name -> absolutify_type_name t name)
 ;;
 
-(* TODO: maybe it would just be easier to start off the file by giving it an existing
-   set of bindings with itself already placed in at Std.Prelude - then none of this would
-   be needed - and this reflects how it should eventually be done, too *)
-(*let requalify_child prepend_path child_module_name bindings =
-  let rename =
-    Tuple2.map_fst ~f:(function
-      | module_name :: _ as path ->
-        if Module_name.equal module_name child_module_name
-        then prepend_path @ path
-        else path
-      | path -> path)
-  in
-  { names =
-      Map.map bindings.names ~f:(function
-        | Imported path -> Or_imported.Imported (rename path)
-        | Local entry ->
-          let typ =
-            match entry.typ with
-            | Type typ ->
-              Name_entry.Type_or_scheme.Type (map_type_expr_names typ ~f:rename)
-            | Scheme scheme -> Scheme (map_type_expr_names scheme ~f:rename)
-          in
-          Local { entry with typ })
-  ; types =
-      Map.map bindings.types ~f:(function
-        | Some (Imported path) -> Some (Or_imported.Imported (rename path))
-        | Some (Local decl) -> Some Local)
-  }
-;;*)
-
 let std_prelude =
   lazy
     (let t = into_parent (t_of_sexp (Sexp.of_string Prelude.names_sexp)) in

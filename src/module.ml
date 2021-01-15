@@ -21,7 +21,7 @@ and sig_ =
 and ('pat, 'expr) def =
   | Common_def of common
   | Module of ('pat, 'expr) t
-  | Let of ('pat * 'expr) list
+  | Let of ('pat * 'expr) list (* TODO: consider making this (and maybe some other types) Nonempty_list.t *)
   | Trait of
       Trait_name.t * Type.Param.t list * sig_ Node.t list * ('pat, 'expr) def Node.t list
   | Impl of

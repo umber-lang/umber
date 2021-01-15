@@ -31,7 +31,7 @@ module Pattern = struct
   [@@deriving sexp, variants]
 
   module Names = struct
-    type t = Name_bindings.Name_entry.t Value_name.Map.t
+    type t = Name_bindings.Name_entry.t Value_name.Map.t [@@deriving sexp]
 
     (* TODO: consider making this a map to types directly, since let_inferred is always used *)
     let add_fresh_name pat_names name =

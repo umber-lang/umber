@@ -15,7 +15,7 @@ module Pattern : sig
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Pattern.t
-    -> Name_bindings.Name_entry.t Value_name.Map.t * (t * Type.t)
+    -> Untyped.Pattern.Names.t * (t * Type.t)
 
   val of_untyped_into
     :  names:Name_bindings.t
