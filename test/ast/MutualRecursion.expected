@@ -51,25 +51,25 @@
      ((a)
       (Variants
        ((Leaf ()) (Node ((Var a) (Type_app (() Forest) ((Var a)))))))))))
-  (36:1-36:51
+  (35:1-35:50
    (Let
-    (((Catch_all (odd))
-      ((Lambda (Catch_all (x))
-        (Match
-         (Fun_call (Fun_call (Name (() ==)) (Name (() x))) (Literal (Int 0)))
-         (((Cnstr_appl (() True) ()) (Name (() False)))
-          ((Cnstr_appl (() False) ())
-           (Fun_call (Name (() even))
-            (Fun_call (Fun_call (Name (() -)) (Name (() x)))
-             (Literal (Int 1))))))))
-       (Function (Type_app (() Int) ()) (Type_app (() Bool) ()))))
-     ((Catch_all (even))
+    (((Catch_all (even))
       ((Lambda (Catch_all (x))
         (Match
          (Fun_call (Fun_call (Name (() ==)) (Name (() x))) (Literal (Int 0)))
          (((Cnstr_appl (() True) ()) (Name (() True)))
           ((Cnstr_appl (() False) ())
            (Fun_call (Name (() odd))
+            (Fun_call (Fun_call (Name (() -)) (Name (() x)))
+             (Literal (Int 1))))))))
+       (Function (Type_app (() Int) ()) (Type_app (() Bool) ()))))
+     ((Catch_all (odd))
+      ((Lambda (Catch_all (x))
+        (Match
+         (Fun_call (Fun_call (Name (() ==)) (Name (() x))) (Literal (Int 0)))
+         (((Cnstr_appl (() True) ()) (Name (() False)))
+          ((Cnstr_appl (() False) ())
+           (Fun_call (Name (() even))
             (Fun_call (Fun_call (Name (() -)) (Name (() x)))
              (Literal (Int 1))))))))
        (Function (Type_app (() Int) ()) (Type_app (() Bool) ())))))))

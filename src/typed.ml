@@ -437,11 +437,11 @@ module Module = struct
        An alternative could be to keep a span for each binding.
        Another option would be to forgo spans on the new binding group (as they can never
        be truly correct) and instead defer to spans in the contained expressions. *)
-    let span =
-      match List.hd bindings with
-      | Some { Call_graph.Binding.info = _, _, span; _ } -> span
-      | None -> compiler_bug [%message "Empty binding group"]
+    let get_span { Call_graph.Binding.info = _, _, span; _ } = span in
+    let bindings =
+      List.sort bindings ~compare:(fun b b' -> Span.compare (get_span b) (get_span b'))
     in
+    let span = get_span (List.hd_exn bindings) in
     let bindings =
       (* First, generalize the toplevel bindings *)
       List.map bindings ~f:(fun { info = (pat, pat_type), expr, _; _ } ->
@@ -476,12 +476,6 @@ module Module = struct
               | Module (module_name, sigs, defs) ->
                 Module
                   (module_name, sigs, loop binding_table (path @ [ module_name ]) defs)
-              | Let bindings ->
-                compiler_bug
-                  [%message
-                    "Dangling let binding in other_defs"
-                      (bindings
-                        : (Pattern.t * (Type.Scheme.t Expr.t * Type.Scheme.t)) list)]
               | _ as def -> def))
       in
       (* Sort defs by span to get them back into their original order *)
