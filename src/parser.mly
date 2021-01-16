@@ -181,10 +181,12 @@ let_rec:
   | LET { true }
   | LET_NONREC { false }
 
-let_binding:
+let_binding_:
   | pat = pattern; equals; expr = expr { pat, expr }
   | fun_name = pattern_name; args = nonempty_list(pattern_term); equals; expr = expr
     { Pattern.Catch_all fun_name, List.fold_right args ~init:expr ~f:Expr.lambda }
+
+let_binding: b = with_loc(let_binding_) { b }
 
 expr:
   | e = delimited(INDENT, expr, DEDENT) { e }
@@ -199,9 +201,9 @@ expr:
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; LINE_SEP?; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
-  | rec_ = let_rec; binding = let_binding; LINE_SEP?; body = expr
+  | rec_ = let_rec; binding = let_binding_; LINE_SEP?; body = expr
     { Expr.Let { rec_; bindings = [binding]; body } }
-  | rec_ = let_rec; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding);
+  | rec_ = let_rec; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding_);
     DEDENT; body = expr
     { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }

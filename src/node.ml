@@ -8,9 +8,9 @@ type 'a t =
 
 let map t ~f = { t with node = f t.node }
 
-let fold_map t ~f =
-  let x, node = f t.node in
-  x, { t with node }
+let fold_map acc t ~f =
+  let acc, node = f acc t.node in
+  acc, { t with node }
 ;;
 
 let sexp_of_t sexp_of_node { span; node } =
