@@ -1,17 +1,14 @@
 (Imports
- ((11:3-11:35
-   (Common_sig
-    (Val * () (((Num (a))) (Function (Var a) (Function (Var a) (Var a))))))))
- ((1:1-1:12 (Common_def (Import Math)))
-  (2:1-2:21 (Common_def (Import_with (Math) (abs))))
-  (3:1-6:1
-   (Common_def
-    (Type_decl Cool
-     (()
-      (Variants
-       ((You_can_define_types_in_between_imports ((Tuple ())))
-        (Bad_style_though ((Type_app (() Option) ((Tuple ())))))))))))
-  (6:1-6:25 (Common_def (Import_with (Number Int) ())))
-  (7:1-7:31 (Common_def (Import_without (Number Float) (pi))))
-  (8:1-8:23 (Common_def (Import_with (Number) (*))))
-  (23:1-23:14 (Let (((Catch_all (*)) (Name (() *))))))))
+ ((Common_sig
+   (Val * () (((Num (a))) (Function (Var a) (Function (Var a) (Var a)))))))
+ ((Common_def (Import Math)) (Common_def (Import_with (Math) (abs)))
+  (Common_def
+   (Type_decl Cool
+    (()
+     (Variants
+      ((You_can_define_types_in_between_imports ((Tuple ())))
+       (Bad_style_though ((Type_app (() Option) ((Tuple ()))))))))))
+  (Common_def (Import_with (Number Int) ()))
+  (Common_def (Import_without (Number Float) (pi)))
+  (Common_def (Import_with (Number) (*)))
+  (Let (((Catch_all (*)) (Name (() *)))))))
