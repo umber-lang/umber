@@ -8,6 +8,7 @@ module Pos = struct
       }
     [@@deriving equal, compare, hash]
 
+    let dummy = { line = 0; col = 0 }
     let to_string_terse { line; col } = sprintf "%d:%d" line col
     let sexp_of_t t = Sexp.Atom (to_string_terse t)
     let of_string_terse str = Scanf.sscanf str "%d:%d" (fun line col -> { line; col })
@@ -31,6 +32,8 @@ type t =
   ; end_ : Pos.t
   }
 [@@deriving equal, compare, hash]
+
+let dummy = { start = Pos.dummy; end_ = Pos.dummy }
 
 let of_loc ((pos1, pos2) : Lexing.position * Lexing.position) =
   { start = Pos.of_lexing_position pos1; end_ = Pos.of_lexing_position pos2 }

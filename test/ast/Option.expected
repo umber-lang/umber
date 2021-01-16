@@ -1,5 +1,4 @@
 (Option
- ((2:3-13:61
-   (Common_sig
-    (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a))))))))))
+ ((Common_sig
+   (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a)))))))))
  ())

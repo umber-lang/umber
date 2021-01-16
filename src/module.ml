@@ -5,6 +5,7 @@ type ('pat, 'expr) t = Module_name.t * sig_ Node.t list * ('pat, 'expr) def Node
 
 and common =
   | Val of Value_name.t * Fixity.t option * Type.Expr.Bounded.t
+  | Extern of Value_name.t * Fixity.t option * Type.Param.t Type.Expr.t * Extern_name.t
   | Type_decl of Type_name.t * Type.Decl.t
   | Trait_sig of Trait_name.t * Type.Param.t list * sig_ Node.t list
   (* TODO: Allow importing paths all at once
@@ -21,7 +22,7 @@ and sig_ =
 and ('pat, 'expr) def =
   | Common_def of common
   | Module of ('pat, 'expr) t
-  | Let of ('pat * 'expr) list (* TODO: consider making this (and maybe some other types) Nonempty_list.t *)
+  | Let of ('pat * 'expr) Node.t list
   | Trait of
       Trait_name.t * Type.Param.t list * sig_ Node.t list * ('pat, 'expr) def Node.t list
   | Impl of

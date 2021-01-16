@@ -1,0 +1,2 @@
+(src/type_bindings.ml.Type_error "Type application mismatch"
+  (((Type_app (() Char) ()) (Type_app (() Int) ()))))

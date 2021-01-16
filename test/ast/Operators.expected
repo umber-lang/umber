@@ -1,69 +1,57 @@
 (Operators
- ((2:3-2:38
-   (Common_sig
-    (Val == ((Non_assoc 4))
-     (() (Function (Var a) (Function (Var a) (Type_app (() Bool) ())))))))
-  (4:3-8:3
-   (Module_sig Arith
-    ((5:5-5:43
-      (Common_sig
-       (Val + ((Left 6))
-        (()
-         (Function (Type_app (() Int) ())
-          (Function (Type_app (() Int) ()) (Type_app (() Int) ())))))))
-     (6:5-6:43
-      (Common_sig
-       (Val mod ((Left 7))
-        (()
-         (Function (Type_app (() Int) ())
-          (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))))))))
-  (8:3-8:46
-   (Common_sig
-    (Val :: ((Right 5))
-     (()
-      (Function (Var a)
-       (Function (Type_app (() List) ((Var a)))
-        (Type_app (() List) ((Var a)))))))))
-  (9:3-9:44
-   (Common_sig
-    (Val "\195\151" ()
-     (()
+ ((Common_sig
+   (Val == ((Non_assoc 4))
+    (() (Function (Var a) (Function (Var a) (Type_app (() Bool) ()))))))
+  (Module_sig Arith
+   ((Common_sig
+     (Val + ((Left 6))
+      (()
+       (Function (Type_app (() Int) ())
+        (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))))
+    (Common_sig
+     (Val mod ((Left 7))
+      (()
+       (Function (Type_app (() Int) ())
+        (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))))))
+  (Common_sig
+   (Val :: ((Right 5))
+    (()
+     (Function (Var a)
       (Function (Type_app (() List) ((Var a)))
-       (Function (Type_app (() List) ((Var b)))
-        (Type_app (() List) ((Tuple ((Var a) (Var b))))))))))))
- ((11:1-11:36
-   (Let
-    (((Catch_all ())
-      (Qualified (Arith)
-       (Op_tree
-        ((() ==)
-         (((() mod)
-           (((() +) (((Literal (Int 2))) ((Literal (Int 11)))))
-            ((Literal (Int 3)))))
-          ((Literal (Int 4)))))))))))
-  (12:1-12:25
-   (Let
-    (((Catch_all (four))
-      (Fun_call (Fun_call (Name ((Arith) +)) (Literal (Int 2)))
-       (Literal (Int 2)))))))
-  (13:1-13:26
-   (Let
-    (((Catch_all (one))
-      (Op_tree (((Arith) mod) (((Literal (Int 5))) ((Literal (Int 2))))))))))
-  (15:1-15:24
-   (Let
-    (((Catch_all (left_section)) (Fun_call (Name (() +)) (Literal (Int 2)))))))
-  (16:1-16:25
-   (Let
-    (((Catch_all (right_section))
-      (Lambda (Catch_all (""))
-       (Fun_call (Fun_call (Name (() *)) (Name (() ""))) (Literal (Int 5))))))))
-  (17:1-17:75
-   (Let
-    (((Catch_all (unicode_my_dudes))
+       (Type_app (() List) ((Var a))))))))
+  (Common_sig
+   (Val "\195\151" ()
+    (()
+     (Function (Type_app (() List) ((Var a)))
+      (Function (Type_app (() List) ((Var b)))
+       (Type_app (() List) ((Tuple ((Var a) (Var b)))))))))))
+ ((Let
+   (((Catch_all ())
+     (Qualified (Arith)
       (Op_tree
-       ((() "\195\151")
-        (((Seq_literal ((Literal (String damn)) (Literal (String ok)))))
-         ((Seq_literal
-           ((Literal (String cartesian)) (Literal (String product))
-            (Literal (String maybe?))))))))))))))
+       ((() ==)
+        (((() mod)
+          (((() +) (((Literal (Int 2))) ((Literal (Int 11)))))
+           ((Literal (Int 3)))))
+         ((Literal (Int 4))))))))))
+  (Let
+   (((Catch_all (four))
+     (Fun_call (Fun_call (Name ((Arith) +)) (Literal (Int 2)))
+      (Literal (Int 2))))))
+  (Let
+   (((Catch_all (one))
+     (Op_tree (((Arith) mod) (((Literal (Int 5))) ((Literal (Int 2)))))))))
+  (Let
+   (((Catch_all (left_section)) (Fun_call (Name (() +)) (Literal (Int 2))))))
+  (Let
+   (((Catch_all (right_section))
+     (Lambda (Catch_all (""))
+      (Fun_call (Fun_call (Name (() *)) (Name (() ""))) (Literal (Int 5)))))))
+  (Let
+   (((Catch_all (unicode_my_dudes))
+     (Op_tree
+      ((() "\195\151")
+       (((Seq_literal ((Literal (String damn)) (Literal (String ok)))))
+        ((Seq_literal
+          ((Literal (String cartesian)) (Literal (String product))
+           (Literal (String maybe?)))))))))))))

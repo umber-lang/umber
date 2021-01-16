@@ -1,0 +1,4 @@
+# Mockup of how Int will be implemented
+type alias MyInt = Int
+
+extern plus (infixl 6) : MyInt -> MyInt -> MyInt = "@Int.add"

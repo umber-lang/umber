@@ -15,9 +15,11 @@
 %token MATCH
 %token WITH
 %token WITHOUT
+%token AS
 %token TYPE
 %token ALIAS
 %token VAL
+%token EXTERN
 %token INFIX
 %token INFIXL
 %token INFIXR
@@ -85,17 +87,6 @@
 %start <Untyped.Module.t> prog
 %%
 
-(* TODO: Idea: Apply a handler to all statements in the module.
-  effect UPPER_NAME with VALUE_NAME
-  e.g.
-  [effect Random with System.random]
-  
-  This would be a good place to use a [handle] keyword.
-  Could also do [by] instead of [with].
-  
-  I like having handle be the same as match but with a default branch that says
-  | x -> x (so it's like try/except basically) *)
-
 val_operator:
   | op = OPERATOR { op }
   | ASTERISK { Ustring.of_string_exn "*" }
@@ -114,6 +105,7 @@ literal:
   | c = CHAR { Literal.Char c }
   | s = STRING { Literal.String s }
 
+(* TODO: probably get rid of this and make undescore its own thing at some point *)
 pattern_name:
   | name = val_name { Some (Value_name.of_ustring_unchecked name) }
   | UNDERSCORE { None }
@@ -134,6 +126,8 @@ pattern:
   | cnstr = qualified(UPPER_NAME); args = nonempty_list(pattern_term)
     { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings_unchecked cnstr, args) }
   | left = pattern; PIPE; right = pattern { Pattern.Union (left, right) }
+  | pat = pattern; AS; name = val_name
+    { Pattern.As (pat, Value_name.of_ustring_unchecked name) }
   | annot = type_annot_bounded(pattern)
     { Pattern.Type_annotation (fst annot, snd annot) }
 
@@ -188,10 +182,12 @@ let_rec:
   | LET { true }
   | LET_NONREC { false }
 
-let_binding:
+let_binding_:
   | pat = pattern; equals; expr = expr { pat, expr }
   | fun_name = pattern_name; args = nonempty_list(pattern_term); equals; expr = expr
     { Pattern.Catch_all fun_name, List.fold_right args ~init:expr ~f:Expr.lambda }
+
+let_binding: b = with_loc(let_binding_) { b }
 
 expr:
   | e = delimited(INDENT, expr, DEDENT) { e }
@@ -206,9 +202,9 @@ expr:
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; LINE_SEP?; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
-  | rec_ = let_rec; binding = let_binding; LINE_SEP?; body = expr
+  | rec_ = let_rec; binding = let_binding_; LINE_SEP?; body = expr
     { Expr.Let { rec_; bindings = [binding]; body } }
-  | rec_ = let_rec; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding);
+  | rec_ = let_rec; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding_);
     DEDENT; body = expr
     { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
@@ -284,6 +280,10 @@ stmt_common:
   | VAL; name = val_name; fix = parens(fixity)?; colon;
     t = block(type_expr_bounded)
     { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
+  | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = block(type_expr); equals;
+    s = STRING
+    { Module.Extern (
+        Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
   | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(equals, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,

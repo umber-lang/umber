@@ -1,4 +1,10 @@
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/AsPattern.expected tokens/AsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/AsPattern.expected ast/AsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Basics.expected tokens/Basics.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -28,11 +34,35 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorDuplicateNameAsPattern.expected
+    tokens/ErrorDuplicateNameAsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorDuplicateNameAsPattern.expected
+    ast/ErrorDuplicateNameAsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorDuplicateVal.expected tokens/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer (diff ast/ErrorDuplicateVal.expected ast/ErrorDuplicateVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorPatternUnionNameTypes.expected
+    tokens/ErrorPatternUnionNameTypes.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorPatternUnionNameTypes.expected
+    ast/ErrorPatternUnionNameTypes.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -45,6 +75,12 @@
   (no-infer
    (diff ast/ErrorPolymorphicRecursion.expected
     ast/ErrorPolymorphicRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/ExternInt.expected ast/ExternInt.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Functions.expected tokens/Functions.out))))
