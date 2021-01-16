@@ -313,17 +313,18 @@ module Module = struct
   (* Name/type resolution steps
      1. Read all bound names in the module and submodules, and assign them fresh type variables
         - This doesn't require knowing anything - just read all the Catch_all names
-        - Also read the types in somehow with placeholder values - maybe Abstract? - or just an option with None
+        - Also read the types in somehow with placeholder values
         - This allows local imports to check properly
         - (* TODO: really only need to do sigs, and then defs if there are no sigs *)
      2. Read imports
         - Don't copy anything - use Imported_from
      3. Read type/trait declarations
-        - Mutual recursion in types is handled somehow
      4. (not yet (?)) Look for trait impls (just the fact they exist)
         - Needs to be done after knowing about types/traits 
      5. Handle val/let bindings
-     6. Handle let/impl expressions *)
+     6. Handle let/impl expressions
+        - Need to re-order and re-group bindings by their dependencies
+        - After re-ordering, type each expression and generalize each binding group *)
 
   let gather_name_placeholders ~names sigs defs =
     let names =
@@ -360,8 +361,6 @@ module Module = struct
     let names =
       gather_names ~names sigs defs ~handle_common:(fun names -> function
         | Val (name, fixity, typ) ->
-          (* TODO: check that val_after_let is impossible, and then probably remove it
-             (since vals are now checked before lets, it should be fine to remove) *)
           let unify = Type_bindings.unify ~names ~types in
           Name_bindings.add_val names name fixity typ ~unify
         | Type_decl _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ -> names)
@@ -432,7 +431,7 @@ module Module = struct
 
   let type_binding_group ~names ~types bindings =
     (* Order bindings in the group by span, then take the first span to represent the
-       whole group *)
+       whole group. This is done to get a consistent ordering among bindings. *)
     let get_span { Call_graph.Binding.info = _, _, span; _ } = span in
     let bindings =
       List.sort bindings ~compare:(fun b b' -> Span.compare (get_span b) (get_span b'))
