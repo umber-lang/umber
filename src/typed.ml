@@ -80,10 +80,18 @@ module Pattern = struct
           of_untyped_with_names ~names ~types pat_names pat2
         in
         Type_bindings.unify ~names ~types typ1 typ2;
-        (* Unions must define the same names, but the types may be slightly different
-           e.g. different variables *)
-        (* FIXME: need to unify the names here *)
-        if not (Map.equal (fun _ _ -> true) pat_names1 pat_names2)
+        (* Unions must define the same names with the same types *)
+        if not
+             (Map.equal
+                (fun entry1 entry2 ->
+                  Type_bindings.unify
+                    ~names
+                    ~types
+                    (Name_bindings.Name_entry.typ entry1)
+                    (Name_bindings.Name_entry.typ entry2);
+                  true)
+                pat_names1
+                pat_names2)
         then type_error_msg "Pattern unions must define the same names";
         pat_names1, (Union (pat1, pat2), typ1)
       | As (pat, name) ->

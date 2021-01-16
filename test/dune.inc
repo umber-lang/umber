@@ -55,6 +55,18 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorPatternUnionNameTypes.expected
+    tokens/ErrorPatternUnionNameTypes.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorPatternUnionNameTypes.expected
+    ast/ErrorPatternUnionNameTypes.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorPolymorphicRecursion.expected
     tokens/ErrorPolymorphicRecursion.out))))
 

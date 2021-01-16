@@ -1,0 +1,2 @@
+let _ = match (1, '2')
+  | (one, two) | (two, one) -> ()
