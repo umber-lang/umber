@@ -5,11 +5,6 @@ open Import
 open Names
 open Llvm
 
-(* TODO: consider making another intermediate representation similar to OCaml's
-   untyped lambda form. This should definitely be done at some point (but maybe after
-   the re-write).
-   See here: https://dev.realworldocaml.org/compiler-backend.html *)
-
 module Name_table : sig
   type t
 
@@ -37,10 +32,11 @@ let codegen_literal { context; _ } lit =
   | String s -> const_string context (Ustring.to_string s)
 ;;
 
-let codegen_expr state ((expr, typ) : Typed.Expr.generalized) =
+let codegen_expr state ((expr, _) : Typed.Expr.generalized) =
   match expr with
   | Literal lit -> codegen_literal state lit
-  | Name _ (*name -> Name_table.find_or_add state.names name typ*)
+  | Name _ ->
+    failwith "TODO: name" (*name -> Name_table.find_or_add state.names name typ*)
   | Fun_call (_, _)
   | Lambda (_, _)
   | Match (_, _)

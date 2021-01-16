@@ -1,11 +1,7 @@
 module :
   type Int
 
-  extern (+) : Int -> Int -> Int = @umber_primitive(Int.add)
-  extern (*) : Int -> Int -> Int = @umber_primitive(Int.mul)
+  extern (+) : Int -> Int -> Int = "@Int_add"
+  extern (*) : Int -> Int -> Int = "@Int_mul"
 
-type Int = @umber_primitive(Int)
-
-# Let's not overcomplicate:
-  `@umber_primitive(Int.add)` can just be `"@Int.add"`
-  `umber_primitive(Int)` can probably just be `Int` and be pre-existing
+type Int

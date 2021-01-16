@@ -33,6 +33,8 @@ module Expr : sig
     | Lambda of Pattern.t * 'typ t
     | Match of 'typ t * (Pattern.t * 'typ t) list
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
+    (* TODO: replace Tuple with some kind of built-in constructor
+       e.g. _Tuple2, _Tuple3, depending on the length *)
     | Tuple of 'typ t list
     | Record_literal of (Value_name.t * 'typ t option) list
     | Record_update of 'typ t * (Value_name.t * 'typ t option) list

@@ -17,5 +17,5 @@ ARROW
 ARROW
 (UPPER_NAME MyInt)
 EQUALS
-(STRING @Int.add)
+(STRING @Int_add)
 EOF

@@ -1,7 +1,6 @@
 # Temporary mock-up for testing purposes
 module :
-  # Types like Bool, Int, etc. are given in Core (automatically pre-loaded)
-  # (might want to rename Core to Primitives, Builtins, etc.)
+  # Types like Bool, Int, etc. are automatically pre-loaded
 
   module List :
     type List a = Nil | Cons a (List a)
@@ -46,9 +45,10 @@ module :
     val (;) (infixl 0) : () => () -> a -> a
 
   import Operators with *
-  # FIXME: why aren't these getting imported??
 
   val sqrt : Int -> Float
+
+  extern print : String -> () = "@Io_print_string"  # TODO: effects
 
 # TODO: implement public/private distinction for modules
 
