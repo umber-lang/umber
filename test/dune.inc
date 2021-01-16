@@ -77,6 +77,12 @@
     ast/ErrorPolymorphicRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/ExternInt.expected ast/ExternInt.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Functions.expected tokens/Functions.out))))
 
 (rule (alias runtest) (deps test.dummy)
