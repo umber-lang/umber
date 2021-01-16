@@ -1,14 +1,8 @@
 let names_sexp = {|
 ((Std)
  ((names
-   ((True
-     (Local
-      ((typ (Scheme (Type_app (() Bool) ()))) (type_source Val_declared)
-       (fixity ()))))
-    (False
-     (Local
-      ((typ (Scheme (Type_app (() Bool) ()))) (type_source Val_declared)
-       (fixity ()))))))
+   ((True (Local ((typ (Scheme (Type_app (() Bool) ()))))))
+    (False (Local ((typ (Scheme (Type_app (() Bool) ()))))))))
   (types
    ((Int ((Local (() Abstract))))
     (Bool ((Local (() (Variants ((False ()) (True ())))))))
@@ -38,8 +32,7 @@ let names_sexp = {|
              (Local
               ((typ
                 (Scheme
-                 (Function (Type_app (() Int) ()) (Type_app (() Float) ()))))
-               (type_source Val_declared) (fixity ()))))))
+                 (Function (Type_app (() Int) ()) (Type_app (() Float) ())))))))))
           (types ((List ((Imported ((Std Prelude List) List))))))
           (modules
            ((List
@@ -47,8 +40,7 @@ let names_sexp = {|
                ((Nil
                  (Local
                   ((typ
-                    (Scheme (Type_app ((Std Prelude List) List) ((Var a)))))
-                   (type_source Val_declared) (fixity ()))))
+                    (Scheme (Type_app ((Std Prelude List) List) ((Var a))))))))
                 (Cons
                  (Local
                   ((typ
@@ -56,8 +48,7 @@ let names_sexp = {|
                      (Function (Var a)
                       (Function
                        (Type_app ((Std Prelude List) List) ((Var a)))
-                       (Type_app ((Std Prelude List) List) ((Var a)))))))
-                   (type_source Val_declared) (fixity ()))))))
+                       (Type_app ((Std Prelude List) List) ((Var a))))))))))))
               (types
                ((List
                  ((Local
@@ -77,7 +68,7 @@ let names_sexp = {|
                      (Function (Type_app (() Int) ())
                       (Function (Type_app (() Int) ())
                        (Type_app (() Int) ())))))
-                   (type_source Val_declared) (fixity ((Left 7))))))
+                   (fixity (Left 7)))))
                 (+
                  (Local
                   ((typ
@@ -85,7 +76,7 @@ let names_sexp = {|
                      (Function (Type_app (() Int) ())
                       (Function (Type_app (() Int) ())
                        (Type_app (() Int) ())))))
-                   (type_source Val_declared) (fixity ((Left 6))))))
+                   (fixity (Left 6)))))
                 (-
                  (Local
                   ((typ
@@ -93,7 +84,7 @@ let names_sexp = {|
                      (Function (Type_app (() Int) ())
                       (Function (Type_app (() Int) ())
                        (Type_app (() Int) ())))))
-                   (type_source Val_declared) (fixity ((Left 6))))))
+                   (fixity (Left 6)))))
                 (.
                  (Local
                   ((typ
@@ -101,12 +92,12 @@ let names_sexp = {|
                      (Function (Function (Var b) (Var c))
                       (Function (Function (Var a) (Var b))
                        (Function (Var a) (Var c))))))
-                   (type_source Val_declared) (fixity ((Right 9))))))
+                   (fixity (Right 9)))))
                 (";"
                  (Local
                   ((typ
                     (Scheme (Function (Tuple ()) (Function (Var a) (Var a)))))
-                   (type_source Val_declared) (fixity ((Left 0))))))
+                   (fixity (Left 0)))))
                 (^
                  (Local
                   ((typ
@@ -114,7 +105,7 @@ let names_sexp = {|
                      (Function (Type_app (() Int) ())
                       (Function (Type_app (() Int) ())
                        (Type_app (() Int) ())))))
-                   (type_source Val_declared) (fixity ((Right 8))))))
+                   (fixity (Right 8)))))
                 (&&
                  (Local
                   ((typ
@@ -122,7 +113,7 @@ let names_sexp = {|
                      (Function (Type_app (() Bool) ())
                       (Function (Type_app (() Bool) ())
                        (Type_app (() Bool) ())))))
-                   (type_source Val_declared) (fixity ((Left 3))))))
+                   (fixity (Left 3)))))
                 (::
                  (Local
                   ((typ
@@ -130,21 +121,21 @@ let names_sexp = {|
                      (Function (Var a)
                       (Function (Type_app ((Std Prelude) List) ((Var a)))
                        (Type_app ((Std Prelude) List) ((Var a)))))))
-                   (type_source Val_declared) (fixity ((Right 5))))))
+                   (fixity (Right 5)))))
                 (==
                  (Local
                   ((typ
                     (Scheme
                      (Function (Var a)
                       (Function (Var a) (Type_app (() Bool) ())))))
-                   (type_source Val_declared) (fixity ((Non_assoc 4))))))
+                   (fixity (Non_assoc 4)))))
                 (|>
                  (Local
                   ((typ
                     (Scheme
                      (Function (Var a)
                       (Function (Function (Var a) (Var b)) (Var b)))))
-                   (type_source Val_declared) (fixity ((Left 0))))))
+                   (fixity (Left 0)))))
                 (||
                  (Local
                   ((typ
@@ -152,13 +143,12 @@ let names_sexp = {|
                      (Function (Type_app (() Bool) ())
                       (Function (Type_app (() Bool) ())
                        (Type_app (() Bool) ())))))
-                   (type_source Val_declared) (fixity ((Left 2))))))
+                   (fixity (Left 2)))))
                 (not
                  (Local
                   ((typ
                     (Scheme
                      (Function (Type_app (() Bool) ())
-                      (Type_app (() Bool) ()))))
-                   (type_source Val_declared) (fixity ()))))))
+                      (Type_app (() Bool) ())))))))))
               (types ()) (modules ())))))))))))))))
 |}

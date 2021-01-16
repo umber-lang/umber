@@ -7,7 +7,7 @@ module Name_entry = struct
       | Placeholder
       | Val_declared
       | Let_inferred
-    [@@deriving sexp]
+    [@@deriving equal, sexp]
   end
 
   module Type_or_scheme = struct
@@ -20,8 +20,9 @@ module Name_entry = struct
   type t =
     { typ : Type_or_scheme.t
     ; type_source : Type_source.t
-    ; fixity : Fixity.t option
-    ; extern_name : Extern_name.t option
+         [@default Type_source.Val_declared] [@sexp_drop_default.equal]
+    ; fixity : Fixity.t option [@sexp.option]
+    ; extern_name : Extern_name.t option [@sexp.option]
     }
   [@@deriving sexp]
 
