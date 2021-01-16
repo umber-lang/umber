@@ -21,6 +21,7 @@ module Name_entry = struct
     { typ : Type_or_scheme.t
     ; type_source : Type_source.t
     ; fixity : Fixity.t option
+    ; extern_name : Extern_name.t option
     }
   [@@deriving sexp]
 
@@ -30,8 +31,17 @@ module Name_entry = struct
     | Scheme scheme -> Type.Scheme.instantiate ~map_name:Fn.id scheme
   ;;
 
-  let let_inferred typ = { type_source = Let_inferred; typ = Type typ; fixity = None }
-  let placeholder typ = { type_source = Placeholder; typ = Type typ; fixity = None }
+  let let_inferred ?fixity ?extern_name typ =
+    { type_source = Let_inferred; typ = Type typ; fixity; extern_name }
+  ;;
+
+  let val_declared ?fixity ?extern_name typ =
+    { type_source = Val_declared; typ = Scheme typ; fixity; extern_name }
+  ;;
+
+  let placeholder typ =
+    { type_source = Placeholder; typ = Type typ; fixity = None; extern_name = None }
+  ;;
 end
 
 module Or_imported = struct
@@ -127,12 +137,7 @@ let core =
           Map.set
             names
             ~key:(Value_name.of_cnstr_name cnstr)
-            ~data:
-              (Local
-                 { type_source = Val_declared
-                 ; typ = Scheme (Type.Concrete.cast Core.Bool.typ)
-                 ; fixity = None
-                 }))
+            ~data:(Local (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
     } )
 ;;
 
@@ -300,7 +305,7 @@ let std_prelude =
      import_all t Core.prelude_module_path)
 ;;
 
-let add_val t name fixity (trait_bounds, type_expr) ~unify =
+let add_val ?extern_name t name fixity (trait_bounds, type_expr) ~unify =
   update_current t ~f:(fun bindings ->
     if not (List.is_empty trait_bounds) then failwith "TODO: trait bounds in val";
     let scheme = absolutify_type_expr t type_expr in
@@ -311,7 +316,7 @@ let add_val t name fixity (trait_bounds, type_expr) ~unify =
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
           | Some (Local ({ type_source = Placeholder; _ } as existing_entry)) ->
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
-            Local { type_source = Val_declared; typ = Scheme scheme; fixity }
+            Local { type_source = Val_declared; typ = Scheme scheme; fixity; extern_name }
           | Some (Imported imported_name) ->
             (* TODO: consider allowing this use case
              e.g. importing from another module, and then giving that import a new,
@@ -349,11 +354,8 @@ let add_type_decl ((current_path, _) as t) type_name decl =
           in
           List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
             let entry =
-              { typ =
-                  Scheme (List.fold_right args ~init:result_type ~f:Type.Expr.function_)
-              ; Name_entry.type_source = Val_declared
-              ; fixity = None
-              }
+              Name_entry.val_declared
+                (List.fold_right args ~init:result_type ~f:Type.Expr.function_)
             in
             Map.add names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry)
             |> or_name_clash
@@ -366,7 +368,11 @@ let add_type_decl ((current_path, _) as t) type_name decl =
 let set_scheme t name scheme =
   update_current t ~f:(fun bindings ->
     let entry =
-      { Name_entry.type_source = Let_inferred; typ = Scheme scheme; fixity = None }
+      { Name_entry.type_source = Let_inferred
+      ; typ = Scheme scheme
+      ; fixity = None
+      ; extern_name = None
+      }
     in
     { bindings with names = Map.set bindings.names ~key:name ~data:(Local entry) })
 ;;

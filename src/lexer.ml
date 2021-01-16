@@ -336,6 +336,7 @@ let read =
     | "type" -> TYPE
     | "alias" -> ALIAS
     | "val" -> VAL
+    | "extern" -> EXTERN
     | "infix" -> INFIX
     | "infixl" -> INFIXL
     | "infixr" -> INFIXR

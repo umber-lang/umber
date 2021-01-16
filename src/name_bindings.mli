@@ -20,11 +20,12 @@ module Name_entry : sig
     { typ : Type_or_scheme.t
     ; type_source : Type_source.t
     ; fixity : Fixity.t option
+    ; extern_name : Extern_name.t option
     }
   [@@deriving sexp]
 
   val typ : t -> Type.t
-  val let_inferred : Type.t -> t
+  val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
 end
 
 type t [@@deriving sexp]
@@ -75,7 +76,8 @@ val import_all : t -> Module_path.t -> t
 val import_without : t -> Module_path.t -> Unidentified_name.t list -> t
 
 val add_val
-  :  t
+  :  ?extern_name:Extern_name.t
+  -> t
   -> Value_name.t
   -> Fixity.t option
   -> Type.Expr.Bounded.t

@@ -19,6 +19,7 @@
 %token TYPE
 %token ALIAS
 %token VAL
+%token EXTERN
 %token INFIX
 %token INFIXL
 %token INFIXR
@@ -279,6 +280,10 @@ stmt_common:
   | VAL; name = val_name; fix = parens(fixity)?; colon;
     t = block(type_expr_bounded)
     { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
+  | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = block(type_expr); equals;
+    s = STRING
+    { Module.Extern (
+        Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
   | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(equals, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,

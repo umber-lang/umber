@@ -16,6 +16,7 @@ module type Unidentified_name = sig
 end
 
 module Unidentified_name : Unidentified_name = Ustring
+module Extern_name : Unidentified_name = Ustring
 
 module type Name = sig
   include General_name

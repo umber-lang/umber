@@ -329,7 +329,8 @@ module Module = struct
   let gather_name_placeholders ~names sigs defs =
     let names =
       gather_names ~names sigs defs ~handle_common:(fun names -> function
-        | Val (name, _, _) -> fst (Name_bindings.add_fresh_var names name)
+        | Val (name, _, _) | Extern (name, _, _, _) ->
+          fst (Name_bindings.add_fresh_var names name)
         | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
         | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names)
     in
@@ -354,7 +355,7 @@ module Module = struct
       | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
       | Trait_sig _ -> failwith "TODO: trait sigs"
-      | Val _ -> names)
+      | Val _ | Extern _ -> names)
   ;;
 
   let rec handle_value_bindings ~names ~types sigs defs =
@@ -363,6 +364,9 @@ module Module = struct
         | Val (name, fixity, typ) ->
           let unify = Type_bindings.unify ~names ~types in
           Name_bindings.add_val names name fixity typ ~unify
+        | Extern (name, fixity, typ, extern_name) ->
+          let unify = Type_bindings.unify ~names ~types in
+          Name_bindings.add_val names name fixity ([], typ) ~extern_name ~unify
         | Type_decl _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ -> names)
     in
     let handle_bindings ~names =
