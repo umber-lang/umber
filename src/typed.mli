@@ -22,7 +22,7 @@ module Pattern : sig
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Pattern.t
-    -> Name_bindings.t * (t * Type.t)
+    -> Name_bindings.t * (Untyped.Pattern.Names.t * (t * Type.t))
 end
 
 module Expr : sig
@@ -43,7 +43,7 @@ module Expr : sig
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Expr.t
-    -> Type.t t * Type.t
+    -> (Type.t * Untyped.Pattern.Names.t) t * Type.t
 end
 
 module Module : sig

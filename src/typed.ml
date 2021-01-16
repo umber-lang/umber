@@ -115,47 +115,21 @@ module Pattern = struct
   ;;
 
   let of_untyped_into ~names ~types pattern =
-    of_untyped_with_names ~names ~types pattern
-    |> Tuple2.map_fst
-         ~f:(Name_bindings.merge_names names ~combine:(fun _ _ new_entry -> new_entry))
+    let ((pat_names, _) as pat) = of_untyped_with_names ~names ~types pattern in
+    let names =
+      Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
+    in
+    names, pat
   ;;
 
-  (* TODO: really should be able to do this externally with a lot less fuss
-     - just keep the pat_names got earlier and map over it: don't look at the pattern *)
-  let rec generalize ~names ~types pat_and_type =
-    match (pat_and_type : t * Type.t) with
-    | (Catch_all None | Constant _), typ -> names, Type_bindings.generalize types typ
-    | Catch_all (Some name), typ ->
-      let scheme = Type_bindings.generalize types typ in
-      Name_bindings.set_scheme names name scheme, scheme
-    | As (pat, name), typ ->
-      let names, scheme = generalize ~names ~types (pat, typ) in
-      Name_bindings.set_scheme names name scheme, scheme
-    | Cnstr_appl (cnstr, args), typ ->
-      let rec loop ~names ~types = function
-        | Type.Expr.Function (arg_type, body_type), arg :: args ->
-          let names, _ = generalize ~names ~types (arg, arg_type) in
-          loop ~names ~types (body_type, args)
-        | body_type, [] ->
-          (* TODO: is this necessary? Hasn't this already been done already in
-             of_untyped_with_names? *)
-          Type_bindings.unify ~names ~types body_type typ;
-          names, Type_bindings.generalize types body_type
-        | _ -> compiler_bug [%message "Constructor arg number mismatch"]
-      in
-      loop ~names ~types (Name_bindings.find_cnstr_type names cnstr, args)
-    | Tuple fields, Tuple field_types ->
-      (match List.zip fields field_types with
-      | Ok fields -> fields
-      | Unequal_lengths -> compiler_bug [%message "Tuple item length mistmatch"])
-      |> List.fold_map ~init:names ~f:(fun names -> generalize ~names ~types)
-      |> Tuple2.map_snd ~f:Type.Expr.tuple
-    | Tuple _, got -> compiler_bug [%message "Expected tuple type" (got : Type.t)]
-    | Record _, _ -> failwith "TODO: generalizing record types in patterns"
-    | Union (pat, _), typ ->
-      (* Both branches must bind the same names (checked earlier), so only one
-         branch needs to be considered) *)
-      generalize ~names ~types (pat, typ)
+  let generalize ~names ~types pat_names typ =
+    let names =
+      Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
+        let typ = Name_bindings.Name_entry.typ entry in
+        let scheme = Type_bindings.generalize types typ in
+        Name_bindings.set_scheme names name scheme)
+    in
+    names, Type_bindings.generalize types typ
   ;;
 end
 
@@ -188,7 +162,7 @@ module Expr = struct
         Fun_call (f, arg), result_type
       | Op_tree tree -> of_untyped ~names ~types (Op_tree.to_untyped_expr ~names tree)
       | Lambda (pat, body) ->
-        let names, (pat, pat_type) = Pattern.of_untyped_into ~names ~types pat in
+        let names, (_, (pat, pat_type)) = Pattern.of_untyped_into ~names ~types pat in
         let body, body_type = of_untyped ~names ~types body in
         Lambda (pat, body), Function (pat_type, body_type)
       | If (cond, then_, else_) ->
@@ -208,7 +182,7 @@ module Expr = struct
         let expr, expr_type = of_untyped ~names ~types expr in
         let branches, branch_types =
           List.map branches ~f:(fun (pat, branch) ->
-            let names, (pat, pat_typ) = Pattern.of_untyped_into ~names ~types pat in
+            let names, (_, (pat, pat_typ)) = Pattern.of_untyped_into ~names ~types pat in
             Type_bindings.unify ~names ~types expr_type pat_typ;
             let branch, branch_type = of_untyped ~names ~types branch in
             (pat, branch), branch_type)
@@ -223,27 +197,33 @@ module Expr = struct
         let names, bindings =
           if rec_
           then (
+            (* FIXME: need to keep pat_names here so we can generalize later*)
             (* Process all bindings at once, allowing mutual recursion *)
             let names, bindings =
               List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
-                let names, pat_typed = Pattern.of_untyped_into ~names ~types pat in
-                names, (pat_typed, expr))
+                let names, (pat_names, (pat, pat_type)) =
+                  Pattern.of_untyped_into ~names ~types pat
+                in
+                names, ((pat, (pat_type, pat_names)), expr))
             in
             let bindings =
               List.map bindings ~f:(Tuple2.map_snd ~f:(of_untyped ~names ~types))
             in
-            List.iter bindings ~f:(fun ((_, pat_type), (_, expr_type)) ->
-              Type_bindings.unify ~names ~types pat_type expr_type);
             ( names
-            , List.map bindings ~f:(fun ((pat, pat_type), (expr, _)) ->
-                (pat, pat_type), expr) ))
+            , List.map
+                bindings
+                ~f:(fun (((_, (pat_type, _)) as pat), (expr, expr_type)) ->
+                Type_bindings.unify ~names ~types pat_type expr_type;
+                pat, expr) ))
           else
             (* Process bindings in order without any recursion *)
             List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
-              let names, (pat, pat_type) = Pattern.of_untyped_into ~names ~types pat in
+              let names, (pat_names, (pat, pat_type)) =
+                Pattern.of_untyped_into ~names ~types pat
+              in
               let expr, expr_type = of_untyped ~names ~types expr in
               Type_bindings.unify ~names ~types pat_type expr_type;
-              names, ((pat, pat_type), expr))
+              names, ((pat, (pat_type, pat_names)), expr))
         in
         let body, body_type = of_untyped ~names ~types body in
         Let { rec_; bindings; body }, body_type
@@ -296,8 +276,8 @@ module Expr = struct
   let rec generalize_let_bindings ~names ~types =
     map_bindings ~f:(fun { rec_; bindings; body } ->
       let bindings =
-        List.map bindings ~f:(fun ((pat, pat_type), expr) ->
-          let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
+        List.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
+          let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
           (pat, scheme), generalize_let_bindings ~names ~types expr)
       in
       { rec_; bindings; body = generalize_let_bindings ~names ~types body })
@@ -386,34 +366,27 @@ module Module = struct
           Name_bindings.add_val names name fixity typ ~unify
         | Type_decl _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ -> names)
     in
+    let handle_bindings ~names =
+      List.fold_map
+        ~init:names
+        ~f:
+          (Node.fold_map ~f:(fun names (pat, expr) ->
+             let pat_names, pat = Pattern.of_untyped_with_names ~names ~types pat in
+             let names =
+               (* Unify pattern bindings with local type information (e.g. val declarations) *)
+               Name_bindings.merge_names names pat_names ~combine:(fun _ entry entry' ->
+                 let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
+                 Type_bindings.unify ~names ~types typ typ';
+                 entry)
+             in
+             names, ((pat, pat_names), expr)))
+    in
     List.fold_map
       defs
       ~init:names
       ~f:
         (Node.fold_map ~f:(fun names -> function
-           | Let bindings ->
-             List.fold_map
-               bindings
-               ~init:names
-               ~f:
-                 (Node.fold_map ~f:(fun names (pat, expr) ->
-                    let pat_names, pat =
-                      Pattern.of_untyped_with_names ~names ~types pat
-                    in
-                    let names =
-                      (* Unify pattern bindings with local type information (e.g. val declarations) *)
-                      Name_bindings.merge_names
-                        names
-                        pat_names
-                        ~combine:(fun _ entry entry' ->
-                        let typ, typ' =
-                          Name_bindings.Name_entry.(typ entry, typ entry')
-                        in
-                        Type_bindings.unify ~names ~types typ typ';
-                        entry)
-                    in
-                    names, ((pat, pat_names), expr)))
-             |> Tuple2.map_snd ~f:let_
+           | Let bindings -> handle_bindings ~names bindings |> Tuple2.map_snd ~f:let_
            | Module (module_name, sigs, defs) ->
              let names = Name_bindings.into_module names module_name in
              let names, defs = handle_value_bindings ~names ~types sigs defs in
@@ -434,7 +407,7 @@ module Module = struct
       | Let bindings ->
         Sequence.map
           (Sequence.of_list bindings)
-          ~f:(fun { node = (pat, pat_names), expr; span } ->
+          ~f:(fun { node = ((_, pat_names) as pat), expr; span } ->
           let current_path = Name_bindings.current_path names in
           let bound_names = Map.key_set pat_names in
           let used_names = Untyped.Expr.names_used ~names expr in
@@ -467,13 +440,16 @@ module Module = struct
     let span = get_span (List.hd_exn bindings) in
     let bindings =
       (* First, generalize the toplevel bindings *)
-      List.map bindings ~f:(fun { info = (pat, pat_type), expr, span; _ } ->
+      List.map bindings ~f:(fun { info = (((_, pat_type), _) as pat), expr, span; _ } ->
         let expr, expr_type = Expr.of_untyped ~names ~types expr in
         Type_bindings.unify ~names ~types pat_type expr_type;
-        pat, pat_type, expr, span)
+        pat, expr, span)
     in
-    List.fold_map bindings ~init:names ~f:(fun names (pat, pat_type, expr, span) ->
-      let names, scheme = Pattern.generalize ~names ~types (pat, pat_type) in
+    List.fold_map
+      bindings
+      ~init:names
+      ~f:(fun names (((pat, pat_type), pat_names), expr, span) ->
+      let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
       (* Generalize local let bindings just after the parent binding *)
       (* TODO: Look into the concept of type variable scope - parent variables are
          getting generalized here as well, which is probably wrong *)
