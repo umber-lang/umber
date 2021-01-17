@@ -57,3 +57,16 @@ let of_typed_module ~names ((module_name, _sigs, defs) : Typed.Module.t) =
       failwith "TODO: Ir.of_typed_module leftover cases"
     | Common_def _ -> stmts)
 ;;
+
+(* Goals should be:
+   - Remove unnecessary type information (definitions, etc.)
+   - Flatten out function definitions/calls (?)
+     - idk if OCaml lambda form does this
+       - Actually it did seem to have lists of argument types for functions
+     - What's the cost of currying?
+     - Surely we don't want all our functions in LLVM to be single-argument?
+   - Move all function definitions to toplevel, with unique names
+     (Other values can stay inside functions (?))
+     (Dynamically created functions may have to represented as closures e.g. like in OCaml
+     partial application even if they don't bind any variables)
+   *)
