@@ -32,7 +32,11 @@ let names_sexp = {|
              (Local
               ((typ
                 (Scheme
-                 (Function (Type_app (() Int) ()) (Type_app (() Float) ())))))))))
+                 (Function (Type_app (() Int) ()) (Type_app (() Float) ())))))))
+            (print
+             (Local
+              ((typ (Scheme (Function (Type_app (() String) ()) (Tuple ()))))
+               (extern_name @Io_print_string))))))
           (types ((List ((Imported ((Std Prelude List) List))))))
           (modules
            ((List
