@@ -17,6 +17,15 @@
  (action (no-infer (diff ast/Classics.expected ast/Classics.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/CrossModuleUsage.expected tokens/CrossModuleUsage.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/CrossModuleUsage.expected ast/CrossModuleUsage.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Empty.expected tokens/Empty.out))))
 
 (rule (alias runtest) (deps test.dummy)

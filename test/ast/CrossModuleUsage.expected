@@ -1,0 +1,23 @@
+(CrossModuleUsage ()
+ ((Let
+   (((Catch_all (source))
+     ((Literal (String "everything depends on me"))
+      (Type_app (() String) ())))))
+  (Module
+   (A ()
+    ((Let
+      (((Catch_all (print))
+        ((Name ((Std Prelude) print))
+         (Function (Type_app (() String) ()) (Tuple ()))))))
+     (Let
+      (((Catch_all (print_source))
+        ((Lambda (Tuple ()) (Fun_call (Name (() print)) (Name (() source))))
+         (Function (Tuple ()) (Tuple ())))))))))
+  (Let
+   (((Catch_all (print_source))
+     ((Lambda (Tuple ())
+       (Fun_call
+        (Fun_call (Name (() ";"))
+         (Fun_call (Name ((A) print_source)) (Tuple ())))
+        (Fun_call (Name (() print)) (Name (() source)))))
+      (Function (Tuple ()) (Tuple ()))))))))
