@@ -18,7 +18,7 @@
     | Read -> resume (get ())
 
   val iter : Collection t => t a -> f:(a -> <Break,Continue> ()) -> ()
-  let iter t ~f = ... # TODO: use fold or something?
+  let iter t ~f = ... # Use fold or something?
   # What functions does Collection have?
 
 # Forget everything above, I read this paper:
@@ -40,15 +40,20 @@ module :
   # One option:
   val if : Bool -> ~then:{a} -> ~else:{a} -> a
   val while : {Bool} -> {()} -> <Diverge> ()
+  # Note: probably not going to have Diverge as an effect
 
   effect State a :
     val get : a  # Note: this is the same as {a}. Do top-level values exist in this syntax?
     val put : a -> ()
 
   # Another option:
-  # TODO: consider allowing a 'lazy' option to avoid evaluating the other branch
   val if : Bool -> ~then:(() -> a) -> ~else:(() -> a) -> a
   val while : (() -> Bool) -> (() -> ()) -> <Diverge> ()
+
+  # With type-level laziness:
+  # (are parens needed around `lazy a`?)
+  val if : Bool -> ~then_:lazy a -> ~else_:lazy a -> a
+  # let if cond ~then_ ~else_ = match cond | True -> then_ | False -> else_
 
   effect State a :
     val get : () -> a
@@ -57,7 +62,6 @@ module :
   effect Break :
     val break : ()
 
-  # TODO: think if effects can some nice syntax alternatives to function piping |> or composition .
   val for : Iterable t a => t -> ~f:(a -> <Break> ()) -> ()
 
 let for itr =
