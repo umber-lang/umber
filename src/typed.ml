@@ -378,9 +378,7 @@ module Module = struct
     let rec loop ~names aliases_seen = function
       | Type.Expr.Type_app (name, args) ->
         (* FIXME: this is inefficient as it looks up the decl twice *)
-        let decl =
-          Name_bindings.(find_absolute_decl names (absolutify_type_name names name))
-        in
+        let decl = Name_bindings.(find_type_decl names name) in
         (match decl with
         | _, Alias alias ->
           (match Hashtbl.add aliases_seen ~key:decl ~data:name with
@@ -399,7 +397,7 @@ module Module = struct
     in
     let aliases_seen = Hashtbl.create (module Type.Decl) in
     let name = Name_bindings.current_path names, name in
-    let decl = Name_bindings.find_absolute_decl names name in
+    let decl = Name_bindings.find_type_decl names name in
     Hashtbl.set aliases_seen ~key:decl ~data:name;
     loop ~names aliases_seen alias
   ;;

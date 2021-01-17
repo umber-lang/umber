@@ -53,13 +53,13 @@ val merge_names
   -> combine:(Value_name.t -> Name_entry.t -> Name_entry.t -> Name_entry.t)
   -> t
 
-(** Find a type declaration given an absolute qualified name *)
-val find_absolute_decl : t -> Type_name.Qualified.t -> Type.Decl.t
+(** Find a type declaration given a qualified name *)
+val find_type_decl : t -> Type_name.Qualified.t -> Type.Decl.t
 
 (** Convert a qualified type name to one with an absolute module path *)
 val absolutify_type_name : t -> Type_name.Qualified.t -> Type_name.Qualified.t
 
-(** Convert a qualiied value name to one with an absolute module path *)
+(** Convert a qualified value name to one with an absolute module path *)
 val absolutify_value_name : t -> Value_name.Qualified.t -> Value_name.Qualified.t
 
 (* Scope handling *)

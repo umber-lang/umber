@@ -231,14 +231,6 @@ let find_type_decl t name =
       path, decl)
 ;;
 
-(* TODO: should be able to just use non-absolute names, I think *)
-let rec find_absolute_decl ((_, bindings) as t) name =
-  match snd (find_type_decl ([], bindings) name) with
-  | Some (Local decl) -> decl
-  | Some (Imported path_name) -> find_absolute_decl t path_name
-  | None -> compiler_bug [%message "Placeholder decl not replaced"]
-;;
-
 let absolutify_path t path =
   find
     t
@@ -427,6 +419,16 @@ let merge_names t new_names ~combine =
           in
           Local (combine key entry1 entry2))
     })
+;;
+
+let find_type_decl =
+  let rec loop t name =
+    match snd (find_type_decl t name) with
+    | Some (Local decl) -> decl
+    | Some (Imported path_name) -> loop t path_name
+    | None -> compiler_bug [%message "Placeholder decl not replaced"]
+  in
+  loop
 ;;
 
 let current_path = fst
