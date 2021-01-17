@@ -8,3 +8,6 @@ module A =
   let print_source () = print source
 
 let print_source () = A.print_source (); print source
+
+val empty : List a
+let empty = Nil

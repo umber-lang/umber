@@ -5,7 +5,7 @@ module :
 
   module List :
     type List a = Nil | Cons a (List a)
-  import List with *  # TODO: remove (should see a type List as List.List)
+  import List with Nil, Cons
 
   module Operators :
     val (.) (infixr 9) : () => (b -> c) -> (a -> b) -> a -> c

@@ -219,11 +219,20 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
+let find_type_decl t name =
+  let open Option.Let_syntax in
+  find t name ~to_ustring:Type_name.Qualified.to_ustring ~f:(fun path bindings name ->
+    match Map.find bindings.types name with
+    | Some decl -> Some (path, decl)
+    | None ->
+      let module_name = Type_name.to_ustring name |> Module_name.of_ustring_unchecked in
+      let%bind bindings = Map.find bindings.modules module_name in
+      let%map decl = Map.find bindings.types name in
+      path, decl)
+;;
+
 let rec find_absolute_decl ((_, bindings) as t) name =
-  let to_ustring = Type_name.Qualified.to_ustring in
-  match
-    find ([], bindings) name ~f:(fun _ bindings -> Map.find bindings.types) ~to_ustring
-  with
+  match snd (find_type_decl ([], bindings) name) with
   | Some (Local decl) -> decl
   | Some (Imported path_name) -> find_absolute_decl t path_name
   | None -> compiler_bug [%message "Placeholder decl not replaced"]
@@ -237,12 +246,7 @@ let absolutify_path t path =
     ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
 ;;
 
-let absolutify_type_name =
-  find
-    ~f:(fun path bindings name ->
-      Option.some_if (Map.mem bindings.types name) (path, name))
-    ~to_ustring:Type_name.Qualified.to_ustring
-;;
+let absolutify_type_name t ((_, name) as path) = fst (find_type_decl t path), name
 
 let absolutify_value_name =
   find

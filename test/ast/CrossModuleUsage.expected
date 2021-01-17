@@ -23,4 +23,7 @@
         (Fun_call (Name (() ";"))
          (Fun_call (Name ((A) print_source)) (Tuple ())))
         (Fun_call (Name (() print)) (Name (() source)))))
-      (Function (Tuple ()) (Tuple ()))))))))
+      (Function (Tuple ()) (Tuple ()))))))
+  (Common_def (Val empty () (() (Type_app (() List) ((Var a))))))
+  (Let
+   (((Catch_all (empty)) ((Name (() Nil)) (Type_app (() List) ((Var a)))))))))
