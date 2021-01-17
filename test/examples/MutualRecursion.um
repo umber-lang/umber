@@ -41,6 +41,6 @@ let number =
   let' number = number + number
   number
 
-# TODO: add tests for mutual recursion with submodules
+# TODO: add tests for use between submodules
   e.g. imports to/from, usage between the parent and child
   ^ make the above module `Tree` and have mutual usage with the parent

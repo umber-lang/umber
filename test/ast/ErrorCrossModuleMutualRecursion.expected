@@ -1,0 +1,2 @@
+(src/type_bindings.ml.Type_error
+  "Mutually recursive functions are not allowed across module boundaries" ())

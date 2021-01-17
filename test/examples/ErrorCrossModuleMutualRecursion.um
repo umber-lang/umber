@@ -1,0 +1,4 @@
+module Child =
+  let child x = parent x
+
+let parent x = Child.child x

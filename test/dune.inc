@@ -25,6 +25,18 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorCrossModuleMutualRecursion.expected
+    tokens/ErrorCrossModuleMutualRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorCrossModuleMutualRecursion.expected
+    ast/ErrorCrossModuleMutualRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorDuplicateLet.expected tokens/ErrorDuplicateLet.out))))
 
 (rule (alias runtest) (deps test.dummy)
