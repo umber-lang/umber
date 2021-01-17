@@ -32,10 +32,11 @@ type t [@@deriving sexp]
 
 exception Name_error of Ustring.t [@@deriving sexp]
 
-(* Default values *)
+(* Handling of default values *)
 val empty : t
 val core : t
 val std_prelude : t Lazy.t
+val without_std : t -> t
 
 (* Querying/updating names *)
 val find_entry : t -> Value_name.Qualified.t -> Name_entry.t
@@ -62,11 +63,12 @@ val absolutify_type_name : t -> Type_name.Qualified.t -> Type_name.Qualified.t
 val absolutify_value_name : t -> Value_name.Qualified.t -> Value_name.Qualified.t
 
 (* Scope handling *)
+val current_path : t -> Module_path.t
 val into_module : t -> Module_name.t -> t
 val into_parent : t -> t
 val with_submodule : t -> Module_name.t -> f:(t -> t) -> t
 val with_submodule' : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
-val current_path : t -> Module_path.t
+val with_path : t -> Module_path.t -> f:(t -> t * 'a) -> t * 'a
 
 (* AST handling *)
 (* TODO: rename the existing module Import to Common, and split into Import.t with:

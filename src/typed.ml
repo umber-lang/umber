@@ -525,8 +525,9 @@ module Module = struct
     let names, binding_groups =
       Sequence.to_list binding_groups
       |> List.fold_map ~init:names ~f:(fun names (bindings, path) ->
-           let names, def = type_binding_group ~names ~types bindings in
-           names, (def, path))
+           Name_bindings.with_path names path ~f:(fun names ->
+             let names, def = type_binding_group ~names ~types bindings in
+             names, (def, path)))
     in
     let path = Name_bindings.current_path names in
     names, reintegrate_binding_groups path other_defs binding_groups

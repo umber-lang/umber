@@ -124,6 +124,11 @@ let with_submodule' ((current_path, _) as t) module_name ~f =
   (current_path, bindings), x
 ;;
 
+let with_path (current_path, bindings) path ~f =
+  let (_, bindings), x = f (path, bindings) in
+  (current_path, bindings), x
+;;
+
 let core =
   ( []
   , { empty_bindings with
@@ -309,6 +314,11 @@ let std_prelude =
   lazy
     (let t = into_parent (t_of_sexp (Sexp.of_string Prelude.names_sexp)) in
      import_all t Core.prelude_module_path)
+;;
+
+let without_std =
+  Tuple2.map_snd ~f:(fun bindings ->
+    { bindings with modules = Map.remove bindings.modules Core.std_module_name })
 ;;
 
 let add_val ?extern_name t name fixity (trait_bounds, type_expr) ~unify =

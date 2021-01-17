@@ -1,9 +1,8 @@
 let source = "everything depends on me"
 
 module A =
-  # TODO: fix
-  #let a = b
-  #let b = a
+  let a = b
+  let b = a
 
   let print = Std.Prelude.print
   let print_source () = print source
