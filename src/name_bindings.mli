@@ -65,6 +65,7 @@ val absolutify_value_name : t -> Value_name.Qualified.t -> Value_name.Qualified.
 val into_module : t -> Module_name.t -> t
 val into_parent : t -> t
 val with_submodule : t -> Module_name.t -> f:(t -> t) -> t
+val with_submodule' : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
 val current_path : t -> Module_path.t
 
 (* AST handling *)

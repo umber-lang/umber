@@ -119,6 +119,11 @@ let into_module t module_name =
 let into_parent (path, t) = List.drop_last path |> Option.value ~default:[], t
 let with_submodule t module_name ~f = fst t, snd (f (into_module t module_name))
 
+let with_submodule' ((current_path, _) as t) module_name ~f =
+  let (_, bindings), x = f (into_module t module_name) in
+  (current_path, bindings), x
+;;
+
 let core =
   ( []
   , { empty_bindings with
