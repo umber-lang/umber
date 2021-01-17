@@ -283,12 +283,14 @@ fixity:
 %inline import_item:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
+%inline import_items: items = separated_nonempty_list(COMMA, import_item) { items }
+
 import_stmt:
   | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
   | path = import_module_path; WITH; ASTERISK { Module.Import_with (path, []) }
-  | path = import_module_path; WITH; items = nonempty_list(import_item)
+  | path = import_module_path; WITH; items = import_items
     { Module.Import_with (path, items) }
-  | path = import_module_path; WITHOUT; items = nonempty_list(import_item)
+  | path = import_module_path; WITHOUT; items = import_items
     { Module.Import_without (path, items) }
 
 stmt_common:
