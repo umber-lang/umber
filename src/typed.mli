@@ -76,6 +76,10 @@ module Module : sig
     -> Untyped.Module.def Node.t list
     -> Name_bindings.t
 
+  type intermediate_def =
+    ((Pattern.t * Type.t) * Untyped.Pattern.Names.t, Untyped.Expr.t) Module.def
+  [@@deriving sexp]
+
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
       variables. *)
@@ -84,10 +88,7 @@ module Module : sig
     -> types:Type_bindings.t
     -> Untyped.Module.sig_ Node.t list
     -> Untyped.Module.def Node.t list
-    -> Name_bindings.t
-       * ((Pattern.t * Type.t) * Untyped.Pattern.Names.t, Untyped.Expr.t) Module.def
-         Node.t
-         list
+    -> Name_bindings.t * intermediate_def Node.t list
 
   (** Type-check the expressions (definitions) for each let binding and trait implementation.
       Performs let-generalization on free variables in let statement bindings.
@@ -96,7 +97,6 @@ module Module : sig
   val type_defs
     :  names:Name_bindings.t
     -> types:Type_bindings.t
-    -> ((Pattern.t * Type.t) * Untyped.Pattern.Names.t, Untyped.Expr.t) Module.def Node.t
-       list
+    -> intermediate_def Node.t list
     -> Name_bindings.t * def Node.t list
 end

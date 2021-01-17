@@ -92,7 +92,7 @@ module Expr = struct
     | Record_update of t * (Value_name.t * t option) list
     | Record_field_access of t * Value_name.t
     | Type_annotation of t * Type.Expr.Bounded.t
-  [@@deriving sexp_of, variants]
+  [@@deriving sexp, variants]
 
   (** Get all the external names referenced by an expression. Names local to the
       expression (e.g. those bound by match expressions or lambdas) are not included. *)

@@ -292,6 +292,10 @@ module Module = struct
   type nonrec def = (Pattern.t, Type.Scheme.t Expr.t * Type.Scheme.t) def
   [@@deriving sexp]
 
+  type intermediate_def =
+    ((Pattern.t * Type.t) * Untyped.Pattern.Names.t, Untyped.Expr.t) Module.def
+  [@@deriving sexp]
+
   let rec gather_names ~names ~f_common ?(f_def = fun _ _ -> None) sigs defs =
     let names =
       List.fold sigs ~init:names ~f:(fun names sig_ ->
@@ -424,34 +428,41 @@ module Module = struct
       This is done by topologically sorting the strongly-connected components of the call
       graph (dependencies between bindings). *)
   let extract_binding_groups ~names defs =
-    let rec gather_bindings_in_defs ~names other_defs defs =
-      Sequence.of_list defs |> Sequence.concat_map ~f:(gather_bindings ~names other_defs)
-    and gather_bindings ~names other_defs def =
+    let rec gather_bindings_in_defs ~names defs acc =
+      List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
+    and gather_bindings ~names def (other_defs, bindings) =
       match def.Node.node with
-      | Let bindings ->
-        Sequence.map
-          (Sequence.of_list bindings)
-          ~f:(fun { node = ((_, pat_names) as pat), expr; span } ->
-          let current_path = Name_bindings.current_path names in
-          let bound_names = Map.key_set pat_names in
-          let used_names = Untyped.Expr.names_used ~names expr in
-          ( { Call_graph.Binding.bound_names; used_names; info = pat, expr, span }
-          , current_path ))
-      | Module (module_name, _, defs) ->
+      | Let bindings' ->
+        ( other_defs
+        , List.fold_right
+            bindings'
+            ~init:bindings
+            ~f:(fun { Node.node = ((_, pat_names) as pat), expr; span } bindings ->
+            let current_path = Name_bindings.current_path names in
+            let bound_names = Map.key_set pat_names in
+            let used_names = Untyped.Expr.names_used ~names expr in
+            ( { Call_graph.Binding.bound_names; used_names; info = pat, expr, span }
+            , current_path )
+            :: bindings) )
+      | Module (module_name, sigs, defs) ->
         let names = Name_bindings.into_module names module_name in
-        gather_bindings_in_defs ~names other_defs defs
+        let other_defs', bindings = gather_bindings_in_defs ~names defs ([], bindings) in
+        ( { def with node = Module (module_name, sigs, other_defs') } :: other_defs
+        , bindings )
       | Common_def _ as node ->
-        Queue.enqueue other_defs { def with node };
-        Sequence.empty
+        (* FIXME: this just doesn't work on nested modules at all, need to actually
+           return the transformed defs from the function
+           Maybe try partitioning the lists - could also try fold_right for better performance *)
+        { def with node } :: other_defs, bindings
       | Trait _ | Impl _ -> failwith "TODO: traits/impls"
     in
-    let other_defs = Queue.create () in
+    let other_defs, bindings = gather_bindings_in_defs ~names defs ([], []) in
     let binding_groups =
-      gather_bindings_in_defs ~names other_defs defs
-      |> Call_graph.of_bindings
+      (* TODO: what's the point in using Sequence? *)
+      Call_graph.of_bindings (Sequence.of_list bindings)
       |> Call_graph.to_regrouped_bindings
     in
-    Queue.to_list other_defs, binding_groups
+    other_defs, binding_groups
   ;;
 
   let type_binding_group ~names ~types bindings =
@@ -499,7 +510,7 @@ module Module = struct
               | Module (module_name, sigs, defs) ->
                 Module
                   (module_name, sigs, loop binding_table (path @ [ module_name ]) defs)
-              | _ as def -> def))
+              | def -> def))
       in
       (* Sort defs by span to get them back into their original order *)
       List.sort
