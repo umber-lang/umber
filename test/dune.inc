@@ -46,6 +46,17 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorCyclicTypeAlias.expected
+    tokens/ErrorCyclicTypeAlias.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorCyclicTypeAlias.expected ast/ErrorCyclicTypeAlias.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorDuplicateLet.expected tokens/ErrorDuplicateLet.out))))
 
 (rule (alias runtest) (deps test.dummy)

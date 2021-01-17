@@ -231,6 +231,7 @@ let find_type_decl t name =
       path, decl)
 ;;
 
+(* TODO: should be able to just use non-absolute names, I think *)
 let rec find_absolute_decl ((_, bindings) as t) name =
   match snd (find_type_decl ([], bindings) name) with
   | Some (Local decl) -> decl

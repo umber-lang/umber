@@ -373,6 +373,37 @@ module Module = struct
       | Val _ | Extern _ -> names)
   ;;
 
+  (** Raise an error upon finding any cycles in a given type alias. *)
+  let check_cyclic_type_alias ~names name alias =
+    let rec loop ~names aliases_seen = function
+      | Type.Expr.Type_app (name, args) ->
+        (* FIXME: this is inefficient as it looks up the decl twice *)
+        let decl =
+          Name_bindings.(find_absolute_decl names (absolutify_type_name names name))
+        in
+        (match decl with
+        | _, Alias alias ->
+          (match Hashtbl.add aliases_seen ~key:decl ~data:name with
+          | `Ok -> loop ~names aliases_seen alias
+          | `Duplicate ->
+            raise_s
+              [%message
+                "Cyclic type alias" (name : Type_name.Qualified.t) (decl : Type.Decl.t)])
+        | _ -> ());
+        List.iter args ~f:(loop ~names aliases_seen)
+      | Function (f, arg) ->
+        loop ~names aliases_seen f;
+        loop ~names aliases_seen arg
+      | Tuple items -> List.iter items ~f:(loop ~names aliases_seen)
+      | Var _ -> ()
+    in
+    let aliases_seen = Hashtbl.create (module Type.Decl) in
+    let name = Name_bindings.current_path names, name in
+    let decl = Name_bindings.find_absolute_decl names name in
+    Hashtbl.set aliases_seen ~key:decl ~data:name;
+    loop ~names aliases_seen alias
+  ;;
+
   let rec handle_value_bindings ~names ~types sigs defs =
     let handle_common ~names = function
       | Val (name, fixity, typ) ->
@@ -381,6 +412,9 @@ module Module = struct
       | Extern (name, fixity, typ, extern_name) ->
         let unify = Type_bindings.unify ~names ~types in
         Name_bindings.add_val names name fixity ([], typ) ~extern_name ~unify
+      | Type_decl (name, (_, Alias alias)) ->
+        check_cyclic_type_alias ~names name alias;
+        names
       | Type_decl _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ -> names
     in
     let rec handle_sigs ~names ~handle_common =

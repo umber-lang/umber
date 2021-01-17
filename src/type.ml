@@ -104,13 +104,13 @@ end
 module Decl = struct
   type decl =
     | Abstract
-    | Alias of Param.t Expr.t (* FIXME: probably need an occurs check to validate this at some point *)
+    | Alias of Param.t Expr.t
     (* TODO: variant constructors should probably support fixity declarations *)
     | Variants of (Cnstr_name.t * Param.t Expr.t list) list
     | Record of (Value_name.t * Param.t Expr.t) list
-  [@@deriving sexp]
+  [@@deriving compare, equal, hash, sexp]
 
-  type t = Param.t list * decl [@@deriving sexp]
+  type t = Param.t list * decl [@@deriving compare, equal, hash, sexp]
 
   let arity (params, _) = List.length params
 
@@ -122,6 +122,17 @@ module Decl = struct
       | Variants cnstrs -> Variants (List.map cnstrs ~f:(Tuple2.map_snd ~f:(List.map ~f)))
       | Record fields -> Record (List.map fields ~f:(Tuple2.map_snd ~f)) )
   ;;
+
+  let fold_exprs (_, decl) ~init:acc ~f =
+    match decl with
+    | Abstract -> acc
+    | Alias expr -> f acc expr
+    | Variants cnstrs ->
+      List.fold cnstrs ~init:acc ~f:(fun acc -> snd >> List.fold ~init:acc ~f)
+    | Record fields -> List.fold fields ~init:acc ~f:(fun acc -> snd >> f acc)
+  ;;
+
+  let iter_exprs decl ~f = fold_exprs decl ~init:() ~f:(fun () -> f)
 
   let no_free_params =
     let check_params params typ =

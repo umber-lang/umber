@@ -51,12 +51,14 @@ module Decl : sig
     | Alias of Param.t Expr.t
     | Variants of (Cnstr_name.t * Param.t Expr.t list) list
     | Record of (Value_name.t * Param.t Expr.t) list
-  [@@deriving sexp]
+  [@@deriving compare, equal, hash, sexp]
 
-  type t = Param.t list * decl [@@deriving sexp]
+  type t = Param.t list * decl [@@deriving compare, equal, hash, sexp]
 
   val arity : t -> int
   val map_exprs : t -> f:(Param.t Expr.t -> Param.t Expr.t) -> t
+  val fold_exprs : t -> init:'acc -> f:('acc -> Param.t Expr.t -> 'acc) -> 'acc
+  val iter_exprs : t -> f:(Param.t Expr.t -> unit) -> unit
   val no_free_params : t -> bool
 end
 
