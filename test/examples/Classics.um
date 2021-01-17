@@ -1,13 +1,8 @@
-# TODO: support matches like this:
-  ```
-  match n
-  | 0
-  | 1 -> 1
-  | n -> n
-  ```
+# Can't go wrong with the classics
 
 let fact = match
-  | 0 | 1 -> 1
+  | 0
+  | 1 -> 1
   | n -> n * fact (n - 1) 
 
 let fib n =

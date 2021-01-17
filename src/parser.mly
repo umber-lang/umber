@@ -175,7 +175,10 @@ expr_op_tree:
   | left = expr_op_tree; op = operator; right = expr_op_term
     { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, left, Leaf right) }
 
-%inline match_branch: b = separated_pair(pattern, ARROW, expr) { b }
+match_branch:
+  | branch = separated_pair(pattern, ARROW, expr) { branch }
+  | left = pattern; LINE_SEP; PIPE; right = match_branch
+    { Pattern.union left (fst right), snd right }
 
 match_branches:
   | PIPE; branches = separated_nonempty_list(PIPE, match_branch) { branches }
