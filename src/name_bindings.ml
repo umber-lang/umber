@@ -431,4 +431,5 @@ let find_type_decl =
   loop
 ;;
 
+let find_absolute_type_decl (_, bindings) = find_type_decl ([], bindings)
 let current_path = fst

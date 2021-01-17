@@ -50,7 +50,7 @@ let rec unify ~names ~types t1 t2 =
         ~map_name:(Name_bindings.absolutify_type_name names)
     in
     let get_decl names name args =
-      let decl = Name_bindings.find_type_decl names name in
+      let decl = Name_bindings.find_absolute_type_decl names name in
       if List.length args = Type.Decl.arity decl
       then decl
       else type_error "Partially applied type constructor" t1 t2
