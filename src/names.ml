@@ -5,6 +5,7 @@ module type General_name = sig
 
   include Comparable.S with type t := t
 
+  val empty : t
   val to_ustring : t -> Ustring.t
 end
 

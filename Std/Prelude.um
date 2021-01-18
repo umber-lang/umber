@@ -46,7 +46,6 @@ module :
     val (;) (infixl 0) : () => () -> a -> a
 
   import Operators with *
-  # FIXME: why aren't these getting imported??
 
   val sqrt : Int -> Float
 

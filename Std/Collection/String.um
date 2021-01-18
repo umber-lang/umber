@@ -6,7 +6,7 @@ module :
     - bytes/chars should let you iterate over bytes/chars (actually just iterate over chars by default maybe)
     - oh, what if strings can implement collections/iterables as both Byte and Char?
       (that could be an actual use case for Iterable t e)
-  # FIXME: Want this to be a `Collection`, but only of `Char`
+  # TODO: Want this to be a `Collection`, but only of `Char`
     - guess I need to add a type parameter to `Collection`?
       seems not ideal
     - can try following Rust's approach where traits can contain types

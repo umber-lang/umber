@@ -197,7 +197,6 @@ module Expr = struct
         let names, bindings =
           if rec_
           then (
-            (* FIXME: need to keep pat_names here so we can generalize later*)
             (* Process all bindings at once, allowing mutual recursion *)
             let names, bindings =
               List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
@@ -377,7 +376,6 @@ module Module = struct
   let check_cyclic_type_alias ~names name alias =
     let rec loop ~names aliases_seen = function
       | Type.Expr.Type_app (name, args) ->
-        (* FIXME: this is inefficient as it looks up the decl twice *)
         let decl = Name_bindings.(find_type_decl names name) in
         (match decl with
         | _, Alias alias ->
@@ -481,11 +479,7 @@ module Module = struct
         let other_defs', bindings = gather_bindings_in_defs ~names defs ([], bindings) in
         ( { def with node = Module (module_name, sigs, other_defs') } :: other_defs
         , bindings )
-      | Common_def _ as node ->
-        (* FIXME: this just doesn't work on nested modules at all, need to actually
-           return the transformed defs from the function
-           Maybe try partitioning the lists - could also try fold_right for better performance *)
-        { def with node } :: other_defs, bindings
+      | Common_def _ as node -> { def with node } :: other_defs, bindings
       | Trait _ | Impl _ -> failwith "TODO: traits/impls"
     in
     let other_defs, bindings = gather_bindings_in_defs ~names defs ([], []) in
