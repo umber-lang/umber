@@ -45,18 +45,28 @@ module Name_entry = struct
   ;;
 end
 
-module Or_imported = struct
+module Entry = struct
+  module Or_imported = struct
+    type ('entry, 'name) t =
+      | Local of 'entry
+      | Imported of (Module_path.t * 'name)
+    [@@deriving sexp, variants]
+  end
+
   type ('entry, 'name) t =
-    | Local of 'entry
-    | Imported of (Module_path.t * 'name)
-  [@@deriving sexp, variants]
+    | Sig of 'entry
+    | Def of ('entry, 'name) Or_imported.t
+    | Sig_and_def of 'entry * ('entry, 'name) Or_imported.t
+  [@@deriving sexp]
+
+  let exported_local entry = Sig_and_def (entry, Local entry)
 end
 
 type t = Module_path.t * bindings
 
 and bindings =
-  { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
-  ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
+  { names : (Name_entry.t, Value_name.t) Entry.t Value_name.Map.t
+  ; types : (Type.Decl.t, Type_name.t) Entry.t option Type_name.Map.t
   ; modules : bindings Module_name.Map.t
   }
 [@@deriving sexp]
@@ -135,7 +145,8 @@ let core =
       types =
         List.fold
           ~init:empty_bindings.types
-          ~f:(fun types (name, decl) -> Map.set types ~key:name ~data:(Some (Local decl)))
+          ~f:(fun types (name, decl) ->
+            Map.set types ~key:name ~data:(Some (Entry.exported_local decl)))
           Core.
             [ Bool.name, Bool.decl
             ; Int.name, Int.decl
@@ -148,7 +159,9 @@ let core =
           Map.set
             names
             ~key:(Value_name.of_cnstr_name cnstr)
-            ~data:(Local (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
+            ~data:
+              (Entry.exported_local
+                 (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
     } )
 ;;
 
@@ -173,6 +186,8 @@ let current_bindings_exn t =
   option_or_default (current_bindings t) ~f:(fun () -> name_error_path (fst t))
 ;;
 
+(* FIXME: find should act differently depending on where you are searching from
+   (whether you are inside the module or not and what is exposed) *)
 let rec find ((current_path, _) as t) ((path, name) as input) ~f ~to_ustring =
   (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
   let open Option.Let_syntax in
