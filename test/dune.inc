@@ -148,6 +148,12 @@
  (action (no-infer (diff ast/Modules.expected ast/Modules.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/ModuleSig.expected tokens/ModuleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/ModuleSig.expected ast/ModuleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
    (diff tokens/MutualRecursion.expected tokens/MutualRecursion.out))))

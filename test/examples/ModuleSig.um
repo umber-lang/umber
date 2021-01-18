@@ -1,0 +1,14 @@
+module Range :
+  type Range
+
+  val between : Int -> Int -> Range
+  val in : Int -> Range -> Bool
+  =
+  type alias Range = (Int, Int)
+
+  let between lo hi = (lo, hi)
+  let in x (lo, hi) = lo <= x && x <= hi
+
+let my_range = Range.between 1 10
+
+let is_10_in_range = Range.in 10 my_range
