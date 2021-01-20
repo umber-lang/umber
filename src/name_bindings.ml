@@ -45,31 +45,57 @@ module Name_entry = struct
   ;;
 end
 
-module Entry = struct
-  module Or_imported = struct
-    type ('entry, 'name) t =
-      | Local of 'entry
-      | Imported of (Module_path.t * 'name)
-    [@@deriving sexp, variants]
-  end
-
+module Or_imported = struct
   type ('entry, 'name) t =
-    | Sig of 'entry
-    | Def of ('entry, 'name) Or_imported.t
-    | Sig_and_def of 'entry * ('entry, 'name) Or_imported.t
-  [@@deriving sexp]
-
-  let exported_local entry = Sig_and_def (entry, Local entry)
+    | Local of 'entry
+    | Imported of (Module_path.t * 'name)
+  [@@deriving sexp, variants]
 end
 
-type t = Module_path.t * bindings
+(* FIXME: Maybe just move the sig/def logic outside? is that sustainable? *)
+module Sig_bindings = struct
+  type t =
+    { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
+    ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
+    ; modules : t Module_name.Map.t
+    }
+  [@@deriving sexp]
 
-and bindings =
-  { names : (Name_entry.t, Value_name.t) Entry.t Value_name.Map.t
-  ; types : (Type.Decl.t, Type_name.t) Entry.t option Type_name.Map.t
-  ; modules : bindings Module_name.Map.t
-  }
-[@@deriving sexp]
+  let empty =
+    { names = Value_name.Map.empty
+    ; types = Type_name.Map.empty
+    ; modules = Module_name.Map.empty
+    }
+  ;;
+end
+
+module Def_bindings = struct
+  type t =
+    { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
+    ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
+    ; sig_modules : Sig_bindings.t Module_name.Map.t
+    ; def_modules : t Module_name.Map.t
+    }
+  [@@deriving sexp]
+
+  let empty =
+    { names = Value_name.Map.empty
+    ; types = Type_name.Map.empty
+    ; sig_modules = Module_name.Map.empty
+    ; def_modules = Module_name.Map.empty
+    }
+  ;;
+end
+
+(* FIXME: sig bindings can only refer to more sigs
+   Yikes - this just got a lot more complex 
+   - Might be better to forget sig_bindings 
+   Think about how this is going to be used outside to decide how sig/def should work 
+   What if instead of modules we have sig_modules and def_modules? - should help
+   - generally you don't care about dealing with the sig/def interaction, most of the time
+     you should just be dealing with one or the other - they just have to be compatible,
+     which is checked once - other times you are looking up the sig or *)
+type t = Module_path.t * Sig_bindings.t * Def_bindings.t
 
 exception Name_error of Ustring.t [@@deriving sexp]
 
@@ -85,14 +111,7 @@ let or_name_clash msg ustr = function
   | `Duplicate -> name_error_msg msg ustr
 ;;
 
-let empty_bindings =
-  { names = Value_name.Map.empty
-  ; types = Type_name.Map.empty
-  ; modules = Module_name.Map.empty
-  }
-;;
-
-let empty = [], empty_bindings
+let empty = [], Sig_bindings.empty, Def_bindings.empty
 
 let add_to_types ?(err_msg = "Type name clash") types name decl =
   Map.update types name ~f:(function
@@ -107,6 +126,8 @@ let update_at_path path bindings ~f =
     | module_name :: rest ->
       { bindings with
         modules =
+          (* TODO: how should we deal with trying to modify an imported module?
+             How do we decide whether to modify the sig or the def? *)
           Map.update bindings.modules module_name ~f:(function
             | Some bindings -> loop bindings ~f rest
             | None -> name_error_path path)
