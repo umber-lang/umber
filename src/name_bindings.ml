@@ -52,50 +52,14 @@ module Or_imported = struct
   [@@deriving sexp, variants]
 end
 
-(* FIXME: Maybe just move the sig/def logic outside? is that sustainable? *)
-module Sig_bindings = struct
-  type t =
-    { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
-    ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
-    ; modules : t Module_name.Map.t
-    }
-  [@@deriving sexp]
+type t = Module_path.t * bindings
 
-  let empty =
-    { names = Value_name.Map.empty
-    ; types = Type_name.Map.empty
-    ; modules = Module_name.Map.empty
-    }
-  ;;
-end
-
-module Def_bindings = struct
-  type t =
-    { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
-    ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
-    ; sig_modules : Sig_bindings.t Module_name.Map.t
-    ; def_modules : t Module_name.Map.t
-    }
-  [@@deriving sexp]
-
-  let empty =
-    { names = Value_name.Map.empty
-    ; types = Type_name.Map.empty
-    ; sig_modules = Module_name.Map.empty
-    ; def_modules = Module_name.Map.empty
-    }
-  ;;
-end
-
-(* FIXME: sig bindings can only refer to more sigs
-   Yikes - this just got a lot more complex 
-   - Might be better to forget sig_bindings 
-   Think about how this is going to be used outside to decide how sig/def should work 
-   What if instead of modules we have sig_modules and def_modules? - should help
-   - generally you don't care about dealing with the sig/def interaction, most of the time
-     you should just be dealing with one or the other - they just have to be compatible,
-     which is checked once - other times you are looking up the sig or *)
-type t = Module_path.t * Sig_bindings.t * Def_bindings.t
+and bindings =
+  { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
+  ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
+  ; modules : bindings Module_name.Map.t
+  }
+[@@deriving sexp]
 
 exception Name_error of Ustring.t [@@deriving sexp]
 
@@ -111,7 +75,14 @@ let or_name_clash msg ustr = function
   | `Duplicate -> name_error_msg msg ustr
 ;;
 
-let empty = [], Sig_bindings.empty, Def_bindings.empty
+let empty_bindings =
+  { names = Value_name.Map.empty
+  ; types = Type_name.Map.empty
+  ; modules = Module_name.Map.empty
+  }
+;;
+
+let empty = [], empty_bindings
 
 let add_to_types ?(err_msg = "Type name clash") types name decl =
   Map.update types name ~f:(function
@@ -126,8 +97,6 @@ let update_at_path path bindings ~f =
     | module_name :: rest ->
       { bindings with
         modules =
-          (* TODO: how should we deal with trying to modify an imported module?
-             How do we decide whether to modify the sig or the def? *)
           Map.update bindings.modules module_name ~f:(function
             | Some bindings -> loop bindings ~f rest
             | None -> name_error_path path)
@@ -166,8 +135,7 @@ let core =
       types =
         List.fold
           ~init:empty_bindings.types
-          ~f:(fun types (name, decl) ->
-            Map.set types ~key:name ~data:(Some (Entry.exported_local decl)))
+          ~f:(fun types (name, decl) -> Map.set types ~key:name ~data:(Some (Local decl)))
           Core.
             [ Bool.name, Bool.decl
             ; Int.name, Int.decl
@@ -180,9 +148,7 @@ let core =
           Map.set
             names
             ~key:(Value_name.of_cnstr_name cnstr)
-            ~data:
-              (Entry.exported_local
-                 (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
+            ~data:(Local (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
     } )
 ;;
 
@@ -207,8 +173,6 @@ let current_bindings_exn t =
   option_or_default (current_bindings t) ~f:(fun () -> name_error_path (fst t))
 ;;
 
-(* FIXME: find should act differently depending on where you are searching from
-   (whether you are inside the module or not and what is exposed) *)
 let rec find ((current_path, _) as t) ((path, name) as input) ~f ~to_ustring =
   (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
   let open Option.Let_syntax in
