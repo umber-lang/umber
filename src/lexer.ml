@@ -131,7 +131,7 @@ let operator_symbol =
     Sub ((pc | pd | pe | pf | pi | po | ps | sc | sk | sm | so), Chars "'\"()[]{},#")]
 ;;
 
-(* FIXME: stray '\r's may cause issues with indentation parsing
+(* TODO: stray '\r's may cause issues with indentation parsing
    '\r' should just always be ignored, I think *)
 let line_comment = [%sedlex.regexp? '#', Star (Compl (Chars "\r\n")), Plus line_sep]
 let unescape _ = failwith "Escapes not implemented yet"

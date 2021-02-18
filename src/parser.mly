@@ -351,7 +351,7 @@ stmt_:
 prog:
   | def1 = flexible_optional_list(LINE_SEP, stmt); sig_ = file_module_sig;
     def2 = lines(stmt); EOF
-    { Module_name.of_string_unchecked "", sig_, def1 @ def2 }
+    { Module_name.empty, sig_, def1 @ def2 }
 
 %inline with_loc(X): node = X { { Node.node ; span = Span.of_loc $loc } }
 

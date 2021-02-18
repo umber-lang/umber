@@ -14,7 +14,6 @@ let (p : Person) = {  # TODO: try and get this to parse without parens
 }
 
 impl Eq Person =
-  # FIXME: should have (&&) at the root of the op tree for proper precedence parsing
   let (==) p1 p2 = p1.name == p2.name && p1.dob == p2.dob
 
 impl (Eq a, Eq b) => Eq (a, b) = let (==) (a, b) (c, d) = a == c && d == d
