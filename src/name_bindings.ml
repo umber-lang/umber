@@ -135,7 +135,8 @@ let add_to_types ?(err_msg = "Type name clash") types name decl =
     | Some _ -> name_error_msg err_msg (Type_name.to_ustring name))
 ;;
 
-let update_current_sigs ?(create_empty = false) t ~f =
+(* TODO: decide what to do with create_empty - should it just always be in effect? *)
+let update_current_sigs ?(create_empty = true) t ~f =
   let rec loop sigs path ~f =
     match path with
     | [] -> f sigs
@@ -149,10 +150,11 @@ let update_current_sigs ?(create_empty = false) t ~f =
               if create_empty
               then None, loop empty_bindings rest ~f
               else (
-                print_s [%message "update_current_sigs" (without_std t : t)];
+                print_s [%message "update_current_sigs errored" (without_std t : t)];
                 name_error_path path))
       }
   in
+  (* TOOD: is it ok to always create empty sigs here? *)
   { t with
     sigs = Some (loop (Option.value t.sigs ~default:empty_bindings) t.current_path ~f)
   }
@@ -247,55 +249,60 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
+(* TODO: cleanup *)
 let bindings_at_path =
   let open Option.Let_syntax in
-  let pursue_defs ~loop defs module_name rest =
-    let%bind defs = defs in
-    let%bind sigs, defs = Map.find defs.modules module_name in
-    loop rest sigs (Some defs)
-  in
-  let finish sigs defs =
-    match sigs, defs with
-    | _, Some defs -> Some (Sigs_and_defs (sigs, defs))
-    | Some sigs, None -> Some (Sigs sigs)
-    | None, None -> None
-  in
-  let bindings_at_current t =
-    let rec loop path sigs defs =
-      match path with
-      | [] -> finish sigs defs
-      | module_name :: rest ->
-        (match pursue_defs ~loop defs module_name rest with
+  let rec loop current_path path sigs defs =
+    match path with
+    | [] ->
+      let following_current =
+        match current_path with
+        | Some [] -> true
+        | _ -> false
+      in
+      (match following_current, sigs, defs with
+      | true, _, Some defs -> Some (Sigs_and_defs (sigs, defs))
+      | false, None, Some defs -> Some (Sigs_and_defs (None, defs))
+      | _, Some sigs, _ -> Some (Sigs sigs)
+      | _, None, None -> None)
+    | module_name :: rest ->
+      let current_path, following_current =
+        match current_path with
+        | Some [] | None -> None, false
+        | Some (module_name' :: rest') ->
+          if Module_name.equal module_name module_name'
+          then Some rest', true
+          else None, false
+      in
+      if following_current
+      then (
+        match pursue_defs current_path defs module_name rest with
         | Some _ as sigs_and_defs -> sigs_and_defs
         | None ->
           let%bind sigs = sigs in
           let%bind _, sigs = Map.find sigs.modules module_name in
-          loop rest (Some sigs) None)
-    in
-    loop t.current_path t.sigs (Some t.defs)
-  in
-  let bindings_at_other t path =
-    let rec loop path sigs defs =
-      match path with
-      | [] -> finish sigs defs
-      | module_name :: rest ->
-        (match sigs with
+          loop current_path rest (Some sigs) None)
+      else (
+        (* FIXME: PROBLEM: during type-checking of our own module, the sig is not visible externally
+        We should be allowed to see defs from our current module, whether or not that is the target 
+        You should also be allowed to follow defs all the way into where you currently are 
+        ^ you can follow defs if the target path is a child of your path (or equal)*)
+        match sigs with
         | Some sigs ->
           let%bind _, sigs = Map.find sigs.modules module_name in
-          loop rest (Some sigs) None
-        | None -> pursue_defs ~loop defs module_name rest)
-    in
-    loop path t.sigs (Some t.defs)
+          loop current_path rest (Some sigs) None
+        | None -> pursue_defs current_path defs module_name rest)
+  and pursue_defs current_path defs module_name rest =
+    let%bind defs = defs in
+    let%bind sigs, defs = Map.find defs.modules module_name in
+    loop current_path rest sigs (Some defs)
   in
-  fun t path ->
-    if Module_path.equal t.current_path path
-    then bindings_at_current t
-    else bindings_at_other t path
+  fun t path -> loop (Some t.current_path) path t.sigs (Some t.defs)
 ;;
 
 let check_sigs_and_defs { current_path; _ } path (sigs, defs) ~f_sigs ~f_defs =
   let open Option.Let_syntax in
-  if Module_path.equal current_path path
+  if Module_path.equal current_path path || Option.is_none sigs
   then (
     match f_defs defs with
     | Some _ as result -> result
@@ -313,7 +320,7 @@ let check_sigs_defs' { current_path; _ } path bindings ~f_sigs ~f_defs =
   match bindings with
   | Sigs sigs -> f_sigs sigs
   | Sigs_and_defs (sigs, defs) ->
-    if Module_path.equal current_path path
+    if Module_path.equal current_path path || Option.is_none sigs
     then f_defs defs
     else f_sigs (Option.value sigs ~default:empty_bindings)
 ;;
