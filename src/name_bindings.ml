@@ -78,6 +78,7 @@ and 'a bindings =
 type sigs_defs =
   | Sigs of sigs
   | Sigs_and_defs of sigs option * defs
+[@@deriving sexp]
 
 exception Name_error of Ustring.t [@@deriving sexp]
 
@@ -92,6 +93,8 @@ let or_name_clash msg ustr = function
   | `Ok value -> value
   | `Duplicate -> name_error_msg msg ustr
 ;;
+
+let or_name_error_path x path = option_or_default x ~f:(fun () -> name_error_path path)
 
 let empty_bindings =
   { names = Value_name.Map.empty
@@ -117,6 +120,15 @@ let rec sigs_of_defs (defs : defs) : sigs =
   }
 ;;
 
+let without_std t =
+  { t with
+    sigs =
+      Option.map t.sigs ~f:(fun sigs ->
+        { sigs with modules = Map.remove sigs.modules Core.std_module_name })
+  ; defs = { t.defs with modules = Map.remove t.defs.modules Core.std_module_name }
+  }
+;;
+
 let add_to_types ?(err_msg = "Type name clash") types name decl =
   Map.update types name ~f:(function
     | None | Some None -> decl
@@ -137,7 +149,7 @@ let update_current_sigs ?(create_empty = false) t ~f =
               if create_empty
               then None, loop empty_bindings rest ~f
               else (
-                print_s [%message "update_current_sigs" (t : t)];
+                print_s [%message "update_current_sigs" (without_std t : t)];
                 name_error_path path))
       }
   in
@@ -235,34 +247,50 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
-let current_bindings t =
+let bindings_at_path =
   let open Option.Let_syntax in
-  let rec loop path sigs defs =
-    match path with
-    | [] ->
-      (match defs with
-      | Some defs -> Some (Sigs_and_defs (sigs, defs))
-      | None ->
-        let%map sigs = sigs in
-        Sigs sigs)
-    | module_name :: rest ->
-      let try_defs () =
-        let%bind defs = defs in
-        let%bind sigs, defs = Map.find defs.modules module_name in
-        loop rest sigs (Some defs)
-      in
-      (match sigs with
-      | Some sigs ->
-        (match Map.find sigs.modules module_name with
-        | Some (_, sigs) -> loop rest (Some sigs) None
-        | None -> try_defs ())
-      | None -> try_defs ())
+  let pursue_defs ~loop defs module_name rest =
+    let%bind defs = defs in
+    let%bind sigs, defs = Map.find defs.modules module_name in
+    loop rest sigs (Some defs)
   in
-  loop t.current_path t.sigs (Some t.defs)
-;;
-
-let current_bindings_exn t =
-  option_or_default (current_bindings t) ~f:(fun () -> name_error_path t.current_path)
+  let finish sigs defs =
+    match sigs, defs with
+    | _, Some defs -> Some (Sigs_and_defs (sigs, defs))
+    | Some sigs, None -> Some (Sigs sigs)
+    | None, None -> None
+  in
+  let bindings_at_current t =
+    let rec loop path sigs defs =
+      match path with
+      | [] -> finish sigs defs
+      | module_name :: rest ->
+        (match pursue_defs ~loop defs module_name rest with
+        | Some _ as sigs_and_defs -> sigs_and_defs
+        | None ->
+          let%bind sigs = sigs in
+          let%bind _, sigs = Map.find sigs.modules module_name in
+          loop rest (Some sigs) None)
+    in
+    loop t.current_path t.sigs (Some t.defs)
+  in
+  let bindings_at_other t path =
+    let rec loop path sigs defs =
+      match path with
+      | [] -> finish sigs defs
+      | module_name :: rest ->
+        (match sigs with
+        | Some sigs ->
+          let%bind _, sigs = Map.find sigs.modules module_name in
+          loop rest (Some sigs) None
+        | None -> pursue_defs ~loop defs module_name rest)
+    in
+    loop path t.sigs (Some t.defs)
+  in
+  fun t path ->
+    if Module_path.equal t.current_path path
+    then bindings_at_current t
+    else bindings_at_other t path
 ;;
 
 let check_sigs_and_defs { current_path; _ } path (sigs, defs) ~f_sigs ~f_defs =
@@ -293,34 +321,39 @@ let check_sigs_defs' { current_path; _ } path bindings ~f_sigs ~f_defs =
 (* FIXME: handle empty sigs exposing the defs - during lookup
    Also should work differently depending on whether you're in the module or not
    (I guess defs get checked first if in the module?) *)
-let rec find ({ current_path; _ } as t) ((path, name) as input) ~f ~to_ustring =
+let rec find ?at_path t ((path, name) as input) ~f ~to_ustring =
   (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
+  let at_path = option_or_default at_path ~f:(fun () -> t.current_path) in
   let open Option.Let_syntax in
-  let full_bindings = current_bindings_exn t in
-  (* TODO: do something about this use of defs_of_sigs - it's a bit wasteful *)
-  let bindings_at_current =
-    match full_bindings with
-    | Sigs sigs -> defs_of_sigs sigs
-    | Sigs_and_defs (_, defs) -> defs
-  in
+  (* FIXME: need to get current bindings at at_path *)
+  let bindings_at_current = or_name_error_path (bindings_at_path t at_path) at_path in
   match path with
-  | first_module :: path_rest ->
-    (match Map.find bindings_at_current.modules first_module with
-    | Some (sigs, defs) ->
-      option_or_default
-        (let%bind bindings = current_bindings { current_path = path_rest; sigs; defs } in
-         f (current_path @ path) name bindings)
-        ~f:(fun () -> raise (Name_error (to_ustring input)))
-    | None -> check_parent t input ~f ~to_ustring)
+  | first_module :: _ ->
+    let full_path = at_path @ path in
+    let f_helper bindings =
+      if Map.mem bindings.modules first_module
+      then
+        option_or_default
+          (* TODO: it's a bit awkward how this gives up and searches from the toplevel
+           again - could be made more efficient by searching using sigs/defs found here
+           (just need to figure out the correct external/local sig/def handling) *)
+          (let%bind bindings = bindings_at_path t full_path in
+           f full_path name bindings)
+          ~f:(fun () -> raise (Name_error (to_ustring input)))
+      else check_parent t at_path input ~f ~to_ustring
+    in
+    check_sigs_defs' t full_path ~f_sigs:f_helper ~f_defs:f_helper bindings_at_current
   | [] ->
-    option_or_default (f current_path name full_bindings) ~f:(fun () ->
-      check_parent t input ~f ~to_ustring)
+    option_or_default (f at_path name bindings_at_current) ~f:(fun () ->
+      check_parent t at_path input ~f ~to_ustring)
 
-and check_parent t input ~f ~to_ustring =
+and check_parent t current_path input ~f ~to_ustring =
   (* Recursively check the parent *)
-  match List.drop_last t.current_path with
-  | Some parent_path -> find { t with current_path = parent_path } input ~f ~to_ustring
-  | None -> raise (Name_error (to_ustring input))
+  match List.drop_last current_path with
+  | Some parent_path -> find t ~at_path:parent_path input ~f ~to_ustring
+  | None ->
+    print_s [%message "reached toplevel" (without_std t : t)];
+    raise (Name_error (to_ustring input))
 ;;
 
 let find_module t path =
@@ -346,9 +379,9 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_decl t name =
+let find_type_decl ?at_path t name =
   let open Option.Let_syntax in
-  find t name ~to_ustring:Type_name.Qualified.to_ustring ~f:(fun path name ->
+  find ?at_path t name ~to_ustring:Type_name.Qualified.to_ustring ~f:(fun path name ->
     let f bindings ~try_again =
       match Map.find bindings.types name with
       | Some decl -> Some (path, decl)
@@ -483,14 +516,6 @@ let std_prelude =
      import_all t Core.prelude_module_path ~place:`Sig)
 ;;
 
-let without_std t =
-  { t with
-    sigs =
-      Option.map t.sigs ~f:(fun sigs ->
-        { sigs with modules = Map.remove sigs.modules Core.std_module_name })
-  }
-;;
-
 let add_val ?extern_name t ~place name fixity (trait_bounds, type_expr) ~unify =
   let f bindings =
     if not (List.is_empty trait_bounds) then failwith "TODO: trait bounds in val";
@@ -613,9 +638,9 @@ let merge_names t new_names ~combine =
     })
 ;;
 
-let find_type_decl =
+let find_type_decl ?at_path =
   let rec loop t name =
-    match snd (find_type_decl t name) with
+    match snd (find_type_decl ?at_path t name) with
     | Some (Local decl) -> decl
     | Some (Imported path_name) -> loop t path_name
     | None -> compiler_bug [%message "Placeholder decl not replaced"]
@@ -623,5 +648,6 @@ let find_type_decl =
   loop
 ;;
 
-let find_absolute_type_decl t = find_type_decl { t with current_path = [] }
+let find_absolute_type_decl = find_type_decl ~at_path:[]
+let find_type_decl = find_type_decl ?at_path:None
 let current_path t = t.current_path
