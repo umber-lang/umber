@@ -127,7 +127,7 @@ module Pattern = struct
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let typ = Name_bindings.Name_entry.typ entry in
         let scheme = Type_bindings.generalize types typ in
-        Name_bindings.set_scheme names name scheme)
+        Name_bindings.set_scheme ~place:`Def names name scheme)
     in
     names, Type_bindings.generalize types typ
   ;;
@@ -153,7 +153,7 @@ module Expr = struct
       | Literal lit -> Literal lit, Type.Concrete.cast (Untyped.Literal.typ lit)
       | Name name -> Name name, Name_bindings.find_type names name
       | Qualified (path, expr) ->
-        of_untyped ~names:(Name_bindings.import_all names path) ~types expr
+        of_untyped ~names:(Name_bindings.import_all ~place:`Def names path) ~types expr
       | Fun_call (f, arg) ->
         let f, f_type = of_untyped ~names ~types f in
         let arg, arg_type = of_untyped ~names ~types arg in
@@ -300,17 +300,17 @@ module Module = struct
     let names =
       List.fold sigs ~init:names ~f:(fun names sig_ ->
         match sig_.Node.node with
-        | Common_sig common -> f_common names common
+        | Common_sig common -> f_common ~place:`Sig names common
         | Module_sig (module_name, sigs) ->
-          Name_bindings.with_submodule names module_name ~f:(fun names ->
+          Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
             gather_names ~names sigs [] ~f_common ~f_def))
     in
     List.fold defs ~init:names ~f:(fun names def ->
       option_or_default (f_def names def) ~f:(fun () ->
         match def.Node.node with
-        | Common_def common -> f_common names common
+        | Common_def common -> f_common ~place:`Def names common
         | Module (module_name, sigs, defs) ->
-          Name_bindings.with_submodule names module_name ~f:(fun names ->
+          Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
             gather_names ~names sigs defs ~f_common ~f_def)
         | Let _ | Trait _ | Impl _ -> names))
   ;;
@@ -337,10 +337,11 @@ module Module = struct
     (* Gather placeholders from all val statements first to correctly handle the presence
        of both val and let without complaining about duplicate names *)
     let names =
-      gather_names ~names sigs defs ~f_common:(fun names -> function
+      gather_names ~names sigs defs ~f_common:(fun ~place names -> function
         | Val (name, _, _) | Extern (name, _, _, _) ->
-          fst (Name_bindings.add_fresh_var names name)
-        | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
+          fst (Name_bindings.add_fresh_var ~place names name)
+        | Type_decl (type_name, _) ->
+          Name_bindings.add_type_placeholder ~place names type_name
         | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names)
     in
     List.fold defs ~init:names ~f:(fun names def ->
@@ -355,20 +356,24 @@ module Module = struct
             | Val_declared, Val_declared | Let_inferred, Let_inferred ->
               Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
             | _ -> entry1))
-      | Module (module_name, _, defs) ->
-        (* TODO: maybe don't look at submodule defs unless there's no sig? 
+      | Module (module_name, sigs, defs) ->
+        (* FIXME: maybe don't look at submodule defs unless there's no sig? 
            Need to handle cross-module privacy properly *)
-        Name_bindings.with_submodule names module_name ~f:(fun names ->
-          gather_name_placeholders ~names [] defs)
+        Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
+          gather_name_placeholders ~names sigs defs)
       | Common_def _ | Trait _ | Impl _ -> names)
   ;;
 
+  (* TODO: test that type decls which import from submodules actually work *)
+  (* TODO: figure out import shadowing semantics - basically, probably ban shadowing *)
   let gather_imports_and_type_decls ~names sigs defs =
-    gather_names ~names sigs defs ~f_common:(fun names -> function
-      | Import module_name -> Name_bindings.import names module_name
-      | Import_with (path, imports) -> Name_bindings.import_with names path imports
-      | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
-      | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
+    gather_names ~names sigs defs ~f_common:(fun ~place names -> function
+      | Import module_name -> Name_bindings.import ~place names module_name
+      | Import_with (path, imports) -> Name_bindings.import_with ~place names path imports
+      | Import_without (path, hiding) ->
+        Name_bindings.import_without ~place names path hiding
+      | Type_decl (type_name, decl) ->
+        Name_bindings.add_type_decl ~place names type_name decl
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ -> names)
   ;;
@@ -377,8 +382,7 @@ module Module = struct
   let check_cyclic_type_alias ~names name alias =
     let rec loop ~names aliases_seen = function
       | Type.Expr.Type_app (name, args) ->
-        (* FIXME: this is inefficient as it looks up the decl twice *)
-        let decl = Name_bindings.(find_type_decl names name) in
+        let decl = Name_bindings.find_type_decl names name in
         (match decl with
         | _, Alias alias ->
           (match Hashtbl.add aliases_seen ~key:decl ~data:name with
@@ -403,13 +407,13 @@ module Module = struct
   ;;
 
   let rec handle_value_bindings ~names ~types sigs defs =
-    let handle_common ~names = function
+    let handle_common ~names ~place = function
       | Val (name, fixity, typ) ->
         let unify = Type_bindings.unify ~names ~types in
-        Name_bindings.add_val names name fixity typ ~unify
+        Name_bindings.add_val ~place names name fixity typ ~unify
       | Extern (name, fixity, typ, extern_name) ->
         let unify = Type_bindings.unify ~names ~types in
-        Name_bindings.add_val names name fixity ([], typ) ~extern_name ~unify
+        Name_bindings.add_val ~place names name fixity ([], typ) ~extern_name ~unify
       | Type_decl (name, (_, Alias alias)) ->
         check_cyclic_type_alias ~names name alias;
         names
@@ -418,9 +422,9 @@ module Module = struct
     let rec handle_sigs ~names ~handle_common =
       List.fold ~init:names ~f:(fun names sig_ ->
         match sig_.Node.node with
-        | Common_sig common -> handle_common ~names common
+        | Common_sig common -> handle_common ~names ~place:`Sig common
         | Module_sig (module_name, sigs) ->
-          Name_bindings.with_submodule names module_name ~f:(fun names ->
+          Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
             handle_sigs ~names ~handle_common sigs))
     in
     let names = handle_sigs ~names ~handle_common sigs in
@@ -447,11 +451,14 @@ module Module = struct
            | Let bindings -> handle_bindings ~names bindings |> Tuple2.map_snd ~f:let_
            | Module (module_name, sigs, defs) ->
              let names, defs =
-               Name_bindings.with_submodule' names module_name ~f:(fun names ->
-                 handle_value_bindings ~names ~types sigs defs)
+               Name_bindings.with_submodule'
+                 ~place:`Def
+                 names
+                 module_name
+                 ~f:(fun names -> handle_value_bindings ~names ~types sigs defs)
              in
              names, Module (module_name, sigs, defs)
-           | Common_def common as def -> handle_common ~names common, def
+           | Common_def common as def -> handle_common ~names ~place:`Def common, def
            | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls"))
   ;;
 
@@ -477,7 +484,7 @@ module Module = struct
             , current_path )
             :: bindings) )
       | Module (module_name, sigs, defs) ->
-        let names = Name_bindings.into_module names module_name in
+        let names = Name_bindings.into_module ~place:`Def names module_name in
         let other_defs', bindings = gather_bindings_in_defs ~names defs ([], bindings) in
         ( { def with node = Module (module_name, sigs, other_defs') } :: other_defs
         , bindings )
@@ -571,7 +578,7 @@ module Module = struct
     in
     let types = option_or_default types ~f:Type_bindings.create in
     try
-      let names = Name_bindings.into_module names module_name in
+      let names = Name_bindings.into_module ~place:`Def names module_name in
       let names = gather_name_placeholders ~names sigs defs in
       let names = gather_imports_and_type_decls ~names sigs defs in
       let names, defs = handle_value_bindings ~names ~types sigs defs in

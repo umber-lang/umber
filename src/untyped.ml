@@ -103,7 +103,7 @@ module Expr = struct
       | Name ([], name) when Set.mem locals name -> used
       | Name name -> Set.add used (Name_bindings.absolutify_value_name names name)
       | Qualified (path, expr) ->
-        loop ~names:(Name_bindings.import_all names path) used locals expr
+        loop ~names:(Name_bindings.import_all ~place:`Def names path) used locals expr
       | Fun_call (e1, e2) -> loop ~names (loop ~names used locals e1) locals e2
       | Op_tree tree ->
         let rec tree_loop acc = function

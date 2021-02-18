@@ -69,7 +69,7 @@ module Module : sig
     -> Untyped.Module.def Node.t list
     -> Name_bindings.t
 
-  (** Gather all imported names and local type/trait declarations *)
+  (** Gather all imported names and local type/trait declarations. *)
   val gather_imports_and_type_decls
     :  names:Name_bindings.t
     -> Untyped.Module.sig_ Node.t list

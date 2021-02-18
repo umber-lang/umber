@@ -11,4 +11,4 @@ module Range :
 
 let my_range = Range.between 1 10
 
-let is_10_in_range = Range.in 10 my_range
+let is_10_in_range = 10 :Range.in: my_range
