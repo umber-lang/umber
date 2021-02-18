@@ -52,13 +52,17 @@ module Or_imported = struct
   [@@deriving sexp, variants]
 end
 
-(* TODO: see if you can find a way to merge the toplevel t, bindings, and sigs_and_defs
+(* TODO: see if you can find a way to merge the toplevel t, bindings, and sigs_defs
    The different representations are annoying to use and a bit confusing *)
 type t =
   { current_path : Module_path.t
-  ; sigs : unit bindings
-  ; defs : unit bindings bindings
+  ; sigs : sigs option (* TODO: allow empty file module sigs to parse somehow *)
+  ; defs : defs
   }
+
+and sigs = Nothing.t bindings
+
+and defs = sigs bindings
 
 (* TODO: modules should probably be imported too, not just copied (I think)
    For now, since modules can't be consumed as values in any way, it should be ok
@@ -67,13 +71,13 @@ type t =
 and 'a bindings =
   { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
   ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
-  ; modules : ('a * 'a bindings) Module_name.Map.t
+  ; modules : ('a option * 'a bindings) Module_name.Map.t
   }
 [@@deriving sexp]
 
-type sigs_and_defs =
-  | Sigs of unit bindings
-  | Sigs_and_defs of unit bindings * unit bindings bindings
+type sigs_defs =
+  | Sigs of sigs
+  | Sigs_and_defs of sigs option * defs
 
 exception Name_error of Ustring.t [@@deriving sexp]
 
@@ -96,19 +100,21 @@ let empty_bindings =
   }
 ;;
 
-let empty = { current_path = []; sigs = empty_bindings; defs = empty_bindings }
+let empty = { current_path = []; sigs = None; defs = empty_bindings }
 
-let defs_of_sigs sigs =
+let defs_of_sigs (sigs : sigs) : defs =
   { sigs with
-    modules = Map.map sigs.modules ~f:(fun ((), sub_sigs) -> sub_sigs, empty_bindings)
+    modules =
+      Map.map sigs.modules ~f:(fun (None, sub_sigs) -> Some sub_sigs, empty_bindings)
   }
 ;;
 
-(* FIXME: should be able to import nested defs into sigs
-   Maybe check for empty sigs and in that case, merge the defs? Can we do a more central
-   check for that somewhere?*)
-let sigs_of_defs defs =
-  { defs with modules = Map.map defs.modules ~f:(fun (sigs, _) -> (), sigs) }
+let rec sigs_of_defs (defs : defs) : sigs =
+  { defs with
+    modules =
+      Map.map defs.modules ~f:(fun (sigs, defs) ->
+        None, option_or_default sigs ~f:(fun () -> sigs_of_defs defs))
+  }
 ;;
 
 let add_to_types ?(err_msg = "Type name clash") types name decl =
@@ -129,13 +135,15 @@ let update_current_sigs ?(create_empty = false) t ~f =
             | Some (other, sigs) -> other, loop sigs rest ~f
             | None ->
               if create_empty
-              then (), loop empty_bindings rest ~f
+              then None, loop empty_bindings rest ~f
               else (
                 print_s [%message "update_current_sigs" (t : t)];
                 name_error_path path))
       }
   in
-  { t with sigs = loop t.sigs t.current_path ~f }
+  { t with
+    sigs = Some (loop (Option.value t.sigs ~default:empty_bindings) t.current_path ~f)
+  }
 ;;
 
 let update_current_defs t ~f =
@@ -154,19 +162,19 @@ let update_current_defs t ~f =
 ;;
 
 let into_module t ~place module_name =
-  let f empty bindings =
+  let f bindings =
     { bindings with
       modules =
         Map.update
           bindings.modules
           module_name
-          ~f:(Option.value ~default:(empty, empty_bindings))
+          ~f:(Option.value ~default:(None, empty_bindings))
     }
   in
   let t =
     match place with
-    | `Sig -> update_current_sigs t ~f:(f ()) ~create_empty:true
-    | `Def -> update_current_defs t ~f:(f empty_bindings)
+    | `Sig -> update_current_sigs t ~f ~create_empty:true
+    | `Def -> update_current_defs t ~f
   in
   { t with current_path = t.current_path @ [ module_name ] }
 ;;
@@ -192,26 +200,27 @@ let with_path t path ~f =
 let core =
   { current_path = []
   ; sigs =
-      { empty_bindings with
-        types =
-          List.fold
-            ~init:empty_bindings.types
-            ~f:(fun types (name, decl) ->
-              Map.set types ~key:name ~data:(Some (Local decl)))
-            Core.
-              [ Bool.name, Bool.decl
-              ; Int.name, Int.decl
-              ; Float.name, Float.decl
-              ; Char.name, Char.decl
-              ; String.name, String.decl
-              ]
-      ; names =
-          List.fold Core.Bool.cnstrs ~init:empty_bindings.names ~f:(fun names cnstr ->
-            Map.set
-              names
-              ~key:(Value_name.of_cnstr_name cnstr)
-              ~data:(Local (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
-      }
+      Some
+        { empty_bindings with
+          types =
+            List.fold
+              ~init:empty_bindings.types
+              ~f:(fun types (name, decl) ->
+                Map.set types ~key:name ~data:(Some (Local decl)))
+              Core.
+                [ Bool.name, Bool.decl
+                ; Int.name, Int.decl
+                ; Float.name, Float.decl
+                ; Char.name, Char.decl
+                ; String.name, String.decl
+                ]
+        ; names =
+            List.fold Core.Bool.cnstrs ~init:empty_bindings.names ~f:(fun names cnstr ->
+              Map.set
+                names
+                ~key:(Value_name.of_cnstr_name cnstr)
+                ~data:(Local (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
+        }
   ; defs = empty_bindings
   }
 ;;
@@ -231,17 +240,23 @@ let current_bindings t =
   let rec loop path sigs defs =
     match path with
     | [] ->
-      Some
-        (match defs with
-        | Some defs -> Sigs_and_defs (sigs, defs)
-        | None -> Sigs sigs)
-    | module_name :: rest ->
-      (match Map.find sigs.modules module_name with
-      | Some ((), sigs) -> loop rest sigs None
+      (match defs with
+      | Some defs -> Some (Sigs_and_defs (sigs, defs))
       | None ->
+        let%map sigs = sigs in
+        Sigs sigs)
+    | module_name :: rest ->
+      let try_defs () =
         let%bind defs = defs in
         let%bind sigs, defs = Map.find defs.modules module_name in
-        loop rest sigs (Some defs))
+        loop rest sigs (Some defs)
+      in
+      (match sigs with
+      | Some sigs ->
+        (match Map.find sigs.modules module_name with
+        | Some (_, sigs) -> loop rest (Some sigs) None
+        | None -> try_defs ())
+      | None -> try_defs ())
   in
   loop t.current_path t.sigs (Some t.defs)
 ;;
@@ -250,23 +265,29 @@ let current_bindings_exn t =
   option_or_default (current_bindings t) ~f:(fun () -> name_error_path t.current_path)
 ;;
 
-let check_sigs_and_defs { current_path; _ } path bindings ~f_sigs ~f_defs =
+let check_sigs_and_defs { current_path; _ } path (sigs, defs) ~f_sigs ~f_defs =
+  let open Option.Let_syntax in
+  if Module_path.equal current_path path
+  then (
+    match f_defs defs with
+    | Some _ as result -> result
+    | None -> sigs >>= f_sigs)
+  else sigs >>= f_sigs
+;;
+
+let check_sigs_defs t path bindings ~f_sigs ~f_defs =
+  match bindings with
+  | Sigs sigs -> f_sigs sigs
+  | Sigs_and_defs (sigs, defs) -> check_sigs_and_defs t path (sigs, defs) ~f_sigs ~f_defs
+;;
+
+let check_sigs_defs' { current_path; _ } path bindings ~f_sigs ~f_defs =
   match bindings with
   | Sigs sigs -> f_sigs sigs
   | Sigs_and_defs (sigs, defs) ->
     if Module_path.equal current_path path
-    then (
-      match f_defs defs with
-      | Some _ as result -> result
-      | None -> f_sigs sigs)
-    else f_sigs sigs
-;;
-
-let check_sigs_and_defs' { current_path; _ } path bindings ~f_sigs ~f_defs =
-  match bindings with
-  | Sigs sigs -> f_sigs sigs
-  | Sigs_and_defs (sigs, defs) ->
-    if Module_path.equal current_path path then f_defs defs else f_sigs sigs
+    then f_defs defs
+    else f_sigs (Option.value sigs ~default:empty_bindings)
 ;;
 
 (* FIXME: handle empty sigs exposing the defs - during lookup
@@ -314,7 +335,7 @@ let rec find_entry t =
   let open Option.Let_syntax in
   find t ~to_ustring:Value_name.Qualified.to_ustring ~f:(fun path name ->
     let f bindings = Map.find bindings.names name >>| resolve_name_or_import t in
-    check_sigs_and_defs t path ~f_sigs:f ~f_defs:f)
+    check_sigs_defs t path ~f_sigs:f ~f_defs:f)
 
 and resolve_name_or_import t = function
   | Or_imported.Local entry -> entry
@@ -337,15 +358,14 @@ let find_type_decl t name =
         let%map decl = try_again bindings in
         path, decl
     in
-    check_sigs_and_defs
+    check_sigs_defs
       t
       path
-      ~f_sigs:(f ~try_again:(fun ((), sigs) -> Map.find sigs.types name))
+      ~f_sigs:(f ~try_again:(fun (_, sigs) -> Map.find sigs.types name))
       ~f_defs:
         (f ~try_again:(fun (sigs, defs) ->
-           if Module_path.equal t.current_path path
-           then Map.find defs.types name
-           else Map.find sigs.types name)))
+           let f bindings = Map.find bindings.types name in
+           check_sigs_and_defs t path ~f_sigs:f ~f_defs:f (sigs, defs))))
 ;;
 
 let absolutify_path t path =
@@ -363,7 +383,7 @@ let absolutify_value_name t =
     t
     ~f:(fun path name ->
       let f bindings = Option.some_if (Map.mem bindings.names name) (path, name) in
-      check_sigs_and_defs t path ~f_sigs:f ~f_defs:f)
+      check_sigs_defs t path ~f_sigs:f ~f_defs:f)
     ~to_ustring:Value_name.Qualified.to_ustring
 ;;
 
@@ -395,48 +415,44 @@ let filter bindings ~f =
 ;;
 
 (* FIXME: import modules directly, don't copy the contents *)
-(* TODO: probably want to expose sigs vs defs from find *)
 let import_filtered t ~place path ~f =
-  let rec map_to_imports_sigs path bindings =
-    { names =
+  let map_to_imports_names_types path bindings =
+    { bindings with
+      names =
         Map.mapi bindings.names ~f:(fun ~key:name ~data:_ ->
           Or_imported.Imported (absolutify_path t path, name))
     ; types =
         Map.mapi bindings.types ~f:(fun ~key:name ~data:_ ->
           Some (Or_imported.Imported (absolutify_path t path, name)))
-    ; modules =
-        Map.mapi bindings.modules ~f:(fun ~key:module_name ~data:((), bindings) ->
-          (), map_to_imports_sigs (path @ [ module_name ]) bindings)
     }
   in
-  let rec map_to_imports_defs path bindings =
-    { names =
-        Map.mapi bindings.names ~f:(fun ~key:name ~data:_ ->
-          Or_imported.Imported (absolutify_path t path, name))
-    ; types =
-        Map.mapi bindings.types ~f:(fun ~key:name ~data:_ ->
-          Some (Or_imported.Imported (absolutify_path t path, name)))
-    ; modules =
-        Map.mapi bindings.modules ~f:(fun ~key:module_name ~data:(sigs, defs) ->
+  let rec map_to_imports_sigs path (sigs : sigs) : sigs =
+    { (map_to_imports_names_types path sigs) with
+      modules =
+        Map.mapi sigs.modules ~f:(fun ~key:module_name ~data:(None, bindings) ->
+          None, map_to_imports_sigs (path @ [ module_name ]) bindings)
+    }
+  in
+  let rec map_to_imports_defs path (defs : defs) =
+    { (map_to_imports_names_types path defs) with
+      modules =
+        Map.mapi defs.modules ~f:(fun ~key:module_name ~data:(sigs, defs) ->
           let new_path = path @ [ module_name ] in
-          map_to_imports_sigs new_path sigs, map_to_imports_defs new_path defs)
+          ( Option.map sigs ~f:(map_to_imports_sigs new_path)
+          , map_to_imports_defs new_path defs ))
     }
   in
   let f_sigs sigs = map_to_imports_sigs path (filter ~f sigs) in
   let f_defs defs = map_to_imports_defs path (filter ~f defs) in
-  let merge sigs_and_defs ~f_sigs ~f_defs bindings =
-    merge_no_shadow bindings (check_sigs_and_defs' t path sigs_and_defs ~f_sigs ~f_defs)
+  let merge sigs_defs ~f_sigs ~f_defs bindings =
+    merge_no_shadow bindings (check_sigs_defs' t path sigs_defs ~f_sigs ~f_defs)
   in
-  let sigs_and_defs = find_module t path in
+  let sigs_defs = find_module t path in
   match place with
   | `Sig ->
-    update_current_sigs
-      t
-      ~f:(merge ~f_sigs ~f_defs:(sigs_of_defs << f_defs) sigs_and_defs)
+    update_current_sigs t ~f:(merge ~f_sigs ~f_defs:(sigs_of_defs << f_defs) sigs_defs)
   | `Def ->
-    update_current_defs
-      t
-      ~f:(merge ~f_sigs:(defs_of_sigs << f_sigs) ~f_defs sigs_and_defs)
+    update_current_defs t ~f:(merge ~f_sigs:(defs_of_sigs << f_sigs) ~f_defs sigs_defs)
 ;;
 
 let import_all = import_filtered ~f:(fun _ -> true)
@@ -469,7 +485,9 @@ let std_prelude =
 
 let without_std t =
   { t with
-    sigs = { t.sigs with modules = Map.remove t.sigs.modules Core.std_module_name }
+    sigs =
+      Option.map t.sigs ~f:(fun sigs ->
+        { sigs with modules = Map.remove sigs.modules Core.std_module_name })
   }
 ;;
 
