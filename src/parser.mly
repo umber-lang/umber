@@ -301,7 +301,7 @@ stmt_common:
     s = STRING
     { Module.Extern (
         Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
-  | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(equals, type_decl)?
+  | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(EQUALS, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
