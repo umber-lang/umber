@@ -149,9 +149,7 @@ let update_current_sigs ?(create_empty = true) t ~f =
             | None ->
               if create_empty
               then None, loop empty_bindings rest ~f
-              else (
-                print_s [%message "update_current_sigs errored" (without_std t : t)];
-                name_error_path path))
+              else name_error_path path)
       }
   in
   (* TOOD: is it ok to always create empty sigs here? *)
@@ -249,17 +247,12 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
-(* TODO: cleanup *)
 let bindings_at_path =
   let open Option.Let_syntax in
   let rec loop current_path path sigs defs =
     match path with
     | [] ->
-      let following_current =
-        match current_path with
-        | Some [] -> true
-        | _ -> false
-      in
+      let following_current = Option.is_some current_path in
       (match following_current, sigs, defs with
       | true, _, Some defs -> Some (Sigs_and_defs (sigs, defs))
       | false, None, Some defs -> Some (Sigs_and_defs (None, defs))
@@ -325,14 +318,10 @@ let check_sigs_defs' { current_path; _ } path bindings ~f_sigs ~f_defs =
     else f_sigs (Option.value sigs ~default:empty_bindings)
 ;;
 
-(* FIXME: handle empty sigs exposing the defs - during lookup
-   Also should work differently depending on whether you're in the module or not
-   (I guess defs get checked first if in the module?) *)
 let rec find ?at_path t ((path, name) as input) ~f ~to_ustring =
   (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
   let at_path = option_or_default at_path ~f:(fun () -> t.current_path) in
   let open Option.Let_syntax in
-  (* FIXME: need to get current bindings at at_path *)
   let bindings_at_current = or_name_error_path (bindings_at_path t at_path) at_path in
   match path with
   | first_module :: _ ->
@@ -358,9 +347,7 @@ and check_parent t current_path input ~f ~to_ustring =
   (* Recursively check the parent *)
   match List.drop_last current_path with
   | Some parent_path -> find t ~at_path:parent_path input ~f ~to_ustring
-  | None ->
-    print_s [%message "reached toplevel" (without_std t : t)];
-    raise (Name_error (to_ustring input))
+  | None -> raise (Name_error (to_ustring input))
 ;;
 
 let find_module t path =
