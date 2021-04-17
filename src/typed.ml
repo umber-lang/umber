@@ -295,26 +295,33 @@ module Module = struct
     ((Pattern.t * Type.t) * Untyped.Pattern.Names.t, Untyped.Expr.t) Module.def
   [@@deriving sexp]
 
-  let rec gather_names ~names ~f_common ?(f_def = fun _ _ -> None) sigs defs =
+  let rec gather_names ~names ~f_common ?f_def sigs defs =
     let names =
       List.fold sigs ~init:names ~f:(fun names sig_ ->
         match sig_.Node.node with
         | Common_sig common -> f_common ~place:`Sig names common
         | Module_sig (module_name, sigs) ->
           Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
-            gather_names ~names sigs [] ~f_common ~f_def))
+            gather_names ~names sigs [] ~f_common ?f_def))
     in
-    List.fold defs ~init:names ~f:(fun names def ->
-      option_or_default (f_def names def) ~f:(fun () ->
-        match def.Node.node with
-        | Common_def common -> f_common ~place:`Def names common
-        | Module (module_name, sigs, defs) ->
-          Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
-            gather_names ~names sigs defs ~f_common ~f_def)
-        | Let _ | Trait _ | Impl _ -> names))
+    let f =
+      match f_def with
+      | Some f_def -> f_def
+      | None ->
+        fun names def ->
+          (match def.Node.node with
+          | Common_def common -> f_common ~place:`Def names common
+          | Module (module_name, sigs, defs) ->
+            Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
+              gather_names ~names sigs defs ~f_common ?f_def)
+          | Let _ | Trait _ | Impl _ -> names)
+    in
+    List.fold defs ~init:names ~f
   ;;
 
   (* Name/type resolution steps
+     0. Copy type/module declarations in sigs to defs when they are missing.
+        TODO: is this a reasonable time to check sig/def compatibility? Probably too early
      1. Read all bound names in the module and submodules, and assign them fresh type variables
         - This doesn't require knowing anything - just read all the Catch_all names
         - Also read the types in somehow with placeholder values
@@ -332,35 +339,136 @@ module Module = struct
         - Need to re-order and re-group bindings by their dependencies
         - After re-ordering, type each expression and generalize each binding group *)
 
+  module Nested_map : sig
+    type 'data t
+
+    val empty : 'data t
+    val add_exn : 'data t -> key:Type_name.t -> data:'data -> 'data t
+    val remove : 'data t -> Type_name.t -> 'data t
+    val fold : 'data t -> init:'a -> f:(key:Type_name.t -> data:'data -> 'a -> 'a) -> 'a
+    val with_module : 'data t -> Module_name.t -> f:('data t -> 'data t) -> 'data t
+    val remove_module : 'data t -> Module_name.t -> 'data t
+
+    val fold_modules
+      :  'data t
+      -> init:'a
+      -> f:(key:Module_name.t -> data:'data t -> 'a -> 'a)
+      -> 'a
+  end = struct
+    type 'data t =
+      { sigs : 'data Type_name.Map.t
+      ; modules : 'data t Module_name.Map.t
+      }
+
+    let empty = { sigs = Type_name.Map.empty; modules = Module_name.Map.empty }
+    let add_exn t ~key ~data = { t with sigs = Map.add_exn t.sigs ~key ~data }
+    let remove t key = { t with sigs = Map.remove t.sigs key }
+    let fold t = Map.fold t.sigs
+
+    let with_module t module_name ~f =
+      { t with
+        modules = Map.update t.modules module_name ~f:(f << Option.value ~default:empty)
+      }
+    ;;
+
+    let remove_module t module_name =
+      { t with modules = Map.remove t.modules module_name }
+    ;;
+
+    let fold_modules t = Map.fold t.modules
+  end
+
+  let copy_some_sigs_to_defs sigs defs =
+    (* Copy type and module declarations to defs if they were left out *)
+    let rec gather_decls sig_map sigs =
+      List.fold sigs ~init:sig_map ~f:(fun sig_map sig_ ->
+        match sig_.Node.node with
+        | Common_sig common ->
+          (match common with
+          | Type_decl (type_name, _) ->
+            let data = { sig_ with node = Common_def common } in
+            Nested_map.add_exn sig_map ~key:type_name ~data
+          | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
+          | Val _
+          | Extern _
+          (* TODO: handle imports bringing in type declarations to copy over (?) *)
+          | Import _
+          | Import_with _
+          | Import_without _ -> sig_map)
+        | Module_sig (module_name, sigs) ->
+          Nested_map.with_module sig_map module_name ~f:(fun sig_map ->
+            gather_decls sig_map sigs))
+    in
+    let rec copy_to_defs sig_map defs =
+      let sig_map, defs =
+        List.fold_map
+          defs
+          ~init:sig_map
+          ~f:
+            (Node.fold_map ~f:(fun sig_map def ->
+               match def with
+               | Common_def common ->
+                 (match common with
+                 | Type_decl (type_name, _) -> Nested_map.remove sig_map type_name, def
+                 | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
+                 | Val _ | Extern _ | Import _ | Import_with _ | Import_without _ ->
+                   sig_map, def)
+               | Module (module_name, sigs, defs) ->
+                 (* TODO: might want to handle this a bit differently *)
+                 let sig_map = Nested_map.remove_module sig_map module_name in
+                 if List.is_empty sigs
+                 then sig_map, Module (module_name, sigs, copy_to_defs sig_map defs)
+                 else
+                   (* Don't copy inherited sigs from the parent over for now because it's
+                      complicated *)
+                   sig_map, def
+               | Trait _ -> failwith "TODO: copy trait_sigs to defs, without overriding"
+               | Let _ | Impl _ -> sig_map, def))
+      in
+      let defs =
+        Nested_map.fold sig_map ~init:defs ~f:(fun ~key:_ ~data:def defs -> def :: defs)
+      in
+      (* Copy over modules and try to populate them with declarations *)
+      Nested_map.fold_modules
+        sig_map
+        ~init:defs
+        ~f:(fun ~key:module_name ~data:sig_map defs ->
+        Node.dummy_span (Module (module_name, [], copy_to_defs sig_map [])) :: defs)
+    in
+    copy_to_defs (gather_decls Nested_map.empty sigs) defs
+  ;;
+
   let rec gather_name_placeholders ~names sigs defs =
     (* Gather placeholders from all val statements first to correctly handle the presence
        of both val and let without complaining about duplicate names *)
-    let names =
-      gather_names ~names sigs defs ~f_common:(fun ~place names -> function
+    gather_names
+      ~names
+      sigs
+      defs
+      ~f_common:(fun ~place names -> function
         | Val (name, _, _) | Extern (name, _, _, _) ->
           fst (Name_bindings.add_fresh_var ~place names name)
         | Type_decl (type_name, _) ->
           Name_bindings.add_type_placeholder ~place names type_name
         | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names)
-    in
-    List.fold defs ~init:names ~f:(fun names def ->
-      match def.Node.node with
-      | Let bindings ->
-        List.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
-          Name_bindings.merge_names
-            names
-            (Untyped.Pattern.Names.gather pat)
-            ~combine:(fun name entry1 entry2 ->
-            match entry1.type_source, entry2.type_source with
-            | Val_declared, Val_declared | Let_inferred, Let_inferred ->
-              Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
-            | _ -> entry1))
-      | Module (module_name, sigs, defs) ->
-        (* FIXME: maybe don't look at submodule defs unless there's no sig? 
+      ~f_def:(fun names def ->
+        match def.Node.node with
+        | Let bindings ->
+          List.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
+            Name_bindings.merge_names
+              names
+              (Untyped.Pattern.Names.gather pat)
+              ~combine:(fun name entry1 entry2 ->
+              match entry1.type_source, entry2.type_source with
+              | Val_declared, Val_declared | Let_inferred, Let_inferred ->
+                Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
+              | _ -> entry1))
+        | Module (module_name, sigs, defs) ->
+          (* FIXME: maybe don't look at submodule defs unless there's no sig? 
            Need to handle cross-module privacy properly *)
-        Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
-          gather_name_placeholders ~names sigs defs)
-      | Common_def _ | Trait _ | Impl _ -> names)
+          Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
+            gather_name_placeholders ~names sigs defs)
+        | Common_def _ | Trait _ | Impl _ -> names)
   ;;
 
   (* TODO: test that type decls which import from submodules actually work *)
@@ -573,6 +681,7 @@ module Module = struct
     in
     let types = option_or_default types ~f:Type_bindings.create in
     try
+      let defs = copy_some_sigs_to_defs sigs defs in
       let names = Name_bindings.into_module ~place:`Def names module_name in
       let names = gather_name_placeholders ~names sigs defs in
       let names = gather_imports_and_type_decls ~names sigs defs in

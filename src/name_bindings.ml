@@ -1,6 +1,11 @@
 open Import
 open Names
 
+(* FIXME: (!) Remove all traces of code trying to do sig lookups inside defs when lookups
+   in the def fail - we're just adding a new compiler pass for that.
+   I think keeping lookups to the def when there is no sig is ok, as we don't have
+   information to propogate e.g. val statements to sigs before type inference is done *)
+
 module Name_entry = struct
   module Type_source = struct
     type t =
@@ -52,11 +57,9 @@ module Or_imported = struct
   [@@deriving sexp, variants]
 end
 
-(* TODO: see if you can find a way to merge the toplevel t, bindings, and sigs_defs
-   The different representations are annoying to use and a bit confusing *)
 type t =
   { current_path : Module_path.t
-  ; sigs : sigs option (* TODO: allow empty file module sigs to parse somehow *)
+  ; sigs : sigs option (* TODO: Empty sigs should function as the option *)
   ; defs : defs
   }
 
@@ -67,7 +70,6 @@ and defs = sigs bindings
 (* TODO: modules should probably be imported too, not just copied (I think)
    For now, since modules can't be consumed as values in any way, it should be ok
    (avoiding copying is good for performance/avoiding potential issues with phys_equal) *)
-(* NOTE: defs aren't visible outside of the module *)
 and 'a bindings =
   { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
   ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
@@ -237,8 +239,14 @@ let core =
   }
 ;;
 
-(* TODO: this should probably use Map.fold instead of allocating new maps just to
-   merge them *)
+let merge_shadow t1 t2 =
+  let shadow ~key:_ _ x = x in
+  { names = Map.merge_skewed t1.names t2.names ~combine:shadow
+  ; types = Map.merge_skewed t1.types t2.types ~combine:shadow
+  ; modules = Map.merge_skewed t1.modules t2.modules ~combine:shadow
+  }
+;;
+
 let merge_no_shadow t1 t2 =
   let err to_ustring ~key:name = name_error_msg "Name clash" (to_ustring name) in
   { names = Map.merge_skewed t1.names t2.names ~combine:(err Value_name.to_ustring)
@@ -320,22 +328,81 @@ let check_sigs_defs' { current_path; _ } path bindings ~f_sigs ~f_defs =
 
 let rec find ?at_path t ((path, name) as input) ~f ~to_ustring =
   (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
-  let at_path = option_or_default at_path ~f:(fun () -> t.current_path) in
   let open Option.Let_syntax in
+  let at_path = option_or_default at_path ~f:(fun () -> t.current_path) in
   let bindings_at_current = or_name_error_path (bindings_at_path t at_path) at_path in
+  (* print_s
+    [%message
+      "find"
+        (to_ustring input : Ustring.t)
+        (at_path : Module_path.t)
+        (bindings_at_current : sigs_defs)]; *)
   match path with
   | first_module :: _ ->
     let full_path = at_path @ path in
     let f_helper bindings =
+      (* FIXME: PROBLEM: this module lookup is failing when bindings_at_current fails to
+         contain the module we need, since it lacks external sig info
+
+         ^ By external sig, we mean a sig which is a child of a parent sig e.g.
+         module A :
+           module B :
+             type alias B = Int
+         
+         I want to be able to elide stuff from defs if its just type info - should be able
+         to look at the sigs, but may have to look up to parents (e.g. the sig of B inside
+         the def of A is empty, we need the sig of B inside the sig of A)
+         
+         IDEA: what if instead of passing up direct maps/bindings, we wrapped it in a
+         cleverer type which could do lookups on your behalf, taking into account 
+         external sigs when doing lookups/iterating over to do merges (for imports) *)
       if Map.mem bindings.modules first_module
-      then
-        option_or_default
-          (* TODO: it's a bit awkward how this gives up and searches from the toplevel
-           again - could be made more efficient by searching using sigs/defs found here
-           (just need to figure out the correct external/local sig/def handling) *)
-          (let%bind bindings = bindings_at_path t full_path in
-           f full_path name bindings)
-          ~f:(fun () -> raise (Name_error (to_ustring input)))
+      then (
+        (* print_s [%message "Found match!" (first_module : Module_name.t)]; *)
+        (* FIXME: needs to take into account sigs from parent modules when searching
+           IDEA: could try just merging all the parent sigs at once? *)
+        (* Lookup and merge relevant sigs from each parent module *)
+        (* TODO: doing this on every lookup seems pretty bad 
+           Also, bindings_at_path looks up from the module root from scratch each time,
+           which doesn't seem ideal *)
+        let local_sigs, local_defs =
+          match bindings_at_path t full_path with
+          | Some (Sigs sigs) -> sigs, None
+          | Some (Sigs_and_defs (sigs, defs)) ->
+            option_or_default sigs ~f:(fun () -> sigs_of_defs defs), Some defs
+          | None -> empty_bindings, None
+        in
+        let rec merge_parent_sigs sigs full_path my_path =
+          (* FIXME: should be looking for a module via the path I've cut off -
+             my own module, not the entire parent *)
+          match list_split_last full_path with
+          | Some (full_path, last_module) ->
+            let my_path = last_module :: my_path in
+            let sigs' =
+              let extract_sigs = function
+                | Sigs sigs | Sigs_and_defs (Some sigs, _) -> sigs
+                | Sigs_and_defs (None, defs) -> sigs_of_defs defs
+              in
+              let%bind parent_sigs = bindings_at_path t full_path >>| extract_sigs in
+              let%map my_sigs_in_parent =
+                bindings_at_path
+                  { current_path = []; sigs = Some parent_sigs; defs = empty_bindings }
+                  my_path
+                >>| extract_sigs
+              in
+              merge_shadow my_sigs_in_parent sigs
+            in
+            merge_parent_sigs (Option.value sigs' ~default:sigs) full_path my_path
+          | None -> sigs
+        in
+        let sigs = merge_parent_sigs local_sigs full_path [] in
+        let sigs_defs =
+          match local_defs with
+          | Some defs -> Sigs_and_defs (Some sigs, defs)
+          | None -> Sigs sigs
+        in
+        option_or_default (f full_path name sigs_defs) ~f:(fun () ->
+          raise (Name_error (to_ustring input))))
       else check_parent t at_path input ~f ~to_ustring
     in
     check_sigs_defs' t full_path ~f_sigs:f_helper ~f_defs:f_helper bindings_at_current
@@ -351,6 +418,7 @@ and check_parent t current_path input ~f ~to_ustring =
 ;;
 
 let find_module t path =
+  (* print_s [%message "find_module" (path : Module_path.t) (t : t)]; *)
   find
     t
     (path, ())
@@ -373,7 +441,7 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_decl ?at_path t name =
+let find_type_decl' ?at_path t name =
   let open Option.Let_syntax in
   find ?at_path t name ~to_ustring:Type_name.Qualified.to_ustring ~f:(fun path name ->
     let f bindings ~try_again =
@@ -403,7 +471,7 @@ let absolutify_path t path =
     ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
 ;;
 
-let absolutify_type_name t ((_, name) as path) = fst (find_type_decl t path), name
+let absolutify_type_name t ((_, name) as path) = fst (find_type_decl' t path), name
 
 let absolutify_value_name t =
   find
@@ -474,6 +542,7 @@ let import_filtered t ~place path ~f =
   let merge sigs_defs ~f_sigs ~f_defs bindings =
     merge_no_shadow bindings (check_sigs_defs' t path sigs_defs ~f_sigs ~f_defs)
   in
+  (* FIXME: just finding one set of sigs/defs is not good enough: what about the others? *)
   let sigs_defs = find_module t path in
   match place with
   | `Sig ->
@@ -578,6 +647,14 @@ let add_type_decl ({ current_path; _ } as t) ~place type_name decl =
   | `Def -> update_current_defs t ~f
 ;;
 
+(* NOTE: this doesn't remove the added variant constructors, pretty hacky *)
+let remove_type_decl t ~place type_name =
+  let f bindings = { bindings with types = Map.remove bindings.types type_name } in
+  match place with
+  | `Sig -> update_current_sigs t ~f
+  | `Def -> update_current_defs t ~f
+;;
+
 let set_scheme t ~place name scheme =
   let f bindings =
     let entry =
@@ -595,6 +672,8 @@ let set_scheme t ~place name scheme =
 ;;
 
 let add_fresh_var t ~place name =
+  (* TODO: remove *)
+  (* print_s [%message "add_fresh_var" (place : [< `Def | `Sig ]) (name : Value_name.t)]; *)
   let typ = Type.fresh_var () in
   let f bindings =
     { bindings with
@@ -632,14 +711,33 @@ let merge_names t new_names ~combine =
     })
 ;;
 
-let find_type_decl ?at_path =
-  let rec loop t name =
-    match snd (find_type_decl ?at_path t name) with
-    | Some (Local decl) -> decl
-    | Some (Imported path_name) -> loop t path_name
-    | None -> compiler_bug [%message "Placeholder decl not replaced"]
+let rec find_type_decl ?at_path t type_name =
+  resolve_decl_or_import ?at_path t (snd (find_type_decl' ?at_path t type_name))
+
+and resolve_decl_or_import ?at_path t = function
+  | Some (Or_imported.Local decl) -> Some decl
+  | Some (Imported path_name) -> find_type_decl ?at_path t path_name
+  | None -> None
+;;
+
+let fold_type_decls t ~init ~f =
+  let bindings = or_name_error_path (bindings_at_path t t.current_path) t.current_path in
+  let f ~key:type_name ~data:decl acc =
+    match resolve_decl_or_import t decl with
+    | Some decl -> f acc type_name decl
+    | None -> acc
   in
-  loop
+  match bindings with
+  | Sigs sigs -> Map.fold sigs.types ~init ~f
+  | Sigs_and_defs (Some sigs, defs) ->
+    let init = Map.fold sigs.types ~init ~f in
+    Map.fold defs.types ~init ~f
+  | Sigs_and_defs (None, defs) -> Map.fold defs.types ~init ~f
+;;
+
+let find_type_decl ?at_path t type_name =
+  option_or_default (find_type_decl ?at_path t type_name) ~f:(fun () ->
+    compiler_bug [%message "Placeholder decl not replaced"])
 ;;
 
 let find_absolute_type_decl = find_type_decl ~at_path:[]

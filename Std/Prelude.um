@@ -29,11 +29,11 @@ module :
     
     val not : Bool -> Bool
     val (==) (infix 4) : a -> a -> Bool
-    #val (!=) (infix 4) : a -> a -> Bool
-    #val (<) (infix 4) : a -> a -> Bool
-    #val (<=) (infix 4) : a -> a -> Bool
-    #val (>) (infix 4) : a -> a -> Bool
-    #val (>=) (infix 4) : a -> a -> Bool
+    val (!=) (infix 4) : a -> a -> Bool
+    val (<) (infix 4) : a -> a -> Bool
+    val (<=) (infix 4) : a -> a -> Bool
+    val (>) (infix 4) : a -> a -> Bool
+    val (>=) (infix 4) : a -> a -> Bool
 
     val (&&) (infixl 3) : Bool -> Bool -> Bool
     

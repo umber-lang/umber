@@ -1,6 +1,7 @@
 open Core
 open Umber
 
+(* TODO: rewrite this with the other Command syntax *)
 let run file debug lex_only print_types print_names no_std parent backtrace () =
   let open Result.Let_syntax in
   if lex_only

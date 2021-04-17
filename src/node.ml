@@ -1,9 +1,12 @@
+open Import
+
 type 'a t =
   { span : Span.t
   ; node : 'a
   }
 [@@deriving equal, compare, hash]
 
+let dummy_span node = { node; span = Span.dummy }
 let map t ~f = { t with node = f t.node }
 
 let fold_map acc t ~f =
@@ -12,4 +15,4 @@ let fold_map acc t ~f =
 ;;
 
 let sexp_of_t sexp_of_node { node; _ } = sexp_of_node node
-let t_of_sexp node_of_sexp node = { span = Span.dummy; node = node_of_sexp node }
+let t_of_sexp node_of_sexp = dummy_span << node_of_sexp

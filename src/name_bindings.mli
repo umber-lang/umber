@@ -114,3 +114,5 @@ val add_val
   -> t
 
 val add_type_decl : t -> place:[< `Sig | `Def ] -> Type_name.t -> Type.Decl.t -> t
+val remove_type_decl : t -> place:[< `Sig | `Def ] -> Type_name.t -> t
+val fold_type_decls : t -> init:'a -> f:('a -> Type_name.t -> Type.Decl.t -> 'a) -> 'a
