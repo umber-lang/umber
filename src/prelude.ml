@@ -22,10 +22,15 @@ let names_sexp = {|
                 (- (Imported ((Std Prelude Operators) -)))
                 (. (Imported ((Std Prelude Operators) .)))
                 (";" (Imported ((Std Prelude Operators) ";")))
+                (< (Imported ((Std Prelude Operators) <)))
+                (> (Imported ((Std Prelude Operators) >)))
                 (^ (Imported ((Std Prelude Operators) ^)))
+                (!= (Imported ((Std Prelude Operators) !=)))
                 (&& (Imported ((Std Prelude Operators) &&)))
                 (:: (Imported ((Std Prelude Operators) ::)))
+                (<= (Imported ((Std Prelude Operators) <=)))
                 (== (Imported ((Std Prelude Operators) ==)))
+                (>= (Imported ((Std Prelude Operators) >=)))
                 (|> (Imported ((Std Prelude Operators) |>)))
                 (|| (Imported ((Std Prelude Operators) ||)))
                 (Nil (Imported ((Std Prelude List) Nil)))
@@ -111,6 +116,20 @@ let names_sexp = {|
                          (Scheme
                           (Function (Tuple ()) (Function (Var a) (Var a)))))
                         (fixity (Left 0)))))
+                     (<
+                      (Local
+                       ((typ
+                         (Scheme
+                          (Function (Var a)
+                           (Function (Var a) (Type_app (() Bool) ())))))
+                        (fixity (Non_assoc 4)))))
+                     (>
+                      (Local
+                       ((typ
+                         (Scheme
+                          (Function (Var a)
+                           (Function (Var a) (Type_app (() Bool) ())))))
+                        (fixity (Non_assoc 4)))))
                      (^
                       (Local
                        ((typ
@@ -119,6 +138,13 @@ let names_sexp = {|
                            (Function (Type_app (() Int) ())
                             (Type_app (() Int) ())))))
                         (fixity (Right 8)))))
+                     (!=
+                      (Local
+                       ((typ
+                         (Scheme
+                          (Function (Var a)
+                           (Function (Var a) (Type_app (() Bool) ())))))
+                        (fixity (Non_assoc 4)))))
                      (&&
                       (Local
                        ((typ
@@ -136,7 +162,21 @@ let names_sexp = {|
                             (Type_app ((Std Prelude) List) ((Var a)))
                             (Type_app ((Std Prelude) List) ((Var a)))))))
                         (fixity (Right 5)))))
+                     (<=
+                      (Local
+                       ((typ
+                         (Scheme
+                          (Function (Var a)
+                           (Function (Var a) (Type_app (() Bool) ())))))
+                        (fixity (Non_assoc 4)))))
                      (==
+                      (Local
+                       ((typ
+                         (Scheme
+                          (Function (Var a)
+                           (Function (Var a) (Type_app (() Bool) ())))))
+                        (fixity (Non_assoc 4)))))
+                     (>=
                       (Local
                        ((typ
                          (Scheme
@@ -171,5 +211,36 @@ let names_sexp = {|
     ((Std
       (()
        ((names ()) (types ())
-        (modules ((Prelude (() ((names ()) (types ()) (modules ()))))))))))))))
+        (modules
+         ((Prelude
+           (()
+            ((names ()) (types ())
+             (modules
+              ((List
+                (()
+                 ((names
+                   ((Nil
+                     (Local
+                      ((typ
+                        (Scheme
+                         (Type_app ((Std Prelude List) List) ((Var a))))))))
+                    (Cons
+                     (Local
+                      ((typ
+                        (Scheme
+                         (Function (Var a)
+                          (Function
+                           (Type_app ((Std Prelude List) List) ((Var a)))
+                           (Type_app ((Std Prelude List) List) ((Var a))))))))))))
+                  (types
+                   ((List
+                     ((Local
+                       ((a)
+                        (Variants
+                         ((Nil ())
+                          (Cons
+                           ((Var a)
+                            (Type_app ((Std Prelude List) List) ((Var a)))))))))))))
+                  (modules ()))))
+               (Operators (() ((names ()) (types ()) (modules ())))))))))))))))))))
 |}

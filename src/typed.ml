@@ -356,14 +356,14 @@ module Module = struct
       -> 'a
   end = struct
     type 'data t =
-      { sigs : 'data Type_name.Map.t
+      { data : 'data Type_name.Map.t
       ; modules : 'data t Module_name.Map.t
       }
 
-    let empty = { sigs = Type_name.Map.empty; modules = Module_name.Map.empty }
-    let add_exn t ~key ~data = { t with sigs = Map.add_exn t.sigs ~key ~data }
-    let remove t key = { t with sigs = Map.remove t.sigs key }
-    let fold t = Map.fold t.sigs
+    let empty = { data = Type_name.Map.empty; modules = Module_name.Map.empty }
+    let add_exn t ~key ~data = { t with data = Map.add_exn t.data ~key ~data }
+    let remove t key = { t with data = Map.remove t.data key }
+    let fold t = Map.fold t.data
 
     let with_module t module_name ~f =
       { t with
@@ -441,34 +441,32 @@ module Module = struct
   let rec gather_name_placeholders ~names sigs defs =
     (* Gather placeholders from all val statements first to correctly handle the presence
        of both val and let without complaining about duplicate names *)
-    gather_names
-      ~names
-      sigs
-      defs
-      ~f_common:(fun ~place names -> function
-        | Val (name, _, _) | Extern (name, _, _, _) ->
-          fst (Name_bindings.add_fresh_var ~place names name)
-        | Type_decl (type_name, _) ->
-          Name_bindings.add_type_placeholder ~place names type_name
-        | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names)
-      ~f_def:(fun names def ->
-        match def.Node.node with
-        | Let bindings ->
-          List.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
-            Name_bindings.merge_names
-              names
-              (Untyped.Pattern.Names.gather pat)
-              ~combine:(fun name entry1 entry2 ->
-              match entry1.type_source, entry2.type_source with
-              | Val_declared, Val_declared | Let_inferred, Let_inferred ->
-                Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
-              | _ -> entry1))
-        | Module (module_name, sigs, defs) ->
-          (* FIXME: maybe don't look at submodule defs unless there's no sig? 
+    let f_common ~place names = function
+      | Val (name, _, _) | Extern (name, _, _, _) ->
+        fst (Name_bindings.add_fresh_var ~place names name)
+      | Type_decl (type_name, _) ->
+        Name_bindings.add_type_placeholder ~place names type_name
+      | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
+    in
+    gather_names ~names sigs defs ~f_common ~f_def:(fun names def ->
+      match def.Node.node with
+      | Let bindings ->
+        List.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
+          Name_bindings.merge_names
+            names
+            (Untyped.Pattern.Names.gather pat)
+            ~combine:(fun name entry1 entry2 ->
+            match entry1.type_source, entry2.type_source with
+            | Val_declared, Val_declared | Let_inferred, Let_inferred ->
+              Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
+            | _ -> entry1))
+      | Module (module_name, sigs, defs) ->
+        (* FIXME: maybe don't look at submodule defs unless there's no sig? 
            Need to handle cross-module privacy properly *)
-          Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
-            gather_name_placeholders ~names sigs defs)
-        | Common_def _ | Trait _ | Impl _ -> names)
+        Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
+          gather_name_placeholders ~names sigs defs)
+      | Common_def common -> f_common ~place:`Def names common
+      | Trait _ | Impl _ -> names)
   ;;
 
   (* TODO: test that type decls which import from submodules actually work *)

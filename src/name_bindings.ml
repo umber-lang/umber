@@ -59,7 +59,7 @@ end
 
 type t =
   { current_path : Module_path.t
-  ; sigs : sigs option (* TODO: Empty sigs should function as the option *)
+  ; sigs : sigs option
   ; defs : defs
   }
 
@@ -301,6 +301,8 @@ let bindings_at_path =
   fun t path -> loop (Some t.current_path) path t.sigs (Some t.defs)
 ;;
 
+(* FIXME: this is looking stuff up in sigs when it probably shouldn't be
+   - we have a compiler pass to handle this now *)
 let check_sigs_and_defs { current_path; _ } path (sigs, defs) ~f_sigs ~f_defs =
   let open Option.Let_syntax in
   if Module_path.equal current_path path || Option.is_none sigs
@@ -443,7 +445,18 @@ let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity
 
 let find_type_decl' ?at_path t name =
   let open Option.Let_syntax in
-  find ?at_path t name ~to_ustring:Type_name.Qualified.to_ustring ~f:(fun path name ->
+  find
+    ?at_path
+    t
+    name
+    ~to_ustring:Type_name.Qualified.to_ustring
+    ~f:(fun path name sigs_defs ->
+    (* print_s
+      [%message
+        "find_type_decl'"
+          (path : Module_path.t)
+          (name : Type_name.t)
+          (sigs_defs : sigs_defs)]; *)
     let f bindings ~try_again =
       match Map.find bindings.types name with
       | Some decl -> Some (path, decl)
@@ -456,6 +469,7 @@ let find_type_decl' ?at_path t name =
     check_sigs_defs
       t
       path
+      sigs_defs
       ~f_sigs:(f ~try_again:(fun (_, sigs) -> Map.find sigs.types name))
       ~f_defs:
         (f ~try_again:(fun (sigs, defs) ->
@@ -647,14 +661,6 @@ let add_type_decl ({ current_path; _ } as t) ~place type_name decl =
   | `Def -> update_current_defs t ~f
 ;;
 
-(* NOTE: this doesn't remove the added variant constructors, pretty hacky *)
-let remove_type_decl t ~place type_name =
-  let f bindings = { bindings with types = Map.remove bindings.types type_name } in
-  match place with
-  | `Sig -> update_current_sigs t ~f
-  | `Def -> update_current_defs t ~f
-;;
-
 let set_scheme t ~place name scheme =
   let f bindings =
     let entry =
@@ -718,21 +724,6 @@ and resolve_decl_or_import ?at_path t = function
   | Some (Or_imported.Local decl) -> Some decl
   | Some (Imported path_name) -> find_type_decl ?at_path t path_name
   | None -> None
-;;
-
-let fold_type_decls t ~init ~f =
-  let bindings = or_name_error_path (bindings_at_path t t.current_path) t.current_path in
-  let f ~key:type_name ~data:decl acc =
-    match resolve_decl_or_import t decl with
-    | Some decl -> f acc type_name decl
-    | None -> acc
-  in
-  match bindings with
-  | Sigs sigs -> Map.fold sigs.types ~init ~f
-  | Sigs_and_defs (Some sigs, defs) ->
-    let init = Map.fold sigs.types ~init ~f in
-    Map.fold defs.types ~init ~f
-  | Sigs_and_defs (None, defs) -> Map.fold defs.types ~init ~f
 ;;
 
 let find_type_decl ?at_path t type_name =
