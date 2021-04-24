@@ -19,9 +19,3 @@ let rec t_of_sexp node_of_sexp leaf_of_sexp = function
   | List [ leaf ] -> Leaf (leaf_of_sexp leaf)
   | _ -> raise_s [%message "Btree.t_of_sexp: parse failed"]
 ;;
-
-module Rotation = struct
-  type t =
-    | Clockwise
-    | Anticlockwise
-end
