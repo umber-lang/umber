@@ -1,0 +1,21 @@
+module :
+  type List a =
+    | Nil
+    | a :: (List a)
+    @deriving(Iterable)
+
+  val empty : List a
+  val singleton : a -> List a
+
+impl Iterable (List a) =
+  # This uses the simple API which forces the type to have kind `* -> *` and just uses
+    `type Iterator a = () -> <Yield a> ()`. This is almost definitely going to be changed. 
+  let iter list () =
+    match list
+    | [] -> ()
+    | x :: xs ->
+      yield x;
+      iter xs ()
+
+let empty = []
+let singleton x = [x]  # also `let singleton = (:: [])`

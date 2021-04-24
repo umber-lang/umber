@@ -1,0 +1,211 @@
+# https://adriann.github.io/programming_problems.html
+
+# -- Lists/Strings --
+
+# 1. Return the largest element in a list
+let largest = Iter.maximum
+# Alternatively:
+  ```
+  let largest =
+    let loop max = match
+      | [] -> max
+      | x :: xs ->
+        let max = Ord.max x max
+        loop max xs
+    loop Int.min_value  # `(Bounded.min_value : Int)`?
+  ```
+
+# 2. Reverse a list
+let reverse = Iter.reverse
+# Alternatively:
+  ```
+  let reverse =
+    let loop acc = match
+      | [] -> acc
+      | x :: xs -> loop (x :: acc) xs
+  loop []
+  ```
+
+# 3. Check whether an element occurs in a list
+let contains = Collection.contains
+
+# 4. Return the elements at odd positions in a list
+let odd_elements = Iter.filter ~f:(\(i, _) -> i % 2 == 1) . Iter.enumerate
+
+# 5. Sum a list
+let sum = Iter.sum
+
+# 6. Test if a string is a palindrome
+let is_palindrome input = Iter.iter input == Iter.reverse input
+# ^ Note: can't implement equality on `Iterator` if it's just a function
+  Having it be a trait could give more flexibility I suppose
+
+# 7..8
+
+# 9. Concatenate lists
+let concat = (++)  # Works on arrays, lists (?): Concat trait or a Collection method?
+# Alternatively:
+  ```
+  let concat xs ys =
+    match xs
+    | [] -> ys
+    | x :: xs -> x :: concat xs ys
+  ```
+
+# 10. Combine two lists by alternately taking elements
+let interleave xs ys =
+  Iter.zip xs ys |> Iter.fold_right ~init:[] ~f:(\(x, y) acc -> x :: y :: acc)
+
+# 11. Merge two sorted lists
+let merge_sorted xs ys =
+  match (xs, ys)
+  | [], list | list, [] -> list
+  | x :: xs, y :: ys ->
+    if x <= y then x :: y :: merge_sorted xs ys
+    else y :: x :: merge_sorted xs ys
+
+# 13. Generate the first 100 Fibonacci numbers
+let iter_fibonacci () =
+  let loop a b =
+    let c = a + b
+    yield c;  # Should you actually need semicolons? Seems weird to not have on let, maybe
+    loop b c
+  yield 1;
+  yield 1;
+  loop 1 1
+
+let first_100_fibonacci_numbers = Iter.take ~n:100 iter_fibonacci
+
+# 14. List the digits of a number
+
+# Int version
+  ```
+  let digit_to_char n =
+  if n :in: 0..9 then (Int.to_string n)@[0]
+  else panic "${n} is more than one digit"
+
+  let list_digits n =
+    let loop acc n =
+      if n == 0 then acc
+      else
+        let quotient, remainder = Math.quot_rem n 10
+        loop (digit_to_char remainder :: acc) quotient
+    match Signed.sign n
+    | Pos -> loop [] n
+    | Neg -> '-' :: loop [] -n  # `(-n)`?
+    | Zero -> ['0']
+  ```
+
+# Nat version
+let list_digits n =
+  let loop acc n =
+    if n == 0 then acc
+    else
+      let quotient, remainder = Math.quot_rem n 10
+      loop (remainder :: acc) quotient
+  if n == 0 then [0] else loop [] n
+
+# 15. Add, subtract, and multiply digit lists
+module DigitList =
+  type DigitList = List Nat  # Should probably actually be like `type Digit = private Nat`
+
+  impl Convert Natural DigitList =
+    let convert = list_digits
+
+  impl Num DigitList =
+    let (+) x y =
+      let carry, acc =
+        Iter.fold_right (Iter.zip x y) ~init:(0, []) ~f:(\(x, y) (carry, acc) ->
+          let sum = x + y + carry
+          if sum >= 10 then (carry + 1, sum - 10 :: acc)
+          else (0, sum :: acc))
+      if carry > 0 then carry :: acc else acc
+
+    #let (-) x y =  ... # Exercise for the reader
+
+    let (*) x y =
+      let partials = Iter.map y ~f:(multiply_digit x)
+      Iter.fold_right ~init:(0, 0) partials ~f:(\n (sum, multiplier) ->
+        (sum + n :lshift: multiplier, multiplier + 1))
+
+  val lshift : (Sequence t Nat) => t -> Nat -> t
+  let lshift x n = x ++ Collection.collect (Iter.repeat ~n 0)
+
+  let multiply_digit x multiplier =
+    Iter.fold_right x ~init:(0, []) ~f:(\x (carry, acc) -> 
+      let product = x * multiplier + carry
+      let carry, next_digit = Math.quot_rem product 10
+      (carry, next_digit :: acc))
+
+# 16
+
+# 17. Implement some sorting algorithms
+let selection_sort array =
+  Iter.for (Iter.enumerate array) ~f:(\(i, x) ->
+    Iter.for (Iter.enumerate (Iter.drop ~n:(i + 1) array)) ~f:(\(j, y) ->
+      if x < y then Array.swap array i j))
+
+let insertion_sort =
+  Iter.for (0 .. Collection.length array - 1) ~f:(\i ->
+    Iter.for (Iter.reverse (0 .. i - 1)) ~f:(\j ->
+      if array@[j] > array@[j + 1] then Array.swap array j (j + 1)
+      else break ()))
+
+# Also: merge sort, quick sort, stooge sort
+
+let merge_sort' =
+  let merge xs ys () =
+    match (Iter.uncons xs, Iter.uncons ys)
+    | None, _ -> ys
+    | _, None -> xs
+    | Some (x, xs), Some (y, ys) ->
+      if x <= y then yield x; yield y
+      else yield y; yield x;  # Awkward semicolon, maybe just ditch em?
+      merge xs ys ()
+  match
+  | [] | [_] as xs -> xs
+  | xs ->
+    let half_len = Iter.length xs // 2
+    let front, back = Iter.take ~n:half_len xs, Iter.drop ~n:half_len xs
+    merge (merge_sort' front) (merge_sort' back)
+
+# 18. Binary search
+# Note: the "array" here should work like a Rust slice (immutable)
+let binary_search array item =
+  if Collection.is_empty array then False
+  else
+    let mid = Collection.length array // 2  # How to look this up better, without the panic?
+    match Ord.compare item array@[mid]
+    | Equal -> true
+    | Lower -> binary_search array@[..mid-1] item  # How can it support leaving out bounds?
+    | Greater -> binary_search array@[mid+1..]
+
+# 19. Print words in a frame
+let print_words_framed words =
+  let max_len = Iter.max (Iter.map ~f:Coll.length words) # `Collection.length` is so awkward to write
+  let frame_len = max_length + 4  # A space and '*' on either side
+  let print_frame len = Fun.repeat len ~f:(\() -> print ~end:None '*')
+  print_frame frame_len;
+  Iter.for words ~f:(print . "* {} *");
+  print_frame frame_len
+
+# Note: definition of `repeat` (Although you could also use `Iter.for (1..n)`)
+let repeat n ~f =
+  if n == 0 then ()
+  else
+    f ();
+    repeat (n - 1) ~f
+
+# 20. Translate to and from Pig Latin
+module PigLatin :
+  # These traits are a mess
+  # TODO: Figure out a better organization for standard traits for collections/iteration/mapping
+  val of_english : (Iterable t String) => Iterator String
+=
+  let of_english = Iter.map ~f:(\word ->
+    if String.is_empty word then ""
+    else "{word@[1..]}{word@[0]}ay")
+
+  let to_english = Iter.map ~f:(match@re
+    | $(rest:.*) $(last_letter:.*) "ay" -> last_letter ++ rest
+    | _ as word -> panic "Invalid pig latin word: {word}")
