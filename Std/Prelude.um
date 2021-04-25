@@ -27,6 +27,7 @@ module :
 
     val (::) (infixr 5) : a -> List a -> List a
     
+    # TODO: add trait bounds to these - this is just temporary
     val not : Bool -> Bool
     val (==) (infix 4) : a -> a -> Bool
     val (!=) (infix 4) : a -> a -> Bool
