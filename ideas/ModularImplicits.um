@@ -1,0 +1,23 @@
+# Paper on modular implicits: https://arxiv.org/pdf/1512.01895.pdf
+
+module type Eq =
+  type T
+  val (==) : T -> T -> Bool
+
+val (!=) : {E : Eq} -> E.T -> E.T -> Bool
+let (!=) {E : Eq} x y = not E.(x == y)
+
+val print_if_equal :
+  {E : Eq} -> {S : Show} -> E.T -> E.T -> ()
+  where type E.t = S.t
+let print_if_equal {E : Eq} x y = if E.(x == y) then print x
+
+# Compared to the implementation with traits:
+trait Eq a :
+  val (==) : a -> a -> Bool
+
+val (!=) : (Eq a) => a -> a -> Bool
+let (!=) x y = not (x == y)
+
+val print_if_equal : (Eq a, Show a) => a -> a -> ()
+let print_if_equal x y = if x == y then print x
