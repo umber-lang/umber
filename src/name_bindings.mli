@@ -3,7 +3,6 @@ open Names
 module Name_entry : sig
   module Type_source : sig
     type t =
-      | Placeholder
       | Val_declared
       | Let_inferred
     [@@deriving sexp]
@@ -16,16 +15,11 @@ module Name_entry : sig
     [@@deriving sexp]
   end
 
-  type t =
-    { typ : Type_or_scheme.t
-    ; type_source : Type_source.t
-    ; fixity : Fixity.t option
-    ; extern_name : Extern_name.t option
-    }
-  [@@deriving sexp]
+  type t [@@deriving sexp]
 
   val typ : t -> Type.t
   val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
+  val type_source : t -> Type_source.t
 end
 
 type t [@@deriving sexp]
@@ -46,7 +40,7 @@ val find_type : t -> Value_name.Qualified.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Qualified.t -> Type.t
 val find_fixity : t -> Value_name.Qualified.t -> Fixity.t
 val set_scheme : t -> place:[ `Sig | `Def ] -> Value_name.t -> Type.Scheme.t -> t
-val add_fresh_var : t -> place:[ `Sig | `Def ] -> Value_name.t -> t * Type.t
+val add_name_placeholder : t -> place:[ `Sig | `Def ] -> Value_name.t -> t
 val add_type_placeholder : t -> place:[ `Sig | `Def ] -> Type_name.t -> t
 
 val merge_names

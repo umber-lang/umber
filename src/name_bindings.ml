@@ -4,12 +4,13 @@ open Names
 (* FIXME: (!) Remove all traces of code trying to do sig lookups inside defs when lookups
    in the def fail - we're just adding a new compiler pass for that.
    I think keeping lookups to the def when there is no sig is ok, as we don't have
-   information to propogate e.g. val statements to sigs before type inference is done *)
+   information to propogate e.g. val statements to sigs before type inference is done 
+   
+   - also delete all these printfs *)
 
 module Name_entry = struct
   module Type_source = struct
     type t =
-      | Placeholder
       | Val_declared
       | Let_inferred
     [@@deriving equal, sexp]
@@ -29,7 +30,7 @@ module Name_entry = struct
     ; fixity : Fixity.t option [@sexp.option]
     ; extern_name : Extern_name.t option [@sexp.option]
     }
-  [@@deriving sexp]
+  [@@deriving fields, sexp]
 
   let typ entry =
     match entry.typ with
@@ -43,10 +44,6 @@ module Name_entry = struct
 
   let val_declared ?fixity ?extern_name typ =
     { type_source = Val_declared; typ = Scheme typ; fixity; extern_name }
-  ;;
-
-  let placeholder typ =
-    { type_source = Placeholder; typ = Type typ; fixity = None; extern_name = None }
   ;;
 end
 
@@ -271,7 +268,6 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
-(* FIXME: this isn't doing the right thing for that new place arg I added *)
 let bindings_at_path =
   let open Option.Let_syntax in
   let rec loop ~place current_path path sigs defs =
@@ -335,7 +331,6 @@ let bindings_at_path =
   else sigs >>= f_sigs
 ;;*)
 
-(* FIXME: reinstate this *)
 let check_sigs_and_defs { current_path; _ } path (sigs, defs) ~f_sigs ~f_defs =
   (* print_s
     [%message
@@ -478,8 +473,6 @@ let rec find ?at_path ?place t ((path, name) as input) ~f ~to_ustring =
           raise (Name_error (to_ustring input))))
       else check_parent t at_path input ~f ~to_ustring
     in
-    (* FIXME: weird interactions with place here (?) - it's making find_module ~place:`Sig
-       not do what I want*)
     check_sigs_defs t full_path ~f_sigs:f_helper ~f_defs:f_helper bindings_at_current
   | None ->
     option_or_default (f at_path name bindings_at_current) ~f:(fun () ->
@@ -645,15 +638,8 @@ let import_filtered t ~place path ~f =
     map_to_imports_defs path (filter ~f defs)
   in
   let merge sigs_defs ~f_sigs ~f_defs bindings =
-    (* FIXME: this now has different behavior (?)
-       - check_sigs_defs is not quite right here because we are updating (?) *)
     merge_no_shadow bindings (check_sigs_defs t path sigs_defs ~f_sigs ~f_defs)
   in
-  (* FIXME: find_module here is finding the thing in our defs, which is wrong because
-     although we are in the right path, we are in the sigs, so we can't see defs
-     we might also need a place field in Name_bindings?
-     Another option is passing on the place argument to [find], although this would have
-     to make it all the way to [bindings_at_path] *)
   (* print_s [%message "importing: find_module"]; *)
   let sigs_defs = find_module t ~place path in
   (* print_s [%message "from find_module" (sigs_defs : sigs_defs)]; *)
@@ -699,15 +685,15 @@ let add_val ?extern_name t ~place name fixity (trait_bounds, type_expr) ~unify =
     { bindings with
       names =
         Map.update bindings.names name ~f:(function
-          | None | Some (Local { type_source = Val_declared | Let_inferred; _ }) ->
+          | None ->
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
-          | Some (Local ({ type_source = Placeholder; _ } as existing_entry)) ->
+          | Some (Local existing_entry) ->
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
             Local { type_source = Val_declared; typ = Scheme scheme; fixity; extern_name }
           | Some (Imported imported_name) ->
             (* TODO: consider allowing this use case
-             e.g. importing from another module, and then giving that import a new,
-             compatible type declaration *)
+               e.g. importing from another module, and then giving that import a new,
+               compatible type declaration *)
             name_error_msg
               "Duplicate val for imported item"
               Ustring.(
@@ -776,20 +762,19 @@ let set_scheme t ~place name scheme =
   | `Def -> update_current_defs t ~f
 ;;
 
-let add_fresh_var t ~place name =
-  (* TODO: remove *)
-  (* print_s [%message "add_fresh_var" (place : [< `Def | `Sig ]) (name : Value_name.t)]; *)
-  let typ = Type.fresh_var () in
+let add_name_placeholder t ~place name =
   let f bindings =
     { bindings with
       names =
-        Map.add bindings.names ~key:name ~data:(Local (Name_entry.placeholder typ))
-        |> or_name_clash "Duplicate name" (Value_name.to_ustring name)
+        Map.update bindings.names name ~f:(function
+          | None -> Local (Name_entry.val_declared (Var Type_param_name.default))
+          | Some (Local { Name_entry.type_source = Let_inferred; _ } as entry) -> entry
+          | _ -> name_error_msg "Duplicate name" (Value_name.to_ustring name))
     }
   in
   match place with
-  | `Sig -> update_current_sigs t ~f, typ
-  | `Def -> update_current_defs t ~f, typ
+  | `Sig -> update_current_sigs t ~f
+  | `Def -> update_current_defs t ~f
 ;;
 
 let add_type_placeholder t ~place type_name =

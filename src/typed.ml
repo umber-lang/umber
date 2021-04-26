@@ -439,11 +439,27 @@ module Module = struct
   ;;
 
   let rec gather_name_placeholders ~names sigs defs =
-    (* Gather placeholders from all val statements first to correctly handle the presence
-       of both val and let without complaining about duplicate names *)
     let f_common ~place names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
-        fst (Name_bindings.add_fresh_var ~place names name)
+        (* FIXME: PROBLEM: adding placeholders has been broken all along
+           - Vals were being skipped inside defs (no common_defs were processed)
+           - This hid the fact that vals were not being processed first and so placeholder
+             handling was wrong
+           - Kinda want to get rid of placeholder
+           - Need a centralized place to do 1 val, 1 let checking
+             Seems fine to do it here and then have that be an invariant (?)
+
+           SOLUTION (probably):
+           - Can maybe just do Let_inferred/Val_declared and then error in a consistent
+             way - which should be handled in Name_bindings if possible
+           - Wait, adding placeholders for vals in defs actually seems pointless?
+             It matters in sigs, but defs have to have the let anyway, the val can't live
+             alone (although we aren't checking that yet I think)
+             - yeah, just skip vals in defs (ah wait, if the sigs are empty they matter)
+                - ok then
+                  
+            TODO: add better tests for this *)
+        Name_bindings.add_name_placeholder ~place names name
       | Type_decl (type_name, _) ->
         Name_bindings.add_type_placeholder ~place names type_name
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
@@ -456,10 +472,10 @@ module Module = struct
             names
             (Untyped.Pattern.Names.gather pat)
             ~combine:(fun name entry1 entry2 ->
-            match entry1.type_source, entry2.type_source with
+            match Name_bindings.Name_entry.(type_source entry1, type_source entry2) with
             | Val_declared, Val_declared | Let_inferred, Let_inferred ->
               Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
-            | _ -> entry1))
+            | _ -> entry2))
       | Module (module_name, sigs, defs) ->
         (* FIXME: maybe don't look at submodule defs unless there's no sig? 
            Need to handle cross-module privacy properly *)
