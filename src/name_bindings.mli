@@ -39,9 +39,9 @@ val find_entry : t -> Value_name.Qualified.t -> Name_entry.t
 val find_type : t -> Value_name.Qualified.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Qualified.t -> Type.t
 val find_fixity : t -> Value_name.Qualified.t -> Fixity.t
-val set_scheme : t -> place:[ `Sig | `Def ] -> Value_name.t -> Type.Scheme.t -> t
-val add_name_placeholder : t -> place:[ `Sig | `Def ] -> Value_name.t -> t
-val add_type_placeholder : t -> place:[ `Sig | `Def ] -> Type_name.t -> t
+val set_scheme : t -> Value_name.t -> Type.Scheme.t -> t
+val add_name_placeholder : t -> Value_name.t -> t
+val add_type_placeholder : t -> Type_name.t -> t
 
 val merge_names
   :  t
@@ -63,48 +63,27 @@ val absolutify_value_name : t -> Value_name.Qualified.t -> Value_name.Qualified.
 
 (* Scope handling *)
 val current_path : t -> Module_path.t
-val into_module : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
+val into_module : t -> Module_name.t -> t
 val into_parent : t -> t
-val with_submodule : t -> place:[ `Sig | `Def ] -> Module_name.t -> f:(t -> t) -> t
-
-val with_submodule'
-  :  t
-  -> place:[ `Sig | `Def ]
-  -> Module_name.t
-  -> f:(t -> t * 'a)
-  -> t * 'a
-
+val with_submodule : t -> Module_name.t -> f:(t -> t) -> t
+val with_submodule' : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
 val with_path : t -> Module_path.t -> f:(t -> t * 'a) -> t * 'a
 
 (* AST handling *)
 (* TODO: rename the existing module Import to Common, and split into Import.t with:
    `val import : t -> Import.t -> t` *)
-val import : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
-
-val import_with
-  :  t
-  -> place:[ `Sig | `Def ]
-  -> Module_path.t
-  -> Unidentified_name.t list
-  -> t
-
-val import_all : t -> place:[ `Sig | `Def ] -> Module_path.t -> t
-
-val import_without
-  :  t
-  -> place:[ `Sig | `Def ]
-  -> Module_path.t
-  -> Unidentified_name.t list
-  -> t
+val import : t -> Module_name.t -> t
+val import_with : t -> Module_path.t -> Unidentified_name.t list -> t
+val import_all : t -> Module_path.t -> t
+val import_without : t -> Module_path.t -> Unidentified_name.t list -> t
 
 val add_val
   :  ?extern_name:Extern_name.t
   -> t
-  -> place:[ `Sig | `Def ]
   -> Value_name.t
   -> Fixity.t option
   -> Type.Expr.Bounded.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
-val add_type_decl : t -> place:[ `Sig | `Def ] -> Type_name.t -> Type.Decl.t -> t
+val add_type_decl : t -> Type_name.t -> Type.Decl.t -> t

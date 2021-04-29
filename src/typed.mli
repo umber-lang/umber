@@ -61,6 +61,8 @@ module Module : sig
     -> Untyped.Module.t
     -> (Name_bindings.t * t, Ustring.t) Result.t
 
+  (* TODO: should probably keep all these functions internal and move all this to the ml *)
+
   (** Gather placeholders for all declared names and types.
       (Needed for imports of submodules to work.) *)
   val gather_name_placeholders

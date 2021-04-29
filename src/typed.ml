@@ -457,8 +457,8 @@ module Module = struct
              alone (although we aren't checking that yet I think)
              - yeah, just skip vals in defs (ah wait, if the sigs are empty they matter)
                 - ok then
-                  
-            TODO: add better tests for this *)
+
+            NOTE: this should be fixed now *)
         Name_bindings.add_name_placeholder ~place names name
       | Type_decl (type_name, _) ->
         Name_bindings.add_type_placeholder ~place names type_name
@@ -478,11 +478,15 @@ module Module = struct
             | _ -> entry2))
       | Module (module_name, sigs, defs) ->
         (* FIXME: maybe don't look at submodule defs unless there's no sig? 
-           Need to handle cross-module privacy properly *)
+           Need to handle cross-module privacy properly.
+           In saying that, we still need to look at these inner defs at some point.
+           We need to look at both sigs and defs, right?
+           - this arg just affects whether we prioritize following sigs or defs to get to
+             the child *)
         Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
           gather_name_placeholders ~names sigs defs)
       | Common_def common -> f_common ~place:`Def names common
-      | Trait _ | Impl _ -> names)
+      | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)")
   ;;
 
   (* TODO: test that type decls which import from submodules actually work *)
@@ -501,6 +505,7 @@ module Module = struct
 
   (** Raise an error upon finding any cycles in a given type alias. *)
   let check_cyclic_type_alias ~names name alias =
+    (* TODO: can rewrite this with [Type.Expr.map] *)
     let rec loop ~names aliases_seen = function
       | Type.Expr.Type_app (name, args) ->
         let decl = Name_bindings.find_type_decl names name in
@@ -697,10 +702,25 @@ module Module = struct
     try
       let defs = copy_some_sigs_to_defs sigs defs in
       let names = Name_bindings.into_module ~place:`Def names module_name in
+      print_s [%message "starting" (Name_bindings.without_std names : Name_bindings.t)];
       let names = gather_name_placeholders ~names sigs defs in
+      print_s
+        [%message
+          "after gathering placeholders"
+            (Name_bindings.without_std names : Name_bindings.t)];
       let names = gather_imports_and_type_decls ~names sigs defs in
+      print_s
+        [%message
+          "after gathering imports/type decls"
+            (Name_bindings.without_std names : Name_bindings.t)];
       let names, defs = handle_value_bindings ~names ~types sigs defs in
+      print_s
+        [%message
+          "after handling value bindings"
+            (Name_bindings.without_std names : Name_bindings.t)];
       let names, defs = type_defs ~names ~types defs in
+      print_s
+        [%message "after typing defs" (Name_bindings.without_std names : Name_bindings.t)];
       Ok (Name_bindings.into_parent names, (module_name, sigs, defs))
     with
     | exn ->
