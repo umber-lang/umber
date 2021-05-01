@@ -68,29 +68,16 @@ module Bindings_path = struct
         loop buf t
     ;;
 
-    (* TODO: deduplicate code between here, [Names.Name_lexing], and the lexer *)
-    let digit = [%sedlex.regexp? '0' .. '9']
-
     let of_string =
       let open Option.Let_syntax in
-      let rec lex_module_name lexbuf =
+      let rec lex_nonempty acc lexbuf =
+        let%bind module_name =
+          Lex_helpers.lex_upper_name lexbuf >>| Module_name.of_ustring_unchecked
+        in
+        let%bind place = Lex_helpers.lex_place lexbuf in
+        let acc = (module_name, place) :: acc in
         match%sedlex lexbuf with
-        | uppercase, Star (digit | alphabetic | '\'' | '_') ->
-          Some
-            (Sedlexing.lexeme lexbuf
-            |> Ustring.of_array_unsafe
-            |> Module_name.of_ustring_unchecked)
-        | _ -> None
-      and lex_place lexbuf =
-        match%sedlex lexbuf with
-        | "(s)" -> Some `Sig
-        | "(d)" -> Some `Def
-        | _ -> None
-      and lex_nonempty acc lexbuf =
-        let%bind module_name = lex_module_name lexbuf in
-        let%bind place = lex_place lexbuf in
-        match%sedlex lexbuf with
-        | '.' -> lex_nonempty ((module_name, place) :: acc) lexbuf
+        | '.' -> lex_nonempty acc lexbuf
         | eof -> Some acc
         | _ -> None
       in
@@ -99,8 +86,7 @@ module Bindings_path = struct
       | str ->
         (match lex_nonempty [] (Sedlexing.Utf8.from_string str) with
         | Some path -> List.rev path
-        | None ->
-          raise_s [%message "Bindings_path.of_string: parse failed" (str : string)])
+        | None -> failwith "Bindings_path.of_string: parse failed")
     ;;
   end
 
@@ -119,8 +105,7 @@ and sigs = Nothing.t bindings
 
 and defs = sigs bindings
 
-(* TODO: should add a separate field for imports as importing into sigs may break the
-   semantics of empty sigs => transparent defs + possibly other reasons *)
+(* TODO: may want to add a separate field for imports *)
 and 'a bindings =
   { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
   ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t

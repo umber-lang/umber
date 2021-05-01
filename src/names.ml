@@ -31,9 +31,8 @@ module type Name = sig
 end
 
 module type Name_validator = sig
-  val valid : string -> bool
-  val coerce_exn : string -> string
-  val error_msg : string
+  val coerce : Sedlexing.lexbuf -> Ustring.t Or_error.t
+  val coerce_lenient : string -> Ustring.t Or_error.t
 end
 
 module Identified_ustring (V : Name_validator) : Name = struct
@@ -43,59 +42,45 @@ module Identified_ustring (V : Name_validator) : Name = struct
   let of_ustring_unchecked = of_ustring
 
   let of_ustring_exn ustr =
-    let str = Ustring.to_string ustr in
-    if V.valid str then of_ustring ustr else raise_s [%message V.error_msg str]
+    let lexbuf = Sedlexing.from_uchar_array (to_array ustr) in
+    V.coerce lexbuf |> ok_exn
   ;;
 
   let of_string_unchecked = of_string_exn
 
   let of_string_exn str =
-    if V.valid str then of_string_unchecked str else raise_s [%message V.error_msg str]
-  ;;
-
-  let of_string_lenient_exn = of_string_unchecked << V.coerce_exn
-end
-
-module Name_lexing = struct
-  let digit = [%sedlex.regexp? '0' .. '9']
-
-  let valid_lower_name str =
-    (* Should have identical semantics to those of the lexer *)
     let lexbuf = Sedlexing.Utf8.from_string str in
-    match%sedlex lexbuf with
-    | lowercase, Star (digit | alphabetic | '\'' | '_'), eof -> true
-    | '_', Plus (digit | alphabetic | '\'' | '_'), eof -> true
-    | _ -> false
+    V.coerce lexbuf |> ok_exn
   ;;
 
-  let valid_upper_name str =
-    (* Should have identical semantics to those of the lexer *)
-    let lexbuf = Sedlexing.Utf8.from_string str in
-    match%sedlex lexbuf with
-    | uppercase, Star (digit | alphabetic | '\'' | '_'), eof -> true
-    | _ -> false
-  ;;
+  let of_string_lenient_exn str = V.coerce_lenient str |> ok_exn
 end
 
 module Lower_name = Identified_ustring (struct
-  let valid = Name_lexing.valid_lower_name
-  let error_msg = "Invalid lower name"
+  let coerce lexbuf =
+    match Lex_helpers.lex_lower_name lexbuf with
+    | Some name -> Ok name
+    | None ->
+      let input = Sedlexing.Utf8.lexeme lexbuf in
+      error_s [%message "Invalid lower name" input]
+  ;;
 
-  let coerce_exn str =
+  let coerce_lenient str =
     (* TODO: add proper unicode capitalization to lower name/upper name checking *)
-    let str' = String.uncapitalize str in
-    if valid str' then str' else raise_s [%message error_msg str]
+    String.uncapitalize str |> Sedlexing.Utf8.from_string |> coerce
   ;;
 end)
 
 module Upper_name = Identified_ustring (struct
-  let valid = Name_lexing.valid_upper_name
-  let error_msg = "Invalid upper name"
-
-  let coerce_exn str =
-    let str' = String.capitalize str in
-    if valid str' then str' else raise_s [%message error_msg str]
+  let coerce lexbuf =
+    match Lex_helpers.lex_upper_name lexbuf with
+    | Some name -> Ok name
+    | None ->
+      let input = Sedlexing.Utf8.lexeme lexbuf in
+      error_s [%message "Invalid upper name" input]
   ;;
+
+  let coerce_lenient str = String.capitalize str |> Sedlexing.Utf8.from_string |> coerce
 end)
 
 module Module_name : Name = Upper_name
