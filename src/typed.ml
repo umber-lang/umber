@@ -713,22 +713,25 @@ module Module = struct
         then (
           let backtrace = Backtrace.(to_string (Exn.most_recent ())) in
           Exn.to_string exn ^ "\n" ^ backtrace)
-        else (
-          match exn with
-          | Type_bindings.Type_error (msg, Some (t1, t2)) ->
-            (* Prevent unstable Var_ids from appearing in test output *)
-            let env = Type.Param.Env_of_vars.create () in
-            let map_type t =
-              Type.Expr.map_vars t ~f:(Type.Param.Env_of_vars.find_or_add env)
-              |> Type.Scheme.sexp_of_t
-            in
-            let ts = Sexp.(List [ List [ map_type t1; map_type t2 ] ]) in
-            let msg = Ustring.to_string msg in
-            Sexp.(
-              to_string_hum
-                ~indent:2
-                (List [ Atom "src/type_bindings.ml.Type_error"; Atom msg; ts ]))
-          | _ -> Exn.to_string exn)
+        else
+          Sexp.to_string_hum
+            ~indent:2
+            (match exn with
+            | Type_bindings.Type_error (msg, Some (t1, t2)) ->
+              (* Prevent unstable Var_ids from appearing in test output *)
+              let env = Type.Param.Env_of_vars.create () in
+              let map_type t =
+                Type.Expr.map_vars t ~f:(Type.Param.Env_of_vars.find_or_add env)
+                |> Type.Scheme.sexp_of_t
+              in
+              let ts = Sexp.(List [ List [ map_type t1; map_type t2 ] ]) in
+              let msg = Ustring.to_string msg in
+              Sexp.(List [ Atom "src/type_bindings.ml.Type_error"; Atom msg; ts ])
+            | Name_bindings.Name_error msg ->
+              (* Override _none_ being the filename (no idea why this happens) *)
+              let msg = Ustring.to_string msg in
+              Sexp.(List [ Atom "src/name_bindings.ml.Name_error"; Atom msg ])
+            | _ -> sexp_of_exn exn)
       in
       Error (Ustring.of_string_exn msg)
   ;;
