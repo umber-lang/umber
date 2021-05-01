@@ -67,6 +67,7 @@ module Module : sig
       (Needed for imports of submodules to work.) *)
   val gather_name_placeholders
     :  names:Name_bindings.t
+    -> Module_name.t
     -> Untyped.Module.sig_ Node.t list
     -> Untyped.Module.def Node.t list
     -> Name_bindings.t
@@ -74,6 +75,7 @@ module Module : sig
   (** Gather all imported names and local type/trait declarations. *)
   val gather_imports_and_type_decls
     :  names:Name_bindings.t
+    -> Module_name.t
     -> Untyped.Module.sig_ Node.t list
     -> Untyped.Module.def Node.t list
     -> Name_bindings.t
@@ -88,6 +90,7 @@ module Module : sig
   val handle_value_bindings
     :  names:Name_bindings.t
     -> types:Type_bindings.t
+    -> Module_name.t
     -> Untyped.Module.sig_ Node.t list
     -> Untyped.Module.def Node.t list
     -> Name_bindings.t * intermediate_def Node.t list
@@ -99,6 +102,7 @@ module Module : sig
   val type_defs
     :  names:Name_bindings.t
     -> types:Type_bindings.t
+    -> Module_name.t
     -> intermediate_def Node.t list
     -> Name_bindings.t * def Node.t list
 end

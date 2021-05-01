@@ -49,7 +49,63 @@ module Or_imported = struct
 end
 
 module Bindings_path = struct
-  type t = (Module_name.t * [ `Sig | `Def ]) list [@@deriving sexp]
+  module T = struct
+    type t = (Module_name.t * [ `Sig | `Def ]) list [@@deriving sexp]
+
+    let to_string =
+      let rec loop buf = function
+        | [] -> Buffer.contents buf
+        | (module_name, place) :: rest ->
+          if Buffer.length buf > 0 then Buffer.add_char buf '.';
+          Ustring.add_to_buffer buf (Module_name.to_ustring module_name);
+          (match place with
+          | `Sig -> Buffer.add_string buf "(s)"
+          | `Def -> Buffer.add_string buf "(d)");
+          loop buf rest
+      in
+      fun t ->
+        let buf = Buffer.create (List.length t * 5) in
+        loop buf t
+    ;;
+
+    (* TODO: deduplicate code between here, [Names.Name_lexing], and the lexer *)
+    let digit = [%sedlex.regexp? '0' .. '9']
+
+    let of_string =
+      let open Option.Let_syntax in
+      let rec lex_module_name lexbuf =
+        match%sedlex lexbuf with
+        | uppercase, Star (digit | alphabetic | '\'' | '_') ->
+          Some
+            (Sedlexing.lexeme lexbuf
+            |> Ustring.of_array_unsafe
+            |> Module_name.of_ustring_unchecked)
+        | _ -> None
+      and lex_place lexbuf =
+        match%sedlex lexbuf with
+        | "(s)" -> Some `Sig
+        | "(d)" -> Some `Def
+        | _ -> None
+      and lex_nonempty acc lexbuf =
+        let%bind module_name = lex_module_name lexbuf in
+        let%bind place = lex_place lexbuf in
+        match%sedlex lexbuf with
+        | '.' -> lex_nonempty ((module_name, place) :: acc) lexbuf
+        | eof -> Some acc
+        | _ -> None
+      in
+      function
+      | "" -> []
+      | str ->
+        (match lex_nonempty [] (Sedlexing.Utf8.from_string str) with
+        | Some path -> List.rev path
+        | None ->
+          raise_s [%message "Bindings_path.of_string: parse failed" (str : string)])
+    ;;
+  end
+
+  include T
+  include Sexpable.Of_stringable (T)
 
   let to_module_path = List.map ~f:fst
 end
@@ -76,7 +132,7 @@ module Sigs_or_defs = struct
   type t =
     | Sigs of sigs
     | Defs of defs
-  [@@deriving variants]
+  [@@deriving sexp, variants]
 end
 
 exception Name_error of Ustring.t [@@deriving sexp]
@@ -135,6 +191,7 @@ let update_current t ~f =
       [%message "Updating imported module" (imported_module : Module_path.t) (t : t)]
   in
   let rec loop_sigs t (sigs : sigs) path ~f =
+    (* print_s [%message "loop_sigs" (path : Bindings_path.t) (sigs : sigs)]; *)
     match path with
     | [] -> f.f sigs
     | (_, `Def) :: _ -> compiler_bug [%message "`Def inside sig path" (t : t)]
@@ -149,18 +206,21 @@ let update_current t ~f =
       }
   in
   let rec loop_defs t defs path ~f =
+    (* print_s [%message "loop_defs" (path : Bindings_path.t) (defs : defs)]; *)
     match path with
     | [] -> f.f defs
     | (module_name, place) :: rest ->
       { defs with
         modules =
-          Map.update defs.modules module_name ~f:(fun module_ ->
-            match module_, place with
-            | Some (Local (Some sigs, defs)), `Sig ->
-              Local (Some (loop_sigs t sigs rest ~f), defs)
-            | Some (Local (sigs, defs)), `Def -> Local (sigs, loop_defs t defs rest ~f)
-            | Some (Imported imported_module), _ -> updating_import_err t imported_module
-            | _ -> name_error_path (Bindings_path.to_module_path t.current_path))
+          Map.update defs.modules module_name ~f:(function
+            | Some (Local (sigs, defs)) ->
+              (match place with
+              | `Sig ->
+                let sigs = Option.value sigs ~default:empty_bindings in
+                Local (Some (loop_sigs t sigs rest ~f), defs)
+              | `Def -> Local (sigs, loop_defs t defs rest ~f))
+            | Some (Imported imported_module) -> updating_import_err t imported_module
+            | None -> name_error_path (Bindings_path.to_module_path t.current_path))
       }
   in
   { t with toplevel = loop_defs t t.toplevel t.current_path ~f }
@@ -190,11 +250,6 @@ let with_submodule t ~place module_name ~f =
 
 let with_submodule' t ~place module_name ~f =
   let t', x = f (into_module ~place t module_name) in
-  { t' with current_path = t.current_path }, x
-;;
-
-let with_path t path ~f =
-  let t', x = f { t with current_path = path } in
   { t' with current_path = t.current_path }, x
 ;;
 
@@ -241,62 +296,45 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
-(* TODO: rewrite bindings_at_path 
-   QUESTION: does the current_path * path combo allow us to unambiguously refer to a
-   module? If the module is the current_module or a direct parent, then use the def;
-   otherwise use the sig *)
-let rec bindings_at_path =
+let rec resolve_path =
   let open Option.Let_syntax in
-  let rec loop t current_path path sigs defs =
+  let rec loop_sigs t acc_path path sigs =
     match path with
-    | [] ->
-      (* If we are following the current path, we can look at defs (??)
-         e.g. if the current path is [A (Def), B (Sig), C (Sig)] and we look at `A.B`
-         that can be in one of 3 places, and only 1 is actually following the path
-         TODO: figure this out 
-         ```
-         module A :
-           module B :
-             val b : Int
-         =
-           module B :
-             val b : Int
-             module C :
-               val c : Int
-           =
-             let b = 1
-             let b' = -1
-             module C =
-               let c = 3
-         ```
-         Basically let's do this case last *)
-      let following_current = Option.is_some current_path in
-      if following_current
-      then Option.map defs ~f:Sigs_or_defs.defs
-      else Option.map sigs ~f:Sigs_or_defs.sigs
+    | [] -> Some (Sigs_or_defs.Sigs sigs, List.rev acc_path)
     | module_name :: rest ->
-      let current_path, go_into =
-        match current_path with
-        | Some [] | None -> None, `Sig
-        | Some ((module_name', place) :: rest') ->
-          if Module_name.(module_name = module_name')
-          then Some rest', place
-          else None, `Sig
-      in
-      (* TODO: check if we are handling imports correctly - do we need find here?
-         Are these absolute paths? *)
-      (match go_into, sigs with
-      | `Sig, Some sigs ->
-        (match%bind Map.find sigs.modules module_name with
-        | Local (None, sigs) -> loop t current_path rest (Some sigs) None
-        | Imported (path, ()) -> bindings_at_path t path)
-      | `Sig, None | `Def, _ ->
-        let%bind defs = defs in
-        (match%bind Map.find defs.modules module_name with
-        | Local (sigs, defs) -> loop t current_path rest sigs (Some defs)
-        | Imported (path, ()) -> bindings_at_path t path))
+      (match%bind Map.find sigs.modules module_name with
+      | Local (None, sigs) -> loop_sigs t ((module_name, `Sig) :: acc_path) rest sigs
+      | Local (Some _, _) -> .
+      | Imported (path, ()) -> resolve_path t path)
+  and loop_defs t acc_path current_path path defs =
+    match path with
+    | [] -> Some (Sigs_or_defs.Defs defs, List.rev acc_path)
+    | module_name :: rest ->
+      (match%bind Map.find defs.modules module_name with
+      | Local (sigs, defs) ->
+        let current_path, go_into =
+          match current_path with
+          | Some [] | None -> None, `Sig
+          | Some ((module_name', place) :: rest') ->
+            if Module_name.(module_name = module_name')
+            then Some rest', place
+            else None, `Sig
+        in
+        (match go_into, sigs with
+        | `Sig, Some sigs -> loop_sigs t ((module_name, `Sig) :: acc_path) rest sigs
+        | `Sig, None | `Def, _ ->
+          loop_defs t ((module_name, `Def) :: acc_path) current_path rest defs)
+      | Imported (path, ()) -> resolve_path t path)
   in
-  fun t path -> loop t (Some t.current_path) path None (Some t.toplevel)
+  fun t path -> loop_defs t [] (Some t.current_path) path t.toplevel
+;;
+
+let resolve_path_exn t path = or_name_error_path (resolve_path t path) path
+
+let with_path t path ~f =
+  let current_path = snd (resolve_path_exn t path) in
+  let t', x = f { t with current_path } in
+  { t' with current_path = t.current_path }, x
 ;;
 
 let find =
@@ -305,7 +343,7 @@ let find =
     let at_path =
       Option.value at_path ~default:(Bindings_path.to_module_path t.current_path)
     in
-    let bindings_at_current = or_name_error_path (bindings_at_path t at_path) at_path in
+    let bindings_at_current = fst (resolve_path_exn t at_path) in
     (* let input' = to_ustring input in
   if Ustring.(input' = of_string_exn "Range.in")
   then
@@ -321,7 +359,7 @@ let find =
       let f bindings =
         if Map.mem bindings.modules first_module
         then (
-          let bindings = or_name_error_path (bindings_at_path t full_path) at_path in
+          let bindings = fst (or_name_error_path (resolve_path t full_path) at_path) in
           option_or_default (f full_path name bindings) ~f:(fun () ->
             raise (Name_error (to_ustring input))))
         else check_parent t at_path input ~f ~to_ustring
@@ -339,14 +377,6 @@ let find =
     | None -> raise (Name_error (to_ustring input))
   in
   loop
-;;
-
-let find_module t path =
-  find
-    t
-    (path, ())
-    ~f:(fun _ () -> Option.some)
-    ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
 ;;
 
 let rec find_entry t name =
@@ -376,6 +406,12 @@ let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
 let find_type_decl' ?at_path t name =
+  (* print_s
+    [%message
+      "find_type_decl'"
+        (at_path : Module_path.t option)
+        (name : Type_name.Qualified.t)
+        (t : t)]; *)
   let open Option.Let_syntax in
   find
     ?at_path
@@ -385,12 +421,13 @@ let find_type_decl' ?at_path t name =
     ~f:(fun path name bindings ->
     (* print_s
       [%message
-        "find_type_decl'"
+        "find_type_decl'.f"
           (path : Module_path.t)
           (name : Type_name.t)
-          (sigs_defs : sigs_defs)]; *)
+          (bindings : Sigs_or_defs.t)]; *)
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
+      (* TODO: should we resolve the import here? *)
       | Some decl -> Some (path, decl)
       | None ->
         (* Allow type names like [List.List] to be found as just [List] *)
@@ -403,8 +440,8 @@ let find_type_decl' ?at_path t name =
         | Local (None, sigs) ->
           let%bind decl = Map.find sigs.types name in
           Some (path, decl)
-        | Imported _ -> None
-        | Local (Some _, _) -> .)
+        | Local (Some _, _) -> .
+        | Imported _ -> None)
     | Defs defs ->
       f defs ~check_submodule:(function
         | Local (None, defs) ->
@@ -446,7 +483,7 @@ let absolutify_value_name t =
    they affect defs only. This behavior is super weird, tbh.
    TODO: try to make this less confusing
    Also, maybe the order of imports should matter - could just gather them as we go? *)
-let import _t ~place:_ _module_name =
+let import _t _module_name =
   (*let module_bindings = find_module t [ module_name ] in
   update_current t ~f:(fun bindings ->
     { bindings with
@@ -456,65 +493,6 @@ let import _t ~place:_ _module_name =
     })*)
   failwith "TODO: module imports (properly)"
 ;;
-
-(* TODO: probably remove *)
-(*let filter bindings ~f =
-  { names = Map.filter_keys bindings.names ~f:(f << Value_name.unidentify)
-  ; types = Map.filter_keys bindings.types ~f:(f << Type_name.unidentify)
-  ; modules = Map.filter_keys bindings.modules ~f:(f << Module_name.unidentify)
-  }
-;;*)
-
-(* FIXME: import modules directly, don't copy the contents *)
-(*let import_filtered t ~place path ~f =
-  (* print_s
-    [%message "import_filtered" (place : [< `Sig | `Def ]) (path : Module_path.t) (t : t)]; *)
-  let map_to_imports_names_types path bindings =
-    { bindings with
-      names =
-        Map.mapi bindings.names ~f:(fun ~key:name ~data:_ ->
-          Or_imported.Imported (absolutify_path t path, name))
-    ; types =
-        Map.mapi bindings.types ~f:(fun ~key:name ~data:_ ->
-          Some (Or_imported.Imported (absolutify_path t path, name)))
-    }
-  in
-  let rec map_to_imports_sigs path (sigs : sigs) =
-    { (map_to_imports_names_types path sigs) with
-      modules =
-        Map.mapi sigs.modules ~f:(fun ~key:module_name ~data:(None, bindings) ->
-          None, map_to_imports_sigs (path @ [ module_name ]) bindings)
-    }
-  in
-  let rec map_to_imports_defs path defs =
-    { (map_to_imports_names_types path defs) with
-      modules =
-        Map.mapi defs.modules ~f:(fun ~key:module_name ~data:(sigs, defs) ->
-          let new_path = path @ [ module_name ] in
-          ( Option.map sigs ~f:(map_to_imports_sigs new_path)
-          , map_to_imports_defs new_path defs ))
-    }
-  in
-  let f_sigs sigs =
-    (* print_s [%message "f_sigs" (sigs : sigs)]; *)
-    map_to_imports_sigs path (filter ~f sigs)
-  in
-  let f_defs defs =
-    (* print_s [%message "f_defs" (defs : defs)]; *)
-    map_to_imports_defs path (filter ~f defs)
-  in
-  let merge sigs_defs ~f_sigs ~f_defs bindings =
-    merge_no_shadow bindings (check_sigs_defs t path sigs_defs ~f_sigs ~f_defs)
-  in
-  (* print_s [%message "importing: find_module"]; *)
-  let sigs_defs = find_module t ~place path in
-  (* print_s [%message "from find_module" (sigs_defs : sigs_defs)]; *)
-  match place with
-  | `Sig ->
-    update_current_sigs t ~f:(merge ~f_sigs ~f_defs:(sigs_of_defs << f_defs) sigs_defs)
-  | `Def ->
-    update_current_defs t ~f:(merge ~f_sigs:(defs_of_sigs << f_sigs) ~f_defs sigs_defs)
-;;*)
 
 (* TODO: test this, it's almost certainly wrong somehow *)
 let import_filtered t path ~f =
@@ -538,7 +516,7 @@ let import_filtered t path ~f =
     }
   in
   let bindings_to_import =
-    match or_name_error_path (bindings_at_path t path) path with
+    match fst (resolve_path_exn t path) with
     | Sigs sigs -> map_to_imports_filtered path ~f sigs
     | Defs defs -> map_to_imports_filtered path ~f defs
   in
@@ -699,7 +677,10 @@ let rec find_type_decl ?at_path t type_name =
 
 and resolve_decl_or_import ?at_path t = function
   | Some (Or_imported.Local decl) -> Some decl
-  | Some (Imported path_name) -> find_type_decl ?at_path t path_name
+  | Some (Imported path_name) ->
+    (* TODO: pretty sure this imprt path should be resolved at the place it's written,
+       not the current path - this goes for all imports, unless we absolutify their paths *)
+    find_type_decl ?at_path t path_name
   | None -> None
 ;;
 
@@ -710,4 +691,4 @@ let find_type_decl ?at_path t type_name =
 
 let find_absolute_type_decl = find_type_decl ~at_path:[]
 let find_type_decl = find_type_decl ?at_path:None
-let current_path t = t.current_path
+let current_path t = Bindings_path.to_module_path t.current_path

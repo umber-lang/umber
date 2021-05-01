@@ -31,4 +31,4 @@ let option_or_default x ~f =
   | None -> f ()
 ;;
 
-let compiler_bug msg = failwith ("COMPILER BUG: " ^ Sexp.to_string msg)
+let compiler_bug msg = failwith ("COMPILER BUG: " ^ Sexp.to_string_hum msg)

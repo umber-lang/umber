@@ -127,7 +127,7 @@ module Pattern = struct
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let typ = Name_bindings.Name_entry.typ entry in
         let scheme = Type_bindings.generalize types typ in
-        Name_bindings.set_scheme ~place:`Def names name scheme)
+        Name_bindings.set_scheme names name scheme)
     in
     names, Type_bindings.generalize types typ
   ;;
@@ -153,7 +153,7 @@ module Expr = struct
       | Literal lit -> Literal lit, Type.Concrete.cast (Untyped.Literal.typ lit)
       | Name name -> Name name, Name_bindings.find_type names name
       | Qualified (path, expr) ->
-        of_untyped ~names:(Name_bindings.import_all ~place:`Def names path) ~types expr
+        of_untyped ~names:(Name_bindings.import_all names path) ~types expr
       | Fun_call (f, arg) ->
         let f, f_type = of_untyped ~names ~types f in
         let arg, arg_type = of_untyped ~names ~types arg in
@@ -295,14 +295,14 @@ module Module = struct
     ((Pattern.t * Type.t) * Untyped.Pattern.Names.t, Untyped.Expr.t) Module.def
   [@@deriving sexp]
 
-  let rec gather_names ~names ~f_common ?f_def sigs defs =
+  let rec gather_names ~names ~f_common ?f_def module_name sigs defs =
     let names =
-      List.fold sigs ~init:names ~f:(fun names sig_ ->
-        match sig_.Node.node with
-        | Common_sig common -> f_common ~place:`Sig names common
-        | Module_sig (module_name, sigs) ->
-          Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
-            gather_names ~names sigs [] ~f_common ?f_def))
+      Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
+        List.fold sigs ~init:names ~f:(fun names sig_ ->
+          match sig_.Node.node with
+          | Common_sig common -> f_common names common
+          | Module_sig (module_name, sigs) ->
+            gather_names ~names module_name sigs [] ~f_common ?f_def))
     in
     let f =
       match f_def with
@@ -310,13 +310,13 @@ module Module = struct
       | None ->
         fun names def ->
           (match def.Node.node with
-          | Common_def common -> f_common ~place:`Def names common
+          | Common_def common -> f_common names common
           | Module (module_name, sigs, defs) ->
-            Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
-              gather_names ~names sigs defs ~f_common ?f_def)
+            gather_names ~names module_name sigs defs ~f_common ?f_def
           | Let _ | Trait _ | Impl _ -> names)
     in
-    List.fold defs ~init:names ~f
+    Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
+      List.fold defs ~init:names ~f)
   ;;
 
   (* Name/type resolution steps
@@ -438,8 +438,8 @@ module Module = struct
     copy_to_defs (gather_decls Nested_map.empty sigs) defs
   ;;
 
-  let rec gather_name_placeholders ~names sigs defs =
-    let f_common ~place names = function
+  let rec gather_name_placeholders ~names module_name sigs defs =
+    let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
         (* FIXME: PROBLEM: adding placeholders has been broken all along
            - Vals were being skipped inside defs (no common_defs were processed)
@@ -459,12 +459,11 @@ module Module = struct
                 - ok then
 
             NOTE: this should be fixed now *)
-        Name_bindings.add_name_placeholder ~place names name
-      | Type_decl (type_name, _) ->
-        Name_bindings.add_type_placeholder ~place names type_name
+        Name_bindings.add_name_placeholder names name
+      | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
     in
-    gather_names ~names sigs defs ~f_common ~f_def:(fun names def ->
+    gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
       match def.Node.node with
       | Let bindings ->
         List.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
@@ -477,28 +476,19 @@ module Module = struct
               Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)
             | _ -> entry2))
       | Module (module_name, sigs, defs) ->
-        (* FIXME: maybe don't look at submodule defs unless there's no sig? 
-           Need to handle cross-module privacy properly.
-           In saying that, we still need to look at these inner defs at some point.
-           We need to look at both sigs and defs, right?
-           - this arg just affects whether we prioritize following sigs or defs to get to
-             the child *)
-        Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
-          gather_name_placeholders ~names sigs defs)
-      | Common_def common -> f_common ~place:`Def names common
+        gather_name_placeholders ~names module_name sigs defs
+      | Common_def common -> f_common names common
       | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)")
   ;;
 
   (* TODO: test that type decls which import from submodules actually work *)
   (* TODO: figure out import shadowing semantics - basically, probably ban shadowing *)
   let gather_imports_and_type_decls ~names sigs defs =
-    gather_names ~names sigs defs ~f_common:(fun ~place names -> function
-      | Import module_name -> Name_bindings.import ~place names module_name
-      | Import_with (path, imports) -> Name_bindings.import_with ~place names path imports
-      | Import_without (path, hiding) ->
-        Name_bindings.import_without ~place names path hiding
-      | Type_decl (type_name, decl) ->
-        Name_bindings.add_type_decl ~place names type_name decl
+    gather_names ~names sigs defs ~f_common:(fun names -> function
+      | Import module_name -> Name_bindings.import names module_name
+      | Import_with (path, imports) -> Name_bindings.import_with names path imports
+      | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
+      | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ -> names)
   ;;
@@ -532,14 +522,14 @@ module Module = struct
     loop ~names aliases_seen alias
   ;;
 
-  let rec handle_value_bindings ~names ~types sigs defs =
-    let handle_common ~names ~place = function
+  let rec handle_value_bindings ~names ~types module_name sigs defs =
+    let handle_common ~names = function
       | Val (name, fixity, typ) ->
         let unify = Type_bindings.unify ~names ~types in
-        Name_bindings.add_val ~place names name fixity typ ~unify
+        Name_bindings.add_val names name fixity typ ~unify
       | Extern (name, fixity, typ, extern_name) ->
         let unify = Type_bindings.unify ~names ~types in
-        Name_bindings.add_val ~place names name fixity ([], typ) ~extern_name ~unify
+        Name_bindings.add_val names name fixity ([], typ) ~extern_name ~unify
       | Type_decl (name, (_, Alias alias)) ->
         check_cyclic_type_alias ~names name alias;
         names
@@ -548,12 +538,15 @@ module Module = struct
     let rec handle_sigs ~names ~handle_common =
       List.fold ~init:names ~f:(fun names sig_ ->
         match sig_.Node.node with
-        | Common_sig common -> handle_common ~names ~place:`Sig common
+        | Common_sig common -> handle_common ~names common
         | Module_sig (module_name, sigs) ->
           Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
             handle_sigs ~names ~handle_common sigs))
     in
-    let names = handle_sigs ~names ~handle_common sigs in
+    let names =
+      Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
+        handle_sigs ~names ~handle_common sigs)
+    in
     let handle_bindings ~names =
       List.fold_map
         ~init:names
@@ -569,23 +562,20 @@ module Module = struct
              in
              names, ((pat, pat_names), expr)))
     in
-    List.fold_map
-      defs
-      ~init:names
-      ~f:
-        (Node.fold_map ~f:(fun names -> function
-           | Let bindings -> handle_bindings ~names bindings |> Tuple2.map_snd ~f:let_
-           | Module (module_name, sigs, defs) ->
-             let names, defs =
-               Name_bindings.with_submodule'
-                 ~place:`Def
-                 names
-                 module_name
-                 ~f:(fun names -> handle_value_bindings ~names ~types sigs defs)
-             in
-             names, Module (module_name, sigs, defs)
-           | Common_def common as def -> handle_common ~names ~place:`Def common, def
-           | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls"))
+    Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
+      List.fold_map
+        defs
+        ~init:names
+        ~f:
+          (Node.fold_map ~f:(fun names -> function
+             | Let bindings -> handle_bindings ~names bindings |> Tuple2.map_snd ~f:let_
+             | Module (module_name, sigs, defs) ->
+               let names, defs =
+                 handle_value_bindings ~names ~types module_name sigs defs
+               in
+               names, Module (module_name, sigs, defs)
+             | Common_def common as def -> handle_common ~names common, def
+             | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls")))
   ;;
 
   (** Re-group and re-order toplevel let bindings so that each group is mutually
@@ -681,17 +671,21 @@ module Module = struct
     loop binding_table path other_defs
   ;;
 
-  let type_defs ~names ~types defs =
-    let other_defs, binding_groups = extract_binding_groups ~names defs in
-    let names, binding_groups =
-      Sequence.to_list binding_groups
-      |> List.fold_map ~init:names ~f:(fun names (bindings, path) ->
-           Name_bindings.with_path names path ~f:(fun names ->
-             let names, def = type_binding_group ~names ~types bindings in
-             names, (def, path)))
-    in
-    let path = Name_bindings.current_path names in
-    names, reintegrate_binding_groups path other_defs binding_groups
+  let type_defs ~names ~types module_name defs =
+    Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
+      let other_defs, binding_groups = extract_binding_groups ~names defs in
+      let names, binding_groups =
+        Sequence.to_list binding_groups
+        |> List.fold_map ~init:names ~f:(fun names (bindings, path) ->
+             (* TODO: check if this is resolving paths correctly.
+              I think it will resolve in the parent, not the current module, which is
+              surely wrong. *)
+             Name_bindings.with_path names path ~f:(fun names ->
+               let names, def = type_binding_group ~names ~types bindings in
+               names, (def, path)))
+      in
+      let path = Name_bindings.current_path names in
+      names, reintegrate_binding_groups path other_defs binding_groups)
   ;;
 
   let of_untyped ?(backtrace = true) ?names ?types (module_name, sigs, defs) =
@@ -701,27 +695,17 @@ module Module = struct
     let types = option_or_default types ~f:Type_bindings.create in
     try
       let defs = copy_some_sigs_to_defs sigs defs in
-      let names = Name_bindings.into_module ~place:`Def names module_name in
-      print_s [%message "starting" (Name_bindings.without_std names : Name_bindings.t)];
-      let names = gather_name_placeholders ~names sigs defs in
-      print_s
-        [%message
-          "after gathering placeholders"
-            (Name_bindings.without_std names : Name_bindings.t)];
-      let names = gather_imports_and_type_decls ~names sigs defs in
-      print_s
-        [%message
-          "after gathering imports/type decls"
-            (Name_bindings.without_std names : Name_bindings.t)];
-      let names, defs = handle_value_bindings ~names ~types sigs defs in
-      print_s
-        [%message
-          "after handling value bindings"
-            (Name_bindings.without_std names : Name_bindings.t)];
-      let names, defs = type_defs ~names ~types defs in
-      print_s
-        [%message "after typing defs" (Name_bindings.without_std names : Name_bindings.t)];
-      Ok (Name_bindings.into_parent names, (module_name, sigs, defs))
+      (* FIXME: We should go into sigs and defs respectively as we parse *)
+      (* print_s [%message "starting" (names : Name_bindings.t)]; *)
+      let names = gather_name_placeholders ~names module_name sigs defs in
+      (* print_s [%message "after gathering placeholders" (names : Name_bindings.t)]; *)
+      let names = gather_imports_and_type_decls ~names module_name sigs defs in
+      (* print_s [%message "after gathering imports/type decls" (names : Name_bindings.t)]; *)
+      let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
+      (* print_s [%message "after handling value bindings" (names : Name_bindings.t)]; *)
+      let names, defs = type_defs ~names ~types module_name defs in
+      (* print_s [%message "after typing defs" (names : Name_bindings.t)]; *)
+      Ok (names, (module_name, sigs, defs))
     with
     | exn ->
       let msg =

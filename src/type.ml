@@ -179,5 +179,5 @@ end
 module Concrete = struct
   type t = Nothing.t Expr.t [@@deriving compare, equal, hash, sexp]
 
-  let cast = Expr.map_vars ~f:(fun _ -> assert false)
+  let cast = Expr.map_vars ~f:(function (_ : Nothing.t) -> .)
 end
