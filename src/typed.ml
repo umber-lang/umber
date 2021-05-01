@@ -696,15 +696,25 @@ module Module = struct
     try
       let defs = copy_some_sigs_to_defs sigs defs in
       (* FIXME: We should go into sigs and defs respectively as we parse *)
-      (* print_s [%message "starting" (names : Name_bindings.t)]; *)
+      print_s [%message "starting" (Name_bindings.without_std names : Name_bindings.t)];
       let names = gather_name_placeholders ~names module_name sigs defs in
-      (* print_s [%message "after gathering placeholders" (names : Name_bindings.t)]; *)
+      print_s
+        [%message
+          "after gathering placeholders"
+            (Name_bindings.without_std names : Name_bindings.t)];
       let names = gather_imports_and_type_decls ~names module_name sigs defs in
-      (* print_s [%message "after gathering imports/type decls" (names : Name_bindings.t)]; *)
+      print_s
+        [%message
+          "after gathering imports/type decls"
+            (Name_bindings.without_std names : Name_bindings.t)];
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
-      (* print_s [%message "after handling value bindings" (names : Name_bindings.t)]; *)
+      print_s
+        [%message
+          "after handling value bindings"
+            (Name_bindings.without_std names : Name_bindings.t)];
       let names, defs = type_defs ~names ~types module_name defs in
-      (* print_s [%message "after typing defs" (names : Name_bindings.t)]; *)
+      print_s
+        [%message "after typing defs" (Name_bindings.without_std names : Name_bindings.t)];
       Ok (names, (module_name, sigs, defs))
     with
     | exn ->

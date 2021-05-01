@@ -426,7 +426,7 @@ let find_type_decl' ?at_path t name =
           let%bind decl = Map.find sigs.types name in
           Some (path, decl)
         | Local (Some _, _) -> .
-        | Imported _ -> None)
+        | Imported (import_path, ()) -> Some (path, Some (Imported (import_path, name))))
     | Defs defs ->
       f defs ~check_submodule:(function
         | Local (None, defs) ->
@@ -435,7 +435,7 @@ let find_type_decl' ?at_path t name =
         | Local (Some sigs, _defs) ->
           let%bind decl = Map.find sigs.types name in
           Some (path, decl)
-        | Imported _ -> None))
+        | Imported (import_path, ()) -> Some (path, Some (Imported (import_path, name)))))
 ;;
 
 let absolutify_path t path =
@@ -671,7 +671,11 @@ and resolve_decl_or_import ?at_path t = function
 
 let find_type_decl ?at_path t type_name =
   option_or_default (find_type_decl ?at_path t type_name) ~f:(fun () ->
-    compiler_bug [%message "Placeholder decl not replaced"])
+    compiler_bug
+      [%message
+        "Placeholder decl not replaced"
+          (type_name : Type_name.Qualified.t)
+          (without_std t : t)])
 ;;
 
 let find_absolute_type_decl = find_type_decl ~at_path:[]
