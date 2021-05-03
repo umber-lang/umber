@@ -1,3 +1,4 @@
+open Import
 open Names
 
 module Name_entry : sig
@@ -20,6 +21,16 @@ module Name_entry : sig
   val typ : t -> Type.t
   val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
   val type_source : t -> Type_source.t
+end
+
+module Path : sig
+  type t [@@deriving sexp]
+
+  include Comparable.S with type t := t
+  include Hashable.S with type t := t
+
+  val to_module_path : t -> Module_path.t
+  val append : t -> Module_name.t -> place:[ `Sig | `Def ] -> t
 end
 
 type t [@@deriving sexp]
@@ -62,7 +73,7 @@ val absolutify_type_name : t -> Type_name.Qualified.t -> Type_name.Qualified.t
 val absolutify_value_name : t -> Value_name.Qualified.t -> Value_name.Qualified.t
 
 (* Scope handling *)
-val current_path : t -> Module_path.t
+val current_path : t -> Path.t
 val into_module : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
 val into_parent : t -> t
 
@@ -76,7 +87,7 @@ val with_submodule'
   -> f:(t -> t * 'a)
   -> t * 'a
 
-val with_path : t -> Module_path.t -> f:(t -> t * 'a) -> t * 'a
+val with_path : t -> Path.t -> f:(t -> t * 'a) -> t * 'a
 
 (* AST handling *)
 (* TODO: rename the existing module Import to Common, and split into Import.t with:

@@ -1,6 +1,8 @@
 open Import
 open Names
 
+(* TODO: probably shouldn't overload terminology between [Name_bindings], [Type_bindings],
+   and this (let bindings) - maybe rename the others to [Name_context] and [Type_context] *)
 module Binding : sig
   type 'a t =
     { bound_names : Value_name.Set.t
@@ -13,6 +15,6 @@ end
 type 'a t
 
 val create : unit -> 'a t
-val add_binding : 'a t -> 'a Binding.t -> Module_path.t -> unit
-val of_bindings : ('a Binding.t * Module_path.t) Sequence.t -> 'a t
-val to_regrouped_bindings : 'a t -> ('a Binding.t list * Module_path.t) Sequence.t
+val add_binding : 'a t -> 'a Binding.t -> Name_bindings.Path.t -> unit
+val of_bindings : ('a Binding.t * Name_bindings.Path.t) Sequence.t -> 'a t
+val to_regrouped_bindings : 'a t -> ('a Binding.t list * Name_bindings.Path.t) Sequence.t

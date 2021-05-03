@@ -48,9 +48,10 @@ module Or_imported = struct
   [@@deriving sexp, variants]
 end
 
-module Bindings_path = struct
+module Path = struct
   module T = struct
-    type t = (Module_name.t * [ `Sig | `Def ]) list [@@deriving sexp]
+    type t = (Module_name.t * [ `Sig | `Def ]) list
+    [@@deriving equal, compare, hash, sexp]
 
     let to_string =
       let rec loop buf = function
@@ -86,18 +87,21 @@ module Bindings_path = struct
       | str ->
         (match lex_nonempty [] (Sedlexing.Utf8.from_string str) with
         | Some path -> List.rev path
-        | None -> failwith "Bindings_path.of_string: parse failed")
+        | None -> failwith "Name_bindings.Path.of_string: parse failed")
     ;;
   end
 
   include T
   include Sexpable.Of_stringable (T)
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let to_module_path = List.map ~f:fst
+  let append t module_name ~place = t @ [ module_name, place ]
 end
 
 type t =
-  { current_path : Bindings_path.t
+  { current_path : Path.t
   ; toplevel : defs
   }
 
@@ -176,7 +180,7 @@ let update_current t ~f =
       [%message "Updating imported module" (imported_module : Module_path.t) (t : t)]
   in
   let rec loop_sigs t (sigs : sigs) path ~f =
-    (* print_s [%message "loop_sigs" (path : Bindings_path.t) (sigs : sigs)]; *)
+    (* print_s [%message "loop_sigs" (path : Path.t) (sigs : sigs)]; *)
     match path with
     | [] -> f.f sigs
     | (_, `Def) :: _ -> compiler_bug [%message "`Def inside sig path" (t : t)]
@@ -186,12 +190,12 @@ let update_current t ~f =
           Map.update sigs.modules module_name ~f:(function
             | Some (Local (None, sigs)) -> Local (None, loop_sigs t sigs rest ~f)
             | Some (Imported imported_module) -> updating_import_err t imported_module
-            | None -> name_error_path (Bindings_path.to_module_path t.current_path)
+            | None -> name_error_path (Path.to_module_path t.current_path)
             | Some (Local (Some _, _)) -> .)
       }
   in
   let rec loop_defs t defs path ~f =
-    (* print_s [%message "loop_defs" (path : Bindings_path.t) (defs : defs)]; *)
+    (* print_s [%message "loop_defs" (path : Path.t) (defs : defs)]; *)
     match path with
     | [] -> f.f defs
     | (module_name, place) :: rest ->
@@ -205,7 +209,7 @@ let update_current t ~f =
                 Local (Some (loop_sigs t sigs rest ~f), defs)
               | `Def -> Local (sigs, loop_defs t defs rest ~f))
             | Some (Imported imported_module) -> updating_import_err t imported_module
-            | None -> name_error_path (Bindings_path.to_module_path t.current_path))
+            | None -> name_error_path (Path.to_module_path t.current_path))
       }
   in
   { t with toplevel = loop_defs t t.toplevel t.current_path ~f }
@@ -317,17 +321,17 @@ let rec resolve_path =
 let resolve_path_exn t path = or_name_error_path (resolve_path t path) path
 
 let with_path t path ~f =
-  let current_path = snd (resolve_path_exn t path) in
-  let t', x = f { t with current_path } in
+  (* TODO: remove this, and maybe refactor resolve_path to not return the path,
+     since we don't use it anymore *)
+  (* let current_path = snd (resolve_path_exn t path) in *)
+  let t', x = f { t with current_path = path } in
   { t' with current_path = t.current_path }, x
 ;;
 
 let find =
   let rec loop ?at_path t ((path, name) as input) ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
-    let at_path =
-      Option.value at_path ~default:(Bindings_path.to_module_path t.current_path)
-    in
+    let at_path = Option.value at_path ~default:(Path.to_module_path t.current_path) in
     let bindings_at_current = fst (resolve_path_exn t at_path) in
     (* let input' = to_ustring input in
   if Ustring.(input' = of_string_exn "Range.in")
@@ -588,7 +592,7 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
         | params, Variants cnstrs ->
           (* Add constructors as functions to the namespace *)
           let result_type =
-            let path = Bindings_path.to_module_path current_path in
+            let path = Path.to_module_path current_path in
             Type.Expr.Type_app ((path, type_name), List.map params ~f:Type.Expr.var)
           in
           List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
@@ -680,4 +684,4 @@ let find_type_decl ?at_path t type_name =
 
 let find_absolute_type_decl = find_type_decl ~at_path:[]
 let find_type_decl = find_type_decl ?at_path:None
-let current_path t = Bindings_path.to_module_path t.current_path
+let current_path t = t.current_path
