@@ -1,0 +1,18 @@
+# Actors contain a collection of functions with will only be run sequentially
+  relative to each other, and can access some common mutable state (class variables).
+# See Pony's actors: https://tutorial.ponylang.io/types/actors.html?h=parallel#sequential
+import Async
+
+module Main =
+  # Suppose `Async` is an effect which contains asynchronous scheduling operations e.g.
+    yielding, waiting on another job, scheduling more jobs, etc.
+  #handle Async with Async.handle_
+  # ^ does this need a local scheduler?
+
+  # TODO: think about this more
+  # Replicating Pony's approach seems to require some dynamic stuff: we need the functions
+    to be associated with a scheduler which they each (effectively) implicitly take as an
+    argument and have it handle their effects. We could handle effects at the module level
+    with a single static scheduler but that only allows for 1 at a time.
+  # Pony's Actor behavior of not running 2 behaviours from the same actor at once is also
+    quite different to what we're thinking about here.
