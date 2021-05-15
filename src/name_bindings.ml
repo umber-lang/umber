@@ -31,6 +31,12 @@ module Name_entry = struct
     | Scheme scheme -> Type.Scheme.instantiate ~map_name:Fn.id scheme
   ;;
 
+  let scheme entry =
+    match entry.typ with
+    | Scheme scheme -> Some scheme
+    | Type _ -> None
+  ;;
+
   let let_inferred ?fixity ?extern_name typ =
     { type_source = Let_inferred; typ = Type typ; fixity; extern_name }
   ;;
@@ -117,12 +123,10 @@ and 'a bindings =
   }
 [@@deriving sexp]
 
-module Sigs_or_defs = struct
-  type t =
-    | Sigs of sigs
-    | Defs of defs
-  [@@deriving sexp, variants]
-end
+type sigs_or_defs =
+  | Sigs of sigs
+  | Defs of defs
+[@@deriving sexp_of]
 
 exception Name_error of Ustring.t [@@deriving sexp]
 
@@ -149,22 +153,6 @@ let empty_bindings =
 
 let empty = { current_path = []; toplevel = empty_bindings }
 
-(* TODO: I feel like we shouldn't have to do these conversions *)
-(*let defs_of_sigs (sigs : sigs) : defs =
-  { sigs with
-    modules =
-      Map.map sigs.modules ~f:(fun (None, sub_sigs) -> Some sub_sigs, empty_bindings)
-  }
-;;
-
-let rec sigs_of_defs (defs : defs) : sigs =
-  { defs with
-    modules =
-      Map.map defs.modules ~f:(fun (sigs, defs) ->
-        None, option_or_default sigs ~f:(fun () -> sigs_of_defs defs))
-  }
-;;*)
-
 let without_std t =
   { t with
     toplevel =
@@ -180,7 +168,6 @@ let update_current t ~f =
       [%message "Updating imported module" (imported_module : Module_path.t) (t : t)]
   in
   let rec loop_sigs t (sigs : sigs) path ~f =
-    (* print_s [%message "loop_sigs" (path : Path.t) (sigs : sigs)]; *)
     match path with
     | [] -> f.f sigs
     | (_, `Def) :: _ -> compiler_bug [%message "`Def inside sig path" (t : t)]
@@ -195,7 +182,6 @@ let update_current t ~f =
       }
   in
   let rec loop_defs t defs path ~f =
-    (* print_s [%message "loop_defs" (path : Path.t) (defs : defs)]; *)
     match path with
     | [] -> f.f defs
     | (module_name, place) :: rest ->
@@ -287,17 +273,17 @@ let merge_no_shadow t1 t2 =
 
 let rec resolve_path =
   let open Option.Let_syntax in
-  let rec loop_sigs t acc_path path sigs =
+  let rec loop_sigs t path sigs =
     match path with
-    | [] -> Some (Sigs_or_defs.Sigs sigs, List.rev acc_path)
+    | [] -> Some (Sigs sigs)
     | module_name :: rest ->
       (match%bind Map.find sigs.modules module_name with
-      | Local (None, sigs) -> loop_sigs t ((module_name, `Sig) :: acc_path) rest sigs
+      | Local (None, sigs) -> loop_sigs t rest sigs
       | Local (Some _, _) -> .
       | Imported (path, ()) -> resolve_path t path)
-  and loop_defs t acc_path current_path path defs =
+  and loop_defs t current_path path defs =
     match path with
-    | [] -> Some (Sigs_or_defs.Defs defs, List.rev acc_path)
+    | [] -> Some (Defs defs)
     | module_name :: rest ->
       (match%bind Map.find defs.modules module_name with
       | Local (sigs, defs) ->
@@ -310,20 +296,16 @@ let rec resolve_path =
             else None, `Sig
         in
         (match go_into, sigs with
-        | `Sig, Some sigs -> loop_sigs t ((module_name, `Sig) :: acc_path) rest sigs
-        | `Sig, None | `Def, _ ->
-          loop_defs t ((module_name, `Def) :: acc_path) current_path rest defs)
+        | `Sig, Some sigs -> loop_sigs t rest sigs
+        | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
       | Imported (path, ()) -> resolve_path t path)
   in
-  fun t path -> loop_defs t [] (Some t.current_path) path t.toplevel
+  fun t path -> loop_defs t (Some t.current_path) path t.toplevel
 ;;
 
 let resolve_path_exn t path = or_name_error_path (resolve_path t path) path
 
 let with_path t path ~f =
-  (* TODO: remove this, and maybe refactor resolve_path to not return the path,
-     since we don't use it anymore *)
-  (* let current_path = snd (resolve_path_exn t path) in *)
   let t', x = f { t with current_path = path } in
   { t' with current_path = t.current_path }, x
 ;;
@@ -332,23 +314,14 @@ let find =
   let rec loop ?at_path t ((path, name) as input) ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
     let at_path = Option.value at_path ~default:(Path.to_module_path t.current_path) in
-    let bindings_at_current = fst (resolve_path_exn t at_path) in
-    (* let input' = to_ustring input in
-  if Ustring.(input' = of_string_exn "Range.in")
-  then
-    print_s
-      [%message
-        "find"
-          (to_ustring input : Ustring.t)
-          (at_path : Module_path.t)
-          (bindings_at_current : sigs_defs)]; *)
+    let bindings_at_current = resolve_path_exn t at_path in
     match List.hd path with
     | Some first_module ->
       let full_path = at_path @ path in
       let f bindings =
         if Map.mem bindings.modules first_module
         then (
-          let bindings = fst (or_name_error_path (resolve_path t full_path) at_path) in
+          let bindings = or_name_error_path (resolve_path t full_path) at_path in
           option_or_default (f full_path name bindings) ~f:(fun () ->
             raise (Name_error (to_ustring input))))
         else check_parent t at_path input ~f ~to_ustring
@@ -369,21 +342,12 @@ let find =
 ;;
 
 let rec find_entry t name =
-  let entry =
-    let open Option.Let_syntax in
-    find t name ~to_ustring:Value_name.Qualified.to_ustring ~f:(fun _ name bindings ->
-      let f bindings = Map.find bindings.names name >>| resolve_name_or_import t in
-      match bindings with
-      | Sigs sigs -> f sigs
-      | Defs defs -> f defs)
-  in
-  (* print_s
-    [%message
-      "Found entry!"
-        (name : Value_name.Qualified.t)
-        (entry : Name_entry.t)
-        (without_std t : t)]; *)
-  entry
+  let open Option.Let_syntax in
+  find t name ~to_ustring:Value_name.Qualified.to_ustring ~f:(fun _ name bindings ->
+    let f bindings = Map.find bindings.names name >>| resolve_name_or_import t in
+    match bindings with
+    | Sigs sigs -> f sigs
+    | Defs defs -> f defs)
 
 and resolve_name_or_import t = function
   | Or_imported.Local entry -> entry
@@ -395,12 +359,6 @@ let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
 let find_type_decl' ?at_path t name =
-  (* print_s
-    [%message
-      "find_type_decl'"
-        (at_path : Module_path.t option)
-        (name : Type_name.Qualified.t)
-        (t : t)]; *)
   let open Option.Let_syntax in
   find
     ?at_path
@@ -408,15 +366,8 @@ let find_type_decl' ?at_path t name =
     name
     ~to_ustring:Type_name.Qualified.to_ustring
     ~f:(fun path name bindings ->
-    (* print_s
-      [%message
-        "find_type_decl'.f"
-          (path : Module_path.t)
-          (name : Type_name.t)
-          (bindings : Sigs_or_defs.t)]; *)
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
-      (* TODO: should we resolve the import here? *)
       | Some decl -> Some (path, decl)
       | None ->
         (* Allow type names like [List.List] to be found as just [List] *)
@@ -505,7 +456,7 @@ let import_filtered t path ~f =
     }
   in
   let bindings_to_import =
-    match fst (resolve_path_exn t path) with
+    match resolve_path_exn t path with
     | Sigs sigs -> map_to_imports_filtered path ~f sigs
     | Defs defs -> map_to_imports_filtered path ~f defs
   in
@@ -667,7 +618,7 @@ let rec find_type_decl ?at_path t type_name =
 and resolve_decl_or_import ?at_path t = function
   | Some (Or_imported.Local decl) -> Some decl
   | Some (Imported path_name) ->
-    (* TODO: pretty sure this imprt path should be resolved at the place it's written,
+    (* TODO: pretty sure this import path should be resolved at the place it's written,
        not the current path - this goes for all imports, unless we absolutify their paths *)
     find_type_decl ?at_path t path_name
   | None -> None
@@ -682,6 +633,90 @@ let find_type_decl ?at_path t type_name =
           (without_std t : t)])
 ;;
 
+let resolve_decl_or_import ?at_path t decl_or_import =
+  option_or_default (resolve_decl_or_import ?at_path t decl_or_import) ~f:(fun () ->
+    compiler_bug
+      [%message
+        "Placeholder decl not replaced"
+          (decl_or_import : (Type.Decl.t, Type_name.t) Or_imported.t option)
+          (without_std t : t)])
+;;
+
 let find_absolute_type_decl = find_type_decl ~at_path:[]
 let find_type_decl = find_type_decl ?at_path:None
 let current_path t = t.current_path
+
+let find_sigs_and_defs t path module_name =
+  let open Option.Let_syntax in
+  let rec loop t path module_name =
+    find
+      t
+      (path, module_name)
+      ~f:(fun _ module_name -> function
+        | Sigs _ ->
+          compiler_bug
+            [%message
+              "Name_bindings.find_sigs_and_defs found only sigs"
+                (path : Module_path.t)
+                (module_name : Module_name.t)
+                (t : t)]
+        | Defs bindings ->
+          (match%bind Map.find bindings.modules module_name with
+          | Imported (path, ()) ->
+            let%bind path, module_name = list_split_last path in
+            Some (loop t path module_name)
+          | Local sigs_and_defs -> Some sigs_and_defs))
+      ~to_ustring:(fun (path, module_name) ->
+        Module_path.to_ustring (path @ [ module_name ]))
+  in
+  let sigs, defs = loop t path module_name in
+  Option.map sigs ~f:(fun sigs -> Sigs sigs), Defs defs
+;;
+
+module Sigs_or_defs = struct
+  type name_bindings = t
+  type t = sigs_or_defs
+
+  let names = function
+    | Sigs { names; _ } | Defs { names; _ } -> names
+  ;;
+
+  let value_names = Map.key_set << names
+
+  let types = function
+    | Sigs { types; _ } | Defs { types; _ } -> types
+  ;;
+
+  let type_names = Map.key_set << types
+
+  let module_names = function
+    | Sigs sigs -> Map.key_set sigs.modules
+    | Defs defs -> Map.key_set defs.modules
+  ;;
+
+  let make_find ~into_bindings ~resolve t bindings name =
+    option_or_default
+      (Map.find (into_bindings bindings) name)
+      ~f:(fun () ->
+        compiler_bug [%message "Sigs_or_defs.find failed" (bindings : sigs_or_defs)])
+    |> resolve t
+  ;;
+
+  let find_entry = make_find ~into_bindings:names ~resolve:resolve_name_or_import
+  let find_type_decl = make_find ~into_bindings:types ~resolve:resolve_decl_or_import
+
+  let find_module t bindings module_name =
+    let open Option.Let_syntax in
+    match bindings with
+    | Sigs bindings ->
+      (match%bind Map.find bindings.modules module_name with
+      | Imported (path, ()) -> resolve_path t path
+      | Local (None, sigs) -> Some (Sigs sigs)
+      | Local (Some _, _) -> .)
+    | Defs bindings ->
+      (match%bind Map.find bindings.modules module_name with
+      | Imported (path, ()) -> resolve_path t path
+      | Local (Some sigs, _) -> Some (Sigs sigs)
+      | Local (None, defs) -> Some (Defs defs))
+  ;;
+end

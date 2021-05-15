@@ -50,6 +50,8 @@ module Decl : sig
     | Abstract
     | Alias of Param.t Expr.t
     | Variants of (Cnstr_name.t * Param.t Expr.t list) list
+    (* TODO: probably just make records a type expression - you can trivially get nominal
+       records with a single variant and an inline record *)
     | Record of (Value_name.t * Param.t Expr.t) list
   [@@deriving compare, equal, hash, sexp]
 

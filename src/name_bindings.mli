@@ -6,21 +6,17 @@ module Name_entry : sig
     type t =
       | Val_declared
       | Let_inferred
-    [@@deriving sexp]
-  end
-
-  module Type_or_scheme : sig
-    type t =
-      | Type of Type.t
-      | Scheme of Type.Scheme.t
-    [@@deriving sexp]
+    [@@deriving equal, sexp]
   end
 
   type t [@@deriving sexp]
 
   val typ : t -> Type.t
-  val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
+  val scheme : t -> Type.Scheme.t option
   val type_source : t -> Type_source.t
+  val fixity : t -> Fixity.t option
+  val extern_name : t -> Extern_name.t option
+  val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
 end
 
 module Path : sig
@@ -107,3 +103,21 @@ val add_val
   -> t
 
 val add_type_decl : t -> Type_name.t -> Type.Decl.t -> t
+
+module Sigs_or_defs : sig
+  type name_bindings = t
+  type t
+
+  val value_names : t -> Value_name.Set.t
+  val type_names : t -> Type_name.Set.t
+  val module_names : t -> Module_name.Set.t
+  val find_entry : name_bindings -> t -> Value_name.t -> Name_entry.t
+  val find_type_decl : name_bindings -> t -> Type_name.t -> Type.Decl.t
+  val find_module : name_bindings -> t -> Module_name.t -> t option
+end
+
+val find_sigs_and_defs
+  :  t
+  -> Module_path.t
+  -> Module_name.t
+  -> Sigs_or_defs.t option * Sigs_or_defs.t

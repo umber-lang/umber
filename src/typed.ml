@@ -439,24 +439,6 @@ module Module = struct
   let rec gather_name_placeholders ~names module_name sigs defs =
     let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
-        (* FIXME: PROBLEM: adding placeholders has been broken all along
-           - Vals were being skipped inside defs (no common_defs were processed)
-           - This hid the fact that vals were not being processed first and so placeholder
-             handling was wrong
-           - Kinda want to get rid of placeholder
-           - Need a centralized place to do 1 val, 1 let checking
-             Seems fine to do it here and then have that be an invariant (?)
-
-           SOLUTION (probably):
-           - Can maybe just do Let_inferred/Val_declared and then error in a consistent
-             way - which should be handled in Name_bindings if possible
-           - Wait, adding placeholders for vals in defs actually seems pointless?
-             It matters in sigs, but defs have to have the let anyway, the val can't live
-             alone (although we aren't checking that yet I think)
-             - yeah, just skip vals in defs (ah wait, if the sigs are empty they matter)
-                - ok then
-
-            NOTE: this should be fixed now *)
         Name_bindings.add_name_placeholder names name
       | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
@@ -722,6 +704,7 @@ module Module = struct
       let names = gather_imports_and_type_decls ~names module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
+      Sig_def_diff.create ~names module_name |> Sig_def_diff.raise_if_nonempty;
       Ok (names, (module_name, sigs, defs))
     with
     | exn ->
