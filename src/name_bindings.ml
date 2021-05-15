@@ -597,6 +597,39 @@ let add_type_placeholder t type_name =
   update_current t ~f:{ f }
 ;;
 
+let fold_local_names t ~init ~f =
+  let fold_local t path bindings init =
+    Map.fold bindings.names ~init ~f:(fun ~key:name ~data acc ->
+      let entry = resolve_name_or_import t data in
+      f acc (path, name) entry)
+  in
+  let rec fold_sigs t path (sigs : sigs) ~init ~f =
+    Map.fold
+      sigs.modules
+      ~init:(fold_local t path sigs init)
+      ~f:(fun ~key:module_name ~data acc ->
+      match data with
+      | Local (None, sigs) ->
+        let path = path @ [ module_name ] in
+        fold_sigs t path sigs ~init:acc ~f
+      | Local (Some _, _) -> .
+      | Imported _ -> acc)
+  and fold_defs t path (defs : defs) ~init ~f =
+    Map.fold
+      defs.modules
+      ~init:(fold_local t path defs init)
+      ~f:(fun ~key:module_name ~data acc ->
+      (* TODO: ignoring sigs here because defs should have all the names, but this seems weird *)
+      match data with
+      | Local (_, defs) -> fold_defs t (path @ [ module_name ]) defs ~init:acc ~f
+      | Imported _ -> acc)
+  in
+  let path = Path.to_module_path t.current_path in
+  match resolve_path_exn t (Path.to_module_path t.current_path) with
+  | Sigs sigs -> fold_sigs t path sigs ~init ~f
+  | Defs defs -> fold_defs t path defs ~init ~f
+;;
+
 let merge_names t new_names ~combine =
   let new_names = Map.map new_names ~f:Or_imported.local in
   let f bindings =

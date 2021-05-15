@@ -50,6 +50,12 @@ val set_scheme : t -> Value_name.t -> Type.Scheme.t -> t
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_placeholder : t -> Type_name.t -> t
 
+val fold_local_names
+  :  t
+  -> init:'a
+  -> f:('a -> Value_name.Qualified.t -> Name_entry.t -> 'a)
+  -> 'a
+
 val merge_names
   :  t
   -> Name_entry.t Value_name.Map.t

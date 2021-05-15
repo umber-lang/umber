@@ -12,6 +12,7 @@ val ( ^ ) : t -> t -> t
 val get : t -> int -> elt
 val index : t -> elt -> int option
 val index_exn : t -> elt -> int
+val concat : t list -> t
 val sub : (t, t) Blit.sub
 val subo : (t, t) Blit.subo
 val of_array_unsafe : Uchar.t array -> t

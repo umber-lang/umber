@@ -1,7 +1,5 @@
 open Import
 
-let underscore = Ustring.of_string_exn "_"
-
 module type General_name = sig
   type t = private Ustring.t [@@deriving compare, equal, hash, sexp]
 
