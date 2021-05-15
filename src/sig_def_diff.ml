@@ -28,8 +28,6 @@ let is_empty { name_diff; type_diff; module_diff } =
   && Sequence.is_empty module_diff
 ;;
 
-(* TODO: there might be a better way to do this e.g. just checking equality besides
-     renaming over the schemes *)
 let compatible_type_schemes ~names scheme1 scheme2 =
   let type1, type2 = Type.Scheme.instantiate scheme1, Type.Scheme.instantiate scheme2 in
   try
@@ -95,6 +93,7 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
 ;;
 
 let do_simple_diff
+  ?(filter : 'name -> bool = fun _ -> true)
   (names : Name_bindings.t)
   ((name_set1, bindings1) : ('name, _) Set.t * Sigs_or_defs.t)
   ((name_set2, bindings2) : ('name, _) Set.t * Sigs_or_defs.t)
@@ -106,9 +105,9 @@ let do_simple_diff
   let same = Set.inter name_set1 name_set2 |> Set.to_sequence in
   Sequence.append
     (Sequence.filter_map different ~f:(function
-      | First name -> Some (name, Missing_from_def)
+      | First name -> if filter name then Some (name, Missing_from_def) else None
       | Second _ -> None))
-    (Sequence.filter_map same ~f:(fun name ->
+    (Sequence.filter_map (Sequence.filter ~f:filter same) ~f:(fun name ->
        let data1, data2 = find names bindings1 name, find names bindings2 name in
        if compatible ~names ~sig_:data1 ~def:data2
        then None
@@ -122,6 +121,7 @@ let create ~names module_name =
           names
           (Sigs_or_defs.value_names bindings1, bindings1)
           (Sigs_or_defs.value_names bindings2, bindings2)
+          ~filter:(not << Value_name.is_cnstr_name)
           ~compatible:compatible_name_entries
           ~find:Sigs_or_defs.find_entry
     ; type_diff =

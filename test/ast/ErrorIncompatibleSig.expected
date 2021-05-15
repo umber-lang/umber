@@ -1,4 +1,4 @@
-((name_diff ((Sunny Missing_from_def) (missing_function Missing_from_def)))
+((name_diff ((missing_function Missing_from_def)))
   (type_diff
     ((T
        (Incompatible (() (Alias (Type_app (() Int) ())))

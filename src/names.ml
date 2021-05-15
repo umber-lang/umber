@@ -23,6 +23,7 @@ module type Name = sig
   include General_name
 
   val unidentify : t -> Unidentified_name.t
+  val of_ustring : Ustring.t -> t Or_error.t
   val of_ustring_unchecked : Ustring.t -> t
   val of_ustring_exn : Ustring.t -> t
   val of_string_unchecked : string -> t
@@ -41,11 +42,12 @@ module Identified_ustring (V : Name_validator) : Name = struct
   let unidentify = to_ustring >> Unidentified_name.of_ustring
   let of_ustring_unchecked = of_ustring
 
-  let of_ustring_exn ustr =
+  let of_ustring ustr =
     let lexbuf = Sedlexing.from_uchar_array (to_array ustr) in
-    V.coerce lexbuf |> ok_exn
+    V.coerce lexbuf
   ;;
 
+  let of_ustring_exn = ok_exn << of_ustring
   let of_string_unchecked = of_string_exn
 
   let of_string_exn str =
@@ -177,6 +179,7 @@ module Value_name : sig
   include Name_qualified
 
   val of_cnstr_name : Cnstr_name.t -> t
+  val is_cnstr_name : t -> bool
 
   module Qualified : sig
     include module type of Qualified
@@ -186,7 +189,8 @@ module Value_name : sig
 end = struct
   include Lower_name_qualified
 
-  let of_cnstr_name = Cnstr_name.to_ustring >> of_ustring_unchecked
+  let of_cnstr_name = of_ustring_unchecked << Cnstr_name.to_ustring
+  let is_cnstr_name = Or_error.is_ok << Cnstr_name.of_ustring << to_ustring
 
   module Qualified = struct
     include Qualified
