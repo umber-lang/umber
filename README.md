@@ -1,4 +1,8 @@
+<div align="center">
+
 # Umber
+
+</div>
 
 ## Disclaimer
 
@@ -23,6 +27,18 @@ Some other planned features include:
 - Support for implicit laziness
 - Better support for concurrent programming (async/await at least can be implemented with effects)
 - A macro system
+
+### Code Examples
+
+```
+# Naive Fibonacci numbers
+val fib : Int -> Int
+let fib = match
+  | 0 | 1 -> 1
+  | n -> fib (n - 1) + fib (n - 2)
+```
+
+You can see code examples used for testing under `test/examples`. Currently only the frontend is being tested, with expected outputs given in `test/tokens` (for the lexer) and `test/ast` (for the parser/type-checker).
 
 ### (Very) Rough Roadmap
 - [x] Lexing

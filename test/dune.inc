@@ -17,10 +17,42 @@
  (action (no-infer (diff ast/Classics.expected ast/Classics.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/CrossModuleUsage.expected tokens/CrossModuleUsage.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/CrossModuleUsage.expected ast/CrossModuleUsage.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Empty.expected tokens/Empty.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff ast/Empty.expected ast/Empty.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorCrossModuleMutualRecursion.expected
+    tokens/ErrorCrossModuleMutualRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorCrossModuleMutualRecursion.expected
+    ast/ErrorCrossModuleMutualRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorCyclicTypeAlias.expected
+    tokens/ErrorCyclicTypeAlias.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorCyclicTypeAlias.expected ast/ErrorCyclicTypeAlias.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -51,6 +83,17 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer (diff ast/ErrorDuplicateVal.expected ast/ErrorDuplicateVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorIncompatibleSig.expected
+    tokens/ErrorIncompatibleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorIncompatibleSig.expected ast/ErrorIncompatibleSig.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -114,6 +157,12 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff ast/Modules.expected ast/Modules.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/ModuleSig.expected tokens/ModuleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/ModuleSig.expected ast/ModuleSig.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action

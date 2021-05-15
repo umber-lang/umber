@@ -1,19 +1,11 @@
-# TODO: support matches like this:
-  ```
-  match n
+# Can't go wrong with the classics
+
+let fact = match
   | 0
   | 1 -> 1
-  | n -> n
-  ```
-# TODO let statements should actually be recursive (always)
-  (since they are mutually recursive with other bindings in the same module, they should
-  also be recursive with themselves - seems weird otherwise)
-let fact = match
-  | 0 | 1 -> 1
   | n -> n * fact (n - 1) 
 
 let fib n =
-  # TODO: allow pipes following a match to be at the same indentation level
   match n
-    | 0 | 1 -> 1
-    | n -> fib (n - 1) + fib (n - 2)
+  | 0 | 1 -> 1
+  | n -> fib (n - 1) + fib (n - 2)

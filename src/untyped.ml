@@ -92,7 +92,7 @@ module Expr = struct
     | Record_update of t * (Value_name.t * t option) list
     | Record_field_access of t * Value_name.t
     | Type_annotation of t * Type.Expr.Bounded.t
-  [@@deriving sexp_of, variants]
+  [@@deriving sexp, variants]
 
   (** Get all the external names referenced by an expression. Names local to the
       expression (e.g. those bound by match expressions or lambdas) are not included. *)
@@ -146,10 +146,7 @@ module Expr = struct
   ;;
 
   let match_function branches =
-    (* FIXME: this should probably create a new unused name
-       Another option is the empty string gets picked up and added later,
-       when we have a Name_bindings.t as context *)
-    let name = Value_name.of_string_unchecked "" in
+    let name = Value_name.empty in
     Lambda (Pattern.Catch_all (Some name), Match (Name ([], name), branches))
   ;;
 
@@ -161,8 +158,7 @@ module Expr = struct
 
   let op_section_right op expr =
     let op = Value_name.Qualified.of_ustrings_unchecked op in
-    (* TODO: Refer uses of the empty string like to a value like Value_name.empty *)
-    let left_var = Value_name.of_string_unchecked "" in
+    let left_var = Value_name.empty in
     let left_var_qualified = Value_name.Qualified.with_path [] left_var in
     Lambda
       ( Pattern.Catch_all (Some left_var)

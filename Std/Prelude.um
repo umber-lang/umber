@@ -4,7 +4,7 @@ module :
 
   module List :
     type List a = Nil | Cons a (List a)
-  import List with *  # TODO: remove (should see a type List as List.List)
+  import List with Nil, Cons
 
   module Operators :
     val (.) (infixr 9) : () => (b -> c) -> (a -> b) -> a -> c
@@ -26,13 +26,14 @@ module :
 
     val (::) (infixr 5) : a -> List a -> List a
     
+    # TODO: add trait bounds to these - this is just temporary
     val not : Bool -> Bool
     val (==) (infix 4) : a -> a -> Bool
-    #val (!=) (infix 4) : a -> a -> Bool
-    #val (<) (infix 4) : a -> a -> Bool
-    #val (<=) (infix 4) : a -> a -> Bool
-    #val (>) (infix 4) : a -> a -> Bool
-    #val (>=) (infix 4) : a -> a -> Bool
+    val (!=) (infix 4) : a -> a -> Bool
+    val (<) (infix 4) : a -> a -> Bool
+    val (<=) (infix 4) : a -> a -> Bool
+    val (>) (infix 4) : a -> a -> Bool
+    val (>=) (infix 4) : a -> a -> Bool
 
     val (&&) (infixl 3) : Bool -> Bool -> Bool
     

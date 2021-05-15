@@ -4,14 +4,6 @@
 val f : Forest a
 let f = Nil
 
-# FIXME: likely problem is generalizing too early - need to generalize them together, probably (?)
-  Should see how Haskell does this
-  May need to group mutually recursive functions together and generalize them at once
-    => dependency graph?
-# TODO: Fix by grouping let statements into binding groups which are mutually recursive
-  Topological sort of the strongly connected components of the variable call graph:
-  - https://jeremymikkola.com/posts/2019_01_11_type_inference_for_haskell_part_11.html
-  - https://www.projectrhea.org/rhea/index.php/Topological_Sort_and_Strongly_Connected_Components_Old_Kiwi
 # NOTE: this is not allowed in OCaml with the error:
   > This kind of expression is not allowed as right-hand side of `let rec'
   It works if the `forest` argument to `sum_forest` is written explicitly.
@@ -41,6 +33,6 @@ let number =
   let' number = number + number
   number
 
-# TODO: add tests for mutual recursion with submodules
+# TODO: add tests for use between submodules
   e.g. imports to/from, usage between the parent and child
   ^ make the above module `Tree` and have mutual usage with the parent

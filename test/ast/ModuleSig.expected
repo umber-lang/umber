@@ -1,0 +1,43 @@
+(ModuleSig ()
+ ((Module
+   (Range
+    ((Common_sig (Type_decl Range (() Abstract)))
+     (Common_sig
+      (Val between ()
+       (()
+        (Function (Type_app (() Int) ())
+         (Function (Type_app (() Int) ()) (Type_app (() Range) ()))))))
+     (Common_sig
+      (Val in ()
+       (()
+        (Function (Type_app (() Int) ())
+         (Function (Type_app (() Range) ()) (Type_app (() Bool) ())))))))
+    ((Common_def
+      (Type_decl Range
+       (() (Alias (Tuple ((Type_app (() Int) ()) (Type_app (() Int) ())))))))
+     (Let
+      (((Catch_all (between))
+        ((Lambda (Catch_all (lo))
+          (Lambda (Catch_all (hi)) (Tuple ((Name (() lo)) (Name (() hi))))))
+         (Function (Var a) (Function (Var b) (Tuple ((Var a) (Var b)))))))))
+     (Let
+      (((Catch_all (in))
+        ((Lambda (Catch_all (x))
+          (Lambda (Tuple ((Catch_all (lo)) (Catch_all (hi))))
+           (Fun_call
+            (Fun_call (Name (() &&))
+             (Fun_call (Fun_call (Name (() <=)) (Name (() lo)))
+              (Name (() x))))
+            (Fun_call (Fun_call (Name (() <=)) (Name (() x))) (Name (() hi))))))
+         (Function (Var a)
+          (Function (Tuple ((Var a) (Var a))) (Type_app (() Bool) ()))))))))))
+  (Let
+   (((Catch_all (my_range))
+     ((Fun_call (Fun_call (Name ((Range) between)) (Literal (Int 1)))
+       (Literal (Int 10)))
+      (Type_app ((ModuleSig Range) Range) ())))))
+  (Let
+   (((Catch_all (is_10_in_range))
+     ((Fun_call (Fun_call (Name ((Range) in)) (Literal (Int 10)))
+       (Name (() my_range)))
+      (Type_app (() Bool) ())))))))

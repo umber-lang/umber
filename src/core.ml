@@ -5,8 +5,9 @@ open Names
    refer to types like Int as Std.Prelude.Int since Std could be shadowed - they need a
    special primitive representation *)
 
+let std_module_name = Module_name.of_string_unchecked "Std"
 let prelude_module_name = Module_name.of_string_unchecked "Prelude"
-let prelude_module_path = [ Module_name.of_string_unchecked "Std"; prelude_module_name ]
+let prelude_module_path = [ std_module_name; prelude_module_name ]
 
 module type Type = sig
   val name : Type_name.t

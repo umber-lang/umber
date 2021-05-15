@@ -1,0 +1,13 @@
+module :
+  trait Index t k v | k -> v :
+    val get : t -> k -> v
+    # ^ Option? Panic? Maybe some other macro can force the option e.g. !
+
+# Sequence can just extend Index?
+impl (Sequence t v) => Index t Nat v =
+  let get = Sequence.get
+
+# Warning: experimental syntax
+macro "" =  # Empty name macro, compiler reserved (?) - could also use `_` or something
+  | $(object:expr)@[$(index:expr)] ->
+    get object index

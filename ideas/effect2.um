@@ -34,13 +34,6 @@ let for_each itr ~f = match iter itr
 # TODO: Consider: the [] pattern could be generic across all Sequences and then
   this would work for all of them
 impl Iterable LinkedList =
-  # TODO: Decide: do I want to force the rec keyword? Some OCaml patterns aren't
-  # as nice if you are always recursive e.g. let x = x + 1 but it's kind of a
-  # pain point (slightly ugly and I often forget it)
-  # What about this: [let] works like [let rec],
-    and [let'] works like [let] (nonrec)?
-  # Also, in modules, all functions are defined as if with let ... and ...
-    (i.e. mutually recursively) by default
   let iter = match
     | [] -> ()
     | x :: xs -> yield x; iter xs

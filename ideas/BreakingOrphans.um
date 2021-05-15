@@ -1,0 +1,185 @@
+module Default =
+  trait Default a :
+    val default : a
+
+module A =
+  impl Default Int = default = 0
+
+module B =
+  impl Default Int = default = 1
+
+# Now A and B cannot be compiled together
+  -> this can be solved by explicit statements of which impl should be used e.g.
+     `import UserA with impl Default Int`
+# Problems occur when dealing with code that uses these values and passes them around
+
+type Color = R | G | B
+
+module Map :
+  type Map k v
+
+  val empty : Map k v
+  val set : (Ord k) => Map k v -> key:k -> data:v -> Map k v
+
+module C :
+  val red_green : Map Color ()
+=
+  impl Ord Color =
+    # ... giving R < G < B
+
+  let red_green =
+    Map.empty
+    |> Map.set ~key:R ~data:()
+    |> Map.set ~key:G ~data:()
+    # (order is R then G in the map)
+
+module D 
+  val red_green_blue : Map Color ()
+=
+  impl Ord Color =
+    # ... giving R > G > B
+
+  let red_green_blue =
+    C.red_green |> Map.set ~key:B ~data:()
+    # (B gets put before R so the order is now B, R, G and the map invariant is broken)
+
+# In this case, invariants were broken as in the presence of orphans we didn't have a way
+  to specify at the type level that a specific value of a type was bound to a set of trait
+  constraints already, which have to be matched by any new uses
+# One way to prevent this is to store, for each value, any results of impl resolution
+  which went into that value, and then check any future instances of this, but that seems
+  very hard, or maybe even impossible
+
+# With modular implicits, we could do this:
+
+module type Ord =
+  type T
+  val compare : T -> Ordering
+
+module Map :
+  type Map k v
+  
+  # I think resolution actually has to be done once, when the thing is created?
+    Our options are to pass the `compare` function in at creation and store it, or pass it
+    with each usage
+  val empty : Map k v
+  val set : {K: Ord} -> Map K.T v -> key:K.T -> data:v -> Map K.T v
+
+module C :
+  val red_green : Map Color ()
+=
+  implicit module OrdColor =
+    type T = Color
+    # `compare` giving R < G < B
+
+  let red_green =
+    Map.empty
+    |> Map.set ~key:R ~data:()
+    |> Map.set ~key:G ~data:()
+    # (order is R then G in the map)
+
+module D :
+  val red_green_blue : Map Color ()
+=
+  implicit module OrdColor =
+    type T = Color
+    # `compare` giving R > G > B
+
+  let red_green_blue =
+    C.red_green |> Map.set ~key:B ~data:()
+    # (B gets put before R so the order is now B, R, G and the map invariant is broken)
+
+# As we can see, modular implicits don't seem to help with this problem by themselves
+# Picturing what an ideal compiler response would look like, I can think of two options:
+  (1) The compiler remembers what impls/implicit modules were used to create a `Map` and
+      then continues to use those functions (either storing them at runtime or threading
+      them through compilation)
+  (2) The compiler remembers what impls/implicit modules were used to create a `Map` and
+      then causes type errors when the map is attempted to be used in a context with
+      different impls/implicit modules in scope
+
+# NOTE: In OCaml we basically manually do this with `comparator_witness` as a third type
+  parameter to `Map`
+
+# Syntax idea for (2):
+module C :
+  val red_green : (Ord Color) => Map Color ()
+  # `(Ord Color) =>` signifies that the constraint `Ord Color` has been solved here
+    (maybe a little confusing that it shares syntax with `(Ord a) =>`, which shows an
+    unsolved constraint).
+  # Uses of `C.red_green` must solve `Ord Color` in the same way it is solved in `C`
+  # Note: this makes impl resolution effectively part of the type-level interface
+    (as opposed to the ad-hoc behavioral interface),
+    so changing internal imports in your module can break compilation
+    (and this may require module introspection (?))
+
+  # Different idea:
+  val red_green : Map Color () with impl Ord Color of C
+  # Now the exact impl used is an explicit part of the type: type declarations can be used
+    then, instead of imports, to specify impl usage (I guess imports would also be good
+    though, since adding type decls everywhere could be really awkward)
+  # Possible problem: Does this force us to write `with impl` in too many signatures?
+    e.g. any value which resolves an impl could implicitly rely on the same impl being
+    used again on it in its internals. Most values shouldn't have this issue so it could
+    impose a huge amount of unnecessary boilerplate
+  # Maybe the idea that impls should be resolved separately for each function in `Map` is
+    just wrong in the first place - they all have to resolve to the same thing, or it
+    won't work. Then again, they have to be resolvable at their callsites, right?
+  # If we want to ban the usage of signatures like the `Map` I wrote (with impl resolution
+    in each method), how can we do that? It seems impossible.
+    That signature relies on the invariant that each call provides the same `compare`
+    function, which we may not be able to provide (note that it can be provided simply by
+    enforcing that only one such impl exists, but that is non-modular).
+    Since `Map` can't rely on that invariant, it just needs to do something like this:
+
+module Map :
+  type Map k v
+  # ^ Could we somehow have `(Ord k) =>` here, claiming that `Map k v` cannot be
+    constructed without solving `Ord k`? How would that work?
+
+  val empty : (Ord k) => Map k v
+  # `Ord` constraint is resolved and stored upon creation (?)
+    How does that work? Isn't this just one value?
+  val set : Map k v -> key:k -> data:v -> Map k v  # No `Ord` constraint here
+  # Thoughts:
+    - This forces the function to be stored at runtime in the map, which may just be
+      unavoidable (the other option is doing it at compile time)
+    - Is this just good? Would abandoning the ability to guarantee the same impl is given
+      each time or refer to specific impls via the compiler just fine? What possible
+      performance issues could occur from having to carry around the function?
+      - In Ocaml, we already do this, right?
+        - We do if you use e.g. `Map.empty (module Int)`
+        - The functors e.g. `Comparable.Make` bake the comparison function into the
+          code at compile time
+    - Note that a value with unresolved trait constraints isn't really a value
+      e.g. see this Haskell (ghci):
+      ```
+      > let n = 5
+      > :t n
+      n :: Num p => p
+      > let x = n :: Int
+      > x
+      5
+      > let y = n :: Float
+      > y
+      5.0
+      ```
+      Haskell doesn't have a value-function distinction anyway (everything is a thunk), so
+      this is fine there. Basically what's happening from our ML-ish perspective is that
+      there are unapplied implicit arguments.
+      -> Note: we should have a compiler pass which resolves all trait constraints and
+         makes these arguments explicit
+
+# I think maybe just not making guarantees about the usage of impls is good
+  (simple, at least), and the performance implications seem totally fine.
+  I think if you want compile-time resolution, we can just use a macro system for that.
+# Thoughts on macros:
+  - Eventually everyone needs them.
+  - Programmers in languages without macros end up implementing them themselves in an
+    awkward and ad hoc way.
+  - We should just support macros in the language and try to give them nice
+    syntax/semantics
+  - Macros should be hygienic and safe, with as few gotchas as possible.
+  - Macros should be easy to use and as easy as practicable to write.
+  - Macro usage should be easy to spot and understand at callsites, while still allowing
+    for nice-looking syntax without boilerplate.

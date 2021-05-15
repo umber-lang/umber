@@ -167,9 +167,6 @@ expr_op_term:
   | e = expr_fun_call { e }
   | e = expr_term { e }
 
-%inline match_branches:
-  | branches = pipe_branches(separated_pair(pattern, ARROW, expr)) { branches }
-
 (* Expressions with binary operators are first parsed as if all operators were
    left-associative with the same precedence. This operator tree is later re-associated. *)
 expr_op_tree:
@@ -177,6 +174,18 @@ expr_op_tree:
     { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, Leaf left, Leaf right) }
   | left = expr_op_tree; op = operator; right = expr_op_term
     { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, left, Leaf right) }
+
+match_branch:
+  | branch = separated_pair(pattern, ARROW, expr) { branch }
+  | left = pattern; LINE_SEP; PIPE; right = match_branch
+    { Pattern.union left (fst right), snd right }
+
+match_branches:
+  | PIPE; branches = separated_nonempty_list(PIPE, match_branch) { branches }
+  | INDENT; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch); DEDENT
+    { branches }
+  | LINE_SEP; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch)
+    { branches }
 
 let_rec:
   | LET { true }
@@ -200,7 +209,7 @@ expr:
   | BACKSLASH; args = nonempty_list(pattern_term); ARROW; body = expr
     { List.fold_right args ~init:body ~f:Expr.lambda }
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
-  | MATCH; e = expr; LINE_SEP?; branches = match_branches { Expr.Match (e, branches) }
+  | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
   | rec_ = let_rec; binding = let_binding_; LINE_SEP?; body = expr
     { Expr.Let { rec_; bindings = [binding]; body } }
@@ -244,9 +253,15 @@ type_cnstr_decl:
   | cnstr = UPPER_NAME; args = list(type_term)
     { Cnstr_name.of_ustring_unchecked cnstr, args }
 
+type_decl_variants:
+  | PIPE?; branches = separated_nonempty_list(PIPE, type_cnstr_decl) { branches }
+  | INDENT; PIPE?; branches = separated_nonempty_list(line_sep_pipe, type_cnstr_decl);
+    DEDENT
+    { branches }
+
 type_decl:
   | PIPE { Type.Decl.Variants [] }
-  | variants = pipe_branches(type_cnstr_decl) { Type.Decl.Variants variants }
+  | variants = type_decl_variants { Type.Decl.Variants variants }
   | r = block(type_record) { r }
 
 %inline type_param_list:
@@ -268,12 +283,14 @@ fixity:
 %inline import_item:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
+%inline import_items: items = separated_nonempty_list(COMMA, import_item) { items }
+
 import_stmt:
   | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
   | path = import_module_path; WITH; ASTERISK { Module.Import_with (path, []) }
-  | path = import_module_path; WITH; items = nonempty_list(import_item)
+  | path = import_module_path; WITH; items = import_items
     { Module.Import_with (path, items) }
-  | path = import_module_path; WITHOUT; items = nonempty_list(import_item)
+  | path = import_module_path; WITHOUT; items = import_items
     { Module.Import_without (path, items) }
 
 stmt_common:
@@ -284,7 +301,7 @@ stmt_common:
     s = STRING
     { Module.Extern (
         Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
-  | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(equals, type_decl)?
+  | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(EQUALS, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
@@ -334,7 +351,7 @@ stmt_:
 prog:
   | def1 = flexible_optional_list(LINE_SEP, stmt); sig_ = file_module_sig;
     def2 = lines(stmt); EOF
-    { Module_name.of_string_unchecked "", sig_, def1 @ def2 }
+    { Module_name.empty, sig_, def1 @ def2 }
 
 %inline with_loc(X): node = X { { Node.node ; span = Span.of_loc $loc } }
 
@@ -346,11 +363,6 @@ prog:
   | a = separated_pair(X, colon, type_expr_bounded) { a }
 
 %inline line_sep_pipe: LINE_SEP?; PIPE { }
-
-pipe_branches(X):
-  | PIPE?; branches = separated_nonempty_list(PIPE, X) { branches }
-  | INDENT; PIPE?; branches = separated_nonempty_list(line_sep_pipe, X); DEDENT
-    { branches }
 
 %inline record_field_equals(X):
   | field = LOWER_NAME; x = preceded(EQUALS, X)?

@@ -1,1 +1,1 @@
-dune exec ./run.exe -- Std/Prelude.um -no-std -parent Std -names
+dune exec ./umberboot.exe -- Std/Prelude.um -no-std -parent Std -names

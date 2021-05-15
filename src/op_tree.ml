@@ -12,16 +12,16 @@ let rec fix_precedence ~names = function
       | Btree.Leaf _, Leaf _ -> None
       | Node (left_name, ll_child, lr_child), Leaf _ ->
         let _, left_level = Name_bindings.find_fixity names left_name in
-        Some (left_level, (Btree.Rotation.Clockwise, left_name, ll_child, lr_child))
+        Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
       | Leaf _, Node (right_name, rl_child, rr_child) ->
         let _, right_level = Name_bindings.find_fixity names right_name in
-        Some (right_level, (Anticlockwise, right_name, rl_child, rr_child))
+        Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
       | Node (left_name, ll_child, lr_child), Node (right_name, rl_child, rr_child) ->
         let _, left_level = Name_bindings.find_fixity names left_name in
         let _, right_level = Name_bindings.find_fixity names right_name in
         if Fixity.Level.(left_level <= right_level)
-        then Some (left_level, (Clockwise, left_name, ll_child, lr_child))
-        else Some (right_level, (Anticlockwise, right_name, rl_child, rr_child))
+        then Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
+        else Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
     in
     (match rotation with
     | None -> root
@@ -30,12 +30,12 @@ let rec fix_precedence ~names = function
       if Fixity.Level.(level < op_level)
       then (
         match rotation_info with
-        | Clockwise, left_name, ll_child, lr_child ->
+        | `Clockwise, left_name, ll_child, lr_child ->
           Node
             ( left_name
             , ll_child
             , fix_precedence ~names (Node (op_name, lr_child, right_child)) )
-        | Anticlockwise, right_name, rl_child, rr_child ->
+        | `Anticlockwise, right_name, rl_child, rr_child ->
           Node
             ( right_name
             , fix_precedence ~names (Node (op_name, left_child, rl_child))

@@ -1,5 +1,5 @@
 module :
-  trait (Convert Integer a) => Num a :
+  trait (Convert Natural a) => Num a :
     val (+), (*), (-) : a -> a -> a
 
   trait (Num a) => Signed a :
@@ -8,5 +8,5 @@ module :
   # Integral, Floating, etc.
     see https://hackage.haskell.org/package/base-4.14.0.0/docs/Prelude.html#t:Num
 
-trait (Num a) => Signed a =
+trait (Num a, Convert Integer a) => Signed a =
   let negate x = 0 - x

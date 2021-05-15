@@ -1,0 +1,22 @@
+((name_diff ((missing_function Missing_from_def)))
+  (type_diff
+    ((T
+       (Incompatible (() (Alias (Type_app (() Int) ())))
+         (() (Alias (Type_app (() String) ())))))
+      (Weather
+        (Incompatible (() (Variants ((Rainy ()) (Sunny ()))))
+          (() (Variants ((Rainy ()))))))))
+  (module_diff
+    ((A
+       (Module_diff
+         ((name_diff
+            ((a
+               (Incompatible
+                 ((typ (Scheme (Type_app ((ErrorIncompatibleSig A) A) ()))))
+                 ((typ (Scheme (Type_app (() String) ())))
+                   (type_source Let_inferred))))))
+           (type_diff ()) (module_diff ()))))
+      (MissingModule
+        (Module_diff
+          ((name_diff ((missing Missing_from_def))) (type_diff ())
+            (module_diff ())))))))

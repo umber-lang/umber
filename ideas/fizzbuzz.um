@@ -1,11 +1,8 @@
 # Various FizzBuzz implementations
 
-# TODO: decide on = vs ==
-# also on Rust-style method syntax vs Haskell-style regular function syntax
-
 # (Probably) the most idiomatic with mapping a range 
 let fizzBuzzMap n = map (1..n) ~f:fun n ->
-  if n % 15 = 0 then "FizzBuzz"
+  if n % 15 == 0 then "FizzBuzz"
   else if n % 3 = 0 then "Fizz"
   else if n % 5 = 0 then "Buzz"
   else show n

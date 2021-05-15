@@ -115,11 +115,10 @@ trait Enum a of Ord a :
   
   val range : start:a -> ?stop:a -> ?step:Int -> Range a
   
-  # TODO: precedence
-  val (..) : a -> a -> Range a
+  val (..) (infix 5) : a -> a -> Range a
   let (..) start stop = range ~start ~stop:stop ~step:1
   
-  val (..<) : a -> a -> Range a
+  val (..<) (infix 5) : a -> a -> Range a
   let (..<) start stop = range ~start ?stop:(pred stop) ~step:1
 
   # Allow syntax like `2 .. 10 :step_by: 2`
