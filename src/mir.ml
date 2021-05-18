@@ -71,30 +71,8 @@ module Value_kind = struct
   ;;
 end
 
-module Expr = struct
-  type t =
-    | Literal of Untyped.Literal.t
-    | Name of Unique_name.t
-    | Fun_call of Unique_name.t * t Non_empty.t
-    (* TODO: args for prim_ops - they're just functions, right?
-       We do at least need a variant for external functions, which is probably what
-       these should be, although having some operations be completely built into the
-       compiler seems reasonable *)
-    | Prim_op of Prim_op.t
-
-  (* TODO: switch (to implement match) *)
-end
-
 module Cnstr = struct
   type t = Value_kind.t list
-end
-
-module Function = struct
-  type t =
-    { args : (Unique_name.t * Value_kind.t) Non_empty.t
-    ; returns : Value_kind.t
-    ; body : Expr.t
-    }
 end
 
 module Context : sig
@@ -139,7 +117,17 @@ end = struct
 end
 
 module Expr = struct
-  include Expr
+  type t =
+    | Literal of Untyped.Literal.t
+    | Name of Unique_name.t
+    | Fun_call of Unique_name.t * t Non_empty.t
+    (* TODO: args for prim_ops - they're just functions, right?
+       We do at least need a variant for external functions, which is probably what
+       these should be, although having some operations be completely built into the
+       compiler seems reasonable *)
+    | Prim_op of Prim_op.t
+
+  (* TODO: switch (to implement match) *)
 
   let rec of_typed_expr ~ctx = function
     | Typed.Expr.Literal lit -> Literal lit
@@ -170,6 +158,14 @@ module Expr = struct
     | Record_literal _ | Record_update (_, _) | Record_field_access (_, _) ->
       failwith "TODO: records in MIR"
   ;;
+end
+
+module Function = struct
+  type t =
+    { args : (Unique_name.t * Value_kind.t) Non_empty.t
+    ; returns : Value_kind.t
+    ; body : Expr.t
+    }
 end
 
 module Stmt = struct
