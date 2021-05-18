@@ -29,6 +29,7 @@ module type Name = sig
   val of_string_unchecked : string -> t
   val of_string_exn : string -> t
   val of_string_lenient_exn : string -> t
+  val arg_type_lenient : t Command.Arg_type.t
 end
 
 module type Name_validator = sig
@@ -56,6 +57,7 @@ module Identified_ustring (V : Name_validator) : Name = struct
   ;;
 
   let of_string_lenient_exn str = V.coerce_lenient str |> ok_exn
+  let arg_type_lenient = Command.Arg_type.create of_string_lenient_exn
 end
 
 module Lower_name = Identified_ustring (struct
