@@ -10,6 +10,7 @@ let command =
      and parse = flag "parse" no_arg ~doc:"Print parser output (untyped AST)"
      and type_ = flag "type" no_arg ~doc:"Print type-checker output (typed AST)"
      and name = flag "name" no_arg ~doc:"Print name-resolver output (name bindings)"
+     and mir = flag "mir" no_arg ~doc:"Print mid-level IR (MIR)"
      and no_std = flag "no-std" no_arg ~doc:"Don't include the standard library"
      and parent =
        flag
@@ -27,12 +28,12 @@ let command =
          | Ok x -> x
          | Error msg -> failwith (Ustring.to_string msg)
        in
-       if parse || type_ || name
+       if parse || type_ || name || mir
        then (
          let print_tokens_to = Option.some_if lex stdout in
          let ast = or_raise (Parsing.parse_file ?print_tokens_to filename) in
          if parse then print_s (Ast.Untyped.Module.sexp_of_t ast);
-         if type_ || name
+         if type_ || name || mir
          then (
            let names =
              if no_std then Name_bindings.core else Lazy.force Name_bindings.std_prelude
@@ -46,7 +47,11 @@ let command =
              or_raise (Ast.Typed.Module.of_untyped ?backtrace ~names ast)
            in
            if type_ then print_s (Ast.Typed.Module.sexp_of_t ast);
-           if name then print_s (Name_bindings.sexp_of_t names)))
+           if name then print_s (Name_bindings.sexp_of_t names);
+           if mir
+           then (
+             let mir = Mir.of_typed_module ~names ast in
+             print_s (Mir.sexp_of_t mir))))
        else if lex
        then
          Parsing.lex_file filename ~print_tokens_to:stdout

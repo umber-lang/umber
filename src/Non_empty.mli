@@ -1,4 +1,4 @@
-type 'a t = ( :: ) of 'a * 'a list
+type 'a t = ( :: ) of 'a * 'a list [@@deriving sexp]
 
 val cons : 'a -> 'a t -> 'a t
 val of_list : 'a list -> 'a t option

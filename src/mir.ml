@@ -24,6 +24,7 @@ module Prim_op = struct
   type t =
     | Int_add (* TODO: arguments? *)
     | Io_print_string
+  [@@deriving sexp_of]
 end
 
 module Value_kind = struct
@@ -48,6 +49,7 @@ module Value_kind = struct
        - https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/storage/heap-objects
     *)
     | Block of t list
+  [@@deriving sexp_of]
 
   (* TODO: String Should be representable some other way - unless this means an inline string?
      Should just be like Array Char (but packed) unless optimizations based on immutability are done
@@ -72,11 +74,11 @@ module Value_kind = struct
 end
 
 module Cnstr = struct
-  type t = Value_kind.t list
+  type t = Value_kind.t list [@@deriving sexp_of]
 end
 
 module Context : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val of_name_bindings : Name_bindings.t -> t
   val find_value_name : t -> Value_name.Qualified.t -> Unique_name.t
@@ -86,6 +88,7 @@ end = struct
     { names : Unique_name.t Ustring.Map.t
     ; cnstrs : Cnstr.t Unique_name.Map.t
     }
+  [@@deriving sexp_of]
 
   let empty = { names = Ustring.Map.empty; cnstrs = Unique_name.Map.empty }
 
@@ -126,6 +129,7 @@ module Expr = struct
        these should be, although having some operations be completely built into the
        compiler seems reasonable *)
     | Prim_op of Prim_op.t
+  [@@deriving sexp_of]
 
   (* TODO: switch (to implement match) *)
 
@@ -166,6 +170,7 @@ module Function = struct
     ; returns : Value_kind.t
     ; body : Expr.t
     }
+  [@@deriving sexp_of]
 end
 
 module Stmt = struct
@@ -175,6 +180,7 @@ module Stmt = struct
   type t =
     | Value_def of Unique_name.t * Expr.t
     | Fun_def of Unique_name.t * Function.t
+  [@@deriving sexp_of]
 
   (* TODO: Functions can be computed at runtime e.g.
      `let f = if true then fun x -> x * 2 else fun x -> x * 3`
@@ -182,7 +188,7 @@ module Stmt = struct
 end
 
 (* TODO: need to handle ordering? function definitions can have side effects *)
-type t = Stmt.t list
+type t = Stmt.t list [@@deriving sexp_of]
 
 let of_typed_module =
   (* TODO: have to deal with names within let bindings, which may be re-used while
@@ -224,7 +230,8 @@ let of_typed_module =
         failwith "TODO: Ir.of_typed_module leftover cases"
       | Common_def _ -> stmts)
   in
-  fun ~names ~path ((module_name, _sigs, defs) : Typed.Module.t) ->
+  fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
+    let path = Name_bindings.(current_path names |> Path.to_module_path) in
     loop ~ctx:(Context.of_name_bindings names) (path @ [ module_name ]) defs |> List.rev
 ;;
 
