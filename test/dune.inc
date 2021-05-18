@@ -132,6 +132,14 @@
  (action (no-infer (diff ast/Functions.expected ast/Functions.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff tokens/Generalization.expected tokens/Generalization.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/Generalization.expected ast/Generalization.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Imports.expected tokens/Imports.out))))
 
 (rule (alias runtest) (deps test.dummy)

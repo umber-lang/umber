@@ -1,0 +1,16 @@
+# Let bindings in expressions should be generalized
+# `val f : a -> b -> b`
+let f x =
+  let id z = z
+  id
+
+# `val g : a -> (Int, Bool)`
+let g x =
+  let id z = z
+  (id 1, id True)
+
+# Don't over-generalize
+# `val h : a -> a`, not `a -> b`
+let h x =
+  let y = x
+  y

@@ -272,6 +272,9 @@ module Expr = struct
 
   let map_bindings expr ~f = map expr ~f:(fun expr -> `Defer expr) ~var:f
 
+  (* FIXME: let bindings should be generalized as soon as parsed - and this should also
+     only generalize type variables that are owned by this scope *)
+
   let rec generalize_let_bindings ~names ~types =
     map_bindings ~f:(fun { rec_; bindings; body } ->
       let bindings =

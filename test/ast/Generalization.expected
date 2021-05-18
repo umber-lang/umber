@@ -1,0 +1,18 @@
+(Generalization ()
+ ((Let
+   (((Catch_all (f))
+     ((Lambda (Catch_all (x))
+       (Let
+        ((rec_ true)
+         (bindings
+          ((((Catch_all (id)) (Function (Var a) (Var a)))
+            (Lambda (Catch_all (z)) (Name (() z))))))
+         (body (Name (() id))))))
+      (Function (Var a) (Function (Var b) (Var b)))))))
+  (Let
+   (((Catch_all (g))
+     ((Lambda (Catch_all (x))
+       (Let
+        ((rec_ true) (bindings ((((Catch_all (y)) (Var a)) (Name (() x)))))
+         (body (Name (() y))))))
+      (Function (Var a) (Var a))))))))
