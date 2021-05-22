@@ -97,7 +97,7 @@ module Context : sig
   type t [@@deriving sexp_of]
 
   val of_name_bindings : Name_bindings.t -> t
-  val add_value_name : t -> Value_name.Qualified.t -> t * Unique_name.t
+  val add_value_name : t -> Value_name.t -> t * Unique_name.t
   val find_value_name : t -> Value_name.Qualified.t -> Unique_name.t
   val add_empty : t -> t * Unique_name.t
   val find_empty : t -> Unique_name.t
@@ -109,24 +109,37 @@ end = struct
     }
   [@@deriving sexp_of]
 
-  let add_value_name t name =
+  let empty_name = [], Value_name.empty
+
+  let add t name =
     let name = Value_name.Qualified.to_ustring name in
     let name' = Unique_name.of_ustring name in
     { t with names = Map.set t.names ~key:name ~data:name' }, name'
   ;;
 
-  let empty_name = [], Value_name.empty
-  let add_empty t = add_value_name t empty_name
+  let add_value_name t name =
+    let path = Name_bindings.(current_path t.name_bindings |> Path.to_module_path) in
+    add t (path, name)
+  ;;
 
-  let find_value_name { names; _ } name =
+  let add_empty t = add t empty_name
+
+  let find { names; _ } name =
     match Map.find names (Value_name.Qualified.to_ustring name) with
     | Some name -> name
     | None ->
       compiler_bug
-        [%message "Context.find_value_name: missing" (name : Value_name.Qualified.t)]
+        [%message
+          "Context.find_value_name: missing"
+            (name : Value_name.Qualified.t)
+            (names : Unique_name.t Ustring.Map.t)]
   ;;
 
-  let find_empty t = find_value_name t empty_name
+  let find_value_name t name =
+    find t (Name_bindings.absolutify_value_name t.name_bindings name)
+  ;;
+
+  let find_empty t = find t empty_name
 
   (* TODO: clean up *)
   (*let add_cnstr t ~names name entry =
@@ -145,10 +158,9 @@ end = struct
   ;;*)
 
   let of_name_bindings name_bindings =
-    Name_bindings.fold_local_names
-      name_bindings
-      ~init:{ names = Ustring.Map.empty; name_bindings }
-      ~f:(fun t name _entry -> fst (add_value_name t name))
+    let t = { names = Ustring.Map.empty; name_bindings } in
+    Name_bindings.fold_local_names name_bindings ~init:t ~f:(fun t name _entry ->
+      fst (add t name))
   ;;
 
   let rec cnstr_index ({ name_bindings; _ } as t) scheme cnstr_name =
@@ -215,7 +227,7 @@ module Expr = struct
           let f' = f', Type.Expr.Function (arg_type', result_type) in
           loop f' (arg', arg_type') (of_typed_expr ~ctx arg :: args) (arg_num + 1)
         | Name _ | Lambda _ | Match _ | Let _ ->
-          let func = { arg_num; body = of_typed_expr ~ctx (f, f_type) } in
+          let func = { arg_num = arg_num + 1; body = of_typed_expr ~ctx (f, f_type) } in
           Fun_call (func, of_typed_expr ~ctx arg :: args)
         | Literal _ | Tuple _ | Record_literal _ | Record_update _ | Record_field_access _
           ->
@@ -275,26 +287,25 @@ type t = Stmt.t list [@@deriving sexp_of]
 let of_typed_module =
   let underscore = Value_name.of_string_unchecked "_" in
   (* TODO: warn/error if bindings are not exhaustive *)
-  let rec bind_pattern ~ctx path pattern mir_expr stmts : Context.t * Stmt.t list =
+  let rec bind_pattern ~ctx pattern mir_expr stmts : Context.t * Stmt.t list =
     match (pattern : Typed.Pattern.t) with
     | Catch_all name ->
       let name = Option.value name ~default:underscore in
-      let ctx, name = Context.add_value_name ctx (path, name) in
+      let ctx, name = Context.add_value_name ctx name in
       ctx, Value_def (name, mir_expr) :: stmts
     | Record _ ->
       (* Assert the result can be destructed, then destruct it, binding to the names *)
       failwith "TODO: record pattern bindings"
     | As (pattern, name) ->
-      (* TODO: this isn't good as it duplicates the expression *)
-      let ctx, name = Context.add_value_name ctx (path, name) in
-      bind_pattern ~ctx path pattern (Name name) (Value_def (name, mir_expr) :: stmts)
+      let ctx, name = Context.add_value_name ctx name in
+      bind_pattern ~ctx pattern (Name name) (Value_def (name, mir_expr) :: stmts)
     | Cnstr_appl (_, args) | Tuple args ->
       (* TODO: Need to assert that the constructor actually matched and throw an
          exception otherwise *)
       let ctx, name = Context.add_empty ctx in
       let stmts = Stmt.Value_def (name, mir_expr) :: stmts in
       List.foldi args ~init:(ctx, stmts) ~f:(fun i (ctx, stmts) arg ->
-        bind_pattern ~ctx path arg (Get_block_field (i, Name name)) stmts)
+        bind_pattern ~ctx arg (Get_block_field (i, Name name)) stmts)
     | Constant _ ->
       (* Assert equality between the result and the constant *)
       failwith "TODO: constant pattern bindings"
@@ -302,7 +313,7 @@ let of_typed_module =
       (* Assert both cases can be bound to *)
       failwith "TODO: union pattern bindings"
   in
-  let loop ~ctx path (defs : Typed.Module.def Node.t list) =
+  let loop ~ctx (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, []) ~f:(fun (ctx, stmts) def ->
       match def.Node.node with
       | Let bindings ->
@@ -311,16 +322,16 @@ let of_typed_module =
           ~init:(ctx, stmts)
           ~f:(fun (ctx, stmts) { node = pattern, expr; _ } ->
           let mir_expr = Expr.of_typed_expr ~ctx expr in
-          bind_pattern ~ctx path pattern mir_expr stmts)
-      | Module (_, _, _) | Trait (_, _, _, _) | Impl (_, _, _, _) ->
-        failwith "TODO: Ir.of_typed_module leftover cases"
+          bind_pattern ~ctx pattern mir_expr stmts)
+      | Module (_, _, _) ->
+        (* TODO: remember to update the name_bindings current_path *)
+        failwith "TODO: MIR submodules"
+      | Trait (_, _, _, _) | Impl (_, _, _, _) -> failwith "TODO: MIR traits/impls"
       | Common_def _ -> ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
-    let path = Name_bindings.(current_path names |> Path.to_module_path) in
-    let _ctx, stmts =
-      loop ~ctx:(Context.of_name_bindings names) (path @ [ module_name ]) defs
-    in
+    let names = Name_bindings.into_module names module_name ~place:`Def in
+    let _ctx, stmts = loop ~ctx:(Context.of_name_bindings names) defs in
     List.rev stmts
 ;;
 
