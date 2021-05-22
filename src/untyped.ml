@@ -34,6 +34,8 @@ module Pattern = struct
   module Names = struct
     type t = Name_bindings.Name_entry.t Value_name.Map.t [@@deriving sexp]
 
+    let empty = Value_name.Map.empty
+
     (* TODO: consider making this a map to types directly, since let_inferred is always used *)
     let add_name pat_names name typ =
       let name_entry = Name_bindings.Name_entry.let_inferred typ in
@@ -84,7 +86,7 @@ module Expr = struct
     | Op_tree of (Value_name.Qualified.t, t) Btree.t
     | Lambda of Pattern.t * t
     | If of t * t * t
-    | Match of t * (Pattern.t * t) list
+    | Match of t * (Pattern.t * t) Non_empty.t
     | Let of (Pattern.t, t) Let_binding.t
     | Tuple of t list
     | Seq_literal of t list
@@ -117,7 +119,7 @@ module Expr = struct
         loop ~names (loop ~names (loop ~names used locals cond) locals then_) locals else_
       | Match (expr, branches) ->
         let used = loop ~names used locals expr in
-        List.fold branches ~init:used ~f:(fun used (pat, branch) ->
+        Non_empty.fold branches ~init:used ~f:(fun used (pat, branch) ->
           loop ~names used (add_locals locals pat) branch)
       | Let { rec_; bindings; body } ->
         let new_locals =

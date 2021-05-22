@@ -181,11 +181,12 @@ match_branch:
     { Pattern.union left (fst right), snd right }
 
 match_branches:
-  | PIPE; branches = separated_nonempty_list(PIPE, match_branch) { branches }
+  | PIPE; branches = separated_nonempty_list(PIPE, match_branch)
+    { Non_empty.of_list_exn branches }
   | INDENT; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch); DEDENT
-    { branches }
+    { Non_empty.of_list_exn branches }
   | LINE_SEP; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch)
-    { branches }
+    { Non_empty.of_list_exn branches }
 
 let_rec:
   | LET { true }

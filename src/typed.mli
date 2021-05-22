@@ -29,9 +29,9 @@ module Expr : sig
   type 'typ t =
     | Literal of Untyped.Literal.t
     | Name of Value_name.Qualified.t
-    | Fun_call of 'typ t * 'typ t
+    | Fun_call of 'typ t * 'typ t * 'typ
     | Lambda of Pattern.t * 'typ t
-    | Match of 'typ t * (Pattern.t * 'typ t) list
+    | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Non_empty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     (* TODO: replace Tuple with some kind of built-in constructor
        e.g. _Tuple2, _Tuple3, depending on the length *)
