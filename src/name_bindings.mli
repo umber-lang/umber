@@ -63,10 +63,10 @@ val merge_names
   -> t
 
 (** Find a type declaration given a qualified name *)
-val find_type_decl : t -> Type_name.Qualified.t -> Type.Decl.t
+val find_type_decl : ?defs_only:bool -> t -> Type_name.Qualified.t -> Type.Decl.t
 
 (** Find a type declaration given an absolute qualified name *)
-val find_absolute_type_decl : t -> Type_name.Qualified.t -> Type.Decl.t
+val find_absolute_type_decl : ?defs_only:bool -> t -> Type_name.Qualified.t -> Type.Decl.t
 
 (** Convert a qualified type name to one with an absolute module path *)
 val absolutify_type_name : t -> Type_name.Qualified.t -> Type_name.Qualified.t

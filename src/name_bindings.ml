@@ -271,7 +271,7 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
-let rec resolve_path =
+let resolve_path =
   let open Option.Let_syntax in
   let rec loop_sigs t path sigs =
     match path with
@@ -280,7 +280,7 @@ let rec resolve_path =
       (match%bind Map.find sigs.modules module_name with
       | Local (None, sigs) -> loop_sigs t rest sigs
       | Local (Some _, _) -> .
-      | Imported (path, ()) -> resolve_path t path)
+      | Imported (path, ()) -> resolve_path t path ~defs_only:false)
   and loop_defs t current_path path defs =
     match path with
     | [] -> Some (Defs defs)
@@ -298,12 +298,25 @@ let rec resolve_path =
         (match go_into, sigs with
         | `Sig, Some sigs -> loop_sigs t rest sigs
         | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
-      | Imported (path, ()) -> resolve_path t path)
+      | Imported (path, ()) -> resolve_path t path ~defs_only:false)
+  and loop_defs_only t path defs =
+    match path with
+    | [] -> Some (Defs defs)
+    | module_name :: rest ->
+      (match%bind Map.find defs.modules module_name with
+      | Local (_, defs) -> loop_defs_only t rest defs
+      | Imported (path, ()) -> resolve_path t path ~defs_only:true)
+  and resolve_path t path ~defs_only =
+    if defs_only
+    then loop_defs_only t path t.toplevel
+    else loop_defs t (Some t.current_path) path t.toplevel
   in
-  fun t path -> loop_defs t (Some t.current_path) path t.toplevel
+  resolve_path
 ;;
 
-let resolve_path_exn t path = or_name_error_path (resolve_path t path) path
+let resolve_path_exn t path ~defs_only =
+  or_name_error_path (resolve_path t path ~defs_only) path
+;;
 
 let with_path t path ~f =
   let t', x = f { t with current_path = path } in
@@ -311,17 +324,19 @@ let with_path t path ~f =
 ;;
 
 let find =
-  let rec loop ?at_path t ((path, name) as input) ~f ~to_ustring =
+  let rec loop ?at_path ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
     let at_path = Option.value at_path ~default:(Path.to_module_path t.current_path) in
-    let bindings_at_current = resolve_path_exn t at_path in
+    let bindings_at_current = resolve_path_exn ~defs_only t at_path in
     match List.hd path with
     | Some first_module ->
       let full_path = at_path @ path in
       let f bindings =
         if Map.mem bindings.modules first_module
         then (
-          let bindings = or_name_error_path (resolve_path t full_path) at_path in
+          let bindings =
+            or_name_error_path (resolve_path ~defs_only t full_path) at_path
+          in
           option_or_default (f full_path name bindings) ~f:(fun () ->
             raise (Name_error (to_ustring input))))
         else check_parent t at_path input ~f ~to_ustring
@@ -358,13 +373,14 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_decl' ?at_path t name =
+let find_type_decl' ?at_path ?defs_only t name =
   let open Option.Let_syntax in
   find
     ?at_path
     t
     name
     ~to_ustring:Type_name.Qualified.to_ustring
+    ?defs_only
     ~f:(fun path name bindings ->
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
@@ -456,7 +472,7 @@ let import_filtered t path ~f =
     }
   in
   let bindings_to_import =
-    match resolve_path_exn t path with
+    match resolve_path_exn t path ~defs_only:false with
     | Sigs sigs -> map_to_imports_filtered path ~f sigs
     | Defs defs -> map_to_imports_filtered path ~f defs
   in
@@ -597,6 +613,7 @@ let add_type_placeholder t type_name =
   update_current t ~f:{ f }
 ;;
 
+(* TODO: document the exact semantics of this *)
 let fold_local_names t ~init ~f =
   let fold_local t path bindings init =
     Map.fold bindings.names ~init ~f:(fun ~key:name ~data acc ->
@@ -625,7 +642,7 @@ let fold_local_names t ~init ~f =
       | Imported _ -> acc)
   in
   let path = Path.to_module_path t.current_path in
-  match resolve_path_exn t (Path.to_module_path t.current_path) with
+  match resolve_path_exn t (Path.to_module_path t.current_path) ~defs_only:false with
   | Sigs sigs -> fold_sigs t path sigs ~init ~f
   | Defs defs -> fold_defs t path defs ~init ~f
 ;;
@@ -645,20 +662,24 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let rec find_type_decl ?at_path t type_name =
-  resolve_decl_or_import ?at_path t (snd (find_type_decl' ?at_path t type_name))
+let rec find_type_decl ?at_path ?defs_only t type_name =
+  resolve_decl_or_import
+    ?at_path
+    ?defs_only
+    t
+    (snd (find_type_decl' ?at_path ?defs_only t type_name))
 
-and resolve_decl_or_import ?at_path t = function
+and resolve_decl_or_import ?at_path ?defs_only t = function
   | Some (Or_imported.Local decl) -> Some decl
   | Some (Imported path_name) ->
     (* TODO: pretty sure this import path should be resolved at the place it's written,
        not the current path - this goes for all imports, unless we absolutify their paths *)
-    find_type_decl ?at_path t path_name
+    find_type_decl ?at_path ?defs_only t path_name
   | None -> None
 ;;
 
-let find_type_decl ?at_path t type_name =
-  option_or_default (find_type_decl ?at_path t type_name) ~f:(fun () ->
+let find_type_decl ?at_path ?(defs_only = false) t type_name =
+  option_or_default (find_type_decl ?at_path ~defs_only t type_name) ~f:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
@@ -743,12 +764,12 @@ module Sigs_or_defs = struct
     match bindings with
     | Sigs bindings ->
       (match%bind Map.find bindings.modules module_name with
-      | Imported (path, ()) -> resolve_path t path
+      | Imported (path, ()) -> resolve_path t path ~defs_only:false
       | Local (None, sigs) -> Some (Sigs sigs)
       | Local (Some _, _) -> .)
     | Defs bindings ->
       (match%bind Map.find bindings.modules module_name with
-      | Imported (path, ()) -> resolve_path t path
+      | Imported (path, ()) -> resolve_path t path ~defs_only:false
       | Local (Some sigs, _) -> Some (Sigs sigs)
       | Local (None, defs) -> Some (Defs defs))
   ;;

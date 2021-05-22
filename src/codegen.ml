@@ -37,12 +37,14 @@ let codegen_expr state ((expr, _) : Typed.Expr.generalized) =
   | Literal lit -> codegen_literal state lit
   | Name _ ->
     failwith "TODO: name" (*name -> Name_table.find_or_add state.names name typ*)
-  | Fun_call (_, _)
-  | Lambda (_, _)
-  | Match (_, _)
-  | Let _ | Tuple _ | Record_literal _
-  | Record_update (_, _)
-  | Record_field_access (_, _) -> failwith "TODO: codegen_expr leftovers"
+  | Fun_call _
+  | Lambda _
+  | Match _
+  | Let _
+  | Tuple _
+  | Record_literal _
+  | Record_update _
+  | Record_field_access _ -> failwith "TODO: codegen_expr leftovers"
 ;;
 
 (*let context = global_context ()
