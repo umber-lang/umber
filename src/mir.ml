@@ -22,7 +22,10 @@ end
 
 module Value_kind = struct
   type t =
-    (* TODO: how on earth will Var work? *)
+    (* TODO: how on earth will Var work?
+       - This should probably be removed, as later we plan to monomorphize per Value_kind,
+         so all Value_kinds will be concrete. For now, we can take Var to mean Block
+         and box everything. *)
     | Var of Type.Param.t
     | Bool
     | Int64
@@ -32,7 +35,7 @@ module Value_kind = struct
     (* TODO: how will functions be represented? As blocks? Names cannot be given to every
        function as you can create arbitrarily many
        - also need to keep track of bound names *)
-    | Closure of t Non_empty.t * t
+    | Closure of t Nonempty.t * t
     (* Block representation: header + fields (fields must all be 64 bits (1 word) in length)
        Header describes which fields are pointers for the GC: i32, i32 for pointers, non-pointers
        - TODO: where should constructor tags go? Get their own field?
@@ -86,8 +89,8 @@ module Value_kind = struct
       let rec loop args result =
         match (result : Type.Scheme.t) with
         | Function (arg, result) ->
-          loop (Non_empty.cons (of_type_scheme ~names arg) args) result
-        | _ -> Closure (Non_empty.rev args, of_type_scheme ~names result)
+          loop (Nonempty.cons (of_type_scheme ~names arg) args) result
+        | _ -> Closure (Nonempty.rev args, of_type_scheme ~names result)
       in
       loop [ of_type_scheme ~names arg ] result
   ;;*)
@@ -197,15 +200,19 @@ module Expr = struct
   type t =
     | Literal of Untyped.Literal.t
     | Name of Unique_name.t
-    (* TODO: closure env *)
+    (* TODO: recursive lets? Mutual recursion? *)
+    | Let of Unique_name.t * t * t
+    (* TODO: closure env - pass a pointer to a struct with all the free variables *)
     | Closure of func
-    | Fun_call of func * t Non_empty.t
+    | Fun_call of func * t Nonempty.t
     | Get_block_field of int * t
-    (* TODO: enforce that all switch cases have the same type + support switch on blocks *)
-    | Switch of t * (Untyped.Literal.t * t) Non_empty.t
+    (* TODO: enforce that all switch cases have the same type + support switch on blocks
+       - actually I'm not sure if this makes sense - variants will have different
+         Value_kinds e.g. Int64 vs Block *)
+    | Switch of t * (Untyped.Literal.t * t) Nonempty.t
 
   and func =
-    { (*args : (Unique_name.t * Value_kind.t) Non_empty.t
+    { (*args : (Unique_name.t * Value_kind.t) Nonempty.t
     ; returns : Value_kind.t*)
       (* TODO: monomorphize functions/types per [Value_kind.t]. For now we can just box
        everything. *)
@@ -214,8 +221,37 @@ module Expr = struct
     }
   [@@deriving sexp_of]
 
-  let rec of_typed_expr ~ctx ((expr, typ) : Typed.Expr.generalized) =
-    match expr, typ with
+  let rec fold_let_pattern ~ctx ~init:acc ~add_let pattern (mir_expr : t) =
+    let underscore = Value_name.of_string_unchecked "_" in
+    (* TODO: warn/error if bindings are not exhaustive *)
+    match (pattern : Typed.Pattern.t) with
+    | Catch_all name ->
+      let name = Option.value name ~default:underscore in
+      let ctx, name = Context.add_value_name ctx name in
+      ctx, add_let acc name mir_expr
+    | As (pattern, name) ->
+      let ctx, name = Context.add_value_name ctx name in
+      let acc = add_let acc name mir_expr in
+      fold_let_pattern ~ctx ~init:acc ~add_let pattern (Name name)
+    | Cnstr_appl (_, args) | Tuple args ->
+      (* TODO: Need to assert that the constructor actually matched and throw an
+         exception otherwise *)
+      let ctx, name = Context.add_empty ctx in
+      let acc = add_let acc name mir_expr in
+      List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
+        fold_let_pattern ~ctx ~init:acc ~add_let arg (Get_block_field (i, Name name)))
+    | Constant _ ->
+      (* Assert equality between the result and the constant *)
+      failwith "TODO: constant pattern bindings"
+    | Union (_, _) ->
+      (* Assert both cases can be bound to *)
+      failwith "TODO: union pattern bindings"
+    | Record _ ->
+      (* Assert the result can be destructed, then destruct it, binding to the names *)
+      failwith "TODO: record pattern bindings"
+  ;;
+
+  let rec of_typed_expr ~ctx : Typed.Expr.generalized -> t = function
     | Literal lit, _ -> Literal lit
     | Name name, _ -> Name (Context.find_value_name ctx name)
     (* FIXME: we've discarded all but the result type - is that bad? How can we easily
@@ -241,10 +277,10 @@ module Expr = struct
     (* TODO: coalesce multi-argument functions *)
     | Lambda (_, body), Function (_, body_type) ->
       Closure { arg_num = 1; body = of_typed_expr ~ctx (body, body_type) }
-    | Match (expr, expr_type, branches), _ ->
+    | Match (expr, expr_type, branches), match_type ->
       (* TODO: switch statement optimization *)
       let branches =
-        Non_empty.map branches ~f:(fun (pat, expr) ->
+        Nonempty.map branches ~f:(fun (pat, expr) ->
           let switch_case : Untyped.Literal.t =
             match pat with
             | Cnstr_appl ((_, cnstr_name), []) ->
@@ -255,15 +291,30 @@ module Expr = struct
                 [%message
                   "TODO: unimplemented match to switch pattern" (pat : Typed.Pattern.t)]
           in
-          switch_case, of_typed_expr ~ctx (expr, typ))
+          switch_case, of_typed_expr ~ctx (expr, match_type))
       in
-      Switch (of_typed_expr ~ctx (expr, typ), branches)
-    | Let _, _ | Tuple _, _ -> failwith "TODO: MIR let/tuple expr"
-    | Record_literal _, _ | Record_update (_, _), _ | Record_field_access (_, _), _ ->
+      Switch (of_typed_expr ~ctx (expr, match_type), branches)
+    | Let { rec_; bindings; body }, body_type ->
+      (* TODO: let statements in expressions should be able to be made into global statements
+         (e.g. to define static functions/values) - not all lets should be global though e.g.
+         for simple expressions like `let y = x + x; (y, y)` *)
+      if rec_
+      then failwith "TODO: let rec in MIR expr"
+      else (
+        let _ctx, acc =
+          Nonempty.fold bindings ~init:(ctx, []) ~f:(fun (ctx, acc) ((pat, typ), expr) ->
+            let mir_expr = of_typed_expr ~ctx (expr, typ) in
+            let add_let acc name mir_expr = (name, mir_expr) :: acc in
+            fold_let_pattern ~ctx pat mir_expr ~init:acc ~add_let)
+        in
+        let body = of_typed_expr ~ctx (body, body_type) in
+        List.fold acc ~init:body ~f:(fun body (name, mir_expr) ->
+          Let (name, mir_expr, body)))
+    | Tuple _, _ -> failwith "TODO: MIR tuple expr"
+    | Record_literal _, _ | Record_update _, _ | Record_field_access _, _ ->
       failwith "TODO: records in MIR exprs"
-    | Lambda (_, _), (Var _ | Type_app (_, _) | Tuple _) ->
-      compiler_bug
-        [%message "Incompatible expr and type" (expr, typ : Typed.Expr.generalized)]
+    | (Lambda _, (Var _ | Type_app _ | Tuple _)) as expr ->
+      compiler_bug [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
   ;;
 end
 
@@ -285,34 +336,6 @@ end
 type t = Stmt.t list [@@deriving sexp_of]
 
 let of_typed_module =
-  let underscore = Value_name.of_string_unchecked "_" in
-  (* TODO: warn/error if bindings are not exhaustive *)
-  let rec bind_pattern ~ctx pattern mir_expr stmts : Context.t * Stmt.t list =
-    match (pattern : Typed.Pattern.t) with
-    | Catch_all name ->
-      let name = Option.value name ~default:underscore in
-      let ctx, name = Context.add_value_name ctx name in
-      ctx, Value_def (name, mir_expr) :: stmts
-    | Record _ ->
-      (* Assert the result can be destructed, then destruct it, binding to the names *)
-      failwith "TODO: record pattern bindings"
-    | As (pattern, name) ->
-      let ctx, name = Context.add_value_name ctx name in
-      bind_pattern ~ctx pattern (Name name) (Value_def (name, mir_expr) :: stmts)
-    | Cnstr_appl (_, args) | Tuple args ->
-      (* TODO: Need to assert that the constructor actually matched and throw an
-         exception otherwise *)
-      let ctx, name = Context.add_empty ctx in
-      let stmts = Stmt.Value_def (name, mir_expr) :: stmts in
-      List.foldi args ~init:(ctx, stmts) ~f:(fun i (ctx, stmts) arg ->
-        bind_pattern ~ctx arg (Get_block_field (i, Name name)) stmts)
-    | Constant _ ->
-      (* Assert equality between the result and the constant *)
-      failwith "TODO: constant pattern bindings"
-    | Union (_, _) ->
-      (* Assert both cases can be bound to *)
-      failwith "TODO: union pattern bindings"
-  in
   let loop ~ctx (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, []) ~f:(fun (ctx, stmts) def ->
       match def.Node.node with
@@ -322,7 +345,8 @@ let of_typed_module =
           ~init:(ctx, stmts)
           ~f:(fun (ctx, stmts) { node = pattern, expr; _ } ->
           let mir_expr = Expr.of_typed_expr ~ctx expr in
-          bind_pattern ~ctx pattern mir_expr stmts)
+          let add_let stmts name mir_expr = Stmt.Value_def (name, mir_expr) :: stmts in
+          Expr.fold_let_pattern ~ctx pattern mir_expr ~init:stmts ~add_let)
       | Module (_, _, _) ->
         (* TODO: remember to update the name_bindings current_path *)
         failwith "TODO: MIR submodules"
