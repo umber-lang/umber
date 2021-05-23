@@ -14,15 +14,20 @@
          (Function (Type_app (() String) ()) (Tuple ()))))))
      (Let
       (((Catch_all (print_source))
-        ((Lambda (Tuple ()) (Fun_call (Name (() print)) (Name (() source))))
+        ((Lambda (Tuple ())
+          (Fun_call (Name (() print)) (Name (() source))
+           (Type_app (() String) ())))
          (Function (Tuple ()) (Tuple ())))))))))
   (Let
    (((Catch_all (print_source))
      ((Lambda (Tuple ())
        (Fun_call
         (Fun_call (Name (() ";"))
-         (Fun_call (Name ((A) print_source)) (Tuple ())))
-        (Fun_call (Name (() print)) (Name (() source)))))
+         (Fun_call (Name ((A) print_source)) (Tuple ()) (Tuple ()))
+         (Tuple ()))
+        (Fun_call (Name (() print)) (Name (() source))
+         (Type_app (() String) ()))
+        (Tuple ())))
       (Function (Tuple ()) (Tuple ()))))))
   (Common_def (Val empty () (() (Type_app (() List) ((Var a))))))
   (Let

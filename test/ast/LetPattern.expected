@@ -9,20 +9,26 @@
       ((Thing1 ((Type_app (() Int) ()))) (Thing2 ((Type_app (() Int) ()))))))))
   (Let
    (((Cnstr_appl (() Thing1) ((Catch_all (one))))
-     ((Fun_call (Name (() Thing1)) (Literal (Int 1)))
+     ((Fun_call (Name (() Thing1)) (Literal (Int 1)) (Type_app (() Int) ()))
       (Type_app ((LetPattern) Thing) ())))))
   (Let
    (((Catch_all (make_thing))
      ((Lambda (Catch_all (""))
-       (Match (Name (() ""))
-        (((Constant (Int 1)) (Fun_call (Name (() Thing1)) (Literal (Int 1))))
-         ((Constant (Int 2)) (Fun_call (Name (() Thing2)) (Literal (Int 2))))
-         ((Catch_all (n)) (Fun_call (Name (() Thing1)) (Name (() n)))))))
+       (Match (Name (() "")) (Type_app (() Int) ())
+        (((Constant (Int 1))
+          (Fun_call (Name (() Thing1)) (Literal (Int 1))
+           (Type_app (() Int) ())))
+         ((Constant (Int 2))
+          (Fun_call (Name (() Thing2)) (Literal (Int 2))
+           (Type_app (() Int) ())))
+         ((Catch_all (n))
+          (Fun_call (Name (() Thing1)) (Name (() n)) (Type_app (() Int) ()))))))
       (Function (Type_app (() Int) ()) (Type_app ((LetPattern) Thing) ()))))))
   (Let
    (((Union (Cnstr_appl (() Thing1) ((Catch_all (n))))
       (Cnstr_appl (() Thing2) ((Catch_all (n)))))
-     ((Fun_call (Name (() make_thing)) (Literal (Int 7)))
+     ((Fun_call (Name (() make_thing)) (Literal (Int 7))
+       (Type_app (() Int) ()))
       (Type_app ((LetPattern) Thing) ())))))
   (Common_def
    (Type_decl Triple
@@ -30,9 +36,11 @@
   (Let
    (((Catch_all ())
      ((Fun_call
-       (Fun_call (Fun_call (Name (() Triple)) (Literal (String s)))
-        (Literal (Int 1)))
-       (Literal (Int 2)))
+       (Fun_call
+        (Fun_call (Name (() Triple)) (Literal (String s))
+         (Type_app (() String) ()))
+        (Literal (Int 1)) (Type_app (() Int) ()))
+       (Literal (Int 2)) (Type_app (() Int) ()))
       (Type_app ((LetPattern) Triple)
        ((Type_app (() String) ()) (Type_app (() Int) ())
         (Type_app (() Int) ())))))))
@@ -50,9 +58,10 @@
        ((Catch_all (x)) (Catch_all (y)) (Constant (Int 5)))))
      ((Fun_call
        (Fun_call
-        (Fun_call (Name (() Triple)) (Literal (String "Weird stuff")))
-        (Literal (Int 5)))
-       (Literal (Int 7)))
+        (Fun_call (Name (() Triple)) (Literal (String "Weird stuff"))
+         (Type_app (() String) ()))
+        (Literal (Int 5)) (Type_app (() Int) ()))
+       (Literal (Int 7)) (Type_app (() Int) ()))
       (Type_app ((LetPattern) Triple)
        ((Type_app (() String) ()) (Type_app (() Int) ())
         (Type_app (() Int) ())))))))

@@ -23,7 +23,8 @@
     (() (Function (Type_app (() Char) ()) (Type_app (() Char) ())))))
   (Let
    (((Catch_all (id_for_bools))
-     ((Lambda (Catch_all (x)) (Fun_call (Name (() id)) (Name (() x))))
+     ((Lambda (Catch_all (x))
+       (Fun_call (Name (() id)) (Name (() x)) (Type_app (() Bool) ())))
       (Function (Type_app (() Bool) ()) (Type_app (() Bool) ()))))))
   (Let
    (((Tuple ((Catch_all (id_alias)) (Catch_all (five))))
@@ -32,18 +33,19 @@
   (Let
    (((Catch_all (|>))
      ((Lambda (Catch_all (x))
-       (Lambda (Catch_all (f)) (Fun_call (Name (() f)) (Name (() x)))))
+       (Lambda (Catch_all (f))
+        (Fun_call (Name (() f)) (Name (() x)) (Var a))))
       (Function (Var a) (Function (Function (Var a) (Var b)) (Var b)))))))
   (Let
    (((Catch_all (if_))
      ((Lambda (Catch_all (then_))
        (Lambda (Catch_all (else_))
         (Lambda (Catch_all (""))
-         (Match (Name (() ""))
+         (Match (Name (() "")) (Type_app (() Bool) ())
           (((Cnstr_appl (() True) ())
-            (Fun_call (Name (() then_)) (Tuple ())))
+            (Fun_call (Name (() then_)) (Tuple ()) (Tuple ())))
            ((Cnstr_appl (() False) ())
-            (Fun_call (Name (() else_)) (Tuple ()))))))))
+            (Fun_call (Name (() else_)) (Tuple ()) (Tuple ()))))))))
       (Function (Function (Tuple ()) (Var a))
        (Function (Function (Tuple ()) (Var a))
         (Function (Type_app (() Bool) ()) (Var a))))))))))
