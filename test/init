@@ -4,4 +4,5 @@ for path in "$dir"/examples/*; do
     expected="${file%.*}.expected"
     touch "$dir/tokens/$expected"
     touch "$dir/ast/$expected"
+    touch "$dir/mir/$expected"
 done

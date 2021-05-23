@@ -31,5 +31,6 @@ let () =
     ~f:(fun filename ->
       let bare_filename = Filename.chop_extension filename in
       handle_dir "tokens" bare_filename;
-      handle_dir "ast" bare_filename)
+      handle_dir "ast" bare_filename;
+      handle_dir "mir" bare_filename)
 ;;

@@ -13,7 +13,8 @@
   (universe) ; cop-out: see https://dune.readthedocs.io/en/stable/concepts.html#deps-field
   (glob_files examples/*)
   (glob_files tokens/*.expected)
-  (glob_files ast/*.expected))
+  (glob_files ast/*.expected)
+  (glob_files mir/*.expected))
  (action
   (progn
    (ignore-stderr
