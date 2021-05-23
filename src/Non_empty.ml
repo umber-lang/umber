@@ -28,7 +28,14 @@ let rev (x :: xs) =
 
 let append (x :: xs) (y :: ys) = x :: (xs @ (y :: ys))
 let append_list (x :: xs) ys = x :: (xs @ ys)
-let rev_append xs ys = List.rev_append (to_list xs) (to_list ys) |> of_list_exn
+
+let rec rev_append_list xs ys =
+  match xs with
+  | [] -> ys
+  | x :: xs -> rev_append_list xs (x :: to_list ys)
+;;
+
+let rev_append xs = rev_append_list (to_list xs)
 
 include Container.Make (struct
   type nonrec 'a t = 'a t
@@ -67,7 +74,7 @@ let zip (x :: xs) (y :: ys) =
 let unzip ((x, y) :: xys) =
   let rec loop xys xs ys =
     match xys with
-    | [] -> xs, ys
+    | [] -> rev xs, rev ys
     | (x, y) :: xys -> loop xys (x :: to_list xs) (y :: to_list ys)
   in
   loop xys [ x ] [ y ]
