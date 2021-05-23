@@ -182,11 +182,11 @@ match_branch:
 
 match_branches:
   | PIPE; branches = separated_nonempty_list(PIPE, match_branch)
-    { Non_empty.of_list_exn branches }
+    { Nonempty.of_list_exn branches }
   | INDENT; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch); DEDENT
-    { Non_empty.of_list_exn branches }
+    { Nonempty.of_list_exn branches }
   | LINE_SEP; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch)
-    { Non_empty.of_list_exn branches }
+    { Nonempty.of_list_exn branches }
 
 let_rec:
   | LET { true }
@@ -216,7 +216,7 @@ expr:
     { Expr.Let { rec_; bindings = [binding]; body } }
   | rec_ = let_rec; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding_);
     DEDENT; body = expr
-    { Expr.Let { rec_; bindings; body } }
+    { Expr.Let { rec_; bindings = Nonempty.of_list_exn bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
 
 type_record:
@@ -393,12 +393,23 @@ qualified(X):
   | xs = loption(flexible_nonempty_list(separator, X)) { xs }
 
 flexible_nonempty_list(separator, X):
-  | x = X { [x] }
+  | x = X { [ x ] }
   | x = X; separator; xs = flexible_list(separator, X) { x :: xs }
 
 flexible_optional_list(separator, X):
   | separator? { [] }
   | x = X; separator?; xs = flexible_optional_list(separator, X) { x :: xs }
+
+(* TODO: maybe look into trying this again (got reduce-reduce conflicts last time)
+   It must have been resolving them arbitrarily, somehow giving the standard library
+   functions precedence or something (??) *)
+(*nonempty(X):
+  | x = X { [ x ] }
+  | x = X; xs = nonempty(X) { x :: xs }
+
+separated_nonempty(separator, X):
+  | x = X { [ x ] }
+  | x = X; separator; xs = separated_nonempty(separator, X) { x :: xs }*)
 
 %inline maybe_delimited(opening, X, closing):
   | x = either(X, delimited(opening, X, closing)) { x }

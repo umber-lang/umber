@@ -31,7 +31,7 @@ module Expr : sig
     | Name of Value_name.Qualified.t
     | Fun_call of 'typ t * 'typ t * 'typ
     | Lambda of Pattern.t * 'typ t
-    | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Non_empty.t
+    | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     (* TODO: replace Tuple with some kind of built-in constructor
        e.g. _Tuple2, _Tuple3, depending on the length *)

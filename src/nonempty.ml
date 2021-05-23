@@ -1,6 +1,6 @@
 open Import
 
-type 'a t = ( :: ) of 'a * 'a list
+type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash]
 
 let of_list : 'a list -> 'a t option = function
   | x :: xs -> Some (x :: xs)
@@ -9,7 +9,7 @@ let of_list : 'a list -> 'a t option = function
 
 let of_list_exn : 'a list -> 'a t = function
   | x :: xs -> x :: xs
-  | [] -> failwith "Non_empty.of_list_exn: empty list"
+  | [] -> failwith "Nonempty.of_list_exn: empty list"
 ;;
 
 let cons x = function
@@ -78,6 +78,12 @@ let unzip ((x, y) :: xys) =
     | (x, y) :: xys -> loop xys (x :: to_list xs) (y :: to_list ys)
   in
   loop xys [ x ] [ y ]
+;;
+
+let fold_right xs ~init ~f = List.fold_right (to_list xs) ~init ~f
+
+let fold_map xs ~init ~f =
+  List.fold_map (to_list xs) ~init ~f |> Tuple2.map_snd ~f:of_list_exn
 ;;
 
 let is_empty _ = false

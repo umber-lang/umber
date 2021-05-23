@@ -86,7 +86,7 @@ module Expr = struct
     | Op_tree of (Value_name.Qualified.t, t) Btree.t
     | Lambda of Pattern.t * t
     | If of t * t * t
-    | Match of t * (Pattern.t * t) Non_empty.t
+    | Match of t * (Pattern.t * t) Nonempty.t
     | Let of (Pattern.t, t) Let_binding.t
     | Tuple of t list
     | Seq_literal of t list
@@ -119,16 +119,16 @@ module Expr = struct
         loop ~names (loop ~names (loop ~names used locals cond) locals then_) locals else_
       | Match (expr, branches) ->
         let used = loop ~names used locals expr in
-        Non_empty.fold branches ~init:used ~f:(fun used (pat, branch) ->
+        Nonempty.fold branches ~init:used ~f:(fun used (pat, branch) ->
           loop ~names used (add_locals locals pat) branch)
       | Let { rec_; bindings; body } ->
         let new_locals =
-          List.fold bindings ~init:locals ~f:(fun locals (pat, _) ->
+          Nonempty.fold bindings ~init:locals ~f:(fun locals (pat, _) ->
             add_locals locals pat)
         in
         let binding_locals = if rec_ then new_locals else locals in
         let used =
-          List.fold bindings ~init:used ~f:(fun used (_, expr) ->
+          Nonempty.fold bindings ~init:used ~f:(fun used (_, expr) ->
             loop ~names used binding_locals expr)
         in
         loop ~names used new_locals body

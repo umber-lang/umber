@@ -2,7 +2,7 @@ open Import
 
 type ('pat, 'expr) t =
   { rec_ : bool
-  ; bindings : ('pat * 'expr) list
+  ; bindings : ('pat * 'expr) Nonempty.t
   ; body : 'expr
   }
-[@@deriving equal, compare, hash, sexp]
+[@@deriving compare, equal, hash, sexp]

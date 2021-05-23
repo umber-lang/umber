@@ -139,7 +139,7 @@ module Expr = struct
     | Name of Value_name.Qualified.t
     | Fun_call of 'typ t * 'typ t * 'typ
     | Lambda of Pattern.t * 'typ t
-    | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Non_empty.t
+    | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t list
     | Record_literal of (Value_name.t * 'typ t option) list
@@ -186,12 +186,12 @@ module Expr = struct
       | Match (expr, branches) ->
         let expr, expr_type = of_untyped ~names ~types expr in
         let branches, branch_type :: rest =
-          Non_empty.map branches ~f:(fun (pat, branch) ->
+          Nonempty.map branches ~f:(fun (pat, branch) ->
             let names, (_, (pat, pat_typ)) = Pattern.of_untyped_into ~names ~types pat in
             Type_bindings.unify ~names ~types expr_type pat_typ;
             let branch, branch_type = of_untyped ~names ~types branch in
             (pat, branch), branch_type)
-          |> Non_empty.unzip
+          |> Nonempty.unzip
         in
         iter_pairs (branch_type :: rest) ~f:(Type_bindings.unify ~names ~types);
         Match (expr, (expr_type, Untyped.Pattern.Names.empty), branches), branch_type
@@ -201,24 +201,24 @@ module Expr = struct
           then (
             (* Process all bindings at once, allowing mutual recursion *)
             let names, bindings =
-              List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
+              Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
                 let names, (pat_names, (pat, pat_type)) =
                   Pattern.of_untyped_into ~names ~types pat
                 in
                 names, ((pat, (pat_type, pat_names)), expr))
             in
             let bindings =
-              List.map bindings ~f:(Tuple2.map_snd ~f:(of_untyped ~names ~types))
+              Nonempty.map bindings ~f:(Tuple2.map_snd ~f:(of_untyped ~names ~types))
             in
             ( names
-            , List.map
+            , Nonempty.map
                 bindings
                 ~f:(fun (((_, (pat_type, _)) as pat), (expr, expr_type)) ->
                 Type_bindings.unify ~names ~types pat_type expr_type;
                 pat, expr) ))
           else
             (* Process bindings in order without any recursion *)
-            List.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
+            Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
               let names, (pat_names, (pat, pat_type)) =
                 Pattern.of_untyped_into ~names ~types pat
               in
@@ -264,7 +264,7 @@ module Expr = struct
         Match
           ( map ~f ~f_binding ~f_type expr
           , f_type expr_type
-          , Non_empty.map branches ~f:(Tuple2.map_snd ~f:(map ~f ~f_binding ~f_type)) )
+          , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map ~f ~f_binding ~f_type)) )
       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~f_binding ~f_type))
       | Record_literal fields ->
         Record_literal
@@ -285,7 +285,7 @@ module Expr = struct
     map
       ~f_binding:(fun { rec_; bindings; body } ->
         let bindings =
-          List.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
+          Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
             let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
             (pat, scheme), generalize_let_bindings ~names ~types expr)
         in
