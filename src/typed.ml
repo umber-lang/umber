@@ -4,24 +4,17 @@ open Names
 let type_error_msg = Type_bindings.type_error_msg
 
 module Pattern = struct
-  type t =
-    | Constant of Untyped.Literal.t
-    | Catch_all of Value_name.t option
-    | As of t * Value_name.t
-    | Cnstr_appl of Cnstr_name.Qualified.t * t list
-    | Tuple of t list
-    | Record of (Value_name.t * t option) list
-    | Union of t * t
-  [@@deriving sexp]
+  include Pattern
 
+  (* TODO: either split up Untyped/Typed patterns into different types or stop returning
+     a pattern from these functions *)
   let of_untyped_with_names ~names ~types pat =
     let rec of_untyped_with_names ~names ~types pat_names = function
-      | Untyped.Pattern.Constant lit ->
-        pat_names, (Constant lit, Type.Concrete.cast (Untyped.Literal.typ lit))
+      | Constant lit -> pat_names, (Constant lit, Type.Concrete.cast (Literal.typ lit))
       | Catch_all name ->
         let pat_names, typ =
           match name with
-          | Some name -> Untyped.Pattern.Names.add_fresh_name pat_names name
+          | Some name -> Pattern.Names.add_fresh_name pat_names name
           | None -> pat_names, Type.fresh_var ()
         in
         pat_names, (Catch_all name, typ)
@@ -96,7 +89,7 @@ module Pattern = struct
         pat_names1, (Union (pat1, pat2), typ1)
       | As (pat, name) ->
         let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
-        let pat_names = Untyped.Pattern.Names.add_name pat_names name typ in
+        let pat_names = Pattern.Names.add_name pat_names name typ in
         pat_names, (As (pat, name), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
@@ -135,7 +128,7 @@ end
 
 module Expr = struct
   type 'typ t =
-    | Literal of Untyped.Literal.t
+    | Literal of Literal.t
     | Name of Value_name.Qualified.t
     | Fun_call of 'typ t * 'typ t * 'typ
     | Lambda of Pattern.t * 'typ t
@@ -152,7 +145,7 @@ module Expr = struct
   let of_untyped ~names ~types expr =
     let rec of_untyped ~names ~types expr =
       match (expr : Untyped.Expr.t) with
-      | Literal lit -> Literal lit, Type.Concrete.cast (Untyped.Literal.typ lit)
+      | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit)
       | Name name -> Name name, Name_bindings.find_type names name
       | Qualified (path, expr) ->
         of_untyped ~names:(Name_bindings.import_all names path) ~types expr
@@ -161,7 +154,7 @@ module Expr = struct
         let arg, arg_type = of_untyped ~names ~types arg in
         let result_type = Type.fresh_var () in
         Type_bindings.unify ~names ~types f_type (Function (arg_type, result_type));
-        Fun_call (f, arg, (arg_type, Untyped.Pattern.Names.empty)), result_type
+        Fun_call (f, arg, (arg_type, Pattern.Names.empty)), result_type
       | Op_tree tree -> of_untyped ~names ~types (Op_tree.to_untyped_expr ~names tree)
       | Lambda (pat, body) ->
         let names, (_, (pat, pat_type)) = Pattern.of_untyped_into ~names ~types pat in
@@ -180,7 +173,7 @@ module Expr = struct
         let cnstr name = Pattern.Cnstr_appl (name, []) in
         ( Match
             ( cond
-            , (bool_type, Untyped.Pattern.Names.empty)
+            , (bool_type, Pattern.Names.empty)
             , [ cnstr Core.Bool.true_, then_; cnstr Core.Bool.false_, else_ ] )
         , then_type )
       | Match (expr, branches) ->
@@ -194,7 +187,7 @@ module Expr = struct
           |> Nonempty.unzip
         in
         iter_pairs (branch_type :: rest) ~f:(Type_bindings.unify ~names ~types);
-        Match (expr, (expr_type, Untyped.Pattern.Names.empty), branches), branch_type
+        Match (expr, (expr_type, Pattern.Names.empty), branches), branch_type
       | Let { rec_; bindings; body } ->
         let names, bindings =
           if rec_
@@ -459,7 +452,7 @@ module Module = struct
         List.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
           Name_bindings.merge_names
             names
-            (Untyped.Pattern.Names.gather pat)
+            (Pattern.Names.gather pat)
             ~combine:(fun name entry1 entry2 ->
             match Name_bindings.Name_entry.(type_source entry1, type_source entry2) with
             | Val_declared, Val_declared | Let_inferred, Let_inferred ->
@@ -515,7 +508,7 @@ module Module = struct
   ;;
 
   type intermediate_def =
-    ((Pattern.t * Type.t) * Untyped.Pattern.Names.t, Untyped.Expr.t) Module.def
+    ((Pattern.t * Type.t) * Pattern.Names.t, Untyped.Expr.t) Module.def
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type

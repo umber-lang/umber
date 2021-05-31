@@ -2,32 +2,24 @@ open Import
 open Names
 
 module Pattern : sig
-  type t =
-    | Constant of Untyped.Literal.t
-    | Catch_all of Value_name.t option
-    | As of t * Value_name.t
-    | Cnstr_appl of Cnstr_name.Qualified.t * t list
-    | Tuple of t list
-    | Record of (Value_name.t * t option) list
-    | Union of t * t
-  [@@deriving sexp]
+  include module type of Pattern
 
   val of_untyped_with_names
     :  names:Name_bindings.t
     -> types:Type_bindings.t
-    -> Untyped.Pattern.t
-    -> Untyped.Pattern.Names.t * (t * Type.t)
+    -> t
+    -> Names.t * (t * Type.t)
 
   val of_untyped_into
     :  names:Name_bindings.t
     -> types:Type_bindings.t
-    -> Untyped.Pattern.t
-    -> Name_bindings.t * (Untyped.Pattern.Names.t * (t * Type.t))
+    -> t
+    -> Name_bindings.t * (Names.t * (t * Type.t))
 end
 
 module Expr : sig
   type 'typ t =
-    | Literal of Untyped.Literal.t
+    | Literal of Literal.t
     | Name of Value_name.Qualified.t
     | Fun_call of 'typ t * 'typ t * 'typ
     | Lambda of Pattern.t * 'typ t
@@ -47,7 +39,7 @@ module Expr : sig
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Expr.t
-    -> (Type.t * Untyped.Pattern.Names.t) t * Type.t
+    -> (Type.t * Pattern.Names.t) t * Type.t
 end
 
 module Module : sig
