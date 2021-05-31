@@ -21,39 +21,20 @@ end = struct
 end
 
 module Value_kind = struct
-  type t =
-    (* TODO: how on earth will Var work?
-       - This should probably be removed, as later we plan to monomorphize per Value_kind,
-         so all Value_kinds will be concrete. For now, we can take Var to mean Block
-         and box everything. *)
-    | Var of Type.Param.t
-    | Bool
-    | Int64
-    | Float64
-    | Char (* Unicode scalar value: 4 bytes *)
-    | String
-    (* TODO: how will functions be represented? As blocks? Names cannot be given to every
-       function as you can create arbitrarily many
-       - also need to keep track of bound names *)
-    | Closure of t Nonempty.t * t
-    (* Block representation: header + fields (fields must all be 64 bits (1 word) in length)
-       Header describes which fields are pointers for the GC: i32, i32 for pointers, non-pointers
-       - TODO: where should constructor tags go? Get their own field?
-       - This is also doesn't quite work for things like strings
-       - Haskell does this, but also has a pointer to a table with info about layout
-       See:
-       - https://dev.realworldocaml.org/runtime-memory-layout.html
-       - https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/storage/heap-objects
-    *)
-    (* TODO: block should include number of fields and what to put in them (?) *)
-    | Block
+  type immediate =
+    [ `Int64
+    | `Float64
+    | `Char (* Unicode scalar value: 4 bytes *)
+    ]
   [@@deriving sexp_of]
 
-  (* TODO: String Should be representable some other way - unless this means an inline string?
-     Should just be like Array Char (but packed) unless optimizations based on immutability are done
-     See Rust's &str and String *)
+  type pointer = [ `Block ] [@@deriving sexp_of]
 
-  (* TODO: something like `Block` to represent constructor application/records/tuples/arrays *)
+  type t =
+    [ immediate
+    | pointer
+    ]
+  [@@deriving sexp_of]
 
   (*let of_primitive_type (path, type_name) =
     match path with
@@ -133,13 +114,18 @@ end = struct
     | None ->
       compiler_bug
         [%message
-          "Context.find_value_name: missing"
+          "Name missing from context"
             (name : Value_name.Qualified.t)
             (names : Unique_name.t Ustring.Map.t)]
   ;;
 
   let find_value_name t name =
-    find t (Name_bindings.absolutify_value_name t.name_bindings name)
+    let name =
+      try Name_bindings.absolutify_value_name t.name_bindings name with
+      | Name_bindings.Name_error _ ->
+        Name_bindings.(current_path t.name_bindings |> Path.to_module_path), snd name
+    in
+    find t name
   ;;
 
   let find_empty t = find t empty_name
@@ -189,7 +175,6 @@ end = struct
 end
 
 module Expr = struct
-  (* TODO: probably need more bytecode-like-level instructions e.g. allocate this thing *)
   (* TODO: can put tags in the pointer to the block e.g. constructor tag,
      see https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/haskell-execution/pointer-tagging
      GHC uses 3 bits (on 64-bit architectures) to store up to 7 constructors (0-6). 
@@ -197,6 +182,17 @@ module Expr = struct
      the info table. Not sure if we want to have info tables, so in that case maybe it
      should be another field on the object. We could also do what OCaml does and take up
      some bits in the block header. *)
+  (* For now, lets just store tags in the block itself as another field
+     Later, we can store them in the pointer or block header *)
+  (* Block representation: header + fields (fields must all be 64 bits (1 word) in length)
+     Header describes which fields are pointers for the GC: i32, i32 for pointers, non-pointers
+     - TODO: where should constructor tags go? Get their own field?
+     - This is also doesn't quite work for things like strings
+     - Haskell does this, but also has a pointer to a table with info about layout
+     See:
+     - https://dev.realworldocaml.org/runtime-memory-layout.html
+     - https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/storage/heap-objects *)
+  (* TODO: support for strings (literal is a weird place probably) as well as arrays *)
   type t =
     | Literal of Untyped.Literal.t
     | Name of Unique_name.t
@@ -205,11 +201,17 @@ module Expr = struct
     (* TODO: closure env - pass a pointer to a struct with all the free variables *)
     | Closure of func
     | Fun_call of func * t Nonempty.t
+    | Make_block of t list
     | Get_block_field of int * t
+    | If of t * t * t
     (* TODO: enforce that all switch cases have the same type + support switch on blocks
        - actually I'm not sure if this makes sense - variants will have different
          Value_kinds e.g. Int64 vs Block *)
-    | Switch of t * (Untyped.Literal.t * t) Nonempty.t
+    | Switch of
+        { expr : t
+        ; cases : (Untyped.Literal.t Nonempty.t * t) list
+        ; default : t option
+        }
 
   and func =
     { (*args : (Unique_name.t * Value_kind.t) Nonempty.t
@@ -277,23 +279,32 @@ module Expr = struct
     (* TODO: coalesce multi-argument functions *)
     | Lambda (_, body), Function (_, body_type) ->
       Closure { arg_num = 1; body = of_typed_expr ~ctx (body, body_type) }
-    | Match (expr, expr_type, branches), match_type ->
+    | Match (expr, expr_type, arms), match_type ->
       (* TODO: switch statement optimization *)
-      let branches =
-        Nonempty.map branches ~f:(fun (pat, expr) ->
-          let switch_case : Untyped.Literal.t =
-            match pat with
-            | Cnstr_appl ((_, cnstr_name), []) ->
-              let cnstr_index = Context.cnstr_index ctx expr_type cnstr_name in
-              Int cnstr_index
-            | pat ->
-              raise_s
-                [%message
-                  "TODO: unimplemented match to switch pattern" (pat : Typed.Pattern.t)]
-          in
-          switch_case, of_typed_expr ~ctx (expr, match_type))
+      let rec switch_case : Typed.Pattern.t -> Untyped.Literal.t list = function
+        | Cnstr_appl ((_, cnstr_name), []) ->
+          let cnstr_index = Context.cnstr_index ctx expr_type cnstr_name in
+          [ Int cnstr_index ]
+        | Catch_all _ -> []
+        | As (pattern, _name) -> switch_case pattern
+        | (Cnstr_appl _ | Constant _ | Tuple _ | Record _ | Union (_, _)) as pat ->
+          raise_s
+            [%message
+              "TODO: unimplemented match to switch pattern" (pat : Typed.Pattern.t)]
       in
-      Switch (of_typed_expr ~ctx (expr, match_type), branches)
+      (* TODO: Warn about unused cases *)
+      let cases, default =
+        Nonempty.fold_right arms ~init:([], None) ~f:(fun (pat, expr) (cases, default) ->
+          if Option.is_some default
+          then cases, default
+          else (
+            (* FIXME: need to bind variable names from the switch case when making this *)
+            let expr = of_typed_expr ~ctx (expr, match_type) in
+            match switch_case pat with
+            | [] -> cases, Some expr
+            | case :: rest -> (Nonempty.(case :: rest), expr) :: cases, default))
+      in
+      Switch { expr = of_typed_expr ~ctx (expr, match_type); cases; default }
     | Let { rec_; bindings; body }, body_type ->
       (* TODO: let statements in expressions should be able to be made into global statements
          (e.g. to define static functions/values) - not all lets should be global though e.g.
@@ -310,10 +321,20 @@ module Expr = struct
         let body = of_typed_expr ~ctx (body, body_type) in
         List.fold acc ~init:body ~f:(fun body (name, mir_expr) ->
           Let (name, mir_expr, body)))
-    | Tuple _, _ -> failwith "TODO: MIR tuple expr"
+    | Tuple fields, Tuple field_types ->
+      let fields =
+        List.map2_exn fields field_types ~f:(fun field typ ->
+          of_typed_expr ~ctx (field, typ))
+      in
+      (* FIXME: we can't work out the Value_kind from the type, as it can vary freely 
+         at runtime due to variants. This means that the position of fields in a record
+         can change based on their value, which is kind of nonsense. We may need to
+         abandon pointers/non-pointer separation and just use the bitfield.*)
+      Make_block fields
     | Record_literal _, _ | Record_update _, _ | Record_field_access _, _ ->
       failwith "TODO: records in MIR exprs"
-    | (Lambda _, (Var _ | Type_app _ | Tuple _)) as expr ->
+    | ( Lambda _, (Var _ | Type_app _ | Tuple _)
+      | Tuple _, (Var _ | Type_app _ | Function _) ) as expr ->
       compiler_bug [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
   ;;
 end
