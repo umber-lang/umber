@@ -36,6 +36,8 @@ module Value_kind = struct
     ]
   [@@deriving sexp_of]
 
+  type bool = [ `Block ] [@@deriving sexp_of]
+
   (*let of_primitive_type (path, type_name) =
     match path with
     | [] ->
@@ -75,6 +77,14 @@ module Value_kind = struct
       in
       loop [ of_type_scheme ~names arg ] result
   ;;*)
+end
+
+module Immediate = struct
+  type t =
+    | Int of int
+    | Float of float
+    | Char of Uchar.t
+  [@@deriving sexp_of]
 end
 
 module Context : sig
@@ -193,37 +203,45 @@ module Expr = struct
      - https://dev.realworldocaml.org/runtime-memory-layout.html
      - https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/storage/heap-objects *)
   (* TODO: support for strings (literal is a weird place probably) as well as arrays *)
-  type t =
-    | Literal of Untyped.Literal.t
-    | Name of Unique_name.t
+  type _ t =
+    | Immediate : Immediate.t -> [> Value_kind.immediate ] t
+    | String : Ustring.t -> [> Value_kind.pointer ] t
+    | Name : Unique_name.t -> _ t
     (* TODO: recursive lets? Mutual recursion? *)
-    | Let of Unique_name.t * t * t
+    | Let : Unique_name.t * _ t * 'kind t -> 'kind t
     (* TODO: closure env - pass a pointer to a struct with all the free variables *)
-    | Closure of func
-    | Fun_call of func * t Nonempty.t
-    | Make_block of t list
-    | Get_block_field of int * t
-    | If of t * t * t
+    | Closure : _ func -> [> Value_kind.pointer ] t
+    | Fun_call : 'kind func * _ t Nonempty.t -> 'kind t
+    | Make_block : _ t list -> _ t
+    | Get_block_field : int * Value_kind.pointer t -> _ t
+    | If : Value_kind.bool t * 'kind t * 'kind t -> 'kind t
     (* TODO: enforce that all switch cases have the same type + support switch on blocks
        - actually I'm not sure if this makes sense - variants will have different
          Value_kinds e.g. Int64 vs Block *)
-    | Switch of
-        { expr : t
-        ; cases : (Untyped.Literal.t Nonempty.t * t) list
-        ; default : t option
+    | Switch :
+        { expr : _ t
+        ; cases : (Untyped.Literal.t Nonempty.t * 'kind t) list
+        ; default : 'kind t option
         }
+        -> 'kind t
 
-  and func =
+  and 'kind func =
     { (*args : (Unique_name.t * Value_kind.t) Nonempty.t
     ; returns : Value_kind.t*)
       (* TODO: monomorphize functions/types per [Value_kind.t]. For now we can just box
        everything. *)
       arg_num : int
-    ; body : t
+    ; body : 'kind t
     }
+
+  and block =
+    | Pointers_first of
+        { pointers : Value_kind.pointer t list
+        ; immediates : Value_kind.immediate t list
+        }
   [@@deriving sexp_of]
 
-  let rec fold_let_pattern ~ctx ~init:acc ~add_let pattern (mir_expr : t) =
+  let rec fold_let_pattern ~ctx ~init:acc ~add_let pattern (mir_expr : _ t) =
     let underscore = Value_name.of_string_unchecked "_" in
     (* TODO: warn/error if bindings are not exhaustive *)
     match (pattern : Typed.Pattern.t) with
@@ -253,8 +271,15 @@ module Expr = struct
       failwith "TODO: record pattern bindings"
   ;;
 
-  let rec of_typed_expr ~ctx : Typed.Expr.generalized -> t = function
-    | Literal lit, _ -> Literal lit
+  let of_literal : Untyped.Literal.t -> Value_kind.t t = function
+    | Int i -> Immediate (Int i)
+    | Float x -> Immediate (Float x)
+    | Char c -> Immediate (Char c)
+    | String s -> String s
+  ;;
+
+  let rec of_typed_expr ~ctx : Typed.Expr.generalized -> Value_kind.t t = function
+    | Literal lit, _ -> of_literal lit
     | Name name, _ -> Name (Context.find_value_name ctx name)
     (* FIXME: we've discarded all but the result type - is that bad? How can we easily
        get the argument types? - can add them to the typed expr in the AST if needed *)
@@ -343,7 +368,7 @@ module Stmt = struct
   (* TODO: closures require creating functions on the fly
      - I suppose we can model this by creating a struct/record with all the used
        parameters and passing that in to a global function *)
-  type t = Value_def of Unique_name.t * Expr.t
+  type t = Value_def : Unique_name.t * _ Expr.t -> t
   (* TODO: implement static function definitions *)
   (*| Fun_def of Unique_name.t * Function.t*)
   [@@deriving sexp_of]
