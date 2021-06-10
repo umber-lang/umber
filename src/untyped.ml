@@ -3,6 +3,12 @@ open Names
 
 (* TODO: add location references to the file/place each token came from *)
 
+module Pattern = struct
+  include Pattern
+
+  type nonrec t = Type.Expr.Bounded.t t [@@deriving sexp]
+end
+
 module Expr = struct
   type t =
     | Literal of Literal.t
@@ -75,7 +81,7 @@ module Expr = struct
 
   let match_function branches =
     let name = Value_name.empty in
-    Lambda (Pattern.Catch_all (Some name), Match (Name ([], name), branches))
+    Lambda (Catch_all (Some name), Match (Name ([], name), branches))
   ;;
 
   let qualified (path, expr) =
@@ -89,7 +95,7 @@ module Expr = struct
     let left_var = Value_name.empty in
     let left_var_qualified = Value_name.Qualified.with_path [] left_var in
     Lambda
-      ( Pattern.Catch_all (Some left_var)
+      ( Catch_all (Some left_var)
       , Fun_call (Fun_call (Name op, Name left_var_qualified), expr) )
   ;;
 

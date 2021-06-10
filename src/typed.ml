@@ -6,6 +6,9 @@ let type_error_msg = Type_bindings.type_error_msg
 module Pattern = struct
   include Pattern
 
+  type 'typ pattern = [%import: 'typ Pattern.t] [@@deriving sexp]
+  type t = Nothing.t pattern [@@deriving sexp]
+
   (* TODO: either split up Untyped/Typed patterns into different types or stop returning
      a pattern from these functions *)
   let of_untyped_with_names ~names ~types pat =

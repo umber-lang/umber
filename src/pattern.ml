@@ -1,16 +1,36 @@
 open Import
 open Names
 
-type t =
+type 'typ t =
   | Constant of Literal.t
   | Catch_all of Value_name.t option
-  | As of t * Value_name.t
-  | Cnstr_appl of Cnstr_name.Qualified.t * t list
-  | Tuple of t list
-  | Record of (Value_name.t * t option) list
-  | Union of t * t
-  | Type_annotation of t * Type.Expr.Bounded.t
+  | As of 'typ t * Value_name.t
+  | Cnstr_appl of Cnstr_name.Qualified.t * 'typ t list
+  | Tuple of 'typ t list
+  (* TODO: record fields should be non-empty *)
+  | Record of (Value_name.t * 'typ t option) list
+  | Union of 'typ t * 'typ t
+  | Type_annotation of 'typ t * 'typ
 [@@deriving sexp, variants]
+
+let rec fold pat ~init ~f =
+  let retry init pat = fold pat ~init ~f in
+  let init, result = f ~retry init pat in
+  match result with
+  | None -> init
+  | Some pat ->
+    (match pat with
+    | Constant _ | Catch_all _ -> init
+    | As (pat, _) | Type_annotation (pat, _) -> fold pat ~init ~f
+    | Cnstr_appl (_, fields) | Tuple fields ->
+      List.fold fields ~init ~f:(fun init -> fold ~init ~f)
+    | Record fields ->
+      List.fold fields ~init ~f:(fun init (_, pat) ->
+        Option.fold pat ~init ~f:(fun init -> fold ~init ~f))
+    | Union (pat1, pat2) ->
+      let init = fold pat1 ~init ~f in
+      fold pat2 ~init ~f)
+;;
 
 module Names = struct
   type t = Name_bindings.Name_entry.t Value_name.Map.t [@@deriving sexp]

@@ -77,6 +77,7 @@ let substitute types typ =
   Type.Expr.map typ ~f:(function
     | Var id as typ ->
       (match Hashtbl.find types.vars id with
+      (* TODO: can I get rid of `Retry and just use recursion here? *)
       | Some type_sub -> `Retry type_sub
       | None -> `Halt typ)
     | typ -> `Defer typ)

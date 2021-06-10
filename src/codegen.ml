@@ -25,7 +25,7 @@ type state =
   }
 
 let codegen_literal { context; _ } lit =
-  match (lit : Untyped.Literal.t) with
+  match (lit : Literal.t) with
   | Int i -> const_int (i64_type context) i
   | Float x -> const_float (double_type context) x
   | Char c -> const_int (i32_type context) (Uchar.to_int c)

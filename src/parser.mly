@@ -1,7 +1,6 @@
 %{
   open Import
-  open Untyped
-  open Ast
+  open Parser_scope
 
   (* Disable deprecation warnings caused by Menhir using Not_found when inferring types *)
   [@@@ocaml.warning "-3"]
