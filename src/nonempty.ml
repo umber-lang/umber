@@ -2,6 +2,9 @@ open Import
 
 type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash]
 
+let hd (x :: _) = x
+let tl (_ :: xs) = xs
+
 let of_list : 'a list -> 'a t option = function
   | x :: xs -> Some (x :: xs)
   | [] -> None
@@ -66,9 +69,18 @@ let zip (x :: xs) (y :: ys) =
   let rec loop xs ys acc =
     match xs, ys with
     | [], _ | _, [] -> acc
-    | x :: xs, y :: ys -> loop xs ys ((x, y) :: to_list acc)
+    | x :: xs, y :: ys -> loop xs ys (cons (x, y) acc)
   in
   loop xs ys [ x, y ] |> rev
+;;
+
+let map2 (x :: xs) (y :: ys) ~f =
+  let rec loop xs ys acc =
+    match xs, ys with
+    | [], _ | _, [] -> acc
+    | x :: xs, y :: ys -> loop xs ys (cons (f x y) acc)
+  in
+  loop xs ys [ f x y ] |> rev
 ;;
 
 let unzip ((x, y) :: xys) =
@@ -80,12 +92,19 @@ let unzip ((x, y) :: xys) =
   loop xys [ x ] [ y ]
 ;;
 
+let reduce xs ~f =
+  match xs with
+  | [ x ] -> x
+  | x :: x' :: xs -> List.fold ~init:(f x x') xs ~f
+;;
+
 let fold_right xs ~init ~f = List.fold_right (to_list xs) ~init ~f
 
 let fold_map xs ~init ~f =
   List.fold_map (to_list xs) ~init ~f |> Tuple2.map_snd ~f:of_list_exn
 ;;
 
+let ( @ ) = append
 let is_empty _ = false
 let min_elt xs ~compare = List.min_elt (to_list xs) ~compare |> Option.value_exn
 let max_elt xs ~compare = List.max_elt (to_list xs) ~compare |> Option.value_exn
