@@ -98,7 +98,7 @@ trait Iterable t =
   let last = fold ~init:None ~f:(\_ x -> Some x)
 
   let nth itr ~n =
-    let rec loop next i =
+    let loop next i =
       match next ()
       | <yield x> k -> if i == 0 then Some x else loop k (i - 1)
       | () -> None

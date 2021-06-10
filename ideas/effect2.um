@@ -8,28 +8,69 @@
   and try to do as much as possible with them (if only to test the bounds and
   efficacy of the idea) e.g. iterators, error handling, and much more.
 
-trait Iterable t :
-   val iter : t a -> <Yield a> ()  # or: `Iterator t a`
+trait Iterable t a :
+   val iter : t -> Iterator t a
    # other stuff e.g. (probably optional) val size_hint : t a -> (Nat, Option Nat)
    # see https://doc.rust-lang.org/std/iter/trait.Iterator.html
    =
    let size_hint _ = (0, None)
 
-effect Yield a :
-  val yield : a -> ()
-# Could also just be effect Yield a : a -> ()
+effect Yield a : a -> ()
+# (another option)
+  ```
+  effect Yield a :
+    val yield : a -> ()
+  ``
 
-type Iterator t b = t a -> <Yield b> ()  # probably?
-# might need to be `() -> <Yield a> ()` with `val iter : t a -> Iterator t a`
-# that would probably make more sense
+type Iterator a = () -> <Yield a> ()
+# Forcing this to be a concrete function type might not be ideal
 
-impl Iterator (Iterator _) =  # does this type-check?
+impl Iterable (Iterator _) =  # does this type-check?
   let iter = id
 
-val for_each : Iterable t => t a -> ~f:(a -> ()) -> ()
-let for_each itr ~f = match iter itr
-  | <yield item> k -> f item; k ()
-  | () -> ()
+# TODO: should we implement continuations shallowly (like Frank) or deeply (like Multicore
+  OCaml)? See https://arxiv.org/pdf/1611.09259.pdf.
+
+  Example:
+  ```
+  effect State a =
+    | Get : a
+    | Set : a -> ()
+
+  # Shallow, one approach (no functions handling argument effects):
+  val run : state -> (() -> <State state> a) -> a
+  let run state f =
+    match f ()
+    | x -> x
+    | <Get> k -> run state (\() -> k state)
+    | <Set state> k -> run state k
+
+  # Shallow, another approach (idk how this would work)
+  val run : ...?
+  let run state f =
+    match f  # how does this work? - we do need to distinguish computation suspension
+    | x -> x
+    | <Get> k -> run state (k state)
+    | <Set state> k -> run state (k ())
+
+  # Deep
+  val run : (() -> <State state> a) -> state -> a
+  let run 
+  ```
+
+val for_each : Iterable t => t a -> f:(a -> ()) -> ()
+let for_each itr ~f =
+  let loop next =
+    handle next ()
+    | <Yield item> k -> f item; loop k
+  loop (iter itr)
+
+val fold : Iterable t => t a -> init:acc -> f:(acc -> a -> acc) -> acc
+let fold itr ~init ~f = match iter itr
+  | <Yield item> k -> 
+  | () -> init
+
+# Kinda equivalent to if iterating gave you an optional closure to call (?)
 
 # TODO: Consider: the [] pattern could be generic across all Sequences and then
   this would work for all of them
@@ -40,17 +81,17 @@ impl Iterable LinkedList =
   # Note, if I use [] as a sequence pattern, then this will not be how this is
     defined (since the Sequence trait inherits from Iterator) 
 
-# Note: unresumable effects should be a thing
-# Option 1:
-effect Panic = val panic : ()
-# Option 2:
-effect Panic = val panic : () -> Never  # or Impossible, Void, !, etc.
-# ^ should probably be some kind of error type (string, lazy string?) to give
-  error information, but whatever
+effect Panic = panic : Error -> Never
 
-effect Exn a = val raise : Error -> a
+effect Exn a b = raise : a -> b
 # Ideas:
-  - Implement panics as `effect Panic = Exn Never`
+  - Implement panics as `effect Panic = Exn Error Never`
+    Maybe then instead of having it be a separate effect, it's an alias e.g.
+    ```
+    effect alias Panic = Exn Error Never
+    let panic error = Never.cast (Raise error)
+    # Could also allow `(Raise error :> a)` or something
+    ```
   - Make the effect declaration syntax similar to variant types e.g.
     effect State a =
       | get : () -> a
