@@ -222,11 +222,11 @@ module Expr = struct
      - https://dev.realworldocaml.org/runtime-memory-layout.html
      - https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/storage/heap-objects *)
   (* TODO: support for strings (literal is a weird place probably) as well as arrays *)
-  (* TODO: are these types actually giving us the proper invariants? *)
   type t =
     | Primitive of Literal.t
     | Name of Unique_name.t
-    (* TODO: recursive lets? Mutual recursion? *)
+    (* TODO: recursive lets? Mutual recursion?
+       Can maybe handle that in toplevel function definitions *)
     | Let of Unique_name.t * t * t
     (* TODO: closure env - pass a pointer to a struct with all the free variables *)
     | Closure of Unique_name.t Nonempty.t * func
@@ -250,7 +250,8 @@ module Expr = struct
     ; returns : Value_kind.t*)
       (* TODO: monomorphize functions/types per [Value_kind.t]. For now we can just box
        everything. *)
-      (* FIXME: there's like no way I'll be able to compile functions with just this info *)
+      (* FIXME: there's like no way I'll be able to compile functions with just this info
+         I'm gonna need names *)
       arg_num : int
     ; body : t
     }
@@ -304,164 +305,10 @@ module Expr = struct
     | Type_annotation _ -> .
   ;;
 
-  module Simple_pattern = struct
-    (*module Category = struct
-      type t =
-        [ `Cnstr_appl
-        | `Constant
-        | `Tuple
-        | `Record
-        ]
-      [@@deriving sexp]
-
-      let raise_incompatible category1 category2 =
-        compiler_bug
-          [%message
-            "Conflicting pattern categories in match arms" (category1 : t) (category2 : t)]
-      ;;
-
-      let rec of_pattern : Typed.Pattern.t -> t option = function
-        | Cnstr_appl _ -> Some `Cnstr_appl
-        | Constant _ -> Some `Constant
-        | Catch_all _ -> None
-        | As (pat, _) -> of_pattern pat
-        | Tuple _ -> Some `Tuple
-        | Record _ -> Some `Record
-        | Union (pat, pat') ->
-          (match of_pattern pat, of_pattern pat' with
-          | Some category, Some category' ->
-            if Poly.( = ) category category'
-            then Some category
-            else raise_incompatible category category'
-          | None, (Some _ as category) | (Some _ as category), None -> category
-          | None, None -> None)
-        | Type_annotation _ -> .
-      ;;
-    end*)
-
-    type t =
-      | Catch_all of Value_name.t option
-      | Constants of Literal.t Nonempty.t
-      | Cnstr_appls of (Cnstr_name.Qualified.t * t list) Nonempty.t
-      | Tuples of t list Nonempty.t
-      | Records of t option Value_name.Map.t Nonempty.t
-    [@@deriving sexp]
-
-    let rec of_pattern : Typed.Pattern.t -> t = function
-      | Catch_all name -> Catch_all name
-      | Constant literal -> Constants [ literal ]
-      | Cnstr_appl (cnstr_name, args) ->
-        Cnstr_appls [ cnstr_name, List.map args ~f:of_pattern ]
-      | Tuple fields -> Tuples [ List.map fields ~f:of_pattern ]
-      | Record fields -> Records [ convert_record_fields fields ]
-      | As (pattern, _) -> of_pattern pattern
-      | Union (pat1, pat2) ->
-        let combine_union pat1 pat2 =
-          let ( @ ) = Nonempty.( @ ) in
-          match pat1, pat2 with
-          | Catch_all name, _ | _, Catch_all name -> Catch_all name
-          | Constants constants1, Constants constants2 ->
-            Constants (constants1 @ constants2)
-          | Cnstr_appls appls1, Cnstr_appls appls2 -> Cnstr_appls (appls1 @ appls2)
-          | Tuples tuples1, Tuples tuples2 ->
-            (* FIXME: as in the `(5, x) | (x, t)` example, which union is picked can
-               change how the names are bound - code for the bindings needs to be inserted
-               e.g. x = Get_block_field _ 0 (or 1) - this is different for each branch *)
-            Tuples (tuples1 @ tuples2)
-          | Records records1, Records records2 -> Records (records1 @ records2)
-          | _ ->
-            compiler_bug [%message "Incompatible patterns in union" (pat1 : t) (pat2 : t)]
-        in
-        combine_union (of_pattern pat1) (of_pattern pat2)
-      | Type_annotation _ -> .
-
-    and convert_record_fields fields =
-      Value_name.Map.of_alist_exn fields |> Map.map ~f:(Option.map ~f:of_pattern)
-    ;;
-
-    (* TODO: probably refactor this to be less heavy. Trying to enforce constraints in the 
-       types is very low-value because they will only be broken with a bug in the type
-       checker, and we just raise when they fail. *)
-    (*module Match_arms = struct
-      type 'expr patterns =
-        | Constants of (Literal.t Nonempty.t * 'expr) Nonempty.t
-        | Cnstr_appls of ((Cnstr_name.Qualified.t * t list) Nonempty.t * 'expr) Nonempty.t
-        | Tuples of (t list Nonempty.t * 'expr) Nonempty.t
-        | Records of (t option Value_name.Map.t Nonempty.t * 'expr) Nonempty.t
-      [@@deriving sexp]
-
-      type simple_pattern = t [@@deriving sexp]
-
-      type 'expr t =
-        | Patterns of 'expr patterns * 'expr option
-        | Trivial of 'expr
-
-      let single_arm (pat, expr) =
-        match (pat : simple_pattern) with
-        | Constants constants -> `Patterns (Constants [ constants, expr ])
-        | Cnstr_appls appls -> `Patterns (Cnstr_appls [ appls, expr ])
-        | Tuples tuples -> `Patterns (Tuples [ tuples, expr ])
-        | Records records -> `Patterns (Records [ records, expr ])
-        | Catch_all -> `Catch_all expr
-      ;;
-
-      let rev : 'a patterns -> 'a patterns = function
-        | Constants xs -> Constants (Nonempty.rev xs)
-        | Cnstr_appls xs -> Cnstr_appls (Nonempty.rev xs)
-        | Tuples xs -> Tuples (Nonempty.rev xs)
-        | Records xs -> Records (Nonempty.rev xs)
-      ;;
-
-      let create (arm :: arms : (simple_pattern * _) Nonempty.t) =
-        match single_arm arm with
-        | `Catch_all expr -> Trivial expr
-        | `Patterns patterns ->
-          let rec loop patterns = function
-            | [] -> Patterns (rev patterns, None)
-            | (pat, expr) :: arms ->
-              (match patterns, (pat : simple_pattern) with
-              | Constants constants, Constants new_constants ->
-                loop (Constants (Nonempty.cons (new_constants, expr) constants)) arms
-              | Cnstr_appls appls, Cnstr_appls new_appls ->
-                loop (Cnstr_appls (Nonempty.cons (new_appls, expr) appls)) arms
-              | Tuples tuples, Tuples new_tuples ->
-                loop (Tuples (Nonempty.cons (new_tuples, expr) tuples)) arms
-              | Records records, Records new_records ->
-                loop (Records (Nonempty.cons (new_records, expr) records)) arms
-              | _, Catch_all -> Patterns (rev patterns, Some expr)
-              | _ -> compiler_bug [%message "Mismatching pattern" (pat : simple_pattern)])
-          in
-          loop patterns arms
-      ;;*)
-  end
-
-  (*let categorize_arms ((first_pattern, _) :: _ as arms : _ Nonempty.t) =
-      let rec loop category default = function
-        | [] -> category, default
-        | (pat, expr) :: rest ->
-          (match category, Category.of_pattern pat with
-          | None, Some _ -> loop category default rest
-          | None, None | Some _, None ->
-            let default =
-              (* TODO: Warn about unused match arms: catch-alls in this case *)
-              match default with
-              | Some _ -> default
-              | None -> Some expr
-            in
-            loop category default rest
-          | Some category1, Some category2 ->
-            if Poly.( = ) category1 category2
-            then loop category default rest
-            else Category.raise_incompatible category1 category2)
-      in
-      loop (Category.of_pattern first_pattern) None (Nonempty.to_list arms)
-    ;;
-  end*)
-
   (* TODO: switch statement optimization
-         See:
-         - https://github.com/ocaml/ocaml/blob/trunk/lambda/matching.ml
-         - https://www.researchgate.net/publication/2840783_Optimizing_Pattern_Matching  *)
+     See:
+     - https://github.com/ocaml/ocaml/blob/trunk/lambda/matching.ml
+     - https://www.researchgate.net/publication/2840783_Optimizing_Pattern_Matching  *)
   (*let rec switch_case ~ctx
         : Pattern.t -> Context.t * Value_kind.t Literal.t list
         = function
@@ -610,41 +457,12 @@ module Expr = struct
         List.map2_exn fields field_types ~f:(fun field typ ->
           of_typed_expr ~ctx (field, typ))
       in
-      (* FIXME: we can't work out the Value_kind from the type, as it can vary freely 
-         at runtime due to variants. This means that the position of fields in a record
-         can change based on their value, which is kind of nonsense. We may need to
-         abandon pointers/non-pointer separation and just use the bitfield.*)
       Make_block fields
     | Record_literal _, _ | Record_update _, _ | Record_field_access _, _ ->
       failwith "TODO: records in MIR exprs"
     | ( Lambda _, (Var _ | Type_app _ | Tuple _)
       | Tuple _, (Var _ | Type_app _ | Function _) ) as expr ->
       compiler_bug [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
-
-  (* FIXME: remove all this stuff, including Simple_pattern, pattern categories,
-     and these simplications *)
-  and simplify_match_arms ~ctx match_type (arm :: arms : _ Nonempty.t) =
-    let make_arm (pattern, arm_expr) =
-      let arm_expr =
-        of_typed_expr
-          (arm_expr, match_type)
-          ~ctx:
-            (Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
-               fst (Context.add_value_name ctx name)))
-      in
-      let pattern = Simple_pattern.of_pattern pattern in
-      pattern, arm_expr
-    in
-    List.fold_until
-      arms
-      ~init:([ make_arm arm ] : _ Nonempty.t)
-      ~f:(fun cases ((pattern, _) as arm) ->
-        let cases = Nonempty.cons (make_arm arm) cases in
-        match pattern with
-        | Catch_all _ -> Stop cases
-        | _ -> Continue cases)
-      ~finish:Fn.id
-    |> Nonempty.rev
 
   and make_match
     ~(ctx : Context.t)
@@ -653,130 +471,6 @@ module Expr = struct
     (arms : (Typed.Pattern.t * Type.Scheme.t Typed.Expr.t) Nonempty.t)
     : t
     =
-    (* TODO: switch statement optimization
-         See:
-         - https://github.com/ocaml/ocaml/blob/trunk/lambda/matching.ml
-         - https://www.researchgate.net/publication/2840783_Optimizing_Pattern_Matching *)
-    (*match Simple_pattern.categorize_arms arms with
-    | Some category, default ->
-      let invalid pattern =
-        compiler_bug
-          [%message
-            "Invalid pattern for category"
-              (pattern : Typed.Pattern.t)
-              (category : Simple_pattern.Category.t)]
-      in
-      (*let handle_cnstrs ~ctx ~expr ~default arms =
-          (* TODO: Turn into a switch on variant tag
-             - need to split up constant vs argumented constructors
-             - constants can be in the switch - on specific int values
-             - NOTE: might be a good idea to forget switch and all that stuff and just
-               make the simplest thing possible, just using if *)
-          let constant_cnstrs, non_constant_cnstrs =
-            List.fold
-              arms
-              ~init:(Cnstr_tag.Map.empty, Cnstr_tag.Map.empty)
-              ~f:(fun (constant_cnstrs, non_constant_cnstrs) (pattern, scheme, expr) ->
-              match pattern with
-              | Cnstr_appl ((_, cnstr_name), args) ->
-                (* FIXME: have to match on args *)
-                let tag = Context.cnstr_tag ctx scheme cnstr_name in
-                if List.is_empty args
-                then
-                  (* FIXME: how does ordering work for multi maps? - order should be
-                     reversed, which is wrong*)
-                  ( Map.add_multi constant_cnstrs ~key:tag ~data:(pattern, expr)
-                  , non_constant_cnstrs )
-                else
-                  ( constant_cnstrs
-                  , Map.add_multi non_constant_cnstrs ~key:tag ~data:(pattern, expr) )
-              | _ -> invalid pattern)
-          in
-          (*let to_switch_cases cnstrs =
-            Map.to_alist cnstrs
-            |> List.map ~f:(fun (tag, ))
-          in*)
-          Switch
-            { expr
-            ; cases = to_switch_cases constant_cnstrs
-            ; default =
-                Some
-                  (Switch
-                     { expr = Get_block_tag expr
-                     ; cases = to_switch_cases non_constant_cnstrs
-                     ; default
-                     })
-            }
-        in*)
-      let mir_expr = of_typed_expr ~ctx (expr, expr_type) in
-      let convert_arm_expr ~ctx pattern arm_expr =
-        of_typed_expr
-          arm_expr
-          ~ctx:
-            (Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
-               fst (Context.add_value_name ctx name)))
-      in
-      (* TODO: is this some nice way to avoid code duplication between these branches? *)
-      (match category with
-      | `Constant ->
-        (*let cases, default =
-          Nonempty.fold_until
-            arms
-            ~init:[]
-            ~f:(fun cases (pattern, arm_expr) ->
-              let arm_expr = convert_arm_expr ~ctx pattern arm_expr in
-              (* FIXME: doesn't work on unions *)
-              match pattern with
-              | Constant lit -> Continue ((Primitive.of_literal lit, arm_expr) :: cases)
-              | Catch_all _ -> Stop (List.rev cases, Some arm_expr)
-              | _ -> invalid pattern)
-            ~finish:(fun cases -> List.rev cases, None)
-        in
-        Switch { expr = mir_expr; cases = Nonempty.of_list_exn cases; default }*)
-        ()
-      | `Tuple -> ()
-      | `Cnstr_appl | `Record -> failwith "TODO: Match cases MIR")
-    | None, Some default -> of_typed_expr ~ctx (default, match_type)
-    | None, None ->
-      compiler_bug
-        [%message "Match classification failed" (expr : Type.Scheme.t Typed.Expr.t)]*)
-    (* TODO: Simplify match arms, then iterate over for each *)
-    (*let invalid pattern =
-      compiler_bug [%message "Invalid pattern" (pattern : Simple_pattern.t)]
-    in*)
-    (* TODO: simplifying first breaks some things because we can't recover the names 
-       added to lost contexts *)
-    (*let ((pattern, expr) :: arms) = simplify_match_arms ~ctx match_type arms in
-    match pattern with
-    | Catch_all name ->
-      (match name with
-      | Some name -> 
-      | None -> expr)
-    | Constants constants ->
-      let convert = Nonempty.map ~f:Primitive.of_literal in
-      List.fold_until
-        arms
-        ~init:([ convert constants, expr ] : _ Nonempty.t)
-        ~f:(fun cases (pattern, expr) ->
-          match pattern with
-          | Constants _ -> Continue (Nonempty.cons (convert constants, expr) cases)
-          | Catch_all ->
-            Stop
-              (Switch
-                 { expr = original_expr; cases = Nonempty.rev cases; default = Some expr })
-          | _ -> invalid pattern)
-        ~finish:(fun cases ->
-          Switch { expr = original_expr; cases = Nonempty.rev cases; default = None })
-    | Tuples tuples ->
-      List.fold
-        arms
-        ~init:(Nonempty.map tuples ~f:Nonempty.singleton)
-        ~f:(fun cases tuples ->
-        Nonempty.map2 tuples cases (fun tuple case -> tuple :: case))*)
-    (* FIXME: before I do this I should really split up unions - they are super annoying
-       - revise Simple_pattern to return multiple patterns on seeing unions (?) *)
-    (* TODO: I should make these all at once
-       - split on union and continue with the arm_expr *)
     let rec make_condition ~ctx ~input_expr ~input_type pattern =
       match (pattern : Typed.Pattern.t) with
       | Catch_all _ | As _ -> None
@@ -839,23 +533,6 @@ module Expr = struct
         | Some arms ->
           If
             (cond, output_expr, handle_arms ~ctx ~input_expr ~input_type ~output_type arms))
-      (*and loop ~ctx input_expr input_type = function
-      | (pat, arm_expr) :: rest ->
-        (* FIXME: handle binding names in patterns - need to insert definitions
-           e.g. aliases or getting out fields *)
-        let add_let bindings name expr = (name, expr) :: bindings in
-        let arm_ctx, bindings = fold_let_pattern ~ctx ~init:[] ~add_let pat input_expr in
-        let arm_expr_with_bindings =
-          List.fold_right
-            bindings
-            ~init:(of_typed_expr ~ctx:arm_ctx (arm_expr, output_type))
-            ~f:(fun (name, binding_expr) arm_expr -> Let (name, binding_expr, arm_expr))
-        in
-        (match make_condition pat input_expr input_type with
-        | None -> arm_expr_with_bindings
-        | Some cond ->
-          If (cond, arm_expr_with_bindings, loop ~ctx input_expr input_type rest))
-      | [] -> compiler_bug [%message "Ran off end of match arms (inexhaustive patterns?)"]*)
     in
     let input_expr = of_typed_expr ~ctx (input_expr, input_type) in
     let ctx, match_expr_name = Context.add_value_name ctx Constant_names.match_ in
