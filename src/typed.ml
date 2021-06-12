@@ -725,6 +725,7 @@ module Module = struct
             (match exn with
             | Type_bindings.Type_error (msg, Some (t1, t2)) ->
               (* Prevent unstable Var_ids from appearing in test output *)
+              (* TODO: check for this using [if_am_running_test] *)
               let env = Type.Param.Env_of_vars.create () in
               let map_type t =
                 Type.Expr.map_vars t ~f:(Type.Param.Env_of_vars.find_or_add env)

@@ -9,7 +9,7 @@ let parse_only_tests = [ "Imports"; "Modules"; "Operators"; "Traits"; "Types" ]
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)
 
 (* These tests are just for type-checking as they are not ready to be converted to MIR.  *)
-let type_only_tests = []
+let type_only_tests = parse_only_tests @ []
 let should_make_mir test = not (List.mem ~equal:String.equal type_only_tests test)
 
 let run_tests () =

@@ -104,6 +104,8 @@ module Context : sig
   val of_name_bindings : Name_bindings.t -> t
   val add_value_name : t -> Value_name.t -> t * Unique_name.t
   val find_value_name : t -> Value_name.Qualified.t -> Unique_name.t
+
+  (* TODO: consider removing *)
   val add_empty : t -> t * Unique_name.t
   val find_empty : t -> Unique_name.t
   val cnstr_tag : t -> Type.Scheme.t -> Cnstr_name.t -> Cnstr_tag.t
@@ -207,9 +209,11 @@ end = struct
   ;;
 end
 
-(* TODO: probably remove this or something *)
-let underscore = Value_name.of_string_unchecked "_"
-let match_keyword = Value_name.of_string_unchecked "match"
+module Constant_names = struct
+  let underscore = Value_name.of_string_unchecked "_"
+  let match_ = Value_name.of_string_unchecked "match"
+  let lambda_arg = Value_name.of_string_unchecked "lambda_arg"
+end
 
 module Expr = struct
   (* TODO: can put tags in the pointer to the block e.g. constructor tag,
@@ -237,7 +241,7 @@ module Expr = struct
     (* TODO: recursive lets? Mutual recursion? *)
     | Let of Unique_name.t * t * t
     (* TODO: closure env - pass a pointer to a struct with all the free variables *)
-    | Closure of func
+    | Closure of Unique_name.t Nonempty.t * func
     | Fun_call of func * t Nonempty.t
     | Make_block of t list
     | Get_block_field of int * t
@@ -245,11 +249,11 @@ module Expr = struct
     (* TODO: enforce that all switch cases have the same type + support switch on blocks
        - actually I'm not sure if this makes sense - variants will have different
          Value_kinds e.g. Int64 vs Block *)
-    | Switch of
+    (*| Switch of
         { expr : t
         ; cases : (Literal.t Nonempty.t * t) Nonempty.t
         ; default : t option
-        }
+        }*)
     | Catch of t * int
     | Exit of int
 
@@ -258,6 +262,7 @@ module Expr = struct
     ; returns : Value_kind.t*)
       (* TODO: monomorphize functions/types per [Value_kind.t]. For now we can just box
        everything. *)
+      (* FIXME: there's like no way I'll be able to compile functions with just this info *)
       arg_num : int
     ; body : t
     }
@@ -272,15 +277,18 @@ module Expr = struct
     | Equals of t * Literal.t
     | Constant_tag_equals of t * Cnstr_tag.t
     | Non_constant_tag_equals of t * Cnstr_tag.t
-    | Or of cond * cond
+    (*| Or of cond * cond*)
     | And of cond * cond
   [@@deriving sexp_of]
 
   let rec fold_let_pattern ~ctx ~init:acc ~add_let pat mir_expr =
     (* TODO: warn/error if bindings are not exhaustive *)
     match (pat : Typed.Pattern.t) with
-    | Catch_all name ->
-      let name = Option.value name ~default:underscore in
+    | Catch_all None ->
+      (* TODO: warn about unused expressions. NOTE: we can only elide the bound expression
+         as we are currently assuming purity. Later we should check for effects. *)
+      ctx, acc
+    | Catch_all (Some name) ->
       let ctx, name = Context.add_value_name ctx name in
       ctx, add_let acc name mir_expr
     | As (pattern, name) ->
@@ -296,6 +304,8 @@ module Expr = struct
         fold_let_pattern ~ctx ~init:acc ~add_let arg (Get_block_field (i, Name name)))
     | Constant _ ->
       (* Assert equality between the result and the constant *)
+      (* FIXME: integrate this with cond generation and assert exhaustiveness, then give
+         a compile error if it fails *)
       failwith "TODO: constant pattern bindings"
     | Union (_, _) ->
       (* Assert both cases can be bound to *)
@@ -359,7 +369,7 @@ module Expr = struct
       | As (pattern, _) -> of_pattern pattern
       | Union (pat1, pat2) ->
         let combine_union pat1 pat2 =
-          let ( @ ) = Nonempty.append in
+          let ( @ ) = Nonempty.( @ ) in
           match pat1, pat2 with
           | Catch_all name, _ | _, Catch_all name -> Catch_all name
           | Constants constants1, Constants constants2 ->
@@ -542,7 +552,8 @@ module Expr = struct
     | Literal lit, _ -> Primitive lit
     | Name name, _ -> Name (Context.find_value_name ctx name)
     (* FIXME: we've discarded all but the result type - is that bad? How can we easily
-       get the argument types? - can add them to the typed expr in the AST if needed *)
+       get the argument types? - can add them to the typed expr in the AST if needed
+       What is happening here? This seems wrong *)
     | Fun_call (f, arg, arg_type), result_type ->
       let rec loop (f, f_type) arg args arg_num =
         match (f : _ Typed.Expr.t) with
@@ -550,7 +561,7 @@ module Expr = struct
           let f' = f', Type.Expr.Function (arg_type', result_type) in
           loop f' (arg', arg_type') (of_typed_expr ~ctx arg :: args) (arg_num + 1)
         | Name _ | Lambda _ | Match _ | Let _ ->
-          let func = { arg_num = arg_num + 1; body = of_typed_expr ~ctx (f, f_type) } in
+          let func = { arg_num; body = of_typed_expr ~ctx (f, f_type) } in
           Fun_call (func, of_typed_expr ~ctx arg :: args)
         | Literal _ | Tuple _ | Record_literal _ | Record_update _ | Record_field_access _
           ->
@@ -560,10 +571,34 @@ module Expr = struct
               "This is not a function; it cannot be applied"
                 (f : Type.Scheme.t Typed.Expr.t)]
       in
-      loop (f, Function (arg_type, result_type)) (arg, arg_type) [] 0
-    (* TODO: coalesce multi-argument functions *)
-    | Lambda (_, body), Function (_, body_type) ->
-      Closure { arg_num = 1; body = of_typed_expr ~ctx (body, body_type) }
+      loop (f, Function (arg_type, result_type)) (arg, arg_type) [] 1
+    | Lambda (arg, body), Function (_, body_type) ->
+      (* TODO: Can I tweak the fold_let_pattern interface to be less awkward? It seems to
+         only really work well for the original use case with statements - maybe a
+         specialized implementation for exprs would be in order
+         Note also that mir_expr is used only to pass into add_let *)
+      (* TODO: Should assert that the pattern is exhaustive in this and let bindings
+         (exhaustive vs unconditional?) *)
+      let rec bind_arg ~ctx arg_names arg_num ~arg ~body ~body_type =
+        let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
+        let add_let acc name mir_expr = (name, mir_expr) :: acc in
+        let ctx, bindings = fold_let_pattern ~ctx arg (Name arg_name) ~init:[] ~add_let in
+        let arg_names, arg_num, body =
+          loop ~ctx Nonempty.(arg_name :: arg_names) (arg_num + 1) (body, body_type)
+        in
+        let body =
+          List.fold bindings ~init:body ~f:(fun body (name, mir_expr) ->
+            Let (name, mir_expr, body))
+        in
+        arg_names, arg_num, body
+      and loop ~ctx arg_names arg_num : Typed.Expr.generalized -> _ = function
+        | Lambda (arg, body), Function (_, body_type) ->
+          bind_arg ~ctx (Nonempty.to_list arg_names) arg_num ~arg ~body ~body_type
+        | body_and_type ->
+          Nonempty.rev arg_names, arg_num, of_typed_expr ~ctx body_and_type
+      in
+      let arg_names, arg_num, body = bind_arg ~ctx [] 0 ~arg ~body ~body_type in
+      Closure (arg_names, { arg_num; body })
     | Match (expr, expr_type, arms), match_type ->
       make_match ~ctx (expr, expr_type) match_type arms
     | Let { rec_; bindings; body }, body_type ->
@@ -573,8 +608,7 @@ module Expr = struct
       if rec_
       then failwith "TODO: let rec in MIR expr"
       else (
-        (* TODO: check ctx semantics *)
-        let _ctx, acc =
+        let ctx, acc =
           Nonempty.fold bindings ~init:(ctx, []) ~f:(fun (ctx, acc) ((pat, typ), expr) ->
             let mir_expr = of_typed_expr ~ctx (expr, typ) in
             let add_let acc name mir_expr = (name, mir_expr) :: acc in
@@ -600,7 +634,7 @@ module Expr = struct
       compiler_bug [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
 
   (* FIXME: remove all this stuff, including Simple_pattern, pattern categories,
-     and this simplications *)
+     and these simplications *)
   and simplify_match_arms ~ctx match_type (arm :: arms : _ Nonempty.t) =
     let make_arm (pattern, arm_expr) =
       let arm_expr =
@@ -836,7 +870,13 @@ module Expr = struct
       | [] -> compiler_bug [%message "Ran off end of match arms (inexhaustive patterns?)"]*)
     in
     let input_expr = of_typed_expr ~ctx (input_expr, input_type) in
-    let ctx, match_expr_name = Context.add_value_name ctx match_keyword in
+    let ctx, match_expr_name = Context.add_value_name ctx Constant_names.match_ in
+    (* TODO: could we encode pattern splitting at the type level? Either that or not do it *)
+    (* FIXME: remove duplication of exprs using catch/exit - not sure exactly how tho *)
+    let arms =
+      Nonempty.concat_map arms ~f:(fun (pat, expr) ->
+        split_up_pattern_unions pat |> Nonempty.map ~f:(fun pat -> pat, expr))
+    in
     Let
       ( match_expr_name
       , input_expr
