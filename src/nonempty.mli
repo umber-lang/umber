@@ -16,6 +16,7 @@ val append_list : 'a t -> 'a list -> 'a t
 val ( @ ) : 'a t -> 'a t -> 'a t
 val zip : 'a t -> 'b t -> ('a * 'b) t
 val unzip : ('a * 'b) t -> 'a t * 'b t
+val concat_map : 'a t -> f:('a -> 'b t) -> 'b t
 val fold_right : 'a t -> init:'acc -> f:('a -> 'acc -> 'acc) -> 'acc
 val fold_map : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc * 'b) -> 'acc * 'b t
 val reduce : 'a t -> f:('a -> 'a -> 'a) -> 'a

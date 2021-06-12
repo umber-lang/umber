@@ -48,20 +48,19 @@ include Container.Make (struct
   let iter = `Define_using_fold
 end)
 
+let concat_map (x :: xs) ~f =
+  let rec loop acc = function
+    | [] -> rev acc
+    | x :: xs -> loop (rev_append (f x) acc) xs
+  in
+  loop (rev (f x)) xs
+;;
+
 include Monad.Make (struct
   type nonrec 'a t = 'a t
 
   let return x = [ x ]
-
-  let bind (x :: xs) ~f =
-    let rec loop xs ~f acc =
-      match (xs : _ list) with
-      | [] -> acc
-      | x :: xs -> loop xs ~f (rev_append (f x) acc)
-    in
-    loop xs ~f (f x) |> rev
-  ;;
-
+  let bind = concat_map
   let map = `Define_using_bind
 end)
 
