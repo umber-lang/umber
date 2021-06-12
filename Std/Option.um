@@ -27,3 +27,20 @@ let try f =
   | <Panic> | <Exn _> -> None
 
 let some_if cond x = if cond then Some x else None
+
+let map x ~f = bind x ~f:(lift . f)
+
+let lift = Some
+  let apply f x =
+    match (f, x)
+    | Some f, Some x -> Some (f x)
+    | _, None | None, _ -> None 
+  
+let bind x ~f =
+  match x
+  | Some x -> f x
+  | None -> None
+
+impl Functor Option
+impl Applicative Option
+impl Monad Option

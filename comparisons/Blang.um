@@ -1,0 +1,58 @@
+module :
+  type Blang a =
+    | True
+    | False
+    | Not (Blang a)
+    | And (Blang a) (Blang a)
+    | Or (Blang a) (Blang a)
+    | If (Blang a) (Blang a) (Blang a)
+    | Base a
+
+  val constant : Bool -> Blang _
+  val all : (Iterable t) => t (Blang a) -> Blang a
+  val any : (Iterable t) => t (Blang a) -> Blang a
+  val eval : Blang a -> f:(a -> Bool) -> Bool
+
+let constant = match
+  | True -> True
+  | False -> False
+
+# TODO: decide: `~init:True` or `~init=True` ?
+let all = Iter.fold ~init:True ~f:(And)
+let any = Iter.fold ~init:False ~f:(Or)
+
+let eval b ~f =
+  match b
+  | True -> True
+  | False -> False
+  | Not b -> not (eval b ~f)
+  | And b b' -> eval b ~f && eval b' ~f
+  | Or b b' -> eval b ~f || eval b' ~f
+  | If cond b b' -> if eval cond ~f then eval b ~f else eval b' ~f
+  | Base x -> f x
+
+impl Functor Blang =
+  let map b ~f =
+    match b
+    | True | False -> b
+    | Not b -> map b ~f
+    | And b b' -> And (map b ~f) (map b' ~f)
+    | Or b b' -> Or (map b ~f) (map b' ~f)
+    | If cond b b' -> If (map cond ~f) (map b ~f) (map b' ~f)
+    | Base x -> Base (f x)
+
+impl Applicative Blang =
+  let lift = Base
+  let apply f b = bind f ~f:(\f -> map ~f b)
+
+let bind b ~f =
+    match b
+    | True | False -> b
+    | Not b -> map b ~f
+    | And b b' -> And (map b ~f) (map b' ~f)
+    | Or b b' -> Or (map b ~f) (map b' ~f)
+    | If cond b b' -> If (map cond ~f) (map b ~f) (map b' ~f)
+    | Base x -> f x
+
+# IDEA: allow just `impl Monad Blang` to be sugar for `impl Monad Blang = let bind = bind`
+impl Monad Blang
