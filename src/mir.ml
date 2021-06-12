@@ -37,36 +37,38 @@ module Value_kind = struct
   [@@deriving sexp_of]
 
   (*let of_primitive_type (path, type_name) =
+    (* Note that [Bool] is not abstract and so doesn't need to be given here
+       We should probably not need to give [String] either *)
     match path with
     | [] ->
-      if Type_name.(type_name = Core.Bool.name)
-      then Some Bool
-      else if Type_name.(type_name = Core.Int.name)
-      then Some Int64
+      if Type_name.(type_name = Core.Int.name)
+      then Some `Int64
       else if Type_name.(type_name = Core.Float.name)
-      then Some Float64
+      then Some `Float64
       else if Type_name.(type_name = Core.Char.name)
-      then Some Char
+      then Some `Char
       else if Type_name.(type_name = Core.String.name)
-      then Some String
+      then Some `Block
       else None
     | _ :: _ -> None
   ;;
 
   let rec of_type_scheme ~names : Type.Scheme.t -> t = function
-    | Var x -> Var x
+    | Var _ -> (* TODO: monomorphization *) `Block
     | Type_app (type_name, _args) ->
       option_or_default (of_primitive_type type_name) ~f:(fun () ->
         match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
         | Alias scheme -> of_type_scheme ~names scheme
-        | Variants _variants -> (* FIXME: *) Block
+        | Variants _ | Record _ -> `Block
         | Abstract ->
+          (* TODO: should be able to break the abstraction boundary to see the
+             implementation *)
           raise_s
             [%message
-              "TODO: of_type_scheme: Abstract" (type_name : Type_name.Qualified.t)]
-        | Record _ -> failwith "TODO: of_type_scheme: Record")
-    | Tuple _fields -> Block
+              "TODO: of_type_scheme: Abstract" (type_name : Type_name.Qualified.t)])
+    | Tuple _ -> `Block
     | Function (arg, result) ->
+      (* TODO: what to do with functions? [Function_def] as a statement? *)
       let rec loop args result =
         match (result : Type.Scheme.t) with
         | Function (arg, result) ->
@@ -85,6 +87,7 @@ module Cnstr_tag : sig
       - For non-constant constructors (i.e. those with arguments), the tag is given in a
         block header as the first 16 bits. In that case, as with any block, the pointer to
         the block will have its least signficiant bit set to 0. *)
+
   type t [@@deriving compare, equal, hash, sexp]
 
   include Comparable.S with type t := t
@@ -154,22 +157,6 @@ end = struct
 
   let find_empty t = find t empty_name
 
-  (* TODO: clean up *)
-  (*let add_cnstr t ~names name entry =
-    let rec loop t name args scheme =
-      match (scheme : Type.Scheme.t) with
-      | Function (arg, result) ->
-        loop t name (Value_kind.of_type_scheme ~names arg :: args) result
-      | Type_app _ -> { t with cnstrs = Map.add_exn t.cnstrs ~key:name ~data:args }
-      | Var _ | Tuple _ ->
-        compiler_bug
-          [%message "Invalid cnstr" (name : Unique_name.t) (scheme : Type.Scheme.t)]
-    in
-    match Name_bindings.Name_entry.scheme entry with
-    | Some scheme -> loop t name [] scheme
-    | None -> compiler_bug [%message "Missing cnstr" (name : Unique_name.t)]
-  ;;*)
-
   let of_name_bindings name_bindings =
     let t = { names = Ustring.Map.empty; name_bindings } in
     Name_bindings.fold_local_names name_bindings ~init:t ~f:(fun t name _entry ->
@@ -187,17 +174,18 @@ end = struct
       (match snd (Name_bindings.find_type_decl name_bindings type_name) with
       | Alias scheme -> lookup_cnstr t scheme cnstr_name
       | Variants variants ->
-        (match
-           List.findi variants ~f:(fun _ (cnstr_name', _) ->
-             Cnstr_name.(cnstr_name = cnstr_name'))
-         with
-        | Some (index, (_, args)) -> index, args
-        | None -> lookup_failed typ cnstr_name)
+        List.fold_until
+          variants
+          ~init:(0, 0)
+          ~f:(fun (constant_i, non_constant_i) (cnstr_name', args) ->
+            if Cnstr_name.(cnstr_name = cnstr_name')
+            then Stop ((if List.is_empty args then constant_i else non_constant_i), args)
+            else Continue (constant_i + 1, non_constant_i + 1))
+          ~finish:(fun _ -> lookup_failed typ cnstr_name)
       | Abstract | Record _ -> lookup_failed typ cnstr_name)
     | Var _ | Function _ | Tuple _ -> lookup_failed typ cnstr_name
   ;;
 
-  (* FIXME: should index by constant/non-constant separately *)
   let cnstr_tag t typ cnstr_name =
     let index, _ = lookup_cnstr t typ cnstr_name in
     Cnstr_tag.of_int index
