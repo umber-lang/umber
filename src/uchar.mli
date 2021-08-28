@@ -1,5 +1,6 @@
 open Core_kernel
 include module type of Uchar
+include Comparable.S with type t := t
 
 exception Malformed
 

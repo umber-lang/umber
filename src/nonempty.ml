@@ -2,6 +2,7 @@ open Import
 
 type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash]
 
+let singleton x = [ x ]
 let hd (x :: _) = x
 let tl (_ :: xs) = xs
 

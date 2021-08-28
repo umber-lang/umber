@@ -22,6 +22,8 @@ and sig_ =
 and ('pat, 'expr) def =
   | Common_def of common
   | Module of ('pat, 'expr) t
+  (* TODO: use Let_binding.t here, with the rec tag initially set, but we should turn it
+     off if the value is not actually using recursion - this will help later stages *)
   | Let of ('pat * 'expr) Node.t list
   | Trait of
       Trait_name.t * Type.Param.t list * sig_ Node.t list * ('pat, 'expr) def Node.t list

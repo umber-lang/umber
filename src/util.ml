@@ -2,6 +2,7 @@ open Core_kernel
 
 let ( << ) f g x = f (g x)
 let ( >> ) f g x = g (f x)
+let on f g x y = f (g x) (g y)
 
 let rec iter_pairs list ~f =
   match list with
@@ -32,3 +33,8 @@ let option_or_default x ~f =
 ;;
 
 let compiler_bug msg = raise_s [%message "COMPILER BUG" (msg : Sexp.t)]
+
+let assert_or_compiler_bug ~here cond =
+  if not cond
+  then compiler_bug [%message "assertion failed" (here : Source_code_position.t)]
+;;

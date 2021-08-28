@@ -5,6 +5,7 @@ type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash, sexp]
 include Container.S1 with type 'a t := 'a t
 include Monad.S with type 'a t := 'a t
 
+val singleton : 'a -> 'a t
 val cons : 'a -> 'a t -> 'a t
 val hd : 'a t -> 'a
 val tl : 'a t -> 'a list

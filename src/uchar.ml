@@ -1,5 +1,6 @@
 open Core_kernel
 include Uchar
+include Comparable.Make (Uchar)
 
 exception Malformed
 

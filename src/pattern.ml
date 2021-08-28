@@ -1,6 +1,11 @@
 open Import
 open Names
 
+(* TODO: consider functorising this so we can have some changes from untyped to
+   typed patterns, e.g.
+   - No more type annotations without needing a type parameter
+   - Replacing record expressions like `{ name }` with `{ name = name }`
+   - Putting record field names in a canonical order, probably in a map *)
 type 'typ t =
   | Constant of Literal.t
   | Catch_all of Value_name.t option
