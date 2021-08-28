@@ -18,7 +18,18 @@ module type Unidentified_name = sig
 end
 
 module Unidentified_name : Unidentified_name = Ustring
-module Extern_name : Unidentified_name = Ustring
+
+module Extern_name : sig
+  include Unidentified_name
+
+  val prim_op_prefix : Uchar.t
+  val is_prim_op : t -> bool
+end = struct
+  include Ustring
+
+  let prim_op_prefix = Uchar.of_char '%'
+  let is_prim_op t = (not (is_empty t)) && Uchar.( = ) (get t 0) prim_op_prefix
+end
 
 module type Name = sig
   include General_name

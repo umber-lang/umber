@@ -49,7 +49,7 @@ module :
 
   val sqrt : Int -> Float
 
-  extern print : String -> () = "@Io_print_string"  # TODO: effects
+  extern print : String -> () = "%print_endline"  # TODO: effects
 
 # TODO: implement public/private distinction for modules
 

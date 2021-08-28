@@ -9,14 +9,23 @@ module Unique_name : sig
   include General_name
 
   val of_ustring : Ustring.t -> t
+  val of_extern_name : Extern_name.t -> t
 end = struct
   include Ustring
   module Id = Unique_id.Int ()
 
-  let slash = Ustring.of_string_exn "/"
+  let slash = of_string_exn "/"
+  let extern_prefix = of_string_exn "extern:"
 
   let of_ustring ustr =
-    Ustring.concat [ ustr; slash; Ustring.of_string_exn (Id.to_string (Id.create ())) ]
+    Ustring.concat [ ustr; slash; of_string_exn (Id.to_string (Id.create ())) ]
+  ;;
+
+  let of_extern_name extern_name =
+    if Extern_name.is_prim_op extern_name
+    then (* Prim_op names are guaranteed to be unique *)
+      Extern_name.to_ustring extern_name
+    else extern_prefix ^ of_ustring (Extern_name.to_ustring extern_name)
   ;;
 end
 
@@ -121,6 +130,7 @@ module Context : sig
   val of_name_bindings : Name_bindings.t -> t
   val add_value_name : t -> Value_name.t -> t * Unique_name.t
   val find_value_name : t -> Value_name.Qualified.t -> Unique_name.t
+  val into_module : t -> Module_name.t -> t
 
   (* TODO: consider removing *)
   val add_empty : t -> t * Unique_name.t
@@ -139,6 +149,12 @@ end = struct
   let empty_name = [], Value_name.empty
   let name_bindings t = t.name_bindings
 
+  let into_module t module_name =
+    { t with
+      name_bindings = Name_bindings.into_module t.name_bindings module_name ~place:`Def
+    }
+  ;;
+
   let add t name =
     let name = Value_name.Qualified.to_ustring name in
     let name' = Unique_name.of_ustring name in
@@ -152,15 +168,23 @@ end = struct
 
   let add_empty t = add t empty_name
 
-  let find { names; _ } name =
+  let find { names; name_bindings } name =
     match Map.find names (Value_name.Qualified.to_ustring name) with
     | Some name -> name
     | None ->
-      compiler_bug
-        [%message
-          "Name missing from context"
-            (name : Value_name.Qualified.t)
-            (names : Unique_name.t Ustring.Map.t)]
+      let name_missing () =
+        compiler_bug
+          [%message
+            "Name missing from context"
+              (name : Value_name.Qualified.t)
+              (names : Unique_name.t Ustring.Map.t)]
+      in
+      let entry =
+        try Name_bindings.find_entry name_bindings name with
+        | Name_bindings.Name_error _ -> name_missing ()
+      in
+      option_or_default (Name_bindings.Name_entry.extern_name entry) ~f:name_missing
+      |> Unique_name.of_extern_name
   ;;
 
   let find_value_name t name =
@@ -980,7 +1004,7 @@ end
 type t = Stmt.t list [@@deriving sexp_of]
 
 let of_typed_module =
-  let loop ~ctx (defs : Typed.Module.def Node.t list) =
+  let rec loop ~ctx (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, []) ~f:(fun (ctx, stmts) def ->
       match def.Node.node with
       | Let bindings ->
@@ -1007,9 +1031,8 @@ let of_typed_module =
                 "The pattern in this let binding is not exhaustive"
                   (missing_cases : Simple_pattern.t list)];
           Expr.fold_pattern_bindings ~ctx pattern mir_expr ~init:stmts ~add_let)
-      | Module (_, _, _) ->
-        (* TODO: remember to update the name_bindings current_path *)
-        failwith "TODO: MIR submodules"
+      | Module (module_name, _sigs, defs) ->
+        loop ~ctx:(Context.into_module ctx module_name) defs
       | Trait (_, _, _, _) | Impl (_, _, _, _) -> failwith "TODO: MIR traits/impls"
       | Common_def _ -> ctx, stmts)
   in
