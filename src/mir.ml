@@ -249,7 +249,7 @@ module Simple_pattern : sig
   [@@deriving sexp, variants]
 
   val flatten_typed_pattern : Typed.Pattern.t -> t Nonempty.t
-  val flatten_typed_pattern_no_unions : Typed.Pattern.t -> place:string -> t
+  val flatten_typed_pattern_no_unions : Typed.Pattern.t -> label:string -> t
 
   module Coverage : sig
     type simple_pattern = t
@@ -300,11 +300,10 @@ end = struct
   ;;*)
 
   let flatten_typed_pattern pattern =
-    let open Nonempty.Let_syntax in
     let rec loop : Typed.Pattern.t -> t Nonempty.t = function
-      | Constant lit -> return (Constant lit)
-      | Catch_all name -> return (Catch_all name)
-      | As (pattern, name) -> loop pattern >>| Fn.flip as_ name
+      | Constant lit -> [ Constant lit ]
+      | Catch_all name -> [ Catch_all name ]
+      | As (pattern, name) -> Nonempty.map (loop pattern) ~f:(Fn.flip as_ name)
       | Cnstr_appl ((_, cnstr_name), args) -> of_cnstr_appl (Cnstr.Named cnstr_name) args
       | Tuple fields -> of_cnstr_appl Tuple fields
       | Record _fields ->
@@ -324,24 +323,20 @@ end = struct
       | Type_annotation _ -> .
     and of_cnstr_appl cnstr args =
       match Nonempty.of_list args with
-      | None -> return (Cnstr_appl (cnstr, []))
+      | None -> [ Cnstr_appl (cnstr, []) ]
       | Some args ->
-        let rec loop_multiple Nonempty.(arg :: args) : t Nonempty.t =
-          let%bind arg = loop arg in
-          match Nonempty.of_list args with
-          | None -> return arg
-          | Some args -> Nonempty.cons arg (loop_multiple args)
-        in
-        loop_multiple args
+        Nonempty.map args ~f:loop
+        |> Nonempty.cartesian_product_all
+        |> Nonempty.map ~f:(fun args -> Cnstr_appl (cnstr, Nonempty.to_list args))
     in
     loop pattern
   ;;
 
-  let flatten_typed_pattern_no_unions pattern ~place =
+  let flatten_typed_pattern_no_unions pattern ~label =
     match flatten_typed_pattern pattern with
     | [ arg ] -> arg
     | _ :: _ :: _ ->
-      let msg = [%string "Unions in %{place} are not supported"] in
+      let msg = [%string "Pattern unions in %{label} are not supported"] in
       mir_error [%message msg (pattern : Typed.Pattern.t)]
   ;;
 
@@ -413,13 +408,6 @@ end = struct
 
     let asterisk = Ustring.of_string_exn "*"
 
-    let rec cartesian_product_all = function
-      | [] -> []
-      | xs :: xss ->
-        let xss' = cartesian_product_all xss in
-        List.concat_map xs ~f:(fun x -> List.map xss' ~f:(List.cons x))
-    ;;
-
     let rec missing_cases coverage ~ctx ~input_type =
       match coverage with
       | Exhaustive -> []
@@ -443,11 +431,24 @@ end = struct
         let missing_in_args =
           Map.to_alist coverage_by_cnstr
           |> List.concat_map ~f:(fun (cnstr, args) ->
-               List.mapi args ~f:(fun i arg ->
-                 let input_type = Context.cnstr_arg_type ctx input_type cnstr i in
-                 missing_cases ~ctx ~input_type arg)
-               |> cartesian_product_all
-               |> List.map ~f:(fun args -> Cnstr_appl (cnstr, args)))
+               match Nonempty.of_list args with
+               | None -> []
+               | Some args ->
+                 let missing_cases_per_arg =
+                   Nonempty.mapi args ~f:(fun i arg ->
+                     let input_type = Context.cnstr_arg_type ctx input_type cnstr i in
+                     missing_cases ~ctx ~input_type arg)
+                 in
+                 if Nonempty.for_all ~f:List.is_empty missing_cases_per_arg
+                 then []
+                 else
+                   Nonempty.map missing_cases_per_arg ~f:(function
+                     | x :: xs -> Nonempty.(x :: xs)
+                     | [] -> [ Catch_all None ])
+                   |> Nonempty.cartesian_product_all
+                   |> Nonempty.map ~f:(fun args ->
+                        Cnstr_appl (cnstr, Nonempty.to_list args))
+                   |> Nonempty.to_list)
         in
         missing_cnstrs @ missing_in_args
     ;;
@@ -825,7 +826,7 @@ module Expr = struct
         let arg =
           Simple_pattern.flatten_typed_pattern_no_unions
             arg
-            ~place:"function argument patterns"
+            ~label:"function argument patterns"
         in
         let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
         let add_let acc name mir_expr = (name, mir_expr) :: acc in
@@ -878,7 +879,7 @@ module Expr = struct
             (* TODO: support unions in let bindings. For the non-rec case we should just
                be able to convert to a match *)
             let pat =
-              Simple_pattern.flatten_typed_pattern_no_unions pat ~place:"let bindings"
+              Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"let bindings"
             in
             let add_let acc name mir_expr = (name, mir_expr) :: acc in
             fold_pattern_bindings ~ctx pat mir_expr ~init:acc ~add_let)
@@ -989,26 +990,23 @@ let of_typed_module =
           ~f:(fun (ctx, stmts) { node = pattern, ((_, input_type) as expr); _ } ->
           let mir_expr = Expr.of_typed_expr ~ctx expr in
           let add_let stmts name mir_expr = Stmt.Value_def (name, mir_expr) :: stmts in
-          match Simple_pattern.flatten_typed_pattern pattern with
-          | [ pattern ] ->
-            (match
-               Simple_pattern.Coverage.(
-                 of_pattern pattern |> missing_cases ~ctx ~input_type)
-             with
-            | [] -> ()
-            | missing_cases ->
-              mir_error
-                [%message
-                  "The pattern in this let bindings is not exhaustive"
-                    (missing_cases : Simple_pattern.t list)]);
-            Expr.fold_pattern_bindings ~ctx pattern mir_expr ~init:stmts ~add_let
-          | _ :: _ :: _ ->
-            (* TODO: Support pattern unions in toplevel let bindings - should work roughly
+          (* TODO: Support pattern unions in toplevel let bindings - should work roughly
                the same as recursive bindings in expressions*)
+          let pattern =
+            Simple_pattern.flatten_typed_pattern_no_unions
+              pattern
+              ~label:"toplevel let bindings"
+          in
+          let missing_cases =
+            Simple_pattern.Coverage.(of_pattern pattern |> missing_cases ~ctx ~input_type)
+          in
+          if not (List.is_empty missing_cases)
+          then
             mir_error
               [%message
-                "Pattern unions in toplevel let bindings are not supported"
-                  (pattern : Typed.Pattern.t)])
+                "The pattern in this let binding is not exhaustive"
+                  (missing_cases : Simple_pattern.t list)];
+          Expr.fold_pattern_bindings ~ctx pattern mir_expr ~init:stmts ~add_let)
       | Module (_, _, _) ->
         (* TODO: remember to update the name_bindings current_path *)
         failwith "TODO: MIR submodules"

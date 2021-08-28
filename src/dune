@@ -3,6 +3,7 @@
  (libraries core_kernel sedlex menhirLib ocamlgraph llvm)
  (preprocess
   (staged_pps ppx_import sedlex.ppx ppx_jane))
+ (inline_tests)
  (instrumentation
   (backend bisect_ppx)))
 

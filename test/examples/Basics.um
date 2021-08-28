@@ -1,7 +1,7 @@
 # This is a comment. P = NP 
 
 let false = False
-let True = True
+let true = True  # TODO: change this to `(True | False)` once that is implemented
 
 let _ = if false then 1.0 else 2.5
 

@@ -74,6 +74,10 @@ let zip (x :: xs) (y :: ys) =
   loop xs ys [ x, y ] |> rev
 ;;
 
+let mapi (x :: xs) ~f =
+  f 0 x :: snd (List.fold_map xs ~init:1 ~f:(fun i x -> i + 1, f i x))
+;;
+
 let map2 (x :: xs) (y :: ys) ~f =
   let rec loop xs ys acc =
     match xs, ys with
@@ -110,3 +114,16 @@ let min_elt xs ~compare = List.min_elt (to_list xs) ~compare |> Option.value_exn
 let max_elt xs ~compare = List.max_elt (to_list xs) ~compare |> Option.value_exn
 let sexp_of_t sexp_of (x :: xs) = sexp_of_list sexp_of (x :: xs)
 let t_of_sexp of_sexp sexp = of_list_exn (list_of_sexp of_sexp sexp)
+
+let rec cartesian_product_all (xs :: xss) =
+  match of_list xss with
+  | None -> map xs ~f:(fun x -> [ x ])
+  | Some xss ->
+    let xss' = cartesian_product_all xss in
+    concat_map xs ~f:(fun x -> map xss' ~f:(cons x))
+;;
+
+let%expect_test "cartesian product" =
+  print_s [%sexp (cartesian_product_all [ [ 1; 2 ]; [ 3 ]; [ 4; 5 ] ] : int t t)];
+  [%expect {| ((1 3 4) (1 3 5) (2 3 4) (2 3 5)) |}]
+;;
