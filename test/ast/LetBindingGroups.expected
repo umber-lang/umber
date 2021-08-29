@@ -37,7 +37,7 @@
   (Let
    (((Catch_all ())
      ((Let
-       ((rec_ true)
+       ((rec_ false)
         (bindings
          ((((Tuple ()) (Tuple ())) (Tuple ()))
           (((Catch_all ())
@@ -79,7 +79,7 @@
   (Let
    (((Catch_all (bottom))
      ((Let
-       ((rec_ true)
+       ((rec_ false)
         (bindings
          ((((Catch_all (bottom_again)) (Var a))
            (Let

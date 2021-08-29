@@ -96,7 +96,7 @@
   (Let
    (((Catch_all (number))
      ((Let
-       ((rec_ true)
+       ((rec_ false)
         (bindings
          ((((Catch_all (number)) (Type_app (() Int) ())) (Literal (Int 5)))))
         (body

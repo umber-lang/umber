@@ -25,7 +25,7 @@
   (Let
    (((Tuple ((Catch_all (a)) (Catch_all (b))))
      ((Let
-       ((rec_ true)
+       ((rec_ false)
         (bindings
          ((((Catch_all (empty)) (Type_app (() String) ()))
            (Literal (String "")))))

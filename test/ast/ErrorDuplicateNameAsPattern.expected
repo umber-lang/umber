@@ -1,1 +1,1 @@
-(src/name_bindings.ml.Name_error "Duplicate name in pattern: : dup")
+(src/name_bindings.ml.Name_error "Duplicate name in pattern: dup")

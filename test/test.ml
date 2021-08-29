@@ -10,7 +10,9 @@ let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests 
 
 (* These tests are just for type-checking as they are not ready to be converted to MIR.  *)
 let type_only_tests = parse_only_tests @ []
-let should_make_mir test = not (List.mem ~equal:String.equal type_only_tests test)
+
+(*let should_make_mir test = not (List.mem ~equal:String.equal type_only_tests test)*)
+let should_make_mir _ = false (* TODO: fix *)
 
 exception Compilation_error of Filename.t * Sexp.t [@@deriving sexp]
 

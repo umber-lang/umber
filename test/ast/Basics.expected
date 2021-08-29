@@ -1,7 +1,6 @@
 (Basics ()
  ((Let (((Catch_all (false)) ((Name (() False)) (Type_app (() Bool) ())))))
-  (Let
-   (((Cnstr_appl (() True) ()) ((Name (() True)) (Type_app (() Bool) ())))))
+  (Let (((Catch_all (true)) ((Name (() True)) (Type_app (() Bool) ())))))
   (Let
    (((Catch_all ())
      ((Match (Name (() false)) (Type_app (() Bool) ())

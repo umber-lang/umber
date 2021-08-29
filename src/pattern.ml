@@ -37,6 +37,7 @@ let rec fold pat ~init ~f =
       fold pat2 ~init ~f)
 ;;
 
+(* TODO: consider abstracting this *)
 module Names = struct
   type t = Name_bindings.Name_entry.t Value_name.Map.t [@@deriving sexp]
 
@@ -80,4 +81,8 @@ module Names = struct
     fold ~init:Value_name.Map.empty ~f:(fun pat_names name ->
       fst (add_fresh_name pat_names name))
   ;;
+
+  let find = Map.find
+  let mem = Map.mem
+  let merge = Map.merge_skewed
 end
