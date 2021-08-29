@@ -23,10 +23,12 @@ end
 
 let handle_syntax_error f =
   try Ok (f ()) with
-  | Lexer.Syntax_error ({ line; col }, msg) ->
+  | Lexer.Syntax_error (pos, msg) ->
     Error
-      (let err = sprintf "Syntax error at line %d, column %d: " line col in
-       Ustring.(of_string_exn err ^ msg))
+      (Compilation_error.create
+         Syntax_error
+         ~span:(Span.of_pos pos)
+         ~msg:(Atom (Ustring.to_string msg)))
 ;;
 
 let rec lex ~print_tokens_to lexbuf lexer =

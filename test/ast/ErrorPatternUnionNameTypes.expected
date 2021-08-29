@@ -1,2 +1,6 @@
-(src/type_bindings.ml.Type_error "Type application mismatch"
-  (((Type_app (() Char) ()) (Type_app (() Int) ()))))
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("Type application mismatch"
+    (((Type_app (() Char) ()) (Type_app (() Int) ())))))
+  (filename ErrorPatternUnionNameTypes.um)))

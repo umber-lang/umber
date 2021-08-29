@@ -17,16 +17,17 @@ let type_only_tests =
 
 let should_make_mir _ = false (* TODO: enable mir tests *)
 
-let handle_compilation_error ~filename ~f ~out =
-  try f () with
-  | ( Lexer.Syntax_error _
-    | Name_bindings.Name_error _
-    | Type_bindings.Type_error _
-    | Mir.Mir_error _ ) as exn ->
-    let error = Exn.sexp_of_t exn in
-    Parsing.fprint_s
-      ~out
-      [%message "Compilation error" (filename : Filename.t) (error : Sexp.t)]
+let print_compilation_error ~out ~filename (error : Compilation_error.t) =
+  let exn =
+    match error.kind with
+    | Other -> error.exn
+    | _ -> None
+  in
+  Parsing.fprint_s
+    ~out
+    [%sexp
+      "Compilation error"
+      , ({ error with filename = Some filename; exn } : Compilation_error.t)]
 ;;
 
 let run_tests () =
@@ -41,17 +42,18 @@ let run_tests () =
     | Ok ast ->
       if should_type_check bare_filename
       then (
-        match Ast.Typed.Module.of_untyped ~backtrace:false ast with
+        match Ast.Typed.Module.of_untyped ast with
         | Ok (names, ast) ->
           Ast.Typed.Module.sexp_of_t ast |> Parsing.fprint_s ~out:print_ast_to;
           if should_make_mir bare_filename
-          then
-            Mir.of_typed_module ~names ast
-            |> [%sexp_of: Mir.Stmt.t list]
-            |> Parsing.fprint_s ~out:print_mir_to
-        | Error msg -> Ustring.print_endline ~out:print_ast_to msg)
-      else Ast.Untyped.Module.sexp_of_t ast |> Parsing.fprint_s ~out:print_ast_to
-    | Error msg -> Ustring.print_endline ~out:print_ast_to msg);
+          then (
+            match Mir.of_typed_module ~names ast with
+            | Ok stmts ->
+              Parsing.fprint_s ~out:print_mir_to [%sexp (stmts : Mir.Stmt.t list)]
+            | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
+        | Error error -> print_compilation_error ~out:print_ast_to ~filename error)
+      else Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Untyped.Module.t)]
+    | Error error -> print_compilation_error ~out:print_ast_to ~filename error);
     Out_channel.close print_tokens_to;
     Out_channel.close print_ast_to;
     Out_channel.close print_mir_to

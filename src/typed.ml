@@ -525,9 +525,11 @@ module Module = struct
           (match Hashtbl.add aliases_seen ~key:decl ~data:name with
           | `Ok -> loop ~names aliases_seen alias
           | `Duplicate ->
-            raise_s
-              [%message
-                "Cyclic type alias" (name : Type_name.Qualified.t) (decl : Type.Decl.t)])
+            Compilation_error.raise
+              Type_error
+              ~msg:
+                [%message
+                  "Cyclic type alias" (name : Type_name.Qualified.t) (decl : Type.Decl.t)])
         | _ -> ());
         List.iter args ~f:(loop ~names aliases_seen)
       | Function (f, arg) ->
@@ -732,7 +734,7 @@ module Module = struct
       names, reintegrate_binding_groups path other_defs binding_groups)
   ;;
 
-  let of_untyped ?(backtrace = true) ?names ?types (module_name, sigs, defs) =
+  let of_untyped ?names ?types (module_name, sigs, defs) =
     let names =
       option_or_default names ~f:(fun () -> Lazy.force Name_bindings.std_prelude)
     in
@@ -746,33 +748,30 @@ module Module = struct
       Sig_def_diff.create ~names module_name |> Sig_def_diff.raise_if_nonempty;
       Ok (names, (module_name, sigs, defs))
     with
+    | Compilation_error.Compilation_error error -> Error error
     | exn ->
-      (* TODO: probably move this handling elsewhere *)
-      let msg =
-        if backtrace
-        then (
-          let backtrace = Backtrace.(to_string (Exn.most_recent ())) in
-          Exn.to_string exn ^ "\n" ^ backtrace)
-        else
-          Sexp.to_string_hum
-            ~indent:2
-            (match exn with
-            | Type_bindings.Type_error (msg, Some (t1, t2)) ->
-              (* Prevent unstable Var_ids from appearing in test output *)
-              let env = Type.Param.Env_of_vars.create () in
-              let map_type t =
-                Type.Expr.map_vars t ~f:(Type.Param.Env_of_vars.find_or_add env)
-                |> Type.Scheme.sexp_of_t
-              in
-              let ts = Sexp.(List [ List [ map_type t1; map_type t2 ] ]) in
-              let msg = Ustring.to_string msg in
-              Sexp.(List [ Atom "src/type_bindings.ml.Type_error"; Atom msg; ts ])
-            | Name_bindings.Name_error msg ->
-              (* Override _none_ being the filename (no idea why this happens) *)
-              let msg = Ustring.to_string msg in
-              Sexp.(List [ Atom "src/name_bindings.ml.Name_error"; Atom msg ])
-            | _ -> sexp_of_exn exn)
+      let kind : Compilation_error.Kind.t =
+        match exn with
+        | Name_bindings.Name_error _ -> Name_error
+        | Type_bindings.Type_error _ -> Type_error
+        | _ -> Other
       in
-      Error (Ustring.of_string_exn msg)
+      (* TODO: would be nice to transition to creating/raising compilation errors and
+         then doing this handling there *)
+      let msg : Sexp.t =
+        match exn with
+        | Type_bindings.Type_error (msg, Some (t1, t2)) ->
+          (* Prevent unstable Var_ids from appearing in test output *)
+          let env = Type.Param.Env_of_vars.create () in
+          let map_type t =
+            Type.Expr.map_vars t ~f:(Type.Param.Env_of_vars.find_or_add env)
+            |> Type.Scheme.sexp_of_t
+          in
+          List
+            [ Atom (Ustring.to_string msg); List [ List [ map_type t1; map_type t2 ] ] ]
+        | Name_bindings.Name_error msg -> Atom (Ustring.to_string msg)
+        | _ -> sexp_of_exn exn
+      in
+      Error (Compilation_error.create ~msg ~exn kind)
   ;;
 end

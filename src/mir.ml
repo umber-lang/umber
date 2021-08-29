@@ -1039,9 +1039,13 @@ let of_typed_module =
       | Common_def _ -> ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
-    let names = Name_bindings.into_module names module_name ~place:`Def in
-    let _ctx, stmts = loop ~ctx:(Context.of_name_bindings names) defs in
-    List.rev stmts
+    try
+      let names = Name_bindings.into_module names module_name ~place:`Def in
+      let _ctx, stmts = loop ~ctx:(Context.of_name_bindings names) defs in
+      Ok (List.rev stmts)
+    with
+    | Compilation_error.Compilation_error error -> Error error
+    | Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
 ;;
 
 (* Goals should be:

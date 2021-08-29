@@ -158,4 +158,5 @@ let create ~names module_name =
 
 (* TODO: remove all cases where we raise real compiler errors as just Failure. Failure
    should be reserved for todos and compiler bugs. *)
-let raise_if_nonempty t = if not (is_empty t) then raise_s (sexp_of_t t)
+let raise_if_nonempty t = if not (is_empty t) then 
+    Compilation_error.raise ~msg:(sexp_of_t t) Type_error

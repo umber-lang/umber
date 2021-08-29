@@ -1,1 +1,3 @@
-(src/name_bindings.ml.Name_error "Duplicate name: a")
+("Compilation error"
+ ((kind Name_error) (msg "Duplicate name: a")
+  (filename ErrorDuplicateVal.um)))

@@ -34,6 +34,7 @@ type t =
 [@@deriving equal, compare, hash]
 
 let dummy = { start = Pos.dummy; end_ = Pos.dummy }
+let of_pos pos = { start = pos; end_ = pos }
 
 let of_loc ((pos1, pos2) : Lexing.position * Lexing.position) =
   { start = Pos.of_lexing_position pos1; end_ = Pos.of_lexing_position pos2 }

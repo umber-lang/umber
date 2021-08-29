@@ -17,16 +17,16 @@ let command =
          "parent"
          (optional Ast.Module_name.arg_type_lenient)
          ~doc:"MODULE_NAME The name of the parent module"
-     and backtrace =
+       (*and backtrace =
        flag
          "backtrace"
          (optional bool)
-         ~doc:"BOOL Whether to include backtraces for errors"
+         ~doc:"BOOL Whether to include backtraces for errors"*)
      in
      fun () ->
        let or_raise = function
          | Ok x -> x
-         | Error msg -> failwith (Ustring.to_string msg)
+         | Error err -> raise_s [%sexp (err : Compilation_error.t)]
        in
        if parse || type_ || name || mir
        then (
@@ -43,9 +43,7 @@ let command =
              | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
              | None -> names
            in
-           let names, ast =
-             or_raise (Ast.Typed.Module.of_untyped ?backtrace ~names ast)
-           in
+           let names, ast = or_raise (Ast.Typed.Module.of_untyped ~names ast) in
            if type_ then print_s (Ast.Typed.Module.sexp_of_t ast);
            if name then print_s (Name_bindings.sexp_of_t names);
            if mir

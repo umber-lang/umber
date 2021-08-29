@@ -1,2 +1,7 @@
-(src/type_bindings.ml.Type_error
-  "Mutually recursive functions are not allowed across module boundaries" ())
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("Mutually recursive functions are not allowed across module boundaries"
+    (module1 (ErrorCrossModuleMutualRecursion Child))
+    (module2 (ErrorCrossModuleMutualRecursion))))
+  (filename ErrorCrossModuleMutualRecursion.um)))
