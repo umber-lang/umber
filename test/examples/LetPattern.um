@@ -1,8 +1,7 @@
 let catch_all = (False,)  # This is the same as `False` or `(False)` as 1-tuples are not allowed
-let 1 = 1  # Refutable pattern should parse/type fine, but trigger a warning later
 
 type Thing = Thing1 Int | Thing2 Int
-let Thing1 one = Thing1 1
+let (Thing1 one | Thing2 one) = Thing1 1
 let make_thing = match
   | 1 -> Thing1 1
   | 2 -> Thing2 2

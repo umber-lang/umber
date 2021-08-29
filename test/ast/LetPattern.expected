@@ -1,14 +1,14 @@
 (LetPattern ()
  ((Let
    (((Catch_all (catch_all)) ((Name (() False)) (Type_app (() Bool) ())))))
-  (Let (((Constant (Int 1)) ((Literal (Int 1)) (Type_app (() Int) ())))))
   (Common_def
    (Type_decl Thing
     (()
      (Variants
       ((Thing1 ((Type_app (() Int) ()))) (Thing2 ((Type_app (() Int) ()))))))))
   (Let
-   (((Cnstr_appl (() Thing1) ((Catch_all (one))))
+   (((Union (Cnstr_appl (() Thing1) ((Catch_all (one))))
+      (Cnstr_appl (() Thing2) ((Catch_all (one)))))
      ((Fun_call (Name (() Thing1)) (Literal (Int 1)) (Type_app (() Int) ()))
       (Type_app ((LetPattern) Thing) ())))))
   (Let

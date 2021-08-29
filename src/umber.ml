@@ -1,3 +1,4 @@
+module Lexer = Lexer
 module Parsing = Parsing
 module Ast = Ast
 module Name_bindings = Name_bindings

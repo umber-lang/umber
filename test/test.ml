@@ -9,12 +9,25 @@ let parse_only_tests = [ "Imports"; "Modules"; "Operators"; "Traits"; "Types" ]
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)
 
 (* These tests are just for type-checking as they are not ready to be converted to MIR.  *)
-let type_only_tests = parse_only_tests @ []
+let type_only_tests =
+  parse_only_tests @ [ "LetBindingGroups" (* let rec *); "MutualRecursion" (* let rec *) ]
+;;
 
 (*let should_make_mir test = not (List.mem ~equal:String.equal type_only_tests test)*)
-let should_make_mir _ = false (* TODO: fix *)
 
-exception Compilation_error of Filename.t * Sexp.t [@@deriving sexp]
+let should_make_mir _ = false (* TODO: enable mir tests *)
+
+let handle_compilation_error ~filename ~f ~out =
+  try f () with
+  | ( Lexer.Syntax_error _
+    | Name_bindings.Name_error _
+    | Type_bindings.Type_error _
+    | Mir.Mir_error _ ) as exn ->
+    let error = Exn.sexp_of_t exn in
+    Parsing.fprint_s
+      ~out
+      [%message "Compilation error" (filename : Filename.t) (error : Sexp.t)]
+;;
 
 let run_tests () =
   let test filename =
@@ -24,24 +37,21 @@ let run_tests () =
     let print_ast_to = Out_channel.create (concat_current "ast" out_filename) in
     let print_mir_to = Out_channel.create (concat_current "mir" out_filename) in
     let in_file = concat_current "examples" filename in
-    (try
-       match Parsing.parse_file ~print_tokens_to ~full_lex:true in_file with
-       | Ok ast ->
-         if should_type_check bare_filename
-         then (
-           match Ast.Typed.Module.of_untyped ~backtrace:false ast with
-           | Ok (names, ast) ->
-             Ast.Typed.Module.sexp_of_t ast |> Parsing.fprint_s ~out:print_ast_to;
-             if should_make_mir bare_filename
-             then
-               Mir.of_typed_module ~names ast
-               |> [%sexp_of: Mir.Stmt.t list]
-               |> Parsing.fprint_s ~out:print_mir_to
-           | Error msg -> Ustring.print_endline ~out:print_ast_to msg)
-         else Ast.Untyped.Module.sexp_of_t ast |> Parsing.fprint_s ~out:print_ast_to
-       | Error msg -> Ustring.print_endline ~out:print_ast_to msg
-     with
-    | exn -> raise (Compilation_error (filename, Exn.sexp_of_t exn)));
+    (match Parsing.parse_file ~print_tokens_to ~full_lex:true in_file with
+    | Ok ast ->
+      if should_type_check bare_filename
+      then (
+        match Ast.Typed.Module.of_untyped ~backtrace:false ast with
+        | Ok (names, ast) ->
+          Ast.Typed.Module.sexp_of_t ast |> Parsing.fprint_s ~out:print_ast_to;
+          if should_make_mir bare_filename
+          then
+            Mir.of_typed_module ~names ast
+            |> [%sexp_of: Mir.Stmt.t list]
+            |> Parsing.fprint_s ~out:print_mir_to
+        | Error msg -> Ustring.print_endline ~out:print_ast_to msg)
+      else Ast.Untyped.Module.sexp_of_t ast |> Parsing.fprint_s ~out:print_ast_to
+    | Error msg -> Ustring.print_endline ~out:print_ast_to msg);
     Out_channel.close print_tokens_to;
     Out_channel.close print_ast_to;
     Out_channel.close print_mir_to

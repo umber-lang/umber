@@ -144,6 +144,24 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorInexhaustivePattern.expected
+    tokens/ErrorInexhaustivePattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorInexhaustivePattern.expected
+    ast/ErrorInexhaustivePattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorInexhaustivePattern.expected
+    mir/ErrorInexhaustivePattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorPatternUnionNameTypes.expected
     tokens/ErrorPatternUnionNameTypes.out))))
 

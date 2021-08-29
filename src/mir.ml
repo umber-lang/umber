@@ -1016,21 +1016,23 @@ let of_typed_module =
           let add_let stmts name mir_expr = Stmt.Value_def (name, mir_expr) :: stmts in
           (* TODO: Support pattern unions in toplevel let bindings - should work roughly
                the same as recursive bindings in expressions*)
-          let pattern =
+          let pattern' =
             Simple_pattern.flatten_typed_pattern_no_unions
               pattern
               ~label:"toplevel let bindings"
           in
           let missing_cases =
-            Simple_pattern.Coverage.(of_pattern pattern |> missing_cases ~ctx ~input_type)
+            Simple_pattern.Coverage.(
+              of_pattern pattern' |> missing_cases ~ctx ~input_type)
           in
           if not (List.is_empty missing_cases)
           then
             mir_error
               [%message
                 "The pattern in this let binding is not exhaustive"
+                  (pattern : Typed.Pattern.t)
                   (missing_cases : Simple_pattern.t list)];
-          Expr.fold_pattern_bindings ~ctx pattern mir_expr ~init:stmts ~add_let)
+          Expr.fold_pattern_bindings ~ctx pattern' mir_expr ~init:stmts ~add_let)
       | Module (module_name, _sigs, defs) ->
         loop ~ctx:(Context.into_module ctx module_name) defs
       | Trait (_, _, _, _) | Impl (_, _, _, _) -> failwith "TODO: MIR traits/impls"
