@@ -1,0 +1,15 @@
+((Value_def Functions.id/277
+  (Closure
+   ((args ((Functions.lambda_arg/275 Block))) (returns Block)
+    (body
+     (Let Functions.x/276 (Name Functions.lambda_arg/275)
+      (Name Functions.x/276))))))
+ (Value_def Functions.zero/278 (Primitive (Float 0)))
+ (Value_def Functions.still_zero_wow/279
+  (Fun_call (Name Functions.id/277) ((Name Functions.zero/278))))
+ (Value_def Functions.sqr/282
+  (Closure
+   ((args ((Functions.lambda_arg/280 Int64))) (returns Int64)
+    (body
+     (Let Functions.x/281 (Name Functions.lambda_arg/280)
+      (Fun_call (Name */246) ((Name Functions.x/281) (Name Functions.x/281)))))))))

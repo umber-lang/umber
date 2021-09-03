@@ -84,3 +84,49 @@ module :
   # TODO: macro support
 
   # TODO: randomness
+
+# FIXME: should be able to remove this - need to make sure it is added in early enough
+  that the name bindings can get it
+module List =
+  type List a = Nil | Cons a (List a)
+
+module Operators =
+  # FIXME: Remove these fixity declarations and have them copied from the sig
+    This requires a way to specify fixity in a let binding. (Also consider that there's 
+    currently there's no way to put fixity declarations inside nested expressions).
+  val (.) (infixr 9) : () => (b -> c) -> (a -> b) -> a -> c
+  let (.) f g x = f (g x) 
+
+  extern (^) (infixr 8) : Int -> Int -> Int = "%int_pow"
+  extern (*) (infixl 7) : Int -> Int -> Int = "%int_mul"
+  extern (+) (infixl 6) : Int -> Int -> Int = "%int_add"
+  extern (-) (infixl 6) : Int -> Int -> Int = "%int_sub"
+
+  val (::) (infixr 5) : a -> List a -> List a
+  let (::) = List.Cons
+  
+  let not = match | True -> False | False -> True
+
+  extern (==) (infix 4) : a -> a -> Bool = "%eq"
+  extern (!=) (infix 4) : a -> a -> Bool = "%neq"
+  extern (<) (infix 4) : a -> a -> Bool = "%lt"
+  extern (<=) (infix 4) : a -> a -> Bool = "%lte"
+  extern (>) (infix 4) : a -> a -> Bool = "%gt"
+  extern (>=) (infix 4) : a -> a -> Bool = "%gte"
+
+  val (&&) (infixl 3) : Bool -> Bool -> Bool
+  let (&&) a b = if a then b else False
+  
+  val (||) (infixl 2) : Bool -> Bool -> Bool
+  let (||) a b = if a then True else b
+
+  val (|>) (infixl 0) : a -> (a -> b) -> b
+  let (|>) x f = f x
+
+  val (;) (infixl 0) : () => () -> a -> a
+  let (;) () x = x
+
+import Operators with *
+
+extern sqrt : Int -> Float = "%int_sqrt"
+extern print : String -> () = "%print_endline"

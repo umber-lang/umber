@@ -51,6 +51,15 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
        Fixity.equal
        (Name_bindings.Name_entry.fixity sig_entry)
        (Name_bindings.Name_entry.fixity def_entry)
+  &&
+  match
+    ( Name_bindings.Name_entry.extern_name sig_entry
+    , Name_bindings.Name_entry.extern_name def_entry )
+  with
+  | None, (None | Some _) -> true
+  | Some _, None -> false
+  | Some sig_extern_name, Some def_extern_name ->
+    Extern_name.equal sig_extern_name def_extern_name
 ;;
 
 (* TODO: test/look at this for correctness, there are probably bugs here *)
@@ -156,7 +165,6 @@ let create ~names module_name =
   | None -> empty
 ;;
 
-(* TODO: remove all cases where we raise real compiler errors as just Failure. Failure
-   should be reserved for todos and compiler bugs. *)
-let raise_if_nonempty t = if not (is_empty t) then 
-    Compilation_error.raise ~msg:(sexp_of_t t) Type_error
+let raise_if_nonempty t =
+  if not (is_empty t) then Compilation_error.raise ~msg:(sexp_of_t t) Type_error
+;;

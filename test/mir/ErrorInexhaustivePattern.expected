@@ -1,0 +1,6 @@
+("Compilation error"
+ ((kind Mir_error)
+  (msg
+   ("The pattern in this let binding is not exhaustive"
+    (pattern (Constant (Int 1))) (missing_cases ((Constant (Int 2))))))
+  (filename ErrorInexhaustivePattern.um)))

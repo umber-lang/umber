@@ -17,11 +17,6 @@ let command =
          "parent"
          (optional Ast.Module_name.arg_type_lenient)
          ~doc:"MODULE_NAME The name of the parent module"
-       (*and backtrace =
-       flag
-         "backtrace"
-         (optional bool)
-         ~doc:"BOOL Whether to include backtraces for errors"*)
      in
      fun () ->
        let or_raise = function
@@ -46,14 +41,12 @@ let command =
            let names, ast = or_raise (Ast.Typed.Module.of_untyped ~names ast) in
            if type_ then print_s (Ast.Typed.Module.sexp_of_t ast);
            if name then print_s (Name_bindings.sexp_of_t names);
-           if mir
-           then (
-             let mir = Mir.of_typed_module ~names ast in
-             print_s (Mir.sexp_of_t mir))))
-       else if lex
-       then
-         Parsing.lex_file filename ~print_tokens_to:stdout
-         |> Result.iter_error ~f:Ustring.print_endline)
+           if mir then print_s [%sexp (or_raise (Mir.of_typed_module ~names ast) : Mir.t)])
+         else if lex
+         then
+           Parsing.lex_file filename ~print_tokens_to:stdout
+           |> Result.iter_error ~f:(fun error ->
+                print_s [%sexp (error : Compilation_error.t)])))
 ;;
 
 let () = Command.run command

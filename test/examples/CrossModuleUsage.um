@@ -1,7 +1,7 @@
 let source = "everything depends on me"
 
 module A =
-  let a = b
+  let a = b  # TODO: this should probably error out at the mir stage
   let b = a
 
   let print = Std.Prelude.print

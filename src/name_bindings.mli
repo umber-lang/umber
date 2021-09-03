@@ -4,8 +4,10 @@ open Names
 module Name_entry : sig
   module Type_source : sig
     type t =
-      | Val_declared
+      | Placeholder
       | Let_inferred
+      | Val_declared
+      | Extern_declared
     [@@deriving equal, sexp]
   end
 
@@ -16,7 +18,9 @@ module Name_entry : sig
   val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
+  val val_declared : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.Scheme.t -> t
   val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
+  val merge : t -> t -> t
 end
 
 module Path : sig
@@ -46,10 +50,11 @@ val find_entry : t -> Value_name.Qualified.t -> Name_entry.t
 val find_type : t -> Value_name.Qualified.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Qualified.t -> Type.t
 val find_fixity : t -> Value_name.Qualified.t -> Fixity.t
-val set_scheme : t -> Value_name.t -> Type.Scheme.t -> t
+val set_inferred_scheme : t -> Value_name.t -> Type.Scheme.t -> t
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_placeholder : t -> Type_name.t -> t
 
+(** Fold over all the local (non-imported) names bound. *)
 val fold_local_names
   :  t
   -> init:'a
@@ -100,11 +105,19 @@ val import_all : t -> Module_path.t -> t
 val import_without : t -> Module_path.t -> Unidentified_name.t list -> t
 
 val add_val
-  :  ?extern_name:Extern_name.t
-  -> t
+  :  t
   -> Value_name.t
   -> Fixity.t option
   -> Type.Expr.Bounded.t
+  -> unify:(Type.t -> Type.t -> unit)
+  -> t
+
+val add_extern
+  :  t
+  -> Value_name.t
+  -> Fixity.t option
+  -> Type.Expr.Bounded.t
+  -> Extern_name.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
@@ -114,6 +127,7 @@ module Sigs_or_defs : sig
   type name_bindings = t
   type t
 
+  (* TODO: instead of having sets of keys + lookup functions, could we not just return maps? *)
   val value_names : t -> Value_name.Set.t
   val type_names : t -> Type_name.Set.t
   val module_names : t -> Module_name.Set.t

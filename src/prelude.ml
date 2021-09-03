@@ -48,7 +48,8 @@ let names_sexp = {|
                     ((typ
                       (Scheme
                        (Function (Type_app (() String) ()) (Tuple ()))))
-                     (extern_name @Io_print_string))))))
+                     (type_source Extern_declared)
+                     (extern_name %print_endline))))))
                 (types ())
                 (modules
                  ((List
@@ -210,7 +211,38 @@ let names_sexp = {|
                              (Function (Type_app (() Bool) ())
                               (Type_app (() Bool) ())))))))))
                       (types ()) (modules ())))))))))
-              ((names ()) (types ())
+              ((names
+                ((* (Imported ((Std Prelude Operators) *)))
+                 (+ (Imported ((Std Prelude Operators) +)))
+                 (- (Imported ((Std Prelude Operators) -)))
+                 (. (Imported ((Std Prelude Operators) .)))
+                 (";" (Imported ((Std Prelude Operators) ";")))
+                 (< (Imported ((Std Prelude Operators) <)))
+                 (> (Imported ((Std Prelude Operators) >)))
+                 (^ (Imported ((Std Prelude Operators) ^)))
+                 (!= (Imported ((Std Prelude Operators) !=)))
+                 (&& (Imported ((Std Prelude Operators) &&)))
+                 (:: (Imported ((Std Prelude Operators) ::)))
+                 (<= (Imported ((Std Prelude Operators) <=)))
+                 (== (Imported ((Std Prelude Operators) ==)))
+                 (>= (Imported ((Std Prelude Operators) >=)))
+                 (|> (Imported ((Std Prelude Operators) |>)))
+                 (|| (Imported ((Std Prelude Operators) ||)))
+                 (not (Imported ((Std Prelude Operators) not)))
+                 (sqrt
+                  (Local
+                   ((typ
+                     (Scheme
+                      (Function (Type_app (() Int) ())
+                       (Type_app (() Float) ()))))
+                    (type_source Extern_declared) (extern_name %int_sqrt))))
+                 (print
+                  (Local
+                   ((typ
+                     (Scheme (Function (Type_app (() String) ()) (Tuple ()))))
+                    (type_source Extern_declared)
+                    (extern_name %print_endline))))))
+               (types ())
                (modules
                 ((List
                   (Local
@@ -240,5 +272,145 @@ let names_sexp = {|
                                (Type_app ((Std Prelude List) List) ((Var a)))))))))))))
                      (modules ())))))
                  (Operators
-                  (Local (() ((names ()) (types ()) (modules ()))))))))))))))))))))))
+                  (Local
+                   (()
+                    ((names
+                      ((*
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Type_app (() Int) ())
+                             (Function (Type_app (() Int) ())
+                              (Type_app (() Int) ())))))
+                          (type_source Extern_declared) (fixity (Left 7))
+                          (extern_name %int_mul))))
+                       (+
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Type_app (() Int) ())
+                             (Function (Type_app (() Int) ())
+                              (Type_app (() Int) ())))))
+                          (type_source Extern_declared) (fixity (Left 6))
+                          (extern_name %int_add))))
+                       (-
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Type_app (() Int) ())
+                             (Function (Type_app (() Int) ())
+                              (Type_app (() Int) ())))))
+                          (type_source Extern_declared) (fixity (Left 6))
+                          (extern_name %int_sub))))
+                       (.
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Function (Var b) (Var c))
+                             (Function (Function (Var a) (Var b))
+                              (Function (Var a) (Var c))))))
+                          (fixity (Right 9)))))
+                       (";"
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Tuple ()) (Function (Var a) (Var a)))))
+                          (fixity (Left 0)))))
+                       (<
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function (Var a) (Type_app (() Bool) ())))))
+                          (type_source Extern_declared)
+                          (fixity (Non_assoc 4)) (extern_name %lt))))
+                       (>
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function (Var a) (Type_app (() Bool) ())))))
+                          (type_source Extern_declared)
+                          (fixity (Non_assoc 4)) (extern_name %gt))))
+                       (^
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Type_app (() Int) ())
+                             (Function (Type_app (() Int) ())
+                              (Type_app (() Int) ())))))
+                          (type_source Extern_declared) (fixity (Right 8))
+                          (extern_name %int_pow))))
+                       (!=
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function (Var a) (Type_app (() Bool) ())))))
+                          (type_source Extern_declared)
+                          (fixity (Non_assoc 4)) (extern_name %neq))))
+                       (&&
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Type_app (() Bool) ())
+                             (Function (Type_app (() Bool) ())
+                              (Type_app (() Bool) ())))))
+                          (fixity (Left 3)))))
+                       (::
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function
+                              (Type_app ((Std Prelude) List) ((Var a)))
+                              (Type_app ((Std Prelude) List) ((Var a)))))))
+                          (fixity (Right 5)))))
+                       (<=
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function (Var a) (Type_app (() Bool) ())))))
+                          (type_source Extern_declared)
+                          (fixity (Non_assoc 4)) (extern_name %lte))))
+                       (==
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function (Var a) (Type_app (() Bool) ())))))
+                          (type_source Extern_declared)
+                          (fixity (Non_assoc 4)) (extern_name %eq))))
+                       (>=
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function (Var a) (Type_app (() Bool) ())))))
+                          (type_source Extern_declared)
+                          (fixity (Non_assoc 4)) (extern_name %gte))))
+                       (|>
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Var a)
+                             (Function (Function (Var a) (Var b)) (Var b)))))
+                          (fixity (Left 0)))))
+                       (||
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Type_app (() Bool) ())
+                             (Function (Type_app (() Bool) ())
+                              (Type_app (() Bool) ())))))
+                          (fixity (Left 2)))))
+                       (not
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function (Type_app (() Bool) ())
+                             (Type_app (() Bool) ()))))
+                          (type_source Let_inferred))))))
+                     (types ()) (modules ()))))))))))))))))))))))
 |}

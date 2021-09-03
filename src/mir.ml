@@ -187,13 +187,20 @@ end = struct
       |> Unique_name.of_extern_name
   ;;
 
+  (* FIXME: make sure names like && in the prelude are correctly absolutified *)
   let find_value_name t name =
-    let name =
+    let name' =
       try Name_bindings.absolutify_value_name t.name_bindings name with
       | Name_bindings.Name_error _ ->
         Name_bindings.(current_path t.name_bindings |> Path.to_module_path), snd name
     in
-    find t name
+    print_s
+      [%message
+        "find_value_name"
+          (name : Value_name.Qualified.t)
+          (name' : Value_name.Qualified.t)
+          (t : t)];
+    find t name'
   ;;
 
   let find_empty t = find t empty_name

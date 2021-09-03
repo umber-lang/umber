@@ -1,0 +1,5 @@
+((Value_def Basics.false/83 (Name False/68))
+ (Value_def Basics.true/84 (Name True/66))
+ (Value_def Basics.xyz/88
+  (Fun_call (Name Basics.Point3/78)
+   ((Primitive (Int 1)) (Primitive (Int 2)) (Primitive (Int 3))))))

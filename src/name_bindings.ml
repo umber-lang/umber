@@ -3,12 +3,27 @@ open Names
 
 module Name_entry = struct
   module Type_source = struct
-    type t =
-      | Val_declared
-      | Let_inferred
-    [@@deriving equal, sexp]
+    module T = struct
+      type t =
+        | Placeholder
+        | Let_inferred
+        | Val_declared
+        | Extern_declared
+      [@@deriving compare, enumerate, equal, sexp, variants]
+    end
+
+    include T
+    include Comparable.Make (T)
+
+    (* FIXME: expect tests are broken (??) - trying to run them from file "_none_" *)
+    (*let%expect_test "priority order" =
+      print_s [%sexp (List.sort ~compare all : t list)];
+      [%expect {| (Placeholder Let_inferred Val_declared Extern_declared) |}]
+    ;;*)
   end
 
+  (* TODO: is it not the case that Type_or_scheme is determined by Type_source?
+     If so, they could maybe be collapsed into one variant *)
   module Type_or_scheme = struct
     type t =
       | Type of Type.t
@@ -37,12 +52,43 @@ module Name_entry = struct
     | Type _ -> None
   ;;
 
+  let val_declared ?fixity ?extern_name typ =
+    { type_source = Val_declared; typ = Scheme typ; fixity; extern_name }
+  ;;
+
   let let_inferred ?fixity ?extern_name typ =
     { type_source = Let_inferred; typ = Type typ; fixity; extern_name }
   ;;
 
-  let val_declared ?fixity ?extern_name typ =
-    { type_source = Val_declared; typ = Scheme typ; fixity; extern_name }
+  let placeholder =
+    { type_source = Placeholder
+    ; typ = Scheme (Var Type_param_name.default)
+    ; fixity = None
+    ; extern_name = None
+    }
+  ;;
+
+  let merge entry entry' =
+    let preferred, typ, other =
+      match
+        Ordering.of_int (Type_source.compare entry.type_source entry'.type_source)
+      with
+      | Greater -> entry, entry.typ, entry'
+      | Less -> entry', entry'.typ, entry
+      | Equal ->
+        let typ =
+          match entry.typ, entry'.typ with
+          | Type _, Scheme _ | Scheme _, Scheme _ | Type _, Type _ -> entry'.typ
+          | Scheme _, Type _ -> entry.typ
+        in
+        entry', typ, entry
+    in
+    let pick getter = Option.first_some (getter preferred) (getter other) in
+    { typ
+    ; type_source = preferred.type_source
+    ; fixity = pick fixity
+    ; extern_name = pick extern_name
+    }
   ;;
 end
 
@@ -507,7 +553,15 @@ let std_prelude =
      import_all t Core.prelude_module_path)
 ;;
 
-let add_val ?extern_name t name fixity (trait_bounds, type_expr) ~unify =
+let add_val_or_extern
+  ?extern_name
+  t
+  name
+  fixity
+  (trait_bounds, type_expr)
+  ~unify
+  ~type_source
+  =
   let f bindings =
     if not (List.is_empty trait_bounds) then failwith "TODO: trait bounds in val";
     let scheme = absolutify_type_expr t type_expr in
@@ -518,7 +572,10 @@ let add_val ?extern_name t name fixity (trait_bounds, type_expr) ~unify =
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
           | Some (Local existing_entry) ->
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
-            Local { type_source = Val_declared; typ = Scheme scheme; fixity; extern_name }
+            Local
+              (Name_entry.merge
+                 existing_entry
+                 { type_source; typ = Scheme scheme; fixity; extern_name })
           | Some (Imported imported_name) ->
             (* TODO: consider allowing this use case
                e.g. importing from another module, and then giving that import a new,
@@ -532,6 +589,12 @@ let add_val ?extern_name t name fixity (trait_bounds, type_expr) ~unify =
     }
   in
   update_current t ~f:{ f }
+;;
+
+let add_val = add_val_or_extern ?extern_name:None ~type_source:Val_declared
+
+let add_extern t name fixity typ extern_name ~unify =
+  add_val_or_extern t name fixity typ ~extern_name ~unify ~type_source:Extern_declared
 ;;
 
 let absolutify_type_decl t = Type.Decl.map_exprs ~f:(absolutify_type_expr t)
@@ -577,16 +640,29 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
   update_current t ~f:{ f }
 ;;
 
-let set_scheme t name scheme =
+let set_inferred_scheme t name scheme =
   let f bindings =
-    let entry =
+    let inferred_entry =
       { Name_entry.type_source = Let_inferred
       ; typ = Scheme scheme
       ; fixity = None
       ; extern_name = None
       }
     in
-    { bindings with names = Map.set bindings.names ~key:name ~data:(Local entry) }
+    { bindings with
+      names =
+        Map.update bindings.names name ~f:(function
+          | None -> Local inferred_entry
+          | Some (Local existing_entry) ->
+            Local (Name_entry.merge existing_entry inferred_entry)
+          | Some (Imported _) ->
+            (* TODO: Think about the exact semantics of this. I think we want to disallow
+               shadowing/name clashes between imported and local names, but I'm not sure
+               if here is the best place to do it. *)
+            name_error_msg
+              "Name clash between imported and local binding"
+              (Value_name.to_ustring name))
+    }
   in
   update_current t ~f:{ f }
 ;;
@@ -596,7 +672,7 @@ let add_name_placeholder t name =
     { bindings with
       names =
         Map.update bindings.names name ~f:(function
-          | None -> Local (Name_entry.val_declared (Var Type_param_name.default))
+          | None -> Local Name_entry.placeholder
           | Some (Local { Name_entry.type_source = Let_inferred; _ } as entry) -> entry
           | _ -> name_error_msg "Duplicate name" (Value_name.to_ustring name))
     }
@@ -613,19 +689,19 @@ let add_type_placeholder t type_name =
   update_current t ~f:{ f }
 ;;
 
-(* TODO: document the exact semantics of this *)
 let fold_local_names t ~init ~f =
-  let fold_local t path bindings init =
+  let fold_local path bindings init =
     Map.fold bindings.names ~init ~f:(fun ~key:name ~data acc ->
-      let entry = resolve_name_or_import t data in
-      f acc (path, name) entry)
+      match data with
+      | Local entry -> f acc (path, name) entry
+      | Imported _ -> acc)
   in
   let rec fold_defs t path (defs : defs) ~init ~f =
     Map.fold
       defs.modules
-      ~init:(fold_local t path defs init)
+      ~init:(fold_local path defs init)
       ~f:(fun ~key:module_name ~data acc ->
-      (* TODO: ignoring sigs here because defs should have all the names, but this seems weird *)
+      (* We can ignore sigs here because defs should have all the names *)
       match data with
       | Local (_, defs) -> fold_defs t (path @ [ module_name ]) defs ~init:acc ~f
       | Imported _ -> acc)
