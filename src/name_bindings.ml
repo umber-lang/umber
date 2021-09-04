@@ -402,13 +402,26 @@ let find =
   loop
 ;;
 
-let rec find_entry t name =
+let rec find_entry' t name =
   let open Option.Let_syntax in
-  find t name ~to_ustring:Value_name.Qualified.to_ustring ~f:(fun _ name bindings ->
-    let f bindings = Map.find bindings.names name >>| resolve_name_or_import t in
+  find
+    t
+    name
+    ~to_ustring:Value_name.Qualified.to_ustring
+    ~f:(fun current_path name bindings ->
+    let f bindings =
+      Map.find bindings.names name >>| resolve_name_or_import' t (current_path, name)
+    in
     match bindings with
     | Sigs sigs -> f sigs
     | Defs defs -> f defs)
+
+and resolve_name_or_import' t name = function
+  | Or_imported.Local entry -> name, entry
+  | Imported path_name -> find_entry' t path_name
+;;
+
+let rec find_entry t name = snd (find_entry' t name)
 
 and resolve_name_or_import t = function
   | Or_imported.Local entry -> entry
@@ -455,6 +468,9 @@ let find_type_decl' ?at_path ?defs_only t name =
         | Imported (import_path, ()) -> Some (path, Some (Imported (import_path, name)))))
 ;;
 
+(* TODO: Ideally we should have consistent behavior between all the absolutify functions,
+   which should include following imports all the way to a local name. I don't think that
+   is currently the case. *)
 let absolutify_path t path =
   find
     t
@@ -465,15 +481,27 @@ let absolutify_path t path =
 
 let absolutify_type_name t ((_, name) as path) = fst (find_type_decl' t path), name
 
-let absolutify_value_name t =
-  find
+let absolutify_value_name t name =
+  (* TODO: cleanup *)
+  (*find
     t
     ~f:(fun path name bindings ->
-      let f bindings = Option.some_if (Map.mem bindings.names name) (path, name) in
+      let f bindings =
+        match Map.find bindings.names name with
+        | Some (Local _) -> Some (path, name)
+        | Some (Imported (path, name)) ->
+          (* FIXME: this is probably wrong as it is resolving the path from the current
+             location, not the location of the import itself. I think we should just
+             absolutify import paths upon getting them. On that topic, can we try adding
+             absoluteness of paths to the type system again? *)
+          (match find_entry t (path, name) )
+        | None -> None
+      in
       match bindings with
       | Sigs sigs -> f sigs
       | Defs defs -> f defs)
-    ~to_ustring:Value_name.Qualified.to_ustring
+    ~to_ustring:Value_name.Qualified.to_ustring*)
+  fst (find_entry' t name)
 ;;
 
 (* TODO: how do I fill in foreign modules?

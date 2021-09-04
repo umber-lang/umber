@@ -12,7 +12,7 @@ let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests 
 let type_only_tests =
   parse_only_tests
   @ [ "LetBindingGroups" (* let rec *)
-    ; "LetPatttern" (* unions in toplevel let bindings *)
+    ; "LetPattern" (* unions in toplevel let bindings *)
     ; "MutualRecursion" (* let rec *)
     ]
 ;;
@@ -50,8 +50,9 @@ let run_tests () =
           if should_make_mir bare_filename
           then (
             match Mir.of_typed_module ~names ast with
-            | Ok stmts ->
-              Parsing.fprint_s ~out:print_mir_to [%sexp (stmts : Mir.Stmt.t list)]
+            | Ok mir ->
+              let mir = Mir.renumber_ids mir in
+              Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)]
             | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
         | Error error -> print_compilation_error ~out:print_ast_to ~filename error)
       else Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Untyped.Module.t)]

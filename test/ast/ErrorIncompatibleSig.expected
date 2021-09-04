@@ -19,8 +19,5 @@
              ((typ (Scheme (Type_app (() String) ())))
               (type_source Let_inferred))))))
          (type_diff ()) (module_diff ()))))
-      (MissingModule
-       (Module_diff
-        ((name_diff ((missing Missing_from_def))) (type_diff ())
-         (module_diff ()))))))))
+      (MissingModule Missing_module)))))
   (filename ErrorIncompatibleSig.um)))

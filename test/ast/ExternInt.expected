@@ -4,4 +4,4 @@
    (Extern plus ((Left 6))
     (Function (Type_app (() MyInt) ())
      (Function (Type_app (() MyInt) ()) (Type_app (() MyInt) ())))
-    @Int_add))))
+    %int_add))))

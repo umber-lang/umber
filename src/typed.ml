@@ -490,11 +490,11 @@ module Module = struct
           Name_bindings.merge_names
             names
             (Pattern.Names.gather pat)
-            ~combine:(fun _ entry entry' ->
-            (* TODO: check if we should be raising on duplicates here, of if it's
-               caught elsewhere. *)
-            (* FIXME: should we be unifying here? *)
-            Name_bindings.Name_entry.merge entry entry'))
+            ~combine:(fun name entry entry' ->
+            match Name_bindings.Name_entry.type_source entry with
+            | Placeholder -> entry'
+            | Let_inferred | Val_declared | Extern_declared ->
+              Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)))
       | Module (module_name, sigs, defs) ->
         gather_name_placeholders ~names module_name sigs defs
       | Common_def common -> f_common names common
@@ -742,8 +742,6 @@ module Module = struct
     let types = option_or_default types ~f:Type_bindings.create in
     try
       let defs = copy_some_sigs_to_defs sigs defs in
-      print_s
-        [%message (defs : (Untyped.Pattern.t, Untyped.Expr.t) Module.def Node.t list)];
       let names = gather_name_placeholders ~names module_name sigs defs in
       let names = gather_imports_and_type_decls ~names module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
