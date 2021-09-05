@@ -579,18 +579,6 @@ module Expr = struct
     | And of cond * cond
   [@@deriving sexp_of]
 
-  (* FIXME: We must integrate with [make_condition]:
-      Example: `let ((5, x) | (x, _)) = (1, 2)`
-      Other options/ideas:
-      - Use flat patterns (make that a type) and ignore unions
-      - Convert non-rec lets into match expressions (at the code should be shared)
-      - Ban patterns beside names in let rec <- bad
-      Wait, since type-checking is done, let rec is the same as match with just
-      the names in the pattern bound in the body e.g. 
-      `let f x = if x <= 0 then 1 else f (x / 2); f 7`
-      is equivalent to
-      `match fun x -> if x <= 0 then 1 else f (x / 2) | f -> f 7`
-      supposing that `f` is also bound in the matched expression *)
   (* TODO: consider merging making bindings with making conditions *)
   let rec fold_pattern_bindings
     ?(add_name = Context.add_value_name)
@@ -634,83 +622,39 @@ module Expr = struct
     | Constant lit -> Some (Equals (input_expr, lit))
     | Cnstr_appl (cnstr, args) ->
       let tag = Context.cnstr_tag ctx input_type cnstr in
-      let tag_cond =
-        if List.is_empty args
-        then Constant_tag_equals (input_expr, tag)
-        else Non_constant_tag_equals (input_expr, tag)
-      in
-      let conds =
-        List.filter_mapi args ~f:(fun i arg ->
-          let arg_expr = Get_block_field (i, input_expr) in
-          let arg_type = Context.cnstr_arg_type ctx input_type cnstr i in
-          condition_of_pattern ~ctx ~input_expr:arg_expr ~input_type:arg_type arg)
-      in
-      Some (List.fold conds ~init:tag_cond ~f:(fun cond cond' -> And (cond, cond')))
+      if List.is_empty args
+      then Some (Constant_tag_equals (input_expr, tag))
+      else (
+        let tag_cond = Non_constant_tag_equals (input_expr, tag) in
+        let conds =
+          List.filter_mapi args ~f:(fun i arg ->
+            let arg_expr = Get_block_field (i, input_expr) in
+            let arg_type = Context.cnstr_arg_type ctx input_type cnstr i in
+            condition_of_pattern ~ctx ~input_expr:arg_expr ~input_type:arg_type arg)
+        in
+        Some (List.fold conds ~init:tag_cond ~f:(fun cond cond' -> And (cond, cond'))))
   ;;
 
-  (*let fold_let_pattern ~ctx ~init ~add_let ~pattern ~input_type ~mir_expr =
-    (* FIXME: this is wrong, we need to insert conditional bindings
-       How the binding is done can depend on runtime values e.g.
-       `let ((5, x) | (x, _)) = (4, 5)`
-       We can take nonrecursive `let`s and make them the same as match statements.
-       Recursive lets seem a little harder - actually wait, you just need the parent
-       names to be bound in the child contexts (anything else?)
-       - Actually, recursion in our let statements is really tricky, since it's possible
-         to create non-terminating values e.g. `let x = x`
-         Some options:
-         - Restrict recursive lets to just values/functions and then restrict the
-           right-hand side like OCaml does. This is very sad as we are rec by default.
-         - Work out if the value is *actually* recursive (referencing itself) - we can
-           have the type checker do this and remove the rec flag - and only apply the
-           restrictions if this is the case. This sounds pretty good. We may also be able
-           to remove some restrictions later. *)
-    Simple_pattern.flatten_typed_pattern pattern
-    |> Nonempty.fold ~init ~f:(fun init pattern ->
-         fold_simple_pattern ~ctx ~init ~add_let ~pattern ~input_type ~mir_expr)
-  ;;*)
+  (* TODO: We need to insert conditional bindings in match statements
+     How the binding is done can depend on runtime values e.g.
+     `let ((5, x) | (x, _)) = (4, 5)`
+     We can take nonrecursive `let`s and make them the same as match statements.
+     Recursive lets seem a little harder - actually wait, you just need the parent
+     names to be bound in the child contexts (anything else?)
+     - Actually, recursion in our let statements is really tricky, since it's possible
+       to create non-terminating values e.g. `let x = x`
+       Some options:
+       - Restrict recursive lets to just values/functions and then restrict the
+         right-hand side like OCaml does. This is very sad as we are rec by default.
+       - Work out if the value is *actually* recursive (referencing itself) - we can
+         have the type checker do this and remove the rec flag - and only apply the
+         restrictions if this is the case. This sounds pretty good. We may also be able
+         to remove some restrictions later. *)
 
   (* TODO: switch statement optimization
      See:
      - https://github.com/ocaml/ocaml/blob/trunk/lambda/matching.ml
      - https://www.researchgate.net/publication/2840783_Optimizing_Pattern_Matching  *)
-  (*let rec switch_case ~ctx
-        : Pattern.t -> Context.t * Value_kind.t Literal.t list
-        = function
-        | Cnstr_appl ((_, cnstr_name), []) ->
-          let cnstr_index = Context.cnstr_index ctx expr_type cnstr_name in
-          ctx, [ Int cnstr_index ]
-        | Catch_all None -> ctx, []
-        | Catch_all (Some name) -> fst (Context.add_value_name ctx name), []
-        | As (pattern, name) ->
-          switch_case ~ctx:(fst (Context.add_value_name ctx name)) pattern
-        | (Cnstr_appl _ | Constant _ | Tuple _ | Record _ | Union (_, _)) as pat ->
-          raise_s
-            [%message
-              "TODO: unimplemented match to switch pattern" (pat : Pattern.t)]
-      in
-      (* TODO: Warn about unused cases *)
-      let cases, default =
-        Nonempty.fold_right arms ~init:([], None) ~f:(fun (pat, expr) (cases, default) ->
-          if Option.is_some default
-          then cases, default
-          else (
-            (* FIXME: need to bind variable names from the switch case when making this *)
-            let ctx, switch_cases = switch_case ~ctx pat in
-            let expr = of_typed_expr ~ctx (expr, match_type) in
-            match switch_cases with
-            | [] -> cases, Some expr
-            | case :: rest -> (Nonempty.(case :: rest), expr) :: cases, default))
-      in*)
-  (*let rec loop_switch ~ctx expr cases default = function
-      | [] -> Switch { expr; cases; default }
-      | arm :: arms -> ()
-    in
-    match arm with
-    | Cnstr_appl _ | Constant _ -> loop_switch ~ctx expr [] None (arm :: arms)
-    | Catch_all (Some name) -> ()
-    | As (pattern, name) ->
-      switch_case ~ctx:(fst (Context.add_value_name ctx name)) pattern
-    | (Tuple _ | Record _ | Union (_, _)) as pat -> ()*)
 
   let of_typed_expr ~ctx:whole_expression_ctx whole_expression_expr =
     let create_break_label = unstage (Break_label.make_creator_for_whole_expression ()) in
@@ -871,29 +815,37 @@ module Expr = struct
       (* FIXME: sharing of break labels between patterns in an arm is just broken *)
       let label = create_break_label () in
       let rec loop Nonempty.(pattern :: patterns) =
-        let add_let body name expr = Let (name, expr, body) in
-        fold_pattern_bindings ~ctx pattern input_expr ~init:(Break label) ~add_let
-        |> Tuple2.map_snd ~f:(fun output_expr ->
-             match condition_of_pattern ~ctx ~input_expr ~input_type pattern with
-             | None ->
-               (* TODO: warn about unused patterns (the other arms) *)
-               output_expr
-             | Some cond ->
-               (match Nonempty.of_list patterns with
-               | Some patterns ->
-                 If { cond; then_ = output_expr; else_ = snd (loop patterns) }
-               | None ->
-                 (match fallback with
-                 | None ->
-                   (* This is the last case, so just elide the condition *)
-                   assert_or_compiler_bug ~here:[%here] (List.is_empty patterns);
-                   output_expr
-                 | Some fallback -> fallback ())))
+        let add_let bindings name expr = (name, expr) :: bindings in
+        let ctx', bindings =
+          fold_pattern_bindings ~ctx pattern input_expr ~init:[] ~add_let
+        in
+        (* TODO: this should skip underscore bindings (bindings for no actual variables )*)
+        let output_expr =
+          List.fold bindings ~init:(Break label) ~f:(fun output_expr (name, mir_expr) ->
+            Let (name, mir_expr, output_expr))
+        in
+        let output_expr' =
+          match condition_of_pattern ~ctx ~input_expr ~input_type pattern with
+          | None ->
+            (* TODO: warn about unused patterns (the other arms) *)
+            output_expr
+          | Some cond ->
+            (match Nonempty.of_list patterns, fallback with
+            | Some patterns, _ ->
+              If { cond; then_ = output_expr; else_ = snd (loop patterns) }
+            | None, Some fallback -> If { cond; then_ = output_expr; else_ = fallback () }
+            | None, None ->
+              (* This is the last case, so just elide the condition *)
+              output_expr)
+        in
+        ctx', output_expr'
       in
       (* NOTE: All patterns in a union must bind the same names with the same types, so we
        can use any one of the [Context.t]s to create the output expression as they will
        all be equivalent. *)
       let ctx, body = loop patterns in
+      (* TODO: if there is only one pattern, we could skip the catch/break.
+         (pass in a function to create the output_expr) *)
       Catch { label; body; with_ = of_typed_expr ~ctx output }
     in
     of_typed_expr ~ctx:whole_expression_ctx whole_expression_expr
