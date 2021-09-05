@@ -579,7 +579,13 @@ module Expr = struct
     | And of cond * cond
   [@@deriving sexp_of]
 
-  (* TODO: consider merging making bindings with making conditions *)
+  (* TODO: consider merging making bindings with making conditions. If we extended
+     [Coverage.t] to include some notion of what conditions have been tested as well, it
+     could help us avoid unnecessary checks. *)
+  (* TODO: I think this should probably just collect the bindings into a list and give
+     them to you - I think most of the uses do this anyway. We could also try to do
+     clever stuff like noticing if a pattern binds only the empty name and no "real"
+     names, and then returning no bindings. *)
   let rec fold_pattern_bindings
     ?(add_name = Context.add_value_name)
     ~ctx
@@ -588,7 +594,6 @@ module Expr = struct
     pat
     mir_expr
     =
-    (* TODO: warn/error if bindings are not exhaustive *)
     match (pat : Simple_pattern.t) with
     | Catch_all None ->
       (* TODO: warn about unused expressions. NOTE: we can only elide the bound expression
@@ -812,14 +817,13 @@ module Expr = struct
       let ((pattern, output_expr) :: arms) = arms in
       loop_one_arm ~pattern ~output_expr ~coverage:None arms
     and handle_match_arm ~ctx ~input_expr ~input_type ~output ?fallback patterns =
-      (* FIXME: sharing of break labels between patterns in an arm is just broken *)
       let label = create_break_label () in
       let rec loop Nonempty.(pattern :: patterns) =
         let add_let bindings name expr = (name, expr) :: bindings in
         let ctx', bindings =
           fold_pattern_bindings ~ctx pattern input_expr ~init:[] ~add_let
         in
-        (* TODO: this should skip underscore bindings (bindings for no actual variables )*)
+        (* TODO: this should skip underscore bindings (bindings for no actual variables) *)
         let output_expr =
           List.fold bindings ~init:(Break label) ~f:(fun output_expr (name, mir_expr) ->
             Let (name, mir_expr, output_expr))
@@ -953,9 +957,7 @@ let of_typed_module =
            [Value_name.empty] elsewhere in the AST, e.g. for match variables.
            Might be a good idea to add a variant for constant names, or something. *)
         if Constant_names.mem name
-        then
-          (* Constant names are always made-up anew *)
-          (* FIXME: let bindings for these will not be added in the right place, I think *)
+        then (* Constant names are always made-up anew *)
           Context.add_value_name ctx name
         else
           (* Look up non-constant names added at the beginning *)

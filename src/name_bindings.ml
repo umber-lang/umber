@@ -15,15 +15,14 @@ module Name_entry = struct
     include T
     include Comparable.Make (T)
 
-    (* FIXME: expect tests are broken (??) - trying to run them from file "_none_" *)
-    (*let%expect_test "priority order" =
-      print_s [%sexp (List.sort ~compare all : t list)];
-      [%expect {| (Placeholder Let_inferred Val_declared Extern_declared) |}]
-    ;;*)
+    let%test "priority order" =
+      List.equal
+        equal
+        (List.sort ~compare all)
+        [ Placeholder; Let_inferred; Val_declared; Extern_declared ]
+    ;;
   end
 
-  (* TODO: is it not the case that Type_or_scheme is determined by Type_source?
-     If so, they could maybe be collapsed into one variant *)
   module Type_or_scheme = struct
     type t =
       | Type of Type.t
@@ -480,29 +479,7 @@ let absolutify_path t path =
 ;;
 
 let absolutify_type_name t ((_, name) as path) = fst (find_type_decl' t path), name
-
-let absolutify_value_name t name =
-  (* TODO: cleanup *)
-  (*find
-    t
-    ~f:(fun path name bindings ->
-      let f bindings =
-        match Map.find bindings.names name with
-        | Some (Local _) -> Some (path, name)
-        | Some (Imported (path, name)) ->
-          (* FIXME: this is probably wrong as it is resolving the path from the current
-             location, not the location of the import itself. I think we should just
-             absolutify import paths upon getting them. On that topic, can we try adding
-             absoluteness of paths to the type system again? *)
-          (match find_entry t (path, name) )
-        | None -> None
-      in
-      match bindings with
-      | Sigs sigs -> f sigs
-      | Defs defs -> f defs)
-    ~to_ustring:Value_name.Qualified.to_ustring*)
-  fst (find_entry' t name)
-;;
+let absolutify_value_name t name = fst (find_entry' t name)
 
 (* TODO: how do I fill in foreign modules?
    For now, just assume a toplevel module already exists and copy (?) it into scope

@@ -41,12 +41,12 @@ let command =
            let names, ast = or_raise (Ast.Typed.Module.of_untyped ~names ast) in
            if type_ then print_s (Ast.Typed.Module.sexp_of_t ast);
            if name then print_s (Name_bindings.sexp_of_t names);
-           if mir then print_s [%sexp (or_raise (Mir.of_typed_module ~names ast) : Mir.t)])
-         else if lex
-         then
-           Parsing.lex_file filename ~print_tokens_to:stdout
-           |> Result.iter_error ~f:(fun error ->
-                print_s [%sexp (error : Compilation_error.t)])))
+           if mir then print_s [%sexp (or_raise (Mir.of_typed_module ~names ast) : Mir.t)]))
+       else if lex
+       then
+         Parsing.lex_file filename ~print_tokens_to:stdout
+         |> Result.iter_error ~f:(fun error ->
+              print_s [%sexp (error : Compilation_error.t)]))
 ;;
 
 let () = Command.run command
