@@ -7,15 +7,13 @@ module Pattern : sig
   type nonrec t = Nothing.t t [@@deriving sexp]
 
   val of_untyped_with_names
-    :  ?fixity:Fixity.t
-    -> names:Name_bindings.t
+    :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Pattern.t
     -> Names.t * (t * Type.t)
 
   val of_untyped_into
-    :  ?fixity:Fixity.t
-    -> names:Name_bindings.t
+    :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Pattern.t
     -> Name_bindings.t * (Names.t * (t * Type.t))

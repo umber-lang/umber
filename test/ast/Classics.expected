@@ -1,6 +1,6 @@
 (Classics ()
  ((Let
-   ((((Catch_all (fact)) ())
+   (((Catch_all (fact))
      ((Lambda (Catch_all (""))
        (Match (Name (() "")) (Type_app (() Int) ())
         (((Union (Constant (Int 0)) (Constant (Int 1))) (Literal (Int 1)))
@@ -15,7 +15,7 @@
            (Type_app (() Int) ()))))))
       (Function (Type_app (() Int) ()) (Type_app (() Int) ()))))))
   (Let
-   ((((Catch_all (fib)) ())
+   (((Catch_all (fib))
      ((Lambda (Catch_all (n))
        (Match (Name (() n)) (Type_app (() Int) ())
         (((Union (Constant (Int 0)) (Constant (Int 1))) (Literal (Int 1)))

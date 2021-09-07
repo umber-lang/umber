@@ -26,7 +26,7 @@
       (Function (Type_app (() List) ((Var b)))
        (Type_app (() List) ((Tuple ((Var a) (Var b)))))))))))
  ((Let
-   ((((Catch_all ()) ())
+   (((Catch_all ())
      (Qualified (Arith)
       (Op_tree
        ((() ==)
@@ -35,21 +35,20 @@
            ((Literal (Int 3)))))
          ((Literal (Int 4))))))))))
   (Let
-   ((((Catch_all (four)) ())
+   (((Catch_all (four))
      (Fun_call (Fun_call (Name ((Arith) +)) (Literal (Int 2)))
       (Literal (Int 2))))))
   (Let
-   ((((Catch_all (one)) ())
+   (((Catch_all (one))
      (Op_tree (((Arith) mod) (((Literal (Int 5))) ((Literal (Int 2)))))))))
   (Let
-   ((((Catch_all (left_section)) ())
-     (Fun_call (Name (() +)) (Literal (Int 2))))))
+   (((Catch_all (left_section)) (Fun_call (Name (() +)) (Literal (Int 2))))))
   (Let
-   ((((Catch_all (right_section)) ())
+   (((Catch_all (right_section))
      (Lambda (Catch_all (""))
       (Fun_call (Fun_call (Name (() *)) (Name (() ""))) (Literal (Int 5)))))))
   (Let
-   ((((Catch_all (unicode_my_dudes)) ())
+   (((Catch_all (unicode_my_dudes))
      (Op_tree
       ((() "\195\151")
        (((Seq_literal ((Literal (String damn)) (Literal (String ok)))))

@@ -1,10 +1,10 @@
 (AsPattern ()
  ((Let
-   ((((As (Tuple ((Catch_all (one)) (Catch_all (two)))) pair) ())
+   (((As (Tuple ((Catch_all (one)) (Catch_all (two)))) pair)
      ((Tuple ((Literal (Int 1)) (Literal (Int 2))))
       (Tuple ((Type_app (() Int) ()) (Type_app (() Int) ())))))))
   (Let
-   ((((Catch_all (iter_pairs)) ())
+   (((Catch_all (iter_pairs))
      ((Lambda (Catch_all (f))
        (Lambda (Catch_all (lst))
         (Match (Name (() lst)) (Type_app ((Std Prelude List) List) ((Var a)))
