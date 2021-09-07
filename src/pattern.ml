@@ -43,9 +43,8 @@ module Names = struct
 
   let empty = Value_name.Map.empty
 
-  (* TODO: consider making this a map to types directly, since let_inferred is always used *)
-  let add_name pat_names name typ =
-    let name_entry = Name_bindings.Name_entry.let_inferred typ in
+  let add_name ?fixity pat_names name typ =
+    let name_entry = Name_bindings.Name_entry.let_inferred ?fixity typ in
     match Map.add pat_names ~key:name ~data:name_entry with
     | `Ok pat_names -> pat_names
     | `Duplicate ->
@@ -54,9 +53,9 @@ module Names = struct
         (Value_name.to_ustring name)
   ;;
 
-  let add_fresh_name pat_names name =
+  let add_fresh_name ?fixity pat_names name =
     let var = Type.fresh_var () in
-    add_name pat_names name var, var
+    add_name ?fixity pat_names name var, var
   ;;
 
   let fold pat ~init ~f =
@@ -77,9 +76,9 @@ module Names = struct
     loop init ~f pat
   ;;
 
-  let gather =
+  let gather ?fixity =
     fold ~init:Value_name.Map.empty ~f:(fun pat_names name ->
-      fst (add_fresh_name pat_names name))
+      fst (add_fresh_name ?fixity pat_names name))
   ;;
 
   let find = Map.find

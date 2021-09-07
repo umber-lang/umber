@@ -1,10 +1,10 @@
 (MutualRecursion ()
  ((Common_def (Val f () (() (Type_app (() Forest) ((Var a))))))
   (Let
-   (((Catch_all (f))
+   ((((Catch_all (f)) ())
      ((Name (() Nil)) (Type_app ((MutualRecursion) Forest) ((Var a)))))))
   (Let
-   (((Catch_all (sum_forest))
+   ((((Catch_all (sum_forest)) ())
      ((Let
        ((rec_ true)
         (bindings
@@ -42,7 +42,7 @@
        (Type_app ((Std Prelude List) List)
         ((Type_app ((MutualRecursion) Tree) ((Type_app (() Int) ())))))
        (Type_app (() Int) ()))))
-    ((Catch_all (sum_tree))
+    (((Catch_all (sum_tree)) ())
      ((Lambda (Catch_all (""))
        (Match (Name (() ""))
         (Type_app ((MutualRecursion) Tree) ((Type_app (() Int) ())))
@@ -63,7 +63,7 @@
     ((a)
      (Variants ((Leaf ()) (Node ((Var a) (Type_app (() Forest) ((Var a))))))))))
   (Let
-   (((Catch_all (even))
+   ((((Catch_all (even)) ())
      ((Lambda (Catch_all (x))
        (Match
         (Fun_call
@@ -78,7 +78,7 @@
             (Literal (Int 1)) (Type_app (() Int) ()))
            (Type_app (() Int) ()))))))
       (Function (Type_app (() Int) ()) (Type_app (() Bool) ()))))
-    ((Catch_all (odd))
+    (((Catch_all (odd)) ())
      ((Lambda (Catch_all (x))
        (Match
         (Fun_call
@@ -94,7 +94,7 @@
            (Type_app (() Int) ()))))))
       (Function (Type_app (() Int) ()) (Type_app (() Bool) ()))))))
   (Let
-   (((Catch_all (number))
+   ((((Catch_all (number)) ())
      ((Let
        ((rec_ false)
         (bindings

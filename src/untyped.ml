@@ -19,7 +19,7 @@ module Expr = struct
     | Lambda of Pattern.t * t
     | If of t * t * t
     | Match of t * (Pattern.t * t) Nonempty.t
-    | Let of (Pattern.t, t) Let_binding.t
+    | Let of (Pattern.t * Fixity.t option, t) Let_binding.t
     | Tuple of t list
     | Seq_literal of t list
     | Record_literal of (Value_name.t * t option) list
@@ -55,7 +55,7 @@ module Expr = struct
           loop ~names used (add_locals locals pat) branch)
       | Let { rec_; bindings; body } ->
         let new_locals =
-          Nonempty.fold bindings ~init:locals ~f:(fun locals (pat, _) ->
+          Nonempty.fold bindings ~init:locals ~f:(fun locals ((pat, _), _) ->
             add_locals locals pat)
         in
         let binding_locals = if rec_ then new_locals else locals in
@@ -79,15 +79,15 @@ module Expr = struct
     loop ~names Value_name.Qualified.Set.empty Value_name.Set.empty
   ;;
 
-  let match_function branches =
-    let name = Value_name.empty in
-    Lambda (Catch_all (Some name), Match (Name ([], name), branches))
-  ;;
-
   let qualified (path, expr) =
     match path with
     | [] -> expr
     | _ -> Qualified (Module_path.of_ustrings_unchecked path, expr)
+  ;;
+
+  let match_function branches =
+    let name = Value_name.empty in
+    Lambda (Catch_all (Some name), Match (Name ([], name), branches))
   ;;
 
   let op_section_right op expr =

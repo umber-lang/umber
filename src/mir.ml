@@ -923,7 +923,7 @@ type t = Stmt.t list [@@deriving sexp_of]
 let of_typed_module =
   let handle_let_bindings ~ctx ~stmts (bindings : _ Node.t list) =
     let ctx =
-      List.fold bindings ~init:ctx ~f:(fun ctx { node = pattern, _; _ } ->
+      List.fold bindings ~init:ctx ~f:(fun ctx { node = (pattern, _fixity), _expr; _ } ->
         Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
           fst (Context.add_value_name ctx name)))
     in
@@ -932,7 +932,7 @@ let of_typed_module =
     List.fold
       bindings
       ~init:(ctx, stmts)
-      ~f:(fun (ctx, stmts) { node = pattern, ((_, input_type) as expr); _ } ->
+      ~f:(fun (ctx, stmts) { node = (pattern, _fixity), ((_, input_type) as expr); _ } ->
       let mir_expr = Expr.of_typed_expr ~ctx expr in
       let add_let stmts name mir_expr = Stmt.Value_def (name, mir_expr) :: stmts in
       (* TODO: Support pattern unions in toplevel let bindings - should work roughly

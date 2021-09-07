@@ -1,25 +1,25 @@
 (CrossModuleUsage ()
  ((Let
-   (((Catch_all (source))
+   ((((Catch_all (source)) ())
      ((Literal (String "everything depends on me"))
       (Type_app (() String) ())))))
   (Module
    (A ()
     ((Let
-      (((Catch_all (a)) ((Name (() b)) (Var a)))
-       ((Catch_all (b)) ((Name (() a)) (Var a)))))
+      ((((Catch_all (a)) ()) ((Name (() b)) (Var a)))
+       (((Catch_all (b)) ()) ((Name (() a)) (Var a)))))
      (Let
-      (((Catch_all (print))
+      ((((Catch_all (print)) ())
         ((Name ((Std Prelude) print))
          (Function (Type_app (() String) ()) (Tuple ()))))))
      (Let
-      (((Catch_all (print_source))
+      ((((Catch_all (print_source)) ())
         ((Lambda (Tuple ())
           (Fun_call (Name (() print)) (Name (() source))
            (Type_app (() String) ())))
          (Function (Tuple ()) (Tuple ())))))))))
   (Let
-   (((Catch_all (print_source))
+   ((((Catch_all (print_source)) ())
      ((Lambda (Tuple ())
        (Fun_call
         (Fun_call (Name (() ";"))
@@ -31,4 +31,5 @@
       (Function (Tuple ()) (Tuple ()))))))
   (Common_def (Val empty () (() (Type_app (() List) ((Var a))))))
   (Let
-   (((Catch_all (empty)) ((Name (() Nil)) (Type_app (() List) ((Var a)))))))))
+   ((((Catch_all (empty)) ())
+     ((Name (() Nil)) (Type_app (() List) ((Var a)))))))))

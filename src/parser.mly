@@ -191,10 +191,14 @@ let_rec:
   | LET { true }
   | LET_NONREC { false }
 
+(* TODO: consider allowing fixity annotations in let bindings
+   - could also allow val statements in expressions (this also lets you put proper type
+     annotations on)
+   - another option: just don't - why bother, just force people to make a toplevel statement *)
 let_binding_:
-  | pat = pattern; equals; expr = expr { pat, expr }
+  | pat = pattern; equals; expr = expr { (pat, None), expr }
   | fun_name = pattern_name; args = nonempty_list(pattern_term); equals; expr = expr
-    { Pattern.Catch_all fun_name, List.fold_right args ~init:expr ~f:Expr.lambda }
+    { (Pattern.Catch_all fun_name, None), List.fold_right args ~init:expr ~f:Expr.lambda }
 
 let_binding: b = with_loc(let_binding_) { b }
 
