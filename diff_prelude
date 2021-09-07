@@ -1,1 +1,1 @@
-./dune_prelude | git diff --no-index -- src/prelude.ml -
+patdiff <(sed '1d;$d' src/prelude.ml) <(./dune_prelude)

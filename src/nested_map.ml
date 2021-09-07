@@ -14,5 +14,6 @@ let with_module t module_name ~f =
   { t with modules = Map.update t.modules module_name ~f }
 ;;
 
+let find_module t = Map.find t.modules
 let remove_module t module_name = { t with modules = Map.remove t.modules module_name }
 let fold_modules t = Map.fold t.modules

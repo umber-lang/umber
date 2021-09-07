@@ -445,14 +445,17 @@ module Module = struct
                  | Extern (_, Some _, _, _)
                  | Import _ | Import_with _ | Import_without _ -> sig_map, def)
                | Module (module_name, sigs, defs) ->
-                 (* TODO: might want to handle this a bit differently *)
-                 let sig_map = Nested_map.remove_module sig_map module_name in
-                 if List.is_empty sigs
-                 then sig_map, Module (module_name, sigs, copy_to_defs ~sig_map defs)
-                 else
-                   (* Don't copy inherited sigs from the parent over for now because it's
-                      complicated *)
-                   sig_map, def
+                 (match Nested_map.find_module sig_map module_name with
+                 | Some child_map ->
+                   if List.is_empty sigs
+                   then
+                     ( Nested_map.remove_module sig_map module_name
+                     , Module (module_name, [], copy_to_defs ~sig_map:child_map defs) )
+                   else
+                     (* Don't copy inherited sigs from the parent over (at least for now)
+                      because it's complicated *)
+                     sig_map, def
+                 | None -> sig_map, def)
                | Trait _ -> failwith "TODO: copy trait_sigs to defs, without overriding"
                | Let _ | Impl _ -> sig_map, def))
       in

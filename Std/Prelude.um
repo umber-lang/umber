@@ -85,17 +85,13 @@ module :
 
   # TODO: randomness
 
-# FIXME: should be able to remove this - need to make sure it is added in early enough
-  that the name bindings can get it
-module List =
-  type List a = Nil | Cons a (List a)
-
 module Operators =
-  # FIXME: Remove these fixity declarations and have them copied from the sig
+  # FIXME: There's a lexer bug when the extra #s under this are removed
+  # TODO: Consider removing these fixity declarations and copying them from the sig
     This requires a way to specify fixity in a let binding. (Also consider that there's 
     currently there's no way to put fixity declarations inside nested expressions).
   val (.) (infixr 9) : () => (b -> c) -> (a -> b) -> a -> c
-  let (.) f g x = f (g x) 
+  let (.) f g x = f (g x)
 
   extern (^) (infixr 8) : Int -> Int -> Int = "%int_pow"
   extern (*) (infixl 7) : Int -> Int -> Int = "%int_mul"
