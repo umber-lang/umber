@@ -3,19 +3,23 @@
  (Value_def CrossModuleUsage.A.a/1 (Name CrossModuleUsage.A.b/2))
  (Value_def CrossModuleUsage.A.b/2 (Name CrossModuleUsage.A.a/1))
  (Value_def CrossModuleUsage.A.print/3 (Name Std.Prelude.print/4))
- (Value_def CrossModuleUsage.A.print_source/5
-  (Closure
-   ((args ((*lambda_arg/6 Block))) (returns Block)
-    (body
-     (Fun_call (Name CrossModuleUsage.A.print/3)
-      ((Name CrossModuleUsage.source/0)))))))
- (Value_def CrossModuleUsage.print_source/7
-  (Closure
-   ((args ((*lambda_arg/8 Block))) (returns Block)
-    (body
-     (Fun_call (Name "Std.Prelude.Operators.;/9")
-      ((Fun_call (Name CrossModuleUsage.A.print_source/5)
-        ((Constant_cnstr 0)))
-       (Fun_call (Name Std.Prelude.print/4)
-        ((Name CrossModuleUsage.source/0)))))))))
+ (Fun_def
+  ((fun_name CrossModuleUsage.A.print_source/5)
+   (closed_over ((CrossModuleUsage.source 0) (CrossModuleUsage.A.print 3)))
+   (args ((*lambda_arg/6 Block))) (returns Block)
+   (body
+    (Fun_call (Name CrossModuleUsage.A.print/3)
+     ((Name CrossModuleUsage.source/0))))))
+ (Fun_def
+  ((fun_name CrossModuleUsage.print_source/7)
+   (closed_over
+    ((Std.Prelude.print 4) (CrossModuleUsage.source 0)
+     ("Std.Prelude.Operators.;" 8) (CrossModuleUsage.A.print_source 5)))
+   (args ((*lambda_arg/9 Block))) (returns Block)
+   (body
+    (Fun_call (Name "Std.Prelude.Operators.;/8")
+     ((Fun_call (Name CrossModuleUsage.A.print_source/5)
+       ((Constant_cnstr 0)))
+      (Fun_call (Name Std.Prelude.print/4)
+       ((Name CrossModuleUsage.source/0))))))))
  (Value_def CrossModuleUsage.empty/10 (Name Std.Prelude.List.Nil/11)))

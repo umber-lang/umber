@@ -2,34 +2,34 @@
   (Make_block 0 ((Primitive (Int 1)) (Primitive (Int 2)))))
  (Value_def AsPattern.one/1 (Get_block_field 0 (Name AsPattern.pair/0)))
  (Value_def AsPattern.two/2 (Get_block_field 1 (Name AsPattern.pair/0)))
- (Value_def AsPattern.iter_pairs/3
-  (Closure
-   ((args ((AsPattern.f/4 Block) (AsPattern.lst/5 Block))) (returns Block)
-    (body
-     (Catch (label 0)
-      (body
-       (If (cond (Constant_tag_equals (Name AsPattern.lst/5) 0))
-        (then_ (Break 0))
-        (else_
-         (If
-          (cond
-           (And (Non_constant_tag_equals (Name AsPattern.lst/5) 1)
-            (Constant_tag_equals (Get_block_field 1 (Name AsPattern.lst/5))
-             0)))
-          (then_
-           (Let /6 (Get_block_field 1 (Name AsPattern.lst/5)) (Break 0)))
-          (else_
-           (Catch (label 1)
-            (body
-             (Let AsPattern.a/7 (Get_block_field 0 (Name AsPattern.lst/5))
-              (Let /8 (Get_block_field 1 (Name AsPattern.lst/5))
-               (Let AsPattern.b/9 (Get_block_field 0 (Name /8))
-                (Let AsPattern.rest/10 (Get_block_field 1 (Name /8))
-                 (Break 1))))))
-            (with_
-             (Fun_call (Name "Std.Prelude.Operators.;/11")
-              ((Fun_call (Name AsPattern.f/4)
-                ((Name AsPattern.a/7) (Name AsPattern.b/9)))
-               (Fun_call (Name AsPattern.iter_pairs/3)
-                ((Name AsPattern.f/4) (Name AsPattern.rest/10))))))))))))
-      (with_ (Constant_cnstr 0))))))))
+ (Fun_def
+  ((fun_name AsPattern.iter_pairs/3)
+   (closed_over ((AsPattern.iter_pairs 3) ("Std.Prelude.Operators.;" 4)))
+   (args ((AsPattern.f/5 Block) (AsPattern.lst/6 Block))) (returns Block)
+   (body
+    (Catch (label 0)
+     (body
+      (If (cond (Constant_tag_equals (Name AsPattern.lst/6) 0))
+       (then_ (Break 0))
+       (else_
+        (If
+         (cond
+          (And (Non_constant_tag_equals (Name AsPattern.lst/6) 1)
+           (Constant_tag_equals (Get_block_field 1 (Name AsPattern.lst/6)) 0)))
+         (then_
+          (Let /7 (Get_block_field 1 (Name AsPattern.lst/6)) (Break 0)))
+         (else_
+          (Catch (label 1)
+           (body
+            (Let AsPattern.a/8 (Get_block_field 0 (Name AsPattern.lst/6))
+             (Let /9 (Get_block_field 1 (Name AsPattern.lst/6))
+              (Let AsPattern.b/10 (Get_block_field 0 (Name /9))
+               (Let AsPattern.rest/11 (Get_block_field 1 (Name /9))
+                (Break 1))))))
+           (with_
+            (Fun_call (Name "Std.Prelude.Operators.;/4")
+             ((Fun_call (Name AsPattern.f/5)
+               ((Name AsPattern.a/8) (Name AsPattern.b/10)))
+              (Fun_call (Name AsPattern.iter_pairs/3)
+               ((Name AsPattern.f/5) (Name AsPattern.rest/11))))))))))))
+     (with_ (Constant_cnstr 0)))))))

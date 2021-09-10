@@ -1,13 +1,12 @@
-((Value_def Functions.id/0
-  (Closure
-   ((args ((Functions.x/1 Block))) (returns Block)
-    (body (Name Functions.x/1)))))
+((Fun_def
+  ((fun_name Functions.id/0) (closed_over ()) (args ((Functions.x/1 Block)))
+   (returns Block) (body (Name Functions.x/1))))
  (Value_def Functions.zero/2 (Primitive (Float 0)))
  (Value_def Functions.still_zero_wow/3
   (Fun_call (Name Functions.id/0) ((Name Functions.zero/2))))
- (Value_def Functions.sqr/4
-  (Closure
-   ((args ((Functions.x/5 Int64))) (returns Int64)
-    (body
-     (Fun_call (Name Std.Prelude.Operators.*/6)
-      ((Name Functions.x/5) (Name Functions.x/5))))))))
+ (Fun_def
+  ((fun_name Functions.sqr/4) (closed_over ((Std.Prelude.Operators.* 5)))
+   (args ((Functions.x/6 Int64))) (returns Int64)
+   (body
+    (Fun_call (Name Std.Prelude.Operators.*/5)
+     ((Name Functions.x/6) (Name Functions.x/6)))))))

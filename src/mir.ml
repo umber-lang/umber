@@ -690,9 +690,9 @@ module Expr = struct
      - https://github.com/ocaml/ocaml/blob/trunk/lambda/matching.ml
      - https://www.researchgate.net/publication/2840783_Optimizing_Pattern_Matching  *)
 
-  let of_typed_expr ~ctx:outer_ctx outer_expr =
+  let of_typed_expr ?just_bound:outer_just_bound ~ctx:outer_ctx outer_expr =
     let create_break_label = unstage (Break_label.make_creator_for_whole_expression ()) in
-    let rec of_typed_expr ~ctx ~fun_defs expr =
+    let rec of_typed_expr ?just_bound ~ctx ~fun_defs expr =
       match (expr : Typed.Expr.generalized) with
       | Literal lit, _ -> Primitive lit, fun_defs
       | Name name, _ -> Name (Context.find_value_name ctx name), fun_defs
@@ -777,8 +777,11 @@ module Expr = struct
         let returns =
           Value_kind.of_type_scheme ~names:(Context.name_bindings ctx) body_type
         in
-        (* TODO: try to match on let into lambda and use the name bound there *)
-        let _ctx, fun_name = Context.add_value_name ctx Constant_names.fun_ in
+        let fun_name =
+          match just_bound with
+          | Some name -> Context.find_value_name ctx ([], name)
+          | None -> snd (Context.add_value_name ctx Constant_names.fun_)
+        in
         let fun_def = { fun_name; closed_over = !closed_over; args; body; returns } in
         Name fun_name, fun_def :: fun_defs
       | Match (expr, input_type, arms), output_type ->
@@ -806,11 +809,18 @@ module Expr = struct
               bindings
               ~init:((ctx, []), fun_defs)
               ~f:(fun ((ctx, bindings), fun_defs) ((pat, typ), expr) ->
-                let mir_expr, fun_defs = of_typed_expr ~ctx ~fun_defs (expr, typ) in
                 (* TODO: support unions in let bindings. For the non-rec case we should
                    just be able to convert to a match *)
                 let pat =
                   Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"let bindings"
+                in
+                let just_bound =
+                  match (pat : Simple_pattern.t) with
+                  | Catch_all name -> name
+                  | Constant _ | As _ | Cnstr_appl _ -> None
+                in
+                let mir_expr, fun_defs =
+                  of_typed_expr ?just_bound ~ctx ~fun_defs (expr, typ)
                 in
                 let add_let bindings name mir_expr = (name, mir_expr) :: bindings in
                 fold_pattern_bindings ~ctx pat mir_expr ~init:bindings ~add_let, fun_defs)
@@ -910,7 +920,7 @@ module Expr = struct
       let with_, fun_defs = of_typed_expr ~ctx ~fun_defs output in
       Catch { label; body; with_ }, fun_defs
     in
-    of_typed_expr ~ctx:outer_ctx ~fun_defs:[] outer_expr
+    of_typed_expr ?just_bound:outer_just_bound ~ctx:outer_ctx ~fun_defs:[] outer_expr
   ;;
 
   let rec map_names expr ~f =
@@ -995,14 +1005,6 @@ let of_typed_module =
       bindings
       ~init:(ctx, stmts)
       ~f:(fun (ctx, stmts) { node = pattern, ((_, input_type) as expr); _ } ->
-      let mir_expr, fun_defs = Expr.of_typed_expr ~ctx expr in
-      let stmts =
-        List.fold_right fun_defs ~init:stmts ~f:(fun fun_def stmts ->
-          Stmt.Fun_def fun_def :: stmts)
-      in
-      let add_let stmts name mir_expr = Stmt.Value_def (name, mir_expr) :: stmts in
-      (* TODO: Support pattern unions in toplevel let bindings - should work roughly
-         the same as recursive bindings in expressions *)
       let pattern' =
         Simple_pattern.flatten_typed_pattern_no_unions
           pattern
@@ -1018,6 +1020,25 @@ let of_typed_module =
             "The pattern in this let binding is not exhaustive"
               (pattern : Typed.Pattern.t)
               (missing_cases : Simple_pattern.t list)];
+      let just_bound =
+        match (pattern' : Simple_pattern.t) with
+        | Catch_all name -> name
+        | Constant _ | As _ | Cnstr_appl _ -> None
+      in
+      let mir_expr, fun_defs = Expr.of_typed_expr ?just_bound ~ctx expr in
+      let stmts =
+        List.fold_right fun_defs ~init:stmts ~f:(fun fun_def stmts ->
+          Stmt.Fun_def fun_def :: stmts)
+      in
+      let add_let stmts name mir_expr =
+        match (mir_expr : Expr.t) with
+        | Name name' when Unique_name.(name = name') ->
+          (* Don't make a Value_def in the case where all we did is make a Fun_def *)
+          stmts
+        | _ -> Stmt.Value_def (name, mir_expr) :: stmts
+      in
+      (* TODO: Support pattern unions in toplevel let bindings - should work roughly
+         the same as recursive bindings in expressions *)
       let add_name ctx name =
         (* TODO: this seems error-prone, especially since we use names like
            [Value_name.empty] elsewhere in the AST, e.g. for match variables.
@@ -1052,6 +1073,7 @@ let of_typed_module =
 
 let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
 
+(* FIXME: Number only the duplicates *)
 let renumber_ids stmts =
   let counter = ref (-1) in
   let id_table = Int.Table.create () in

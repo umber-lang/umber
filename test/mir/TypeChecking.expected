@@ -1,42 +1,40 @@
 ((Value_def /0 (Constant_cnstr 0))
- (Value_def TypeChecking.id/1
-  (Closure
-   ((args ((TypeChecking.x/2 Block))) (returns Block)
-    (body (Name TypeChecking.x/2)))))
- (Value_def TypeChecking.id_for_ints/3
-  (Closure
-   ((args ((TypeChecking.x/4 Int64))) (returns Int64)
-    (body (Name TypeChecking.x/4)))))
- (Value_def TypeChecking.id_for_floats/5
-  (Closure
-   ((args ((TypeChecking.x/6 Float64))) (returns Float64)
-    (body (Name TypeChecking.x/6)))))
+ (Fun_def
+  ((fun_name TypeChecking.id/1) (closed_over ())
+   (args ((TypeChecking.x/2 Block))) (returns Block)
+   (body (Name TypeChecking.x/2))))
+ (Fun_def
+  ((fun_name TypeChecking.id_for_ints/3) (closed_over ())
+   (args ((TypeChecking.x/4 Int64))) (returns Int64)
+   (body (Name TypeChecking.x/4))))
+ (Fun_def
+  ((fun_name TypeChecking.id_for_floats/5) (closed_over ())
+   (args ((TypeChecking.x/6 Float64))) (returns Float64)
+   (body (Name TypeChecking.x/6))))
  (Value_def TypeChecking.id_for_chars/7 (Name TypeChecking.id/1))
- (Value_def TypeChecking.id_for_bools/8
-  (Closure
-   ((args ((TypeChecking.x/9 Block))) (returns Block)
-    (body (Fun_call (Name TypeChecking.id/1) ((Name TypeChecking.x/9)))))))
+ (Fun_def
+  ((fun_name TypeChecking.id_for_bools/8) (closed_over ((TypeChecking.id 1)))
+   (args ((TypeChecking.x/9 Block))) (returns Block)
+   (body (Fun_call (Name TypeChecking.id/1) ((Name TypeChecking.x/9))))))
  (Value_def /10
   (Make_block 0 ((Name TypeChecking.id/1) (Primitive (Int 5)))))
  (Value_def TypeChecking.id_alias/11 (Get_block_field 0 (Name /10)))
  (Value_def TypeChecking.five/12 (Get_block_field 1 (Name /10)))
- (Value_def TypeChecking.|>/13
-  (Closure
-   ((args ((TypeChecking.x/14 Block) (TypeChecking.f/15 Block)))
-    (returns Block)
-    (body (Fun_call (Name TypeChecking.f/15) ((Name TypeChecking.x/14)))))))
- (Value_def TypeChecking.if_/16
-  (Closure
-   ((args
-     ((TypeChecking.then_/17 Block) (TypeChecking.else_/18 Block)
-      (/19 Block)))
-    (returns Block)
-    (body
-     (Catch (label 0)
-      (body
-       (If (cond (Constant_tag_equals (Name /19) 1)) (then_ (Break 0))
-        (else_
-         (Catch (label 1) (body (Break 1))
-          (with_
-           (Fun_call (Name TypeChecking.else_/18) ((Constant_cnstr 0))))))))
-      (with_ (Fun_call (Name TypeChecking.then_/17) ((Constant_cnstr 0))))))))))
+ (Fun_def
+  ((fun_name TypeChecking.|>/13) (closed_over ())
+   (args ((TypeChecking.x/14 Block) (TypeChecking.f/15 Block)))
+   (returns Block)
+   (body (Fun_call (Name TypeChecking.f/15) ((Name TypeChecking.x/14))))))
+ (Fun_def
+  ((fun_name TypeChecking.if_/16) (closed_over ())
+   (args
+    ((TypeChecking.then_/17 Block) (TypeChecking.else_/18 Block) (/19 Block)))
+   (returns Block)
+   (body
+    (Catch (label 0)
+     (body
+      (If (cond (Constant_tag_equals (Name /19) 1)) (then_ (Break 0))
+       (else_
+        (Catch (label 1) (body (Break 1))
+         (with_ (Fun_call (Name TypeChecking.else_/18) ((Constant_cnstr 0))))))))
+     (with_ (Fun_call (Name TypeChecking.then_/17) ((Constant_cnstr 0)))))))))
