@@ -13,6 +13,7 @@ module Unique_name : sig
 
   val of_ustring : Ustring.t -> t
   val of_extern_name : Extern_name.t -> t
+  val base_name : t -> Ustring.t
   val map_id : t -> f:(int -> int) -> t
 end = struct
   module Id = Unique_id.Int ()
@@ -38,6 +39,7 @@ end = struct
 
   let of_ustring ustr = ustr, Id.create ()
   let of_extern_name extern_name = of_ustring (Extern_name.to_ustring extern_name)
+  let base_name = fst
   let map_id t ~f = Tuple2.map_snd t ~f:(Id.of_int_exn << f << Id.to_int_exn)
 
   (* TODO: cleanup *)
@@ -1078,25 +1080,17 @@ let of_typed_module =
 
 let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
 
-(*let renumber_ids stmts =
-  let count_by_id = Int.Table.create () in
-  map_names stmts ~f:(fun name ->
-    Unique_name.map_id name ~f:(fun id ->
-      let count = Option.value (Hashtbl.find count_by_id id) ~default:(-1) in
-      Hashtbl.set count_by_id ~key:id ~data:(count + 1);
-      count))
-;;*)
-
-(* FIXME: numbering *)
-
 let renumber_ids stmts =
-  let counter = ref (-1) in
-  let id_table = Int.Table.create () in
+  let name_table = Ustring.Table.create () in
   map_names stmts ~f:(fun name ->
     Unique_name.map_id name ~f:(fun id ->
-      Hashtbl.find_or_add id_table id ~default:(fun () ->
-        incr counter;
-        !counter)))
+      let name = Unique_name.base_name name in
+      match Hashtbl.find name_table name with
+      | None ->
+        Hashtbl.set name_table ~key:name ~data:(Int.Table.create ());
+        0
+      | Some id_table ->
+        Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
 ;;
 
 (* Goals should be:

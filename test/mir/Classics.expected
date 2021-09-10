@@ -1,43 +1,43 @@
 ((Fun_def
   ((fun_name Classics.fact/0)
    (closed_over
-    (Classics.fact/0 Std.Prelude.Operators.*/1 Std.Prelude.Operators.-/2))
-   (args ((/3 Int64))) (returns Int64)
+    (Classics.fact/0 Std.Prelude.Operators.*/0 Std.Prelude.Operators.-/0))
+   (args ((/0 Int64))) (returns Int64)
    (body
     (Catch (label 0)
      (body
-      (If (cond (Equals (Name /3) (Int 0))) (then_ (Break 0))
+      (If (cond (Equals (Name /0) (Int 0))) (then_ (Break 0))
        (else_
-        (If (cond (Equals (Name /3) (Int 1))) (then_ (Break 0))
+        (If (cond (Equals (Name /0) (Int 1))) (then_ (Break 0))
          (else_
-          (Catch (label 1) (body (Let Classics.n/4 (Name /3) (Break 1)))
+          (Catch (label 1) (body (Let Classics.n/0 (Name /0) (Break 1)))
            (with_
-            (Fun_call (Name Std.Prelude.Operators.*/1)
-             ((Name Classics.n/4)
+            (Fun_call (Name Std.Prelude.Operators.*/0)
+             ((Name Classics.n/0)
               (Fun_call (Name Classics.fact/0)
-               ((Fun_call (Name Std.Prelude.Operators.-/2)
-                 ((Name Classics.n/4) (Primitive (Int 1)))))))))))))))
+               ((Fun_call (Name Std.Prelude.Operators.-/0)
+                 ((Name Classics.n/0) (Primitive (Int 1)))))))))))))))
      (with_ (Primitive (Int 1)))))))
  (Fun_def
-  ((fun_name Classics.fib/5)
+  ((fun_name Classics.fib/0)
    (closed_over
-    (Classics.fib/5 Std.Prelude.Operators.+/6 Std.Prelude.Operators.-/2))
-   (args ((Classics.n/7 Int64))) (returns Int64)
+    (Classics.fib/0 Std.Prelude.Operators.+/0 Std.Prelude.Operators.-/0))
+   (args ((Classics.n/1 Int64))) (returns Int64)
    (body
     (Catch (label 0)
      (body
-      (If (cond (Equals (Name Classics.n/7) (Int 0))) (then_ (Break 0))
+      (If (cond (Equals (Name Classics.n/1) (Int 0))) (then_ (Break 0))
        (else_
-        (If (cond (Equals (Name Classics.n/7) (Int 1))) (then_ (Break 0))
+        (If (cond (Equals (Name Classics.n/1) (Int 1))) (then_ (Break 0))
          (else_
           (Catch (label 1)
-           (body (Let Classics.n/8 (Name Classics.n/7) (Break 1)))
+           (body (Let Classics.n/2 (Name Classics.n/1) (Break 1)))
            (with_
-            (Fun_call (Name Std.Prelude.Operators.+/6)
-             ((Fun_call (Name Classics.fib/5)
-               ((Fun_call (Name Std.Prelude.Operators.-/2)
-                 ((Name Classics.n/8) (Primitive (Int 1))))))
-              (Fun_call (Name Classics.fib/5)
-               ((Fun_call (Name Std.Prelude.Operators.-/2)
-                 ((Name Classics.n/8) (Primitive (Int 2)))))))))))))))
+            (Fun_call (Name Std.Prelude.Operators.+/0)
+             ((Fun_call (Name Classics.fib/0)
+               ((Fun_call (Name Std.Prelude.Operators.-/0)
+                 ((Name Classics.n/2) (Primitive (Int 1))))))
+              (Fun_call (Name Classics.fib/0)
+               ((Fun_call (Name Std.Prelude.Operators.-/0)
+                 ((Name Classics.n/2) (Primitive (Int 2)))))))))))))))
      (with_ (Primitive (Int 1))))))))
