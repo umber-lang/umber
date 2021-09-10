@@ -5,7 +5,7 @@
  (Value_def Functions.still_zero_wow/3
   (Fun_call (Name Functions.id/0) ((Name Functions.zero/2))))
  (Fun_def
-  ((fun_name Functions.sqr/4) (closed_over ((Std.Prelude.Operators.* 5)))
+  ((fun_name Functions.sqr/4) (closed_over (Std.Prelude.Operators.*/5))
    (args ((Functions.x/6 Int64))) (returns Int64)
    (body
     (Fun_call (Name Std.Prelude.Operators.*/5)

@@ -4,7 +4,7 @@
  (Value_def AsPattern.two/2 (Get_block_field 1 (Name AsPattern.pair/0)))
  (Fun_def
   ((fun_name AsPattern.iter_pairs/3)
-   (closed_over ((AsPattern.iter_pairs 3) ("Std.Prelude.Operators.;" 4)))
+   (closed_over (AsPattern.iter_pairs/3 "Std.Prelude.Operators.;/4"))
    (args ((AsPattern.f/5 Block) (AsPattern.lst/6 Block))) (returns Block)
    (body
     (Catch (label 0)

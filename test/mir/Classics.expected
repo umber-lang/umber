@@ -1,8 +1,7 @@
 ((Fun_def
   ((fun_name Classics.fact/0)
    (closed_over
-    ((Classics.fact 0) (Std.Prelude.Operators.* 1)
-     (Std.Prelude.Operators.- 2)))
+    (Classics.fact/0 Std.Prelude.Operators.*/1 Std.Prelude.Operators.-/2))
    (args ((/3 Int64))) (returns Int64)
    (body
     (Catch (label 0)
@@ -22,8 +21,7 @@
  (Fun_def
   ((fun_name Classics.fib/5)
    (closed_over
-    ((Classics.fib 5) (Std.Prelude.Operators.+ 6)
-     (Std.Prelude.Operators.- 2)))
+    (Classics.fib/5 Std.Prelude.Operators.+/6 Std.Prelude.Operators.-/2))
    (args ((Classics.n/7 Int64))) (returns Int64)
    (body
     (Catch (label 0)

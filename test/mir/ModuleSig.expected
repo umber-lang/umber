@@ -6,7 +6,7 @@
     (Make_block 0 ((Name ModuleSig.Range.lo/1) (Name ModuleSig.Range.hi/2))))))
  (Fun_def
   ((fun_name ModuleSig.Range.in/3)
-   (closed_over ((Std.Prelude.Operators.&& 4) (Std.Prelude.Operators.<= 5)))
+   (closed_over (Std.Prelude.Operators.&&/4 Std.Prelude.Operators.<=/5))
    (args ((ModuleSig.Range.x/6 Block) (*lambda_arg/7 Block))) (returns Block)
    (body
     (Let ModuleSig.Range.lo/8 (Get_block_field 0 (Name *lambda_arg/7))

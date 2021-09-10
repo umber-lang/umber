@@ -13,7 +13,7 @@
    (body (Name TypeChecking.x/6))))
  (Value_def TypeChecking.id_for_chars/7 (Name TypeChecking.id/1))
  (Fun_def
-  ((fun_name TypeChecking.id_for_bools/8) (closed_over ((TypeChecking.id 1)))
+  ((fun_name TypeChecking.id_for_bools/8) (closed_over (TypeChecking.id/1))
    (args ((TypeChecking.x/9 Block))) (returns Block)
    (body (Fun_call (Name TypeChecking.id/1) ((Name TypeChecking.x/9))))))
  (Value_def /10

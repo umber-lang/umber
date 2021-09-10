@@ -18,7 +18,18 @@ end = struct
   module Id = Unique_id.Int ()
 
   module T = struct
-    type t = Ustring.t * Id.t [@@deriving compare, hash, sexp]
+    type t = Ustring.t * Id.t [@@deriving compare, hash]
+
+    let sexp_of_t (ustr, id) =
+      Sexp.Atom (String.concat [ Ustring.to_string ustr; "/"; Id.to_string id ])
+    ;;
+
+    let t_of_sexp = function
+      | Sexp.Atom str ->
+        let name, id = String.rsplit2_exn str ~on:'/' in
+        Ustring.of_string_exn name, Id.of_string id
+      | List _ -> raise_s [%message "Unique_name.t_of_sexp: unexpected sexp list"]
+    ;;
   end
 
   include T
@@ -28,12 +39,6 @@ end = struct
   let of_ustring ustr = ustr, Id.create ()
   let of_extern_name extern_name = of_ustring (Extern_name.to_ustring extern_name)
   let map_id t ~f = Tuple2.map_snd t ~f:(Id.of_int_exn << f << Id.to_int_exn)
-
-  (*let sexp_of_t (ustr, _) = Ustring.sexp_of_t ustr*)
-
-  let sexp_of_t (ustr, id) =
-    Sexp.Atom (String.concat [ Ustring.to_string ustr; "/"; Id.to_string id ])
-  ;;
 
   (* TODO: cleanup *)
 
@@ -1073,7 +1078,17 @@ let of_typed_module =
 
 let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
 
-(* FIXME: Number only the duplicates *)
+(*let renumber_ids stmts =
+  let count_by_id = Int.Table.create () in
+  map_names stmts ~f:(fun name ->
+    Unique_name.map_id name ~f:(fun id ->
+      let count = Option.value (Hashtbl.find count_by_id id) ~default:(-1) in
+      Hashtbl.set count_by_id ~key:id ~data:(count + 1);
+      count))
+;;*)
+
+(* FIXME: numbering *)
+
 let renumber_ids stmts =
   let counter = ref (-1) in
   let id_table = Int.Table.create () in
