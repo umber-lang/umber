@@ -18,7 +18,6 @@ module Name_entry : sig
   val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
-  val val_declared : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.Scheme.t -> t
   val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
   val merge : t -> t -> t
 end

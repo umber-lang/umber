@@ -1,11 +1,37 @@
-(* Generating LLVM IR for the AST
-   see https://llvm.org/docs/tutorial/OCamlLangImpl3.html *)
+(* Generating LLVM IR for the AST *)
 
-open Import
+(*open Import
 open Names
 open Llvm
 
-module Name_table : sig
+type t =
+  { context : llcontext
+  ; values : (Mir.Unique_name.t, llvalue) Hashtbl.t
+  }
+
+let codegen_literal { context; _ } lit =
+  match (lit : Literal.t) with
+  | Int i -> const_int (i64_type context) i
+  | Float x -> const_float (double_type context) x
+  | Char c -> const_int (i32_type context) (Uchar.to_int c)
+  | String s -> const_string context (Ustring.to_string s)
+;;
+
+let codegen_expr t expr =
+  match (expr : Mir.Expr.t) with
+  | Primitive lit -> codegen_literal t lit
+  | Name name -> Hashtbl.find_exn t.values name
+  | Let (_, _, _)
+  | Fun_call (_, _ :: _)
+  | Constant_cnstr _
+  | Make_block (_, _ :: _)
+  | Get_block_field (_, _)
+  | If _ | Catch _ | Break _ -> failwith "TODO: codegen_expr"
+;;*)
+
+(* TODO: cleanup: probably remove all of this *)
+
+(*module Name_table : sig
   type t
 
   val create : unit -> t
@@ -45,7 +71,7 @@ let codegen_expr state ((expr, _) : Typed.Expr.generalized) =
   | Record_literal _
   | Record_update _
   | Record_field_access _ -> failwith "TODO: codegen_expr leftovers"
-;;
+;;*)
 
 (*let context = global_context ()
 let the_module = create_module context "my module"
