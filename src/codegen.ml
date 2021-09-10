@@ -6,8 +6,19 @@ open Llvm
 
 type t =
   { context : llcontext
-  ; values : (Mir.Unique_name.t, llvalue) Hashtbl.t
+  ; module_ : llmodule
+  ; values : llvalue Mir.Unique_name.Table.t
   }
+
+let create ~module_name =
+  (* TODO: should this use `create_context`? *)
+  let context = global_context () in
+  { context
+  ; module_ =
+      create_module context (Ustring.to_string (Module_name.to_ustring module_name))
+  ; values = Mir.Unique_name.Table.create ()
+  }
+;;
 
 let codegen_literal { context; _ } lit =
   match (lit : Literal.t) with
@@ -17,12 +28,14 @@ let codegen_literal { context; _ } lit =
   | String s -> const_string context (Ustring.to_string s)
 ;;
 
-let codegen_expr t expr =
+let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
   | Name name -> Hashtbl.find_exn t.values name
-  | Let (_, _, _)
-  | Fun_call (_, _ :: _)
+  | Let (name, expr, body) ->
+    Hashtbl.add_exn t.values ~key:name ~data:(codegen_expr t expr);
+    codegen_expr t body
+  | Fun_call (fun_, args) -> lookup_function
   | Constant_cnstr _
   | Make_block (_, _ :: _)
   | Get_block_field (_, _)

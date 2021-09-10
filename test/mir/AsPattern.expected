@@ -26,9 +26,9 @@
               (Let AsPattern.b/0 (Get_block_field 0 (Name /0))
                (Let AsPattern.rest/0 (Get_block_field 1 (Name /0)) (Break 1))))))
            (with_
-            (Fun_call (Name "Std.Prelude.Operators.;/0")
-             ((Fun_call (Name AsPattern.f/0)
+            (Fun_call "Std.Prelude.Operators.;/0"
+             ((Fun_call AsPattern.f/0
                ((Name AsPattern.a/0) (Name AsPattern.b/0)))
-              (Fun_call (Name AsPattern.iter_pairs/0)
+              (Fun_call AsPattern.iter_pairs/0
                ((Name AsPattern.f/0) (Name AsPattern.rest/0))))))))))))
      (with_ (Constant_cnstr 0)))))))

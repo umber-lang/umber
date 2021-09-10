@@ -564,7 +564,7 @@ module Expr = struct
        Can maybe handle that in toplevel function definitions. *)
     | Let of Unique_name.t * t * t
     (* TODO: Can function calls just be to a single [Unique_name.t]? *)
-    | Fun_call of t * t Nonempty.t
+    | Fun_call of Unique_name.t * t Nonempty.t
     | Constant_cnstr of Cnstr.Tag.t
     | Make_block of Cnstr.Tag.t * t Nonempty.t
     | Get_block_field of int * t
@@ -715,7 +715,16 @@ module Expr = struct
           | Name _ | Lambda _ | Match _ | Let _ ->
             let fun_, fun_defs = of_typed_expr ~ctx ~fun_defs (f, f_type) in
             let arg, fun_defs = of_typed_expr ~ctx ~fun_defs arg in
-            Fun_call (fun_, arg :: args), fun_defs
+            (match fun_ with
+            | Name fun_name -> Fun_call (fun_name, arg :: args), fun_defs
+            | Let (_, _, _) | Get_block_field (_, _) | If _ | Catch _ | Break _ ->
+              (* TODO: Allow `let`, `match`, `if`, etc. in function expressions *)
+              mir_error
+                [%message
+                  "This kind of expression is not allowed in a function call"
+                    (f : Type.Scheme.t Typed.Expr.t)]
+            | Primitive _ | Fun_call _ | Constant_cnstr _ | Make_block (_, _ :: _) ->
+              compiler_bug [%message "Invalid function expression" (fun_ : t)])
           | Literal _
           | Tuple _
           | Record_literal _
@@ -939,10 +948,10 @@ module Expr = struct
       let expr = map_names expr ~f in
       let body = map_names body ~f in
       Let (name, expr, body)
-    | Fun_call (func, args) ->
-      let func = map_names func ~f in
+    | Fun_call (fun_name, args) ->
+      let fun_name = f fun_name in
       let args = Nonempty.map args ~f:(map_names ~f) in
-      Fun_call (func, args)
+      Fun_call (fun_name, args)
     | Make_block (tag, fields) -> Make_block (tag, Nonempty.map fields ~f:(map_names ~f))
     | Get_block_field (i, expr) -> Get_block_field (i, map_names expr ~f)
     | If { cond; then_; else_ } ->

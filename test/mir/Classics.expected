@@ -12,10 +12,10 @@
          (else_
           (Catch (label 1) (body (Let Classics.n/0 (Name /0) (Break 1)))
            (with_
-            (Fun_call (Name Std.Prelude.Operators.*/0)
+            (Fun_call Std.Prelude.Operators.*/0
              ((Name Classics.n/0)
-              (Fun_call (Name Classics.fact/0)
-               ((Fun_call (Name Std.Prelude.Operators.-/0)
+              (Fun_call Classics.fact/0
+               ((Fun_call Std.Prelude.Operators.-/0
                  ((Name Classics.n/0) (Primitive (Int 1)))))))))))))))
      (with_ (Primitive (Int 1)))))))
  (Fun_def
@@ -33,11 +33,11 @@
           (Catch (label 1)
            (body (Let Classics.n/2 (Name Classics.n/1) (Break 1)))
            (with_
-            (Fun_call (Name Std.Prelude.Operators.+/0)
-             ((Fun_call (Name Classics.fib/0)
-               ((Fun_call (Name Std.Prelude.Operators.-/0)
+            (Fun_call Std.Prelude.Operators.+/0
+             ((Fun_call Classics.fib/0
+               ((Fun_call Std.Prelude.Operators.-/0
                  ((Name Classics.n/2) (Primitive (Int 1))))))
-              (Fun_call (Name Classics.fib/0)
-               ((Fun_call (Name Std.Prelude.Operators.-/0)
+              (Fun_call Classics.fib/0
+               ((Fun_call Std.Prelude.Operators.-/0
                  ((Name Classics.n/2) (Primitive (Int 2)))))))))))))))
      (with_ (Primitive (Int 1))))))))
