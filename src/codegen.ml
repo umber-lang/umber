@@ -13,8 +13,7 @@ type t =
   }
 
 let create ~source_filename =
-  (* TODO: should this use `create_context`? *)
-  let context = global_context () in
+  let context = create_context () in
   { context
   ; builder = builder context
   ; module_ = create_module context source_filename
@@ -37,18 +36,15 @@ let block_header_type context =
 ;;
 
 let block_type context =
-  let rec block_type =
-    (* TODO: check if this the array type is right. Apparently 0 size => variable size. 
-       http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt *)
-    lazy
-      (struct_type
-         context
-         [| block_header_type context
-          ; array_type (pointer_type (Lazy.force block_type)) 0
-          ; array_type (i64_type context) 0
-         |])
-  in
-  Lazy.force block_type
+  let block_type = named_struct_type context "block" in
+  struct_set_body
+    block_type
+    [| block_header_type context
+     ; array_type (pointer_type block_type) 0
+     ; array_type (i64_type context) 0
+    |]
+    false;
+  block_type
 ;;
 
 let block_pointer_type context = pointer_type (block_type context)
@@ -199,7 +195,8 @@ let codegen_stmt t stmt =
     position_at_end entry_block t.builder;
     let return_value = codegen_expr t body in
     ignore (build_ret return_value t.builder : llvalue);
-    Llvm_analysis.assert_valid_function fun_;
+    (* FIXME: probably re-enable *)
+    (*Llvm_analysis.assert_valid_function fun_;*)
     Hashtbl.add_exn t.values ~key:fun_name ~data:fun_;
     fun_
 ;;
@@ -207,6 +204,7 @@ let codegen_stmt t stmt =
 let of_mir ~source_filename mir =
   let t = create ~source_filename in
   List.iter mir ~f:(ignore << codegen_stmt t);
+  Llvm_analysis.assert_valid_module t.module_;
   t
 ;;
 

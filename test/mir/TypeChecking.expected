@@ -1,40 +1,40 @@
-((Value_def -0 (Make_block (tag 0)))
+((Value_def .0 (Make_block (tag 0)))
  (Fun_def
-  ((fun_name TypeChecking.id-0) (closed_over ())
-   (args ((TypeChecking.x-0 Block))) (returns Block)
-   (body (Name TypeChecking.x-0))))
+  ((fun_name TypeChecking.id.0) (closed_over ())
+   (args ((TypeChecking.x.0 Block))) (returns Block)
+   (body (Name TypeChecking.x.0))))
  (Fun_def
-  ((fun_name TypeChecking.id_for_ints-0) (closed_over ())
-   (args ((TypeChecking.x-1 Int64))) (returns Int64)
-   (body (Name TypeChecking.x-1))))
+  ((fun_name TypeChecking.id_for_ints.0) (closed_over ())
+   (args ((TypeChecking.x.1 Int64))) (returns Int64)
+   (body (Name TypeChecking.x.1))))
  (Fun_def
-  ((fun_name TypeChecking.id_for_floats-0) (closed_over ())
-   (args ((TypeChecking.x-2 Float64))) (returns Float64)
-   (body (Name TypeChecking.x-2))))
- (Value_def TypeChecking.id_for_chars-0 (Name TypeChecking.id-0))
+  ((fun_name TypeChecking.id_for_floats.0) (closed_over ())
+   (args ((TypeChecking.x.2 Float64))) (returns Float64)
+   (body (Name TypeChecking.x.2))))
+ (Value_def TypeChecking.id_for_chars.0 (Name TypeChecking.id.0))
  (Fun_def
-  ((fun_name TypeChecking.id_for_bools-0) (closed_over (TypeChecking.id-0))
-   (args ((TypeChecking.x-3 Block))) (returns Block)
-   (body (Fun_call TypeChecking.id-0 ((Name TypeChecking.x-3))))))
- (Value_def -0
-  (Make_block (tag 0) (pointers ((Name TypeChecking.id-0)))
+  ((fun_name TypeChecking.id_for_bools.0) (closed_over (TypeChecking.id.0))
+   (args ((TypeChecking.x.3 Block))) (returns Block)
+   (body (Fun_call TypeChecking.id.0 ((Name TypeChecking.x.3))))))
+ (Value_def .0
+  (Make_block (tag 0) (pointers ((Name TypeChecking.id.0)))
    (immediates ((Primitive (Int 5))))))
- (Value_def TypeChecking.id_alias-0 (Get_block_field 0 (Name -0)))
- (Value_def TypeChecking.five-0 (Get_block_field 1 (Name -0)))
+ (Value_def TypeChecking.id_alias.0 (Get_block_field 0 (Name .0)))
+ (Value_def TypeChecking.five.0 (Get_block_field 1 (Name .0)))
  (Fun_def
-  ((fun_name TypeChecking.|>-0) (closed_over ())
-   (args ((TypeChecking.x-4 Block) (TypeChecking.f-0 Block))) (returns Block)
-   (body (Fun_call TypeChecking.f-0 ((Name TypeChecking.x-4))))))
+  ((fun_name TypeChecking.|>.0) (closed_over ())
+   (args ((TypeChecking.x.4 Block) (TypeChecking.f.0 Block))) (returns Block)
+   (body (Fun_call TypeChecking.f.0 ((Name TypeChecking.x.4))))))
  (Fun_def
-  ((fun_name TypeChecking.if_-0) (closed_over ())
+  ((fun_name TypeChecking.if_.0) (closed_over ())
    (args
-    ((TypeChecking.then_-0 Block) (TypeChecking.else_-0 Block) (-1 Block)))
+    ((TypeChecking.then_.0 Block) (TypeChecking.else_.0 Block) (.1 Block)))
    (returns Block)
    (body
     (Catch (label 0)
      (body
-      (If (cond (Constant_tag_equals (Name -1) 1)) (then_ (Break 0))
+      (If (cond (Constant_tag_equals (Name .1) 1)) (then_ (Break 0))
        (else_
         (Catch (label 1) (body (Break 1))
-         (with_ (Fun_call TypeChecking.else_-0 ((Make_block (tag 0)))))))))
-     (with_ (Fun_call TypeChecking.then_-0 ((Make_block (tag 0))))))))))
+         (with_ (Fun_call TypeChecking.else_.0 ((Make_block (tag 0)))))))))
+     (with_ (Fun_call TypeChecking.then_.0 ((Make_block (tag 0))))))))))

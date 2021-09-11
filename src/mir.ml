@@ -23,11 +23,11 @@ end = struct
       type t = Ustring.t * Id.t [@@deriving compare, hash]
 
       let to_string (ustr, id) =
-        String.concat [ Ustring.to_string ustr; "-"; Id.to_string id ]
+        String.concat [ Ustring.to_string ustr; "."; Id.to_string id ]
       ;;
 
       let of_string str =
-        let name, id = String.rsplit2_exn str ~on:'-' in
+        let name, id = String.rsplit2_exn str ~on:'.' in
         Ustring.of_string_exn name, Id.of_string id
       ;;
     end

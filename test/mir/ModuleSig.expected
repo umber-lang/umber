@@ -1,25 +1,25 @@
 ((Fun_def
-  ((fun_name ModuleSig.Range.between-0) (closed_over ())
-   (args ((ModuleSig.Range.lo-0 Block) (ModuleSig.Range.hi-0 Block)))
+  ((fun_name ModuleSig.Range.between.0) (closed_over ())
+   (args ((ModuleSig.Range.lo.0 Block) (ModuleSig.Range.hi.0 Block)))
    (returns Block)
    (body
     (Make_block (tag 0)
-     (pointers ((Name ModuleSig.Range.lo-0) (Name ModuleSig.Range.hi-0)))))))
+     (pointers ((Name ModuleSig.Range.lo.0) (Name ModuleSig.Range.hi.0)))))))
  (Fun_def
-  ((fun_name ModuleSig.Range.in-0)
-   (closed_over (Std.Prelude.Operators.&&-0 Std.Prelude.Operators.<=-0))
-   (args ((ModuleSig.Range.x-0 Block) (*lambda_arg-0 Block))) (returns Block)
+  ((fun_name ModuleSig.Range.in.0)
+   (closed_over (Std.Prelude.Operators.&&.0 Std.Prelude.Operators.<=.0))
+   (args ((ModuleSig.Range.x.0 Block) (*lambda_arg.0 Block))) (returns Block)
    (body
-    (Let ModuleSig.Range.lo-1 (Get_block_field 0 (Name *lambda_arg-0))
-     (Let ModuleSig.Range.hi-1 (Get_block_field 1 (Name *lambda_arg-0))
-      (Fun_call Std.Prelude.Operators.&&-0
-       ((Fun_call Std.Prelude.Operators.<=-0
-         ((Name ModuleSig.Range.lo-1) (Name ModuleSig.Range.x-0)))
-        (Fun_call Std.Prelude.Operators.<=-0
-         ((Name ModuleSig.Range.x-0) (Name ModuleSig.Range.hi-1))))))))))
- (Value_def ModuleSig.my_range-0
-  (Fun_call ModuleSig.Range.between-0
+    (Let ModuleSig.Range.lo.1 (Get_block_field 0 (Name *lambda_arg.0))
+     (Let ModuleSig.Range.hi.1 (Get_block_field 1 (Name *lambda_arg.0))
+      (Fun_call Std.Prelude.Operators.&&.0
+       ((Fun_call Std.Prelude.Operators.<=.0
+         ((Name ModuleSig.Range.lo.1) (Name ModuleSig.Range.x.0)))
+        (Fun_call Std.Prelude.Operators.<=.0
+         ((Name ModuleSig.Range.x.0) (Name ModuleSig.Range.hi.1))))))))))
+ (Value_def ModuleSig.my_range.0
+  (Fun_call ModuleSig.Range.between.0
    ((Primitive (Int 1)) (Primitive (Int 10)))))
- (Value_def ModuleSig.is_10_in_range-0
-  (Fun_call ModuleSig.Range.in-0
-   ((Primitive (Int 10)) (Name ModuleSig.my_range-0)))))
+ (Value_def ModuleSig.is_10_in_range.0
+  (Fun_call ModuleSig.Range.in.0
+   ((Primitive (Int 10)) (Name ModuleSig.my_range.0)))))
