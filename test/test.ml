@@ -9,6 +9,7 @@ let parse_only_tests = [ "Imports"; "Modules"; "Operators"; "Traits"; "Types" ]
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)
 
 (* These tests are just for type-checking as they are not ready to be converted to MIR.  *)
+(* TODO: enable these for mir *)
 let type_only_tests =
   parse_only_tests
   @ [ "LetBindingGroups" (* let rec *)
@@ -18,6 +19,14 @@ let type_only_tests =
 ;;
 
 let should_make_mir test = not (List.mem ~equal:String.equal type_only_tests test)
+
+(* TODO: expand this to more files *)
+let no_llvm_tests = [ "AsPattern" (* closures *) ]
+
+(* FIXME: enable *)
+let should_make_llvm test =
+  should_make_mir test && (not (List.mem ~equal:String.equal no_llvm_tests test)) && false
+;;
 
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =
   let exn =
@@ -39,6 +48,7 @@ let run_tests () =
     let print_tokens_to = Out_channel.create (concat_current "tokens" out_filename) in
     let print_ast_to = Out_channel.create (concat_current "ast" out_filename) in
     let print_mir_to = Out_channel.create (concat_current "mir" out_filename) in
+    let llvm_file = concat_current "llvm" out_filename in
     let in_file = concat_current "examples" filename in
     (match Parsing.parse_file ~print_tokens_to ~full_lex:true in_file with
     | Ok ast ->
@@ -46,13 +56,18 @@ let run_tests () =
       then (
         match Ast.Typed.Module.of_untyped ast with
         | Ok (names, ast) ->
-          Ast.Typed.Module.sexp_of_t ast |> Parsing.fprint_s ~out:print_ast_to;
+          Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Typed.Module.t)];
           if should_make_mir bare_filename
           then (
             match Mir.of_typed_module ~names ast with
             | Ok mir ->
               let mir = Mir.renumber_ids mir in
-              Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)]
+              Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
+              if should_make_llvm bare_filename
+              then
+                (* TODO: could be nicer to put the module name in the mir *)
+                Codegen.of_mir ~module_name:(Ast.Module.module_name ast) mir
+                |> Codegen.print ~to_:llvm_file
             | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
         | Error error -> print_compilation_error ~out:print_ast_to ~filename error)
       else Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Untyped.Module.t)]

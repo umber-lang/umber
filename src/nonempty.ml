@@ -108,6 +108,11 @@ let fold_map xs ~init ~f =
   List.fold_map (to_list xs) ~init ~f |> Tuple2.map_snd ~f:of_list_exn
 ;;
 
+let foldi t ~init ~f =
+  fold t ~init:(0, init) ~f:(fun (i, acc) x -> i + 1, f i acc x) |> snd
+;;
+
+let iteri t ~f = foldi t ~init:() ~f:(fun i () x -> f i x)
 let ( @ ) = append
 let is_empty _ = false
 let min_elt xs ~compare = List.min_elt (to_list xs) ~compare |> Option.value_exn

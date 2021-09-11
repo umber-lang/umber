@@ -1,4 +1,4 @@
-(data_only_dirs examples tokens ast)
+(data_only_dirs examples tokens ast mir llvm)
 
 (executables
  (names test gen_dune)
@@ -14,13 +14,14 @@
   (glob_files examples/*)
   (glob_files tokens/*.expected)
   (glob_files ast/*.expected)
-  (glob_files mir/*.expected))
+  (glob_files mir/*.expected)
+  (glob_files test/*.expected))
  (action
   (progn
    (ignore-stderr
     (with-accepted-exit-codes
      (or 0 1)
-     (system "mkdir ast tokens")))
+     (system "mkdir ast tokens mir llvm")))
    (run %{dep:test.exe}) ; does this do anything different to just ./test.exe ? (adds it as a dependency)
    (system "echo \"Tests run at $(date)\" > %{target}"))))
 

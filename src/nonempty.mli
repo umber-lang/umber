@@ -20,9 +20,11 @@ val unzip : ('a * 'b) t -> 'a t * 'b t
 val concat_map : 'a t -> f:('a -> 'b t) -> 'b t
 val fold_right : 'a t -> init:'acc -> f:('a -> 'acc -> 'acc) -> 'acc
 val fold_map : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc * 'b) -> 'acc * 'b t
+val foldi : 'a t -> init:'acc -> f:(int -> 'acc -> 'a -> 'acc) -> 'acc
 val reduce : 'a t -> f:('a -> 'a -> 'a) -> 'a
 val mapi : 'a t -> f:(int -> 'a -> 'b) -> 'b t
 val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+val iteri : 'a t -> f:(int -> 'a -> unit) -> unit
 val min_elt : 'a t -> compare:('a -> 'a -> int) -> 'a
 val max_elt : 'a t -> compare:('a -> 'a -> int) -> 'a
 val cartesian_product_all : 'a t t -> 'a t t

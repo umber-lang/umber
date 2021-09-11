@@ -1,4 +1,5 @@
 module Ast = Ast
+module Codegen = Codegen
 module Compilation_error = Compilation_error
 module Lexer = Lexer
 module Mir = Mir

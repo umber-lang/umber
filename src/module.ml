@@ -46,4 +46,5 @@ let with_filename (_, sigs, defs) filename =
   module_name, sigs, defs
 ;;
 
+let module_name : _ t -> Module_name.t = Tuple3.get1
 let let_ bindings = Let bindings

@@ -14,23 +14,27 @@ module Unique_name : sig
   val of_ustring : Ustring.t -> t
   val of_extern_name : Extern_name.t -> t
   val base_name : t -> Ustring.t
+  val to_string : t -> string
   val map_id : t -> f:(int -> int) -> t
 end = struct
   module Id = Unique_id.Int ()
 
   module T = struct
-    type t = Ustring.t * Id.t [@@deriving compare, hash]
+    module U = struct
+      type t = Ustring.t * Id.t [@@deriving compare, hash]
 
-    let sexp_of_t (ustr, id) =
-      Sexp.Atom (String.concat [ Ustring.to_string ustr; "/"; Id.to_string id ])
-    ;;
+      let to_string (ustr, id) =
+        String.concat [ Ustring.to_string ustr; "-"; Id.to_string id ]
+      ;;
 
-    let t_of_sexp = function
-      | Sexp.Atom str ->
-        let name, id = String.rsplit2_exn str ~on:'/' in
+      let of_string str =
+        let name, id = String.rsplit2_exn str ~on:'-' in
         Ustring.of_string_exn name, Id.of_string id
-      | List _ -> raise_s [%message "Unique_name.t_of_sexp: unexpected sexp list"]
-    ;;
+      ;;
+    end
+
+    include U
+    include Sexpable.Of_stringable (U)
   end
 
   include T
@@ -70,6 +74,16 @@ module Value_kind = struct
     | pointer
     ]
   [@@deriving sexp_of]
+
+  let is_immediate = function
+    | #immediate -> true
+    | _ -> false
+  ;;
+
+  let is_pointer = function
+    | #pointer -> true
+    | _ -> false
+  ;;
 
   let of_primitive_type (path, type_name) =
     (* Note that [Bool] is not abstract and so doesn't need to be given here
@@ -565,8 +579,11 @@ module Expr = struct
     | Let of Unique_name.t * t * t
     (* TODO: Can function calls just be to a single [Unique_name.t]? *)
     | Fun_call of Unique_name.t * t Nonempty.t
-    | Constant_cnstr of Cnstr.Tag.t
-    | Make_block of Cnstr.Tag.t * t Nonempty.t
+    | Make_block of
+        { tag : Cnstr.Tag.t
+        ; pointers : t list [@sexp.omit_nil]
+        ; immediates : t list [@sexp.omit_nil]
+        }
     | Get_block_field of int * t
     | If of
         { cond : cond
@@ -723,7 +740,7 @@ module Expr = struct
                 [%message
                   "This kind of expression is not allowed in a function call"
                     (f : Type.Scheme.t Typed.Expr.t)]
-            | Primitive _ | Fun_call _ | Constant_cnstr _ | Make_block (_, _ :: _) ->
+            | Primitive _ | Fun_call _ | Make_block _ ->
               compiler_bug [%message "Invalid function expression" (fun_ : t)])
           | Literal _
           | Tuple _
@@ -848,18 +865,19 @@ module Expr = struct
           in
           expr, fun_defs)
       | Tuple fields, Tuple field_types ->
-        let fields, fun_defs =
+        let pointers, immediates, fun_defs =
           List.fold2_exn
             fields
             field_types
-            ~init:([], fun_defs)
-            ~f:(fun (fields, fun_defs) field typ ->
+            ~init:([], [], fun_defs)
+            ~f:(fun (pointers, immediates, fun_defs) field typ ->
             let field, fun_defs = of_typed_expr ~ctx ~fun_defs (field, typ) in
-            field :: fields, fun_defs)
+            if Value_kind.is_pointer
+                 (Value_kind.of_type_scheme ~names:(Context.name_bindings ctx) typ)
+            then field :: pointers, immediates, fun_defs
+            else pointers, field :: immediates, fun_defs)
         in
-        (match Nonempty.of_list (List.rev fields) with
-        | Some fields -> Make_block (Cnstr.Tag.default, fields), fun_defs
-        | None -> Constant_cnstr Cnstr.Tag.default, fun_defs)
+        Make_block { tag = Cnstr.Tag.default; pointers; immediates }, fun_defs
       | Record_literal _, _ | Record_update _, _ | Record_field_access _, _ ->
         failwith "TODO: records in MIR exprs"
       | ( Lambda _, (Var _ | Type_app _ | Tuple _)
@@ -941,7 +959,7 @@ module Expr = struct
 
   let rec map_names expr ~f =
     match expr with
-    | Primitive _ | Break _ | Constant_cnstr _ -> expr
+    | Primitive _ | Break _ -> expr
     | Name name -> Name (f name)
     | Let (name, expr, body) ->
       let name = f name in
@@ -952,7 +970,10 @@ module Expr = struct
       let fun_name = f fun_name in
       let args = Nonempty.map args ~f:(map_names ~f) in
       Fun_call (fun_name, args)
-    | Make_block (tag, fields) -> Make_block (tag, Nonempty.map fields ~f:(map_names ~f))
+    | Make_block { tag; pointers; immediates } ->
+      let pointers = List.map pointers ~f:(map_names ~f) in
+      let immediates = List.map immediates ~f:(map_names ~f) in
+      Make_block { tag; pointers; immediates }
     | Get_block_field (i, expr) -> Get_block_field (i, map_names expr ~f)
     | If { cond; then_; else_ } ->
       let cond = map_cond_names cond ~f in
