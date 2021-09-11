@@ -12,7 +12,6 @@ module Unique_name : sig
   include Hashable.S with type t := t
 
   val of_ustring : Ustring.t -> t
-  val of_extern_name : Extern_name.t -> t
   val base_name : t -> Ustring.t
   val to_string : t -> string
   val map_id : t -> f:(int -> int) -> t
@@ -42,21 +41,8 @@ end = struct
   include Hashable.Make (T)
 
   let of_ustring ustr = ustr, Id.create ()
-  let of_extern_name extern_name = of_ustring (Extern_name.to_ustring extern_name)
   let base_name = fst
   let map_id t ~f = Tuple2.map_snd t ~f:(Id.of_int_exn << f << Id.to_int_exn)
-
-  (* TODO: cleanup *)
-
-  (*let extern_prefix = of_string_exn "extern:"
-  let of_extern_name extern_name =
-    if Extern_name.is_prim_op extern_name
-    then (* Prim_op names are guaranteed to be unique *)
-      Extern_name.to_ustring extern_name
-    else extern_prefix ^ of_ustring (Extern_name.to_ustring extern_name)
-  ;;
-
-  let sexp_of_t t = Sexp.Atom (String.take_while (to_string t) ~f:(Char.( <> ) '/'))*)
 end
 
 module Value_kind = struct
@@ -110,8 +96,7 @@ module Value_kind = struct
         | Alias scheme -> of_type_scheme ~names scheme
         | Variants _ | Record _ -> `Block
         | Abstract ->
-          (* TODO: should be able to break the abstraction boundary to see the
-             implementation *)
+          (* TODO: What should we do with abstract types in defs? Treat them as pointers? *)
           raise_s
             [%message
               "TODO: of_type_scheme: Abstract" (type_name : Type_name.Qualified.t)])
@@ -237,7 +222,7 @@ end = struct
       | exception Name_bindings.Name_error _ -> None
       | entry ->
         Name_bindings.Name_entry.extern_name entry
-        |> Option.map ~f:Unique_name.of_extern_name)
+        |> Option.map ~f:(Unique_name.of_ustring << Extern_name.to_ustring))
   ;;
 
   let find_value_name' t name =
@@ -877,7 +862,12 @@ module Expr = struct
             then field :: pointers, immediates, fun_defs
             else pointers, field :: immediates, fun_defs)
         in
-        Make_block { tag = Cnstr.Tag.default; pointers; immediates }, fun_defs
+        ( Make_block
+            { tag = Cnstr.Tag.default
+            ; pointers = List.rev pointers
+            ; immediates = List.rev immediates
+            }
+        , fun_defs )
       | Record_literal _, _ | Record_update _, _ | Record_field_access _, _ ->
         failwith "TODO: records in MIR exprs"
       | ( Lambda _, (Var _ | Type_app _ | Tuple _)

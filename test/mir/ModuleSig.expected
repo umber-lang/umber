@@ -4,7 +4,7 @@
    (returns Block)
    (body
     (Make_block (tag 0)
-     (pointers ((Name ModuleSig.Range.hi-0) (Name ModuleSig.Range.lo-0)))))))
+     (pointers ((Name ModuleSig.Range.lo-0) (Name ModuleSig.Range.hi-0)))))))
  (Fun_def
   ((fun_name ModuleSig.Range.in-0)
    (closed_over (Std.Prelude.Operators.&&-0 Std.Prelude.Operators.<=-0))

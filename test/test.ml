@@ -66,7 +66,7 @@ let run_tests () =
               if should_make_llvm bare_filename
               then
                 (* TODO: could be nicer to put the module name in the mir *)
-                Codegen.of_mir ~module_name:(Ast.Module.module_name ast) mir
+                Codegen.of_mir ~source_filename:filename mir
                 |> Codegen.print ~to_:llvm_file
             | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
         | Error error -> print_compilation_error ~out:print_ast_to ~filename error)

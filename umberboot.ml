@@ -48,7 +48,7 @@ let command =
              if mir then print_s [%sexp (mir_stmts : Mir.t)];
              if llvm
              then
-               Codegen.of_mir ~module_name:(Ast.Module.module_name ast) mir_stmts
+               Codegen.of_mir ~source_filename:filename mir_stmts
                |> Codegen.to_string
                |> print_endline)))
        else if lex

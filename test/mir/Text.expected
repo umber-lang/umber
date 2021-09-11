@@ -6,7 +6,7 @@
  (Value_def -0
   (Let Text.empty-0 (Primitive (String ""))
    (Make_block (tag 0)
-    (immediates ((Primitive (Char b)) (Primitive (Char a)))))))
+    (immediates ((Primitive (Char a)) (Primitive (Char b)))))))
  (Value_def Text.a-0 (Get_block_field 0 (Name -0)))
  (Value_def Text.b-0 (Get_block_field 1 (Name -0)))
  (Value_def Text._UNICODE_WORKS_TOO-0

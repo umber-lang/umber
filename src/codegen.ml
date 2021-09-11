@@ -1,7 +1,6 @@
 (* Generating LLVM IR for the AST *)
 
 open Import
-open Names
 open Llvm
 
 let fun_call_name = "fun_call"
@@ -13,15 +12,52 @@ type t =
   ; values : llvalue Mir.Unique_name.Table.t
   }
 
-let create ~module_name =
+let create ~source_filename =
   (* TODO: should this use `create_context`? *)
   let context = global_context () in
   { context
   ; builder = builder context
-  ; module_ =
-      create_module context (Ustring.to_string (Module_name.to_ustring module_name))
+  ; module_ = create_module context source_filename
   ; values = Mir.Unique_name.Table.create ()
   }
+;;
+
+let block_index_type context = i16_type context
+
+let block_header_type context =
+  let typ = named_struct_type context "header" in
+  struct_set_body
+    typ
+    [| i16_type context (* tag *)
+     ; block_index_type context (* # of pointers *)
+     ; block_index_type context (* # of immediates *)
+    |]
+    false;
+  typ
+;;
+
+let block_type context =
+  let rec block_type =
+    (* TODO: check if this the array type is right. Apparently 0 size => variable size. 
+       http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt *)
+    lazy
+      (struct_type
+         context
+         [| block_header_type context
+          ; array_type (pointer_type (Lazy.force block_type)) 0
+          ; array_type (i64_type context) 0
+         |])
+  in
+  Lazy.force block_type
+;;
+
+let block_pointer_type context = pointer_type (block_type context)
+
+let type_value_kind t : Mir.Value_kind.t -> lltype = function
+  | `Int64 -> i64_type t.context
+  | `Float64 -> double_type t.context
+  | `Char -> i32_type t.context
+  | `Block -> block_pointer_type t.context
 ;;
 
 let codegen_literal t lit =
@@ -39,13 +75,13 @@ let codegen_literal t lit =
     const_string t.context s
 ;;
 
-let codegen_constant_tag t tag = const_int (i64_type t.context) (Mir.Cnstr.Tag.to_int tag)
+let codegen_constant_tag t tag =
+  const_int (integer_type t.context 63) (Mir.Cnstr.Tag.to_int tag)
+;;
 
 let codegen_non_constant_tag t tag =
   const_int (i16_type t.context) (Mir.Cnstr.Tag.to_int tag)
 ;;
-
-let block_index_type context = i16_type context
 
 let get_block_tag t value =
   build_gep value [| const_int (block_index_type t.context) 0 |] "tag" t.builder
@@ -123,8 +159,8 @@ and box ?(tag = Mir.Cnstr.Tag.default) t ~pointers ~immediates =
   (* TODO: Heap allocation. Also, GC. (Actually, for now, let's just try to plug in a
      conservative GC e.g. Boehm) *)
   let block_header =
-    const_struct
-      t.context
+    const_named_struct
+      (block_header_type t.context)
       [| codegen_non_constant_tag t tag
        ; const_int (block_index_type t.context) (List.length pointers)
        ; const_int (block_index_type t.context) (List.length immediates)
@@ -133,28 +169,6 @@ and box ?(tag = Mir.Cnstr.Tag.default) t ~pointers ~immediates =
   let pointers = const_struct t.context (Array.of_list pointers) in
   let immediates = const_struct t.context (Array.of_list immediates) in
   const_struct t.context [| block_header; pointers; immediates |]
-;;
-
-let block_type context =
-  let rec block_type =
-    (* TODO: check if this the array type is right. Apparently 0 size => variable size. 
-       http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt *)
-    lazy
-      (struct_type
-         context
-         [| i16_type context (* Block tag *)
-          ; block_index_type context (* Block length *)
-          ; array_type (pointer_type (Lazy.force block_type)) 0
-         |])
-  in
-  Lazy.force block_type
-;;
-
-let type_value_kind t : Mir.Value_kind.t -> lltype = function
-  | `Int64 -> i64_type t.context
-  | `Float64 -> double_type t.context
-  | `Char -> i32_type t.context
-  | `Block -> block_type t.context
 ;;
 
 let codegen_stmt t stmt =
@@ -190,8 +204,8 @@ let codegen_stmt t stmt =
     fun_
 ;;
 
-let of_mir ~module_name mir =
-  let t = create ~module_name in
+let of_mir ~source_filename mir =
+  let t = create ~source_filename in
   List.iter mir ~f:(ignore << codegen_stmt t);
   t
 ;;
