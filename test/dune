@@ -15,7 +15,7 @@
   (glob_files tokens/*.expected)
   (glob_files ast/*.expected)
   (glob_files mir/*.expected)
-  (glob_files test/*.expected))
+  (glob_files llvm/*.expected))
  (action
   (progn
    (ignore-stderr

@@ -105,7 +105,9 @@ let rec codegen_expr t expr =
       let immediates = List.map immediates ~f:(codegen_expr t) in
       box t ~tag ~pointers ~immediates)
   | Get_block_field (i, expr) ->
-    const_gep (codegen_expr t expr) [| const_int (i16_type t.context) i |]
+    const_gep
+      (codegen_expr t expr)
+      [| const_int (i16_type t.context) (Mir.Block_index.to_int i + 1) |]
   | If { cond; then_; else_ } ->
     let cond = codegen_cond t cond in
     let start_block = insertion_block t.builder in

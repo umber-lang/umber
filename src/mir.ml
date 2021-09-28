@@ -88,6 +88,7 @@ module Value_kind = struct
     | _ :: _ -> None
   ;;
 
+  (* TODO: this should accept a [Type.Concrete.t] to force monomorphization *)
   let rec of_type_scheme ~names : Type.Scheme.t -> t = function
     | Var _ -> (* TODO: monomorphization *) `Block
     | Type_app (type_name, _args) ->
@@ -100,17 +101,7 @@ module Value_kind = struct
           raise_s
             [%message
               "TODO: of_type_scheme: Abstract" (type_name : Type_name.Qualified.t)])
-    | Tuple _ -> `Block
-    | Function (_arg, _result) ->
-      (* TODO: what to do with functions? [Function_def] as a statement? *)
-      (*let rec loop args result =
-        match (result : Type.Scheme.t) with
-        | Function (arg, result) ->
-          loop (Nonempty.cons (of_type_scheme ~names arg) args) result
-        | _ -> Closure (Nonempty.rev args, of_type_scheme ~names result)
-      in
-      loop [ of_type_scheme ~names arg ] result*)
-      `Block
+    | Tuple _ | Function _ -> `Block
   ;;
 end
 
@@ -154,6 +145,24 @@ module Cnstr = struct
   end
 end
 
+module Block_index : sig
+  type 'kind t constraint 'kind = [< `Raw | `Processed ] [@@deriving sexp]
+  type raw = [ `Raw ] t [@@deriving sexp]
+  type processed = [ `Processed ] t [@@deriving sexp]
+
+  val raw : int -> [ `Raw ] t
+  val processed : int -> [ `Processed ] t
+  val to_int : _ t -> int
+end = struct
+  type 'kind t = int constraint 'kind = [< `Raw | `Processed ] [@@deriving sexp]
+  type raw = [ `Raw ] t [@@deriving sexp]
+  type processed = [ `Processed ] t [@@deriving sexp]
+
+  let raw = Fn.id
+  let processed = Fn.id
+  let to_int = Fn.id
+end
+
 module Constant_names = struct
   (* NOTE: none of these can be valid value names a user could enter. *)
   let empty = Value_name.empty
@@ -177,18 +186,73 @@ module Context : sig
   val with_find_observer : t -> f:((Unique_name.t -> unit) -> Unique_name.t -> unit) -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
   val cnstr_tag : t -> Type.Scheme.t -> Cnstr.t -> Cnstr.Tag.t
-  val cnstr_arg_type : t -> Type.Scheme.t -> Cnstr.t -> int -> Type.Scheme.t
+
+  val cnstr_arg_info
+    :  t
+    -> Type.Scheme.t
+    -> Cnstr.t
+    -> Block_index.raw
+    -> Block_index.processed * Type.Scheme.t
+
   val cnstrs : t -> Type.Scheme.t -> Cnstr.Set.t
   val name_bindings : t -> Name_bindings.t
 end = struct
+  module Cnstr_info = struct
+    module Arg = struct
+      type t = Block_index.processed * Type.Scheme.t [@@deriving sexp]
+    end
+
+    type t =
+      | Variants of
+          { constant_cnstrs : Cnstr_name.t list
+          ; non_constant_cnstrs : (Cnstr_name.t * Arg.t list) list
+          }
+      | Tuple of Arg.t list
+    [@@deriving sexp]
+
+    let make_arg_list ~names args =
+      List.fold_map args ~init:(0, 0) ~f:(fun (pointer_i, immediate_i) scheme ->
+        let value_kind = Value_kind.of_type_scheme ~names scheme in
+        if Value_kind.is_pointer value_kind
+        then (pointer_i + 1, immediate_i), (Block_index.processed pointer_i, scheme)
+        else (pointer_i, immediate_i + 1), (Block_index.processed immediate_i, scheme))
+      |> snd
+    ;;
+
+    let of_variants ~names variants =
+      let constant_cnstrs, non_constant_cnstrs =
+        List.fold
+          variants
+          ~init:([], [])
+          ~f:(fun (constant_cnstrs, non_constant_cnstrs) (cnstr_name, args) ->
+          if List.is_empty args
+          then cnstr_name :: constant_cnstrs, non_constant_cnstrs
+          else
+            ( constant_cnstrs
+            , (cnstr_name, make_arg_list ~names args) :: non_constant_cnstrs ))
+      in
+      Variants
+        { constant_cnstrs = List.rev constant_cnstrs
+        ; non_constant_cnstrs = List.rev non_constant_cnstrs
+        }
+    ;;
+
+    let of_tuple ~names args = Tuple (make_arg_list ~names args)
+  end
+
+  (* TODO: should save function defs for polymorphic functions here - just make it a
+     hashtable (the parts which should be global can just be mutable)
+     - or we could also make it another type, might be a bit nicer to spread the
+       responsibility *)
   type t =
     { names : Unique_name.t Ustring.Map.t
-    ; name_bindings : Name_bindings.t
-    ; add_observer : Unique_name.t -> unit
-    ; find_observer : Unique_name.t -> unit
+    ; name_bindings : Name_bindings.t [@sexp.opaque]
+    ; cnstr_info_cache : Cnstr_info.t Type.Scheme.Table.t
+    ; add_observer : Unique_name.t -> unit [@sexp.opaque]
+    ; find_observer : Unique_name.t -> unit [@sexp.opaque]
     }
+  [@@deriving sexp_of]
 
-  let sexp_of_t t = [%sexp_of: Unique_name.t Ustring.Map.t] t.names
   let name_bindings t = t.name_bindings
 
   let with_module t module_name ~f =
@@ -257,6 +321,7 @@ end = struct
     let t =
       { names = Ustring.Map.empty
       ; name_bindings
+      ; cnstr_info_cache = Type.Scheme.Table.create ()
       ; add_observer = ignore
       ; find_observer = ignore
       }
@@ -273,49 +338,55 @@ end = struct
           (cnstr_name : Cnstr_name.t option)]
   ;;
 
-  let rec get_cnstr_info ({ name_bindings; _ } as t) typ =
+  let rec get_cnstr_info t typ =
     match (typ : Type.Scheme.t) with
     | Type_app (type_name, _args) ->
-      (match snd (Name_bindings.find_type_decl name_bindings type_name) with
-      | Alias scheme -> get_cnstr_info t scheme
-      | Variants variants -> `Variants variants
-      | Abstract | Record _ -> cnstr_lookup_failed typ)
-    | Tuple args -> `Tuple args
+      Hashtbl.find_or_add t.cnstr_info_cache typ ~default:(fun () ->
+        match snd (Name_bindings.find_type_decl t.name_bindings type_name) with
+        | Alias scheme -> get_cnstr_info t scheme
+        | Variants variants -> Cnstr_info.of_variants ~names:t.name_bindings variants
+        | Abstract | Record _ -> cnstr_lookup_failed typ)
+    | Tuple args ->
+      Hashtbl.find_or_add t.cnstr_info_cache typ ~default:(fun () ->
+        Cnstr_info.of_tuple ~names:t.name_bindings args)
     | Var _ | Function _ -> cnstr_lookup_failed typ
   ;;
 
   let lookup_cnstr t typ cnstr =
     match get_cnstr_info t typ, (cnstr : Cnstr.t) with
-    | `Variants variants, Named cnstr_name ->
-      `Variants
-        (List.fold_until
-           variants
-           ~init:(0, 0)
-           ~f:(fun (constant_i, non_constant_i) (cnstr_name', args) ->
-             if Cnstr_name.(cnstr_name = cnstr_name')
-             then Stop ((if List.is_empty args then constant_i else non_constant_i), args)
-             else Continue (constant_i + 1, non_constant_i + 1))
-           ~finish:(fun _ -> cnstr_lookup_failed typ ~cnstr_name))
-    | `Tuple args, Tuple -> `Tuple args
-    | _cnstr_info, cnstr ->
-      compiler_bug [%message "Incompatible cnstr info" (cnstr : Cnstr.t)]
+    | Variants { constant_cnstrs; non_constant_cnstrs }, Named cnstr_name ->
+      (match List.findi constant_cnstrs ~f:(fun _ -> Cnstr_name.( = ) cnstr_name) with
+      | Some (i, _) -> `Variants (Cnstr.Tag.of_int i, [])
+      | None ->
+        (match
+           List.findi non_constant_cnstrs ~f:(fun _ -> Cnstr_name.( = ) cnstr_name << fst)
+         with
+        | Some (i, (_, args)) -> `Variants (Cnstr.Tag.of_int i, args)
+        | None -> cnstr_lookup_failed ~cnstr_name typ))
+    | Tuple args, Tuple -> `Tuple args
+    | cnstr_info, cnstr ->
+      compiler_bug
+        [%message "Incompatible cnstr info" (cnstr : Cnstr.t) (cnstr_info : Cnstr_info.t)]
   ;;
 
   let cnstr_tag t typ cnstr =
     match lookup_cnstr t typ cnstr with
-    | `Variants (index, _) -> Cnstr.Tag.of_int index
-    | `Tuple _ -> Cnstr.Tag.of_int 0
+    | `Variants (index, _) -> index
+    | `Tuple _ -> Cnstr.Tag.default
   ;;
 
-  let cnstr_arg_type t typ cnstr_name arg_index =
+  let cnstr_arg_info t typ cnstr_name (arg_index : Block_index.raw) =
     let (`Variants (_, args) | `Tuple args) = lookup_cnstr t typ cnstr_name in
-    List.nth_exn args arg_index
+    List.nth_exn args (Block_index.to_int arg_index)
   ;;
 
   let cnstrs t typ =
     match get_cnstr_info t typ with
-    | `Variants variants -> List.map variants ~f:(Cnstr.named << fst) |> Cnstr.Set.of_list
-    | `Tuple _ -> Cnstr.Set.singleton Tuple
+    | Variants { constant_cnstrs; non_constant_cnstrs } ->
+      Cnstr.Set.of_list
+        (List.map constant_cnstrs ~f:Cnstr.named
+        @ List.map non_constant_cnstrs ~f:(Cnstr.named << fst))
+    | Tuple _ -> Cnstr.Set.singleton Tuple
   ;;
 end
 
@@ -501,7 +572,9 @@ end = struct
                | Some args ->
                  let missing_cases_per_arg =
                    Nonempty.mapi args ~f:(fun i arg ->
-                     let input_type = Context.cnstr_arg_type ctx input_type cnstr i in
+                     let (_ : Block_index.processed), input_type =
+                       Context.cnstr_arg_info ctx input_type cnstr (Block_index.raw i)
+                     in
                      missing_cases ~ctx ~input_type arg)
                  in
                  if Nonempty.for_all ~f:List.is_empty missing_cases_per_arg
@@ -569,7 +642,7 @@ module Expr = struct
         ; pointers : t list [@sexp.omit_nil]
         ; immediates : t list [@sexp.omit_nil]
         }
-    | Get_block_field of int * t
+    | Get_block_field of Block_index.processed * t
     | If of
         { cond : cond
         ; then_ : t
@@ -631,6 +704,7 @@ module Expr = struct
     ~add_let
     pat
     mir_expr
+    type_
     =
     match (pat : Simple_pattern.t) with
     | Catch_all None ->
@@ -643,8 +717,8 @@ module Expr = struct
     | As (pattern, name) ->
       let ctx, name = add_name ctx name in
       let acc = add_let acc name mir_expr in
-      fold_pattern_bindings ~ctx ~init:acc ~add_let pattern (Name name)
-    | Cnstr_appl (_, args) ->
+      fold_pattern_bindings ~ctx ~init:acc ~add_let pattern (Name name) type_
+    | Cnstr_appl (cnstr, args) ->
       let ctx, name, acc =
         match mir_expr with
         | Name name -> ctx, name, acc
@@ -653,8 +727,14 @@ module Expr = struct
           let acc = add_let acc name mir_expr in
           ctx, name, acc
       in
+      (* FIXME: this is definitely incorrect in the pointers-first representation 
+         - we need to re-index constructor information in Context.t *)
       List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
-        fold_pattern_bindings ~ctx ~init:acc ~add_let arg (Get_block_field (i, Name name)))
+        let arg_index, arg_type =
+          Context.cnstr_arg_info ctx type_ cnstr (Block_index.raw i)
+        in
+        let arg_expr = Get_block_field (arg_index, Name name) in
+        fold_pattern_bindings ~ctx ~init:acc ~add_let arg arg_expr arg_type)
     | Constant _ -> ctx, acc
   ;;
 
@@ -671,8 +751,10 @@ module Expr = struct
         let tag_cond = Non_constant_tag_equals (input_expr, tag) in
         let conds =
           List.filter_mapi args ~f:(fun i arg ->
-            let arg_expr = Get_block_field (i, input_expr) in
-            let arg_type = Context.cnstr_arg_type ctx input_type cnstr i in
+            let arg_index, arg_type =
+              Context.cnstr_arg_info ctx input_type cnstr (Block_index.raw i)
+            in
+            let arg_expr = Get_block_field (arg_index, input_expr) in
             condition_of_pattern ~ctx ~input_expr:arg_expr ~input_type:arg_type arg)
         in
         Some (List.fold conds ~init:tag_cond ~f:(fun cond cond' -> And (cond, cond'))))
@@ -719,7 +801,7 @@ module Expr = struct
             let arg, fun_defs = of_typed_expr ~ctx ~fun_defs arg in
             (match fun_ with
             | Name fun_name -> Fun_call (fun_name, arg :: args), fun_defs
-            | Let (_, _, _) | Get_block_field (_, _) | If _ | Catch _ | Break _ ->
+            | Let _ | Get_block_field _ | If _ | Catch _ | Break _ ->
               (* TODO: Allow `let`, `match`, `if`, etc. in function expressions *)
               mir_error
                 [%message
@@ -758,7 +840,9 @@ module Expr = struct
             | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
               let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
               let add_let acc name mir_expr = (name, mir_expr) :: acc in
-              arg_name, fold_pattern_bindings ~ctx arg (Name arg_name) ~init:[] ~add_let
+              ( arg_name
+              , fold_pattern_bindings ~ctx arg (Name arg_name) arg_type ~init:[] ~add_let
+              )
           in
           let arg =
             ( arg_name
@@ -841,7 +925,8 @@ module Expr = struct
                   of_typed_expr ?just_bound ~ctx ~fun_defs (expr, typ)
                 in
                 let add_let bindings name mir_expr = (name, mir_expr) :: bindings in
-                fold_pattern_bindings ~ctx pat mir_expr ~init:bindings ~add_let, fun_defs)
+                ( fold_pattern_bindings ~ctx pat mir_expr typ ~init:bindings ~add_let
+                , fun_defs ))
           in
           let body, fun_defs = of_typed_expr ~ctx ~fun_defs (body, body_type) in
           let expr =
@@ -909,7 +994,7 @@ module Expr = struct
       let rec loop ~fun_defs Nonempty.(pattern :: patterns) =
         let add_let bindings name expr = (name, expr) :: bindings in
         let ctx', bindings =
-          fold_pattern_bindings ~ctx pattern input_expr ~init:[] ~add_let
+          fold_pattern_bindings ~ctx pattern input_expr input_type ~init:[] ~add_let
         in
         (* TODO: this should skip underscore bindings (bindings for no actual variables) *)
         let output_expr =
@@ -1031,24 +1116,22 @@ let of_typed_module =
     List.fold
       bindings
       ~init:(ctx, stmts)
-      ~f:(fun (ctx, stmts) { node = pattern, ((_, input_type) as expr); _ } ->
-      let pattern' =
-        Simple_pattern.flatten_typed_pattern_no_unions
-          pattern
-          ~label:"toplevel let bindings"
+      ~f:(fun (ctx, stmts) { node = pat, ((_, type_) as expr); _ } ->
+      let pat' =
+        Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"toplevel let bindings"
       in
       let missing_cases =
-        Simple_pattern.Coverage.(of_pattern pattern' |> missing_cases ~ctx ~input_type)
+        Simple_pattern.Coverage.(of_pattern pat' |> missing_cases ~ctx ~input_type:type_)
       in
       if not (List.is_empty missing_cases)
       then
         mir_error
           [%message
             "The pattern in this let binding is not exhaustive"
-              (pattern : Typed.Pattern.t)
+              ~pattern:(pat : Typed.Pattern.t)
               (missing_cases : Simple_pattern.t list)];
       let just_bound =
-        match (pattern' : Simple_pattern.t) with
+        match (pat' : Simple_pattern.t) with
         | Catch_all name -> name
         | Constant _ | As _ | Cnstr_appl _ -> None
       in
@@ -1077,7 +1160,7 @@ let of_typed_module =
           (* Look up non-constant names added at the beginning *)
           ctx, Context.find_value_name ctx ([], name)
       in
-      Expr.fold_pattern_bindings ~add_name ~ctx pattern' mir_expr ~init:stmts ~add_let)
+      Expr.fold_pattern_bindings ~add_name ~ctx pat' mir_expr type_ ~init:stmts ~add_let)
   in
   let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->

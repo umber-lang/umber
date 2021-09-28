@@ -25,7 +25,7 @@ let should_make_mir test =
 let no_llvm_tests = [ "AsPattern" (* closures *) ]
 
 let should_make_llvm test =
-  false && should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
+  should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
 ;;
 
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =
@@ -48,7 +48,7 @@ let run_tests () =
     let print_tokens_to = Out_channel.create (concat_current "tokens" out_filename) in
     let print_ast_to = Out_channel.create (concat_current "ast" out_filename) in
     let print_mir_to = Out_channel.create (concat_current "mir" out_filename) in
-    (* let llvm_file = concat_current "llvm" out_filename in *)
+    let print_llvm_to = Out_channel.create (concat_current "llvm" out_filename) in
     let in_file = concat_current "examples" filename in
     (match Parsing.parse_file ~print_tokens_to ~full_lex:true in_file with
     | Ok ast ->
@@ -62,21 +62,23 @@ let run_tests () =
             match Mir.of_typed_module ~names ast with
             | Ok mir ->
               let mir = Mir.renumber_ids mir in
-              Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)]
-              (*if should_make_llvm bare_filename
-              then (
-                try
-                  Codegen.of_mir ~source_filename:filename mir
-                  |> Codegen.print ~to_:llvm_file
-                with
-                | exn -> Out_channel.write_all llvm_file ~data:(Exn.to_string exn))*)
+              Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
+              if should_make_llvm bare_filename
+              then
+                Out_channel.output_string
+                  print_llvm_to
+                  (try
+                     Codegen.of_mir ~source_filename:filename mir |> Codegen.to_string
+                   with
+                  | exn -> Exn.to_string exn)
             | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
         | Error error -> print_compilation_error ~out:print_ast_to ~filename error)
       else Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Untyped.Module.t)]
     | Error error -> print_compilation_error ~out:print_ast_to ~filename error);
     Out_channel.close print_tokens_to;
     Out_channel.close print_ast_to;
-    Out_channel.close print_mir_to
+    Out_channel.close print_mir_to;
+    Out_channel.close print_llvm_to
   in
   Array.iter (Sys.readdir Filename.(concat current_dir_name "examples")) ~f:test
 ;;

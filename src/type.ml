@@ -155,10 +155,16 @@ type t = Var_id.t Expr.t [@@deriving compare, hash, equal, sexp]
 let fresh_var () = Expr.Var (Var_id.create ())
 
 module Scheme = struct
-  (* TODO: add trait constraints to this type here
+  module T = struct
+    (* TODO: add trait constraints to this type here
      Having this type not be the same as the type that plain type expressions get parsed
      into also seems highly desirable *)
-  type nonrec t = Param.t Expr.t [@@deriving compare, hash, equal, sexp]
+    type nonrec t = Param.t Expr.t [@@deriving compare, hash, equal, sexp]
+  end
+
+  include T
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let instantiate ?(map_name = Fn.id) ?params typ =
     let params = option_or_default params ~f:Param.Env_to_vars.create in

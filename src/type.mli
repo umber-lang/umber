@@ -71,6 +71,9 @@ val fresh_var : unit -> t
 module Scheme : sig
   type nonrec t = Param.t Expr.t [@@deriving compare, hash, equal, sexp]
 
+  include Comparable.S with type t := t
+  include Hashable.S with type t := t
+
   val instantiate
     :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
     -> ?params:Param.Env_to_vars.t
