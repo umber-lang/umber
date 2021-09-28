@@ -20,7 +20,7 @@
   (Make_block (tag 0) (pointers ((Name TypeChecking.id.0)))
    (immediates ((Primitive (Int 5))))))
  (Value_def TypeChecking.id_alias.0 (Get_block_field 0 (Name .0)))
- (Value_def TypeChecking.five.0 (Get_block_field 1 (Name .0)))
+ (Value_def TypeChecking.five.0 (Get_block_field 0 (Name .0)))
  (Fun_def
   ((fun_name TypeChecking.|>.0) (closed_over ())
    (args ((TypeChecking.x.4 Block) (TypeChecking.f.0 Block))) (returns Block)

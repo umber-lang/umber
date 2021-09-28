@@ -14,7 +14,7 @@
        (else_
         (If
          (cond
-          (And (Non_constant_tag_equals (Name AsPattern.lst.0) 1)
+          (And (Non_constant_tag_equals (Name AsPattern.lst.0) 0)
            (Constant_tag_equals (Get_block_field 1 (Name AsPattern.lst.0)) 0)))
          (then_
           (Let .0 (Get_block_field 1 (Name AsPattern.lst.0)) (Break 0)))
