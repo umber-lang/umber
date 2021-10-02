@@ -11,6 +11,8 @@ module Param = struct
   end
 
   include T
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   module Env_to_vars : sig
     type param = t
@@ -61,25 +63,23 @@ module Expr = struct
     | Tuple of 'var t list
   [@@deriving compare, equal, hash, sexp, variants]
 
-  let rec map typ ~f ~var =
+  let rec map' typ ~f ~var =
     match f typ with
     | `Halt typ -> typ
-    | `Retry typ -> map typ ~f ~var
+    | `Retry typ -> map' typ ~f ~var
     | `Defer typ ->
       (match typ with
       | Var v -> Var (var v)
-      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var))
-      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var))
+      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map' ~f ~var))
+      | Tuple fields -> Tuple (List.map fields ~f:(map' ~f ~var))
       | Function (arg, body) ->
         (* Ensure functions are evaluated left-to-right for consistency*)
-        let arg = map ~f ~var arg in
-        Function (arg, map ~f ~var body))
+        let arg = map' ~f ~var arg in
+        Function (arg, map' ~f ~var body))
   ;;
 
-  let map_vars typ ~f = map typ ~f:(fun typ -> `Defer typ) ~var:f
-
-  (* TODO: make a functor or something to be able to used the more general map *)
-  let map = map ~var:Fn.id
+  let map = map' ~var:Fn.id
+  let map_vars typ ~f = map' typ ~f:(fun typ -> `Defer typ) ~var:f
 
   let rec fold_vars typ ~init ~f =
     match typ with
@@ -99,55 +99,6 @@ module Expr = struct
   module Bounded = struct
     type nonrec t = Trait_bound.t * Param.t t [@@deriving compare, equal, hash, sexp]
   end
-end
-
-module Decl = struct
-  type decl =
-    | Abstract
-    | Alias of Param.t Expr.t
-    (* TODO: variant constructors should probably support fixity declarations *)
-    | Variants of (Cnstr_name.t * Param.t Expr.t list) list
-    | Record of (Value_name.t * Param.t Expr.t) list
-  [@@deriving compare, equal, hash, sexp]
-
-  type t = Param.t list * decl [@@deriving compare, equal, hash, sexp]
-
-  let arity (params, _) = List.length params
-
-  let map_exprs (params, decl) ~f =
-    ( params
-    , match decl with
-      | Abstract -> decl
-      | Alias expr -> Alias (f expr)
-      | Variants cnstrs -> Variants (List.map cnstrs ~f:(Tuple2.map_snd ~f:(List.map ~f)))
-      | Record fields -> Record (List.map fields ~f:(Tuple2.map_snd ~f)) )
-  ;;
-
-  let fold_exprs (_, decl) ~init:acc ~f =
-    match decl with
-    | Abstract -> acc
-    | Alias expr -> f acc expr
-    | Variants cnstrs ->
-      List.fold cnstrs ~init:acc ~f:(fun acc -> snd >> List.fold ~init:acc ~f)
-    | Record fields -> List.fold fields ~init:acc ~f:(fun acc -> snd >> f acc)
-  ;;
-
-  let iter_exprs decl ~f = fold_exprs decl ~init:() ~f:(fun () -> f)
-
-  let no_free_params =
-    let check_params params typ =
-      Expr.for_all_vars typ ~f:(List.mem params ~equal:Param.equal)
-    in
-    fun (params, decl) ->
-      match decl with
-      | Alias expr -> check_params params expr
-      | Abstract -> true
-      | Variants cnstrs ->
-        List.for_all cnstrs ~f:(fun (_, args) ->
-          List.for_all args ~f:(check_params params))
-      | Record fields ->
-        List.for_all fields ~f:(fun (_, field) -> check_params params field)
-  ;;
 end
 
 type t = Var_id.t Expr.t [@@deriving compare, hash, equal, sexp]
@@ -183,7 +134,79 @@ module Scheme = struct
 end
 
 module Concrete = struct
-  type t = Nothing.t Expr.t [@@deriving compare, equal, hash, sexp]
+  module T = struct
+    type t = Nothing.t Expr.t [@@deriving compare, equal, hash, sexp]
+  end
+
+  include T
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let cast = Expr.map_vars ~f:(function (_ : Nothing.t) -> .)
+end
+
+module Decl = struct
+  type 'var decl =
+    | Abstract
+    | Alias of 'var Expr.t
+    (* TODO: variant constructors should probably support fixity declarations *)
+    | Variants of (Cnstr_name.t * 'var Expr.t list) list
+    | Record of (Value_name.t * 'var Expr.t) list
+  [@@deriving compare, equal, hash, sexp]
+
+  type t = Param.t list * Param.t decl [@@deriving compare, equal, hash, sexp]
+
+  let arity (params, _) = List.length params
+
+  let map_exprs (params, decl) ~f =
+    ( params
+    , match decl with
+      | Abstract -> Abstract
+      | Alias expr -> Alias (f expr)
+      | Variants cnstrs -> Variants (List.map cnstrs ~f:(Tuple2.map_snd ~f:(List.map ~f)))
+      | Record fields -> Record (List.map fields ~f:(Tuple2.map_snd ~f)) )
+  ;;
+
+  let fold_exprs (_, decl) ~init:acc ~f =
+    match decl with
+    | Abstract -> acc
+    | Alias expr -> f acc expr
+    | Variants cnstrs ->
+      List.fold cnstrs ~init:acc ~f:(fun acc -> snd >> List.fold ~init:acc ~f)
+    | Record fields -> List.fold fields ~init:acc ~f:(fun acc -> snd >> f acc)
+  ;;
+
+  let iter_exprs decl ~f = fold_exprs decl ~init:() ~f:(fun () -> f)
+
+  let no_free_params =
+    let check_params params typ =
+      Expr.for_all_vars typ ~f:(List.mem params ~equal:Param.equal)
+    in
+    fun (params, decl) ->
+      match decl with
+      | Alias expr -> check_params params expr
+      | Abstract -> true
+      | Variants cnstrs ->
+        List.for_all cnstrs ~f:(fun (_, args) ->
+          List.for_all args ~f:(check_params params))
+      | Record fields ->
+        List.for_all fields ~f:(fun (_, field) -> check_params params field)
+  ;;
+
+  module Monomorphic = struct
+    type t = Nothing.t decl [@@deriving compare, equal, hash, sexp]
+  end
+
+  let monomorphize t ~(args : Concrete.t list) =
+    let param_subs = List.zip_exn (fst t) args |> Param.Map.of_alist_exn in
+    map_exprs
+      t
+      ~f:
+        (Expr.map'
+           ~f:(function
+             | Var param -> `Halt (Map.find_exn param_subs param)
+             | (Type_app _ | Function _ | Tuple _) as expr -> `Defer expr)
+           ~var:(fun _ -> compiler_bug [%message "Type.Decl.monomorphize: var"]))
+    |> snd
+  ;;
 end

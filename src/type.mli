@@ -45,25 +45,6 @@ module Expr : sig
   end
 end
 
-module Decl : sig
-  type decl =
-    | Abstract
-    | Alias of Param.t Expr.t
-    | Variants of (Cnstr_name.t * Param.t Expr.t list) list
-    (* TODO: probably just make records a type expression - you can trivially get nominal
-       records with a single variant and an inline record *)
-    | Record of (Value_name.t * Param.t Expr.t) list
-  [@@deriving compare, equal, hash, sexp]
-
-  type t = Param.t list * decl [@@deriving compare, equal, hash, sexp]
-
-  val arity : t -> int
-  val map_exprs : t -> f:(Param.t Expr.t -> Param.t Expr.t) -> t
-  val fold_exprs : t -> init:'acc -> f:('acc -> Param.t Expr.t -> 'acc) -> 'acc
-  val iter_exprs : t -> f:(Param.t Expr.t -> unit) -> unit
-  val no_free_params : t -> bool
-end
-
 type t = Var_id.t Expr.t [@@deriving compare, hash, equal, sexp]
 
 val fresh_var : unit -> t
@@ -91,4 +72,32 @@ module Concrete : sig
   type t = Nothing.t Expr.t [@@deriving compare, equal, hash, sexp]
 
   val cast : t -> 'a Expr.t
+
+  include Comparable.S with type t := t
+  include Hashable.S with type t := t
+end
+
+module Decl : sig
+  type 'var decl =
+    | Abstract
+    | Alias of 'var Expr.t
+    | Variants of (Cnstr_name.t * 'var Expr.t list) list
+    (* TODO: probably just make records a type expression - you can trivially get nominal
+       records with a single variant and an inline record *)
+    | Record of (Value_name.t * 'var Expr.t) list
+  [@@deriving compare, equal, hash, sexp]
+
+  type t = Param.t list * Param.t decl [@@deriving compare, equal, hash, sexp]
+
+  val arity : t -> int
+  val map_exprs : t -> f:(Param.t Expr.t -> Param.t Expr.t) -> t
+  val fold_exprs : t -> init:'acc -> f:('acc -> Param.t Expr.t -> 'acc) -> 'acc
+  val iter_exprs : t -> f:(Param.t Expr.t -> unit) -> unit
+  val no_free_params : t -> bool
+
+  module Monomorphic : sig
+    type t = Nothing.t decl [@@deriving compare, equal, hash, sexp]
+  end
+
+  val monomorphize : t -> args:Concrete.t list -> Monomorphic.t
 end
