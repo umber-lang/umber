@@ -158,12 +158,9 @@ expr_term:
   | record = expr_term; PERIOD; field = LOWER_NAME
     { Expr.Record_field_access (record, Value_name.of_ustring_unchecked field) }
 
-expr_fun_call:
-  | f = expr_term; arg = expr_term { Expr.Fun_call (f, arg) }
-  | f = expr_fun_call; arg = expr_term { Expr.Fun_call (f, arg) }
-
 expr_op_term:
-  | e = expr_fun_call { e }
+  | f = expr_term; args = nonempty_list(expr_term)
+    { Expr.Fun_call (f, Nonempty.of_list_exn args) }
   | e = expr_term { e }
 
 (* Expressions with binary operators are first parsed as if all operators were
@@ -193,8 +190,8 @@ let_rec:
 
 let_binding_:
   | pat = pattern; equals; expr = expr { pat, expr }
-  | fun_name = pattern_name; args = nonempty_list(pattern_term); equals; expr = expr
-    { Pattern.Catch_all fun_name, List.fold_right args ~init:expr ~f:Expr.lambda }
+  | fun_name = pattern_name; args = nonempty_list(pattern_term); equals; body = expr
+    { Pattern.Catch_all fun_name, Expr.Lambda (Nonempty.of_list_exn args, body) }
 
 let_binding: b = with_loc(let_binding_) { b }
 
@@ -207,7 +204,7 @@ expr:
   | op_tree = expr_op_tree { Expr.Op_tree op_tree }
   | e = expr_op_term { e }
   | BACKSLASH; args = nonempty_list(pattern_term); ARROW; body = expr
-    { List.fold_right args ~init:body ~f:Expr.lambda }
+    { Expr.Lambda (Nonempty.of_list_exn args, body) }
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
@@ -229,15 +226,27 @@ type_term:
     { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, []) }
   | param = LOWER_NAME { Type.Expr.Var (Type_param_name.of_ustring_unchecked param) }
 
-type_non_func:
+type_non_fun:
   | t = type_term { t }
   | cnstr = qualified(UPPER_NAME); args = nonempty_list(type_term)
     { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, args) }
 
+(* TODO: should probably make it so `a -> a -> a` is a syntax error, and it forces you to
+   write `a -> (a -> a)` if that's what you really meant. (i.e. `->` should be
+   non-associative rather than right-associative). Ideally this should also have a nice
+   error message attached to it. 
+   e.g. HINT:
+   Functions which take multiple arguments should be written like this: `a, b -> c`,
+   functions which return multiple results like this: `a -> b, c`,
+   functions take other functions as arguments like this: `(a -> b) -> c`,
+   and functions which return other functions like this: `a -> (b -> c)`. *)
+type_fun_args:
+  | arg = type_non_fun { Nonempty.singleton arg }
+  | arg = type_non_fun; COMMA; args = type_fun_args { arg :: args }
+
 type_expr:
-  | t = type_non_func { t }
-  | arg = type_non_func; ARROW; body = type_expr
-    { Type.Expr.Function (arg, body) }
+  | t = type_non_fun { t }
+  | args = type_fun_args; ARROW; body = type_expr { Type.Expr.Function (args, body) }
 
 %inline trait_bound:
   | bounds = parens(block_items(pair(UPPER_NAME, nonempty_list(LOWER_NAME))));

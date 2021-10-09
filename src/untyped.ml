@@ -14,9 +14,9 @@ module Expr = struct
     | Literal of Literal.t
     | Name of Value_name.Qualified.t
     | Qualified of Module_path.t * t
-    | Fun_call of t * t
+    | Fun_call of t * t Nonempty.t
     | Op_tree of (Value_name.Qualified.t, t) Btree.t
-    | Lambda of Pattern.t * t
+    | Lambda of Pattern.t Nonempty.t * t
     | If of t * t * t
     | Match of t * (Pattern.t * t) Nonempty.t
     | Let of (Pattern.t, t) Let_binding.t
@@ -38,7 +38,9 @@ module Expr = struct
       | Name name -> Set.add used (Name_bindings.absolutify_value_name names name)
       | Qualified (path, expr) ->
         loop ~names:(Name_bindings.import_all names path) used locals expr
-      | Fun_call (e1, e2) -> loop ~names (loop ~names used locals e1) locals e2
+      | Fun_call (fun_, args) ->
+        let used = loop ~names used locals fun_ in
+        Nonempty.fold args ~init:used ~f:(fun used expr -> loop ~names used locals expr)
       | Op_tree tree ->
         let rec tree_loop acc = function
           | Btree.Node (op_name, left_child, right_child) ->
@@ -46,7 +48,8 @@ module Expr = struct
           | Leaf expr -> loop ~names acc locals expr
         in
         tree_loop used tree
-      | Lambda (arg, body) -> loop ~names used (add_locals locals arg) body
+      | Lambda (args, body) ->
+        loop ~names used (Nonempty.fold args ~init:locals ~f:add_locals) body
       | If (cond, then_, else_) ->
         loop ~names (loop ~names (loop ~names used locals cond) locals then_) locals else_
       | Match (expr, branches) ->
@@ -81,7 +84,7 @@ module Expr = struct
 
   let match_function branches =
     let name = Value_name.empty in
-    Lambda (Catch_all (Some name), Match (Name ([], name), branches))
+    Lambda ([ Catch_all (Some name) ], Match (Name ([], name), branches))
   ;;
 
   let qualified (path, expr) =
@@ -95,12 +98,12 @@ module Expr = struct
     let left_var = Value_name.empty in
     let left_var_qualified = Value_name.Qualified.with_path [] left_var in
     Lambda
-      ( Catch_all (Some left_var)
-      , Fun_call (Fun_call (Name op, Name left_var_qualified), expr) )
+      ( [ Catch_all (Some left_var) ]
+      , Fun_call (Name op, [ Name left_var_qualified; expr ]) )
   ;;
 
   let op_section_left expr op =
-    Fun_call (Name (Value_name.Qualified.of_ustrings_unchecked op), expr)
+    Fun_call (Name (Value_name.Qualified.of_ustrings_unchecked op), [ expr ])
   ;;
 end
 

@@ -4,7 +4,20 @@ module Var_id : module type of Unique_id.Int ()
 
 module Param : sig
   (* TODO: consider adding support for weak type variables here *)
+  (* TODO: consider hiding/breaking this type equality *)
+  (* TODO: consider making this a unique int or something so that mapping over it can be
+     done across types. *)
   type t = Type_param_name.t [@@deriving compare, equal, hash, sexp]
+
+  include Comparable.S with type t := t
+
+  module Map : sig
+    include module type of Map
+
+    val hash_fold_t : (Hash.state -> 'a -> Hash.state) -> Hash.state -> 'a t -> Hash.state
+  end
+
+  include Hashable.S with type t := t
 
   module Env_to_vars : sig
     type param = t
@@ -27,7 +40,7 @@ module Expr : sig
   type 'var t =
     | Var of 'var
     | Type_app of Type_name.Qualified.t * 'var t list
-    | Function of 'var t * 'var t
+    | Function of 'var t Nonempty.t * 'var t
     | Tuple of 'var t list
   [@@deriving compare, equal, hash, sexp, variants]
 
@@ -66,6 +79,8 @@ module Scheme : sig
     -> ?params:Param.Env_to_vars.t
     -> Expr.Bounded.t
     -> Var_id.t Expr.t
+
+  val infer_param_map : template_type:t -> instance_type:t -> t Param.Map.t
 end
 
 module Concrete : sig
@@ -95,6 +110,7 @@ module Decl : sig
   val iter_exprs : t -> f:(Param.t Expr.t -> unit) -> unit
   val no_free_params : t -> bool
 
+  (* TODO: Remove this. I don't think I want to use it. *)
   module Monomorphic : sig
     type t = Nothing.t decl [@@deriving compare, equal, hash, sexp]
   end

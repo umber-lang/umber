@@ -74,6 +74,14 @@ let zip (x :: xs) (y :: ys) =
   loop xs ys [ x, y ] |> rev
 ;;
 
+let zip_strict xs ys : _ List.Or_unequal_lengths.t =
+  match List.zip (to_list xs) (to_list ys) with
+  | Ok list -> Ok (of_list_exn list)
+  | Unequal_lengths -> Unequal_lengths
+;;
+
+let zip_exn xs ys = of_list_exn (List.zip_exn (to_list xs) (to_list ys))
+
 let mapi (x :: xs) ~f =
   f 0 x :: snd (List.fold_map xs ~init:1 ~f:(fun i x -> i + 1, f i x))
 ;;
@@ -112,7 +120,9 @@ let foldi t ~init ~f =
   fold t ~init:(0, init) ~f:(fun (i, acc) x -> i + 1, f i acc x) |> snd
 ;;
 
+let fold2_exn xs ys ~init ~f = List.fold2_exn (to_list xs) (to_list ys) ~init ~f
 let iteri t ~f = foldi t ~init:() ~f:(fun i () x -> f i x)
+let iter2_strict xs ys = List.iter2 (to_list xs) (to_list ys)
 let ( @ ) = append
 let is_empty _ = false
 let min_elt xs ~compare = List.min_elt (to_list xs) ~compare |> Option.value_exn

@@ -23,11 +23,11 @@ module Expr : sig
   type 'typ t =
     | Literal of Literal.t
     | Name of Value_name.Qualified.t
-    | Fun_call of 'typ t * 'typ t * 'typ
-    | Lambda of Pattern.t * 'typ t
+    | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
+    | Lambda of Pattern.t Nonempty.t * 'typ t
     | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
-    (* TODO: replace Tuple with some kind of built-in constructor
+    (* TODO: consider replacing Tuple with some kind of built-in constructor
        e.g. _Tuple2, _Tuple3, depending on the length *)
     | Tuple of 'typ t list
     | Record_literal of (Value_name.t * 'typ t option) list

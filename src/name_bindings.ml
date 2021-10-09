@@ -633,7 +633,9 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
           List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
             let entry =
               Name_entry.val_declared
-                (List.fold_right args ~init:result_type ~f:Type.Expr.function_)
+                (match Nonempty.of_list args with
+                | Some args -> Function (args, result_type)
+                | None -> result_type)
             in
             Map.add names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry)
             |> or_name_clash

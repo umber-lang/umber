@@ -12,6 +12,12 @@ module Param = struct
 
   include T
   include Comparable.Make (T)
+
+  module Map = struct
+    include Map
+    include Map.Provide_hash (T)
+  end
+
   include Hashable.Make (T)
 
   module Env_to_vars : sig
@@ -59,7 +65,7 @@ module Expr = struct
   type 'var t =
     | Var of 'var
     | Type_app of Type_name.Qualified.t * 'var t list
-    | Function of 'var t * 'var t
+    | Function of 'var t Nonempty.t * 'var t
     | Tuple of 'var t list
   [@@deriving compare, equal, hash, sexp, variants]
 
@@ -72,10 +78,9 @@ module Expr = struct
       | Var v -> Var (var v)
       | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map' ~f ~var))
       | Tuple fields -> Tuple (List.map fields ~f:(map' ~f ~var))
-      | Function (arg, body) ->
-        (* Ensure functions are evaluated left-to-right for consistency*)
-        let arg = map' ~f ~var arg in
-        Function (arg, map' ~f ~var body))
+      | Function (args, body) ->
+        let args = Nonempty.map args ~f:(map' ~f ~var) in
+        Function (args, map' ~f ~var body))
   ;;
 
   let map = map' ~var:Fn.id
@@ -86,14 +91,17 @@ module Expr = struct
     | Var var -> f init var
     | Type_app (_, fields) | Tuple fields ->
       List.fold fields ~init ~f:(fun init -> fold_vars ~init ~f)
-    | Function (arg, body) -> fold_vars body ~f ~init:(fold_vars arg ~init ~f)
+    | Function (args, body) ->
+      let init = Nonempty.fold args ~init ~f:(fun init -> fold_vars ~init ~f) in
+      fold_vars body ~f ~init
   ;;
 
   let rec for_all_vars typ ~f =
     match typ with
     | Var var -> f var
     | Type_app (_, fields) | Tuple fields -> List.for_all fields ~f:(for_all_vars ~f)
-    | Function (arg, body) -> for_all_vars arg ~f && for_all_vars body ~f
+    | Function (args, body) ->
+      Nonempty.for_all args ~f:(for_all_vars ~f) && for_all_vars body ~f
   ;;
 
   module Bounded = struct
@@ -130,6 +138,42 @@ module Scheme = struct
     match typ with
     | [], typ -> instantiate ?map_name ?params typ
     | _ -> raise_s [%message "Trait bounds not yet implemented"]
+  ;;
+
+  let infer_param_map =
+    let add_consistent param_map ~key:param ~data:new_ =
+      Param.Map.update param_map param ~f:(function
+        | None -> new_
+        | Some existing ->
+          if equal existing new_
+          then existing
+          else
+            compiler_bug
+              [%message "Inconsistent type instantiation" (existing : t) (new_ : t)])
+    in
+    let rec loop param_map t t' =
+      match (t : t), (t' : t) with
+      | Var param, _ -> add_consistent param_map ~key:param ~data:t'
+      | Type_app (type_name, args), Type_app (type_name', args') ->
+        assert_or_compiler_bug
+          (Type_name.Qualified.equal type_name type_name')
+          ~here:[%here];
+        List.fold2_exn args args' ~init:param_map ~f:loop
+      | Function (args, body), Function (args', body') ->
+        let param_map = Nonempty.fold2_exn args args' ~init:param_map ~f:loop in
+        loop param_map body body'
+      | Tuple fields, Tuple fields' ->
+        List.fold2_exn fields fields' ~init:param_map ~f:loop
+      | Type_app _, (Var _ | Function _ | Tuple _)
+      | Function _, (Var _ | Type_app _ | Tuple _)
+      | Tuple _, (Var _ | Type_app _ | Function _) ->
+        compiler_bug
+          [%message
+            "infer_param_map: incompatible template and instance types"
+              ~template:(t : t)
+              ~instance:(t : t)]
+    in
+    fun ~template_type ~instance_type -> loop Param.Map.empty template_type instance_type
   ;;
 end
 

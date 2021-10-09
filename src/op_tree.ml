@@ -107,7 +107,7 @@ let rec to_untyped_expr = function
   | Btree.Leaf expr -> expr
   | Node (op_name, left_child, right_child) ->
     let left_arg, right_arg = to_untyped_expr left_child, to_untyped_expr right_child in
-    Untyped.Expr.Fun_call (Fun_call (Name op_name, left_arg), right_arg)
+    Untyped.Expr.Fun_call (Name op_name, [ left_arg; right_arg ])
 ;;
 
 let to_untyped_expr ~names =

@@ -23,17 +23,26 @@ module Pattern = struct
         pat_names, (Catch_all name, typ)
       | Cnstr_appl (cnstr, args) ->
         (* TODO: inferring unqualified name given type information *)
-        let rec loop pat_names args = function
-          | Type.Expr.Function (arg_type, body_type), arg :: rest ->
-            let pat_names, (arg, arg_type2) =
-              of_untyped_with_names ~names ~types pat_names arg
-            in
-            Type_bindings.unify ~names ~types arg_type arg_type2;
-            loop pat_names (arg :: args) (body_type, rest)
-          | body_type, [] -> pat_names, (Cnstr_appl (cnstr, List.rev args), body_type)
-          | _ -> type_error_msg "Arg number mismatch"
+        let arg_types, body_type =
+          match Name_bindings.find_cnstr_type names cnstr with
+          | Function (arg_types, body_type) -> Nonempty.to_list arg_types, body_type
+          | body_type -> [], body_type
         in
-        loop pat_names [] (Name_bindings.find_cnstr_type names cnstr, args)
+        (match
+           List.fold2
+             arg_types
+             args
+             ~init:(pat_names, [])
+             ~f:(fun (pat_names, args) arg_type arg ->
+             let pat_names, (arg, arg_type') =
+               of_untyped_with_names ~names ~types pat_names arg
+             in
+             Type_bindings.unify ~names ~types arg_type arg_type';
+             pat_names, arg :: args)
+         with
+        | Ok (pat_names, args) -> pat_names, (Cnstr_appl (cnstr, List.rev args), body_type)
+        | Unequal_lengths ->
+          type_error_msg "Wrong number of arguments in constructor application")
       | Tuple fields ->
         let pat_names, fields, field_types =
           List.fold_right
@@ -133,8 +142,8 @@ module Expr = struct
   type 'typ t =
     | Literal of Literal.t
     | Name of Value_name.Qualified.t
-    | Fun_call of 'typ t * 'typ t * 'typ
-    | Lambda of Pattern.t * 'typ t
+    | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
+    | Lambda of Pattern.t Nonempty.t * 'typ t
     | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t list
@@ -155,18 +164,28 @@ module Expr = struct
         Name name, Name_bindings.Name_entry.typ name_entry
       | Qualified (path, expr) ->
         of_untyped ~names:(Name_bindings.import_all names path) ~types ~f_name expr
-      | Fun_call (f, arg) ->
-        let f, f_type = of_untyped ~names ~types ~f_name f in
-        let arg, arg_type = of_untyped ~names ~types ~f_name arg in
+      | Fun_call (fun_, args) ->
+        let fun_, fun_type = of_untyped ~names ~types ~f_name fun_ in
+        let args =
+          Nonempty.map args ~f:(fun arg ->
+            let arg, arg_type = of_untyped ~names ~types ~f_name arg in
+            arg, (arg_type, Pattern.Names.empty))
+        in
+        let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
         let result_type = Type.fresh_var () in
-        Type_bindings.unify ~names ~types f_type (Function (arg_type, result_type));
-        Fun_call (f, arg, (arg_type, Pattern.Names.empty)), result_type
+        Type_bindings.unify ~names ~types fun_type (Function (arg_types, result_type));
+        Fun_call (fun_, args), result_type
       | Op_tree tree ->
         of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
-      | Lambda (pat, body) ->
-        let names, (_, (pat, pat_type)) = Pattern.of_untyped_into ~names ~types pat in
+      | Lambda (args, body) ->
+        let names, args_and_types =
+          Nonempty.fold_map args ~init:names ~f:(fun names arg ->
+            let names, (_, (arg, arg_type)) = Pattern.of_untyped_into ~names ~types arg in
+            names, (arg, arg_type))
+        in
+        let args, arg_types = Nonempty.unzip args_and_types in
         let body, body_type = of_untyped ~names ~types ~f_name body in
-        Lambda (pat, body), Function (pat_type, body_type)
+        Lambda (args, body), Function (arg_types, body_type)
       | If (cond, then_, else_) ->
         let cond, cond_type = of_untyped ~names ~types ~f_name cond in
         let bool_type = Type.Concrete.cast Core.Bool.typ in
@@ -285,13 +304,17 @@ module Expr = struct
       (match expr with
       | Let bindings -> Let (f_binding bindings)
       | (Literal _ | Name (_, _)) as expr -> expr
-      | Fun_call (func, arg, arg_type) ->
-        Fun_call
-          (map ~f ~f_binding ~f_type func, map ~f ~f_binding ~f_type arg, f_type arg_type)
-      | Lambda (arg, body) -> Lambda (arg, map ~f ~f_binding ~f_type body)
+      | Fun_call (fun_, args) ->
+        let fun_ = map ~f ~f_binding ~f_type fun_ in
+        let args = Nonempty.map args ~f:(fun (arg, arg_type) ->
+          map ~f ~f_binding ~f_type arg, f_type arg_type)
+        in
+        Fun_call (fun_, args)
+      | Lambda (args, body) -> Lambda (args, map ~f ~f_binding ~f_type body)
       | Match (expr, expr_type, branches) ->
+        let expr = map ~f ~f_binding ~f_type expr in
         Match
-          ( map ~f ~f_binding ~f_type expr
+          ( expr
           , f_type expr_type
           , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map ~f ~f_binding ~f_type)) )
       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~f_binding ~f_type))
@@ -301,8 +324,9 @@ module Expr = struct
              fields
              ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_binding ~f_type))))
       | Record_update (expr, fields) ->
+        let expr = map ~f ~f_binding ~f_type expr in
         Record_update
-          ( map ~f ~f_binding ~f_type expr
+          ( expr
           , List.map
               fields
               ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_binding ~f_type))) )
@@ -536,9 +560,10 @@ module Module = struct
                   "Cyclic type alias" (name : Type_name.Qualified.t) (decl : Type.Decl.t)])
         | _ -> ());
         List.iter args ~f:(loop ~names aliases_seen)
-      | Function (f, arg) ->
-        loop ~names aliases_seen f;
-        loop ~names aliases_seen arg
+      | Function (args, body) ->
+        Nonempty.iter args ~f:(loop ~names aliases_seen);
+        loop ~names aliases_seen body;
+       
       | Tuple items -> List.iter items ~f:(loop ~names aliases_seen)
       | Var _ -> ()
     in

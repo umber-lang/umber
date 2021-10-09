@@ -246,3 +246,43 @@ end = struct
     of_string_unchecked (Buffer.contents buf)
   ;;
 end
+
+module Unique_name : sig
+  type t [@@deriving sexp_of]
+
+  include Comparable.S with type t := t
+  include Hashable.S with type t := t
+
+  val of_ustring : Ustring.t -> t
+  val base_name : t -> Ustring.t
+  val to_string : t -> string
+  val map_id : t -> f:(int -> int) -> t
+end = struct
+  module Id = Unique_id.Int ()
+
+  module T = struct
+    module U = struct
+      type t = Ustring.t * Id.t [@@deriving compare, hash]
+
+      let to_string (ustr, id) =
+        String.concat [ Ustring.to_string ustr; "."; Id.to_string id ]
+      ;;
+
+      let of_string str =
+        let name, id = String.rsplit2_exn str ~on:'.' in
+        Ustring.of_string_exn name, Id.of_string id
+      ;;
+    end
+
+    include U
+    include Sexpable.Of_stringable (U)
+  end
+
+  include T
+  include Comparable.Make (T)
+  include Hashable.Make (T)
+
+  let of_ustring ustr = ustr, Id.create ()
+  let base_name = fst
+  let map_id t ~f = Tuple2.map_snd t ~f:(Id.of_int_exn << f << Id.to_int_exn)
+end

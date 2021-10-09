@@ -16,15 +16,19 @@ val append : 'a t -> 'a t -> 'a t
 val append_list : 'a t -> 'a list -> 'a t
 val ( @ ) : 'a t -> 'a t -> 'a t
 val zip : 'a t -> 'b t -> ('a * 'b) t
+val zip_strict : 'a t -> 'b t -> ('a * 'b) t List.Or_unequal_lengths.t
+val zip_exn : 'a t -> 'b t -> ('a * 'b) t
 val unzip : ('a * 'b) t -> 'a t * 'b t
 val concat_map : 'a t -> f:('a -> 'b t) -> 'b t
 val fold_right : 'a t -> init:'acc -> f:('a -> 'acc -> 'acc) -> 'acc
 val fold_map : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc * 'b) -> 'acc * 'b t
 val foldi : 'a t -> init:'acc -> f:(int -> 'acc -> 'a -> 'acc) -> 'acc
+val fold2_exn : 'a t -> 'b t -> init:'acc -> f:('acc -> 'a -> 'b -> 'acc) -> 'acc
 val reduce : 'a t -> f:('a -> 'a -> 'a) -> 'a
 val mapi : 'a t -> f:(int -> 'a -> 'b) -> 'b t
 val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 val iteri : 'a t -> f:(int -> 'a -> unit) -> unit
+val iter2_strict : 'a t -> 'b t -> f:('a -> 'b -> unit) -> unit List.Or_unequal_lengths.t
 val min_elt : 'a t -> compare:('a -> 'a -> int) -> 'a
 val max_elt : 'a t -> compare:('a -> 'a -> int) -> 'a
 val cartesian_product_all : 'a t t -> 'a t t

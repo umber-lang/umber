@@ -15,10 +15,10 @@ type t = { vars : Type.t Type.Var_id.Table.t } [@@deriving sexp]
 
 let create () = { vars = Type.Var_id.Table.create () }
 
-let rec occurs_in id = function
-  | Type.Expr.Var id2 -> Type.Var_id.(id = id2)
+let rec occurs_in id : Type.t -> bool = function
+  | Var id2 -> Type.Var_id.(id = id2)
   | Type_app (_, fields) | Tuple fields -> List.exists fields ~f:(occurs_in id)
-  | Function (arg, body) -> occurs_in id arg || occurs_in id body
+  | Function (args, body) -> Nonempty.exists args ~f:(occurs_in id) || occurs_in id body
 ;;
 
 let rec unify ~names ~types t1 t2 =
@@ -63,8 +63,10 @@ let rec unify ~names ~types t1 t2 =
       | decl2 ->
         if not (phys_equal decl1 decl2) then type_error "Type application mismatch" t1 t2;
         iter2 args1 args2 ~f:(unify ~names ~types)))
-  | Function (arg1, res1), Function (arg2, res2) ->
-    unify ~names ~types arg1 arg2;
+  | Function (args1, res1), Function (args2, res2) ->
+    (match Nonempty.iter2_strict args1 args2 ~f:(unify ~names ~types) with
+    | Ok () -> ()
+    | Unequal_lengths -> type_error "Function argument number mismatch" t1 t2);
     unify ~names ~types res1 res2
   | Tuple xs, Tuple ys -> iter2 ~f:(unify ~names ~types) xs ys
   | _ ->
