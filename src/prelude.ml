@@ -41,13 +41,13 @@ let names_sexp = {|
                    (Local
                     ((typ
                       (Scheme
-                       (Function (Type_app (() Int) ())
+                       (Function ((Type_app (() Int) ()))
                         (Type_app (() Float) ())))))))
                   (print
                    (Local
                     ((typ
                       (Scheme
-                       (Function (Type_app (() String) ()) (Tuple ()))))
+                       (Function ((Type_app (() String) ())) (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name %print_endline))))))
                 (types ())
@@ -65,10 +65,10 @@ let names_sexp = {|
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function
-                               (Type_app ((Std Prelude List) List) ((Var a)))
-                               (Type_app ((Std Prelude List) List) ((Var a))))))))))))
+                             (Function
+                              ((Var a)
+                               (Type_app ((Std Prelude List) List) ((Var a))))
+                              (Type_app ((Std Prelude List) List) ((Var a)))))))))))
                       (types
                        ((List
                          ((Local
@@ -88,127 +88,129 @@ let names_sexp = {|
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Type_app (() Int) ())
-                              (Function (Type_app (() Int) ())
-                               (Type_app (() Int) ())))))
+                             (Function
+                              ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                              (Type_app (() Int) ()))))
                            (fixity (Left 7)))))
                         (+
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Type_app (() Int) ())
-                              (Function (Type_app (() Int) ())
-                               (Type_app (() Int) ())))))
+                             (Function
+                              ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                              (Type_app (() Int) ()))))
                            (fixity (Left 6)))))
                         (-
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Type_app (() Int) ())
-                              (Function (Type_app (() Int) ())
-                               (Type_app (() Int) ())))))
+                             (Function
+                              ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                              (Type_app (() Int) ()))))
                            (fixity (Left 6)))))
                         (.
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Function (Var b) (Var c))
-                              (Function (Function (Var a) (Var b))
-                               (Function (Var a) (Var c))))))
+                             (Function
+                              ((Function ((Var b)) (Var c))
+                               (Function ((Var a)) (Var b)) (Var a))
+                              (Var c))))
                            (fixity (Right 9)))))
                         (";"
                          (Local
                           ((typ
-                            (Scheme
-                             (Function (Tuple ()) (Function (Var a) (Var a)))))
+                            (Scheme (Function ((Tuple ()) (Var a)) (Var a))))
                            (fixity (Left 0)))))
                         (<
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function (Var a) (Type_app (() Bool) ())))))
+                             (Function ((Var a) (Var a))
+                              (Type_app (() Bool) ()))))
                            (fixity (Non_assoc 4)))))
                         (>
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function (Var a) (Type_app (() Bool) ())))))
+                             (Function ((Var a) (Var a))
+                              (Type_app (() Bool) ()))))
                            (fixity (Non_assoc 4)))))
                         (^
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Type_app (() Int) ())
-                              (Function (Type_app (() Int) ())
-                               (Type_app (() Int) ())))))
+                             (Function
+                              ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                              (Type_app (() Int) ()))))
                            (fixity (Right 8)))))
                         (!=
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function (Var a) (Type_app (() Bool) ())))))
+                             (Function ((Var a) (Var a))
+                              (Type_app (() Bool) ()))))
                            (fixity (Non_assoc 4)))))
                         (&&
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Type_app (() Bool) ())
-                              (Function (Type_app (() Bool) ())
-                               (Type_app (() Bool) ())))))
+                             (Function
+                              ((Type_app (() Bool) ())
+                               (Type_app (() Bool) ()))
+                              (Type_app (() Bool) ()))))
                            (fixity (Left 3)))))
                         (::
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function
-                               (Type_app ((Std Prelude) List) ((Var a)))
-                               (Type_app ((Std Prelude) List) ((Var a)))))))
+                             (Function
+                              ((Var a)
+                               (Type_app ((Std Prelude) List) ((Var a))))
+                              (Type_app ((Std Prelude) List) ((Var a))))))
                            (fixity (Right 5)))))
                         (<=
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function (Var a) (Type_app (() Bool) ())))))
+                             (Function ((Var a) (Var a))
+                              (Type_app (() Bool) ()))))
                            (fixity (Non_assoc 4)))))
                         (==
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function (Var a) (Type_app (() Bool) ())))))
+                             (Function ((Var a) (Var a))
+                              (Type_app (() Bool) ()))))
                            (fixity (Non_assoc 4)))))
                         (>=
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function (Var a) (Type_app (() Bool) ())))))
+                             (Function ((Var a) (Var a))
+                              (Type_app (() Bool) ()))))
                            (fixity (Non_assoc 4)))))
                         (|>
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Var a)
-                              (Function (Function (Var a) (Var b)) (Var b)))))
+                             (Function ((Var a) (Function ((Var a)) (Var b)))
+                              (Var b))))
                            (fixity (Left 0)))))
                         (||
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Type_app (() Bool) ())
-                              (Function (Type_app (() Bool) ())
-                               (Type_app (() Bool) ())))))
+                             (Function
+                              ((Type_app (() Bool) ())
+                               (Type_app (() Bool) ()))
+                              (Type_app (() Bool) ()))))
                            (fixity (Left 2)))))
                         (not
                          (Local
                           ((typ
                             (Scheme
-                             (Function (Type_app (() Bool) ())
+                             (Function ((Type_app (() Bool) ()))
                               (Type_app (() Bool) ())))))))))
                       (types ()) (modules ())))))))))
               ((names
@@ -233,13 +235,14 @@ let names_sexp = {|
                   (Local
                    ((typ
                      (Scheme
-                      (Function (Type_app (() Int) ())
+                      (Function ((Type_app (() Int) ()))
                        (Type_app (() Float) ()))))
                     (type_source Extern_declared) (extern_name %int_sqrt))))
                  (print
                   (Local
                    ((typ
-                     (Scheme (Function (Type_app (() String) ()) (Tuple ()))))
+                     (Scheme
+                      (Function ((Type_app (() String) ())) (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name %print_endline))))))
                (types ())
@@ -257,10 +260,10 @@ let names_sexp = {|
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function
-                              (Type_app ((Std Prelude List) List) ((Var a)))
-                              (Type_app ((Std Prelude List) List) ((Var a))))))))))))
+                            (Function
+                             ((Var a)
+                              (Type_app ((Std Prelude List) List) ((Var a))))
+                             (Type_app ((Std Prelude List) List) ((Var a)))))))))))
                      (types
                       ((List
                         ((Local
@@ -279,137 +282,139 @@ let names_sexp = {|
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Type_app (() Int) ())
-                             (Function (Type_app (() Int) ())
-                              (Type_app (() Int) ())))))
+                            (Function
+                             ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                             (Type_app (() Int) ()))))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name %int_mul))))
                        (+
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Type_app (() Int) ())
-                             (Function (Type_app (() Int) ())
-                              (Type_app (() Int) ())))))
+                            (Function
+                             ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                             (Type_app (() Int) ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name %int_add))))
                        (-
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Type_app (() Int) ())
-                             (Function (Type_app (() Int) ())
-                              (Type_app (() Int) ())))))
+                            (Function
+                             ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                             (Type_app (() Int) ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name %int_sub))))
                        (.
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Function (Var b) (Var c))
-                             (Function (Function (Var a) (Var b))
-                              (Function (Var a) (Var c))))))
+                            (Function
+                             ((Function ((Var b)) (Var c))
+                              (Function ((Var a)) (Var b)) (Var a))
+                             (Var c))))
                           (fixity (Right 9)))))
                        (";"
                         (Local
                          ((typ
-                           (Scheme
-                            (Function (Tuple ()) (Function (Var a) (Var a)))))
+                           (Scheme (Function ((Tuple ()) (Var a)) (Var a))))
                           (fixity (Left 0)))))
                        (<
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function (Var a) (Type_app (() Bool) ())))))
+                            (Function ((Var a) (Var a))
+                             (Type_app (() Bool) ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name %lt))))
                        (>
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function (Var a) (Type_app (() Bool) ())))))
+                            (Function ((Var a) (Var a))
+                             (Type_app (() Bool) ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name %gt))))
                        (^
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Type_app (() Int) ())
-                             (Function (Type_app (() Int) ())
-                              (Type_app (() Int) ())))))
+                            (Function
+                             ((Type_app (() Int) ()) (Type_app (() Int) ()))
+                             (Type_app (() Int) ()))))
                           (type_source Extern_declared) (fixity (Right 8))
                           (extern_name %int_pow))))
                        (!=
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function (Var a) (Type_app (() Bool) ())))))
+                            (Function ((Var a) (Var a))
+                             (Type_app (() Bool) ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name %neq))))
                        (&&
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Type_app (() Bool) ())
-                             (Function (Type_app (() Bool) ())
-                              (Type_app (() Bool) ())))))
+                            (Function
+                             ((Type_app (() Bool) ())
+                              (Type_app (() Bool) ()))
+                             (Type_app (() Bool) ()))))
                           (fixity (Left 3)))))
                        (::
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function
-                              (Type_app ((Std Prelude) List) ((Var a)))
-                              (Type_app ((Std Prelude) List) ((Var a)))))))
+                            (Function
+                             ((Var a)
+                              (Type_app ((Std Prelude) List) ((Var a))))
+                             (Type_app ((Std Prelude) List) ((Var a))))))
                           (fixity (Right 5)))))
                        (<=
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function (Var a) (Type_app (() Bool) ())))))
+                            (Function ((Var a) (Var a))
+                             (Type_app (() Bool) ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name %lte))))
                        (==
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function (Var a) (Type_app (() Bool) ())))))
+                            (Function ((Var a) (Var a))
+                             (Type_app (() Bool) ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name %eq))))
                        (>=
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function (Var a) (Type_app (() Bool) ())))))
+                            (Function ((Var a) (Var a))
+                             (Type_app (() Bool) ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name %gte))))
                        (|>
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Var a)
-                             (Function (Function (Var a) (Var b)) (Var b)))))
+                            (Function ((Var a) (Function ((Var a)) (Var b)))
+                             (Var b))))
                           (fixity (Left 0)))))
                        (||
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Type_app (() Bool) ())
-                             (Function (Type_app (() Bool) ())
-                              (Type_app (() Bool) ())))))
+                            (Function
+                             ((Type_app (() Bool) ())
+                              (Type_app (() Bool) ()))
+                             (Type_app (() Bool) ()))))
                           (fixity (Left 2)))))
                        (not
                         (Local
                          ((typ
                            (Scheme
-                            (Function (Type_app (() Bool) ())
+                            (Function ((Type_app (() Bool) ()))
                              (Type_app (() Bool) ()))))
                           (type_source Let_inferred))))))
                      (types ()) (modules ()))))))))))))))))))))))

@@ -84,7 +84,7 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
       Type_bindings.unify ~names ~types (Var sig_param_type) (Var def_param_type);
       true)
     &&
-    match (sig_type : _ Type.Decl.decl), (def_type : _ Type.Decl.decl) with
+    match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
     | Abstract, _ -> true
     | Alias scheme1, Alias scheme2 ->
       unify_schemes ~names ~types param_env scheme1 scheme2

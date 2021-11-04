@@ -1,6 +1,7 @@
 (* Generating LLVM IR for the AST *)
 
 open Import
+open Names
 open Llvm
 
 let fun_call_name = "fun_call"
@@ -9,7 +10,7 @@ type t =
   { context : llcontext
   ; builder : llbuilder
   ; module_ : llmodule
-  ; values : llvalue Mir.Unique_name.Table.t
+  ; values : llvalue Unique_name.Table.t
   }
 
 let create ~source_filename =
@@ -17,7 +18,7 @@ let create ~source_filename =
   { context
   ; builder = builder context
   ; module_ = create_module context source_filename
-  ; values = Mir.Unique_name.Table.create ()
+  ; values = Unique_name.Table.create ()
   }
 ;;
 
@@ -93,7 +94,7 @@ let rec codegen_expr t expr =
     codegen_expr t body
   | Fun_call (fun_name, args) ->
     let fun_ =
-      Option.value_exn (lookup_function (Mir.Unique_name.to_string fun_name) t.module_)
+      Option.value_exn (lookup_function (Unique_name.to_string fun_name) t.module_)
     in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     build_call fun_ args fun_call_name t.builder
@@ -173,25 +174,25 @@ let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
     let value =
-      define_global (Mir.Unique_name.to_string name) (codegen_expr t expr) t.module_
+      define_global (Unique_name.to_string name) (codegen_expr t expr) t.module_
     in
     set_global_constant true value;
     Hashtbl.add_exn t.values ~key:name ~data:value;
     value
-  | Fun_def { fun_name; closed_over; args; returns; body } ->
+  | Fun_def (fun_name, { closed_over; args; returns; body }) ->
     if not (Set.is_empty closed_over)
-    then raise_s [%message "TODO: closures" (closed_over : Mir.Unique_name.Set.t)];
+    then raise_s [%message "TODO: closures" (closed_over : Unique_name.Set.t)];
     let arg_names, arg_kinds = Nonempty.unzip args in
     let fun_type =
       function_type
         (type_value_kind t returns)
         (Array.of_list_map ~f:(type_value_kind t) (Nonempty.to_list arg_kinds))
     in
-    let fun_ = define_function (Mir.Unique_name.to_string fun_name) fun_type t.module_ in
+    let fun_ = define_function (Unique_name.to_string fun_name) fun_type t.module_ in
     let fun_params = params fun_ in
     Nonempty.iteri arg_names ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
-      set_value_name (Mir.Unique_name.to_string arg_name) arg_value;
+      set_value_name (Unique_name.to_string arg_name) arg_value;
       Hashtbl.add_exn t.values ~key:arg_name ~data:arg_value);
     let entry_block = append_block t.context "entry" fun_ in
     position_at_end entry_block t.builder;

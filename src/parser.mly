@@ -231,22 +231,13 @@ type_non_fun:
   | cnstr = qualified(UPPER_NAME); args = nonempty_list(type_term)
     { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, args) }
 
-(* TODO: should probably make it so `a -> a -> a` is a syntax error, and it forces you to
-   write `a -> (a -> a)` if that's what you really meant. (i.e. `->` should be
-   non-associative rather than right-associative). Ideally this should also have a nice
-   error message attached to it. 
-   e.g. HINT:
-   Functions which take multiple arguments should be written like this: `a, b -> c`,
-   functions which return multiple results like this: `a -> b, c`,
-   functions take other functions as arguments like this: `(a -> b) -> c`,
-   and functions which return other functions like this: `a -> (b -> c)`. *)
 type_fun_args:
   | arg = type_non_fun { Nonempty.singleton arg }
-  | arg = type_non_fun; COMMA; args = type_fun_args { arg :: args }
+  | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
 
 type_expr:
   | t = type_non_fun { t }
-  | args = type_fun_args; ARROW; body = type_expr { Type.Expr.Function (args, body) }
+  | args = type_fun_args; ARROW; body = type_non_fun { Type.Expr.Function (args, body) }
 
 %inline trait_bound:
   | bounds = parens(block_items(pair(UPPER_NAME, nonempty_list(LOWER_NAME))));

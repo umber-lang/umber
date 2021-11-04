@@ -16,9 +16,11 @@ type t = { vars : Type.t Type.Var_id.Table.t } [@@deriving sexp]
 let create () = { vars = Type.Var_id.Table.create () }
 
 let rec occurs_in id : Type.t -> bool = function
-  | Var id2 -> Type.Var_id.(id = id2)
+  | Var id' -> Type.Var_id.(id = id')
   | Type_app (_, fields) | Tuple fields -> List.exists fields ~f:(occurs_in id)
   | Function (args, body) -> Nonempty.exists args ~f:(occurs_in id) || occurs_in id body
+  | Partial_function (args, id') ->
+    Nonempty.exists args ~f:(occurs_in id) || Type.Var_id.(id = id')
 ;;
 
 let rec unify ~names ~types t1 t2 =
@@ -75,17 +77,29 @@ let rec unify ~names ~types t1 t2 =
     type_error "Fell through cases" t1 t2
 ;;
 
-let substitute types typ =
-  Type.Expr.map typ ~f:(function
-    | Var id as typ ->
+let rec substitute types typ =
+  Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~f:(fun typ ->
+    match typ with
+    | Var id ->
       (match Hashtbl.find types.vars id with
-      (* TODO: can I get rid of `Retry and just use recursion here? *)
-      | Some type_sub -> `Retry type_sub
-      | None -> `Halt typ)
-    | typ -> `Defer typ)
+      | Some type_sub -> Retry type_sub
+      | None -> Halt typ)
+    | Partial_function (args, id) ->
+      (* FIXME: Will this actually detect functions returning functions properly?
+           Is throwing away the partial function information here ok? *)
+      (match Hashtbl.find types.vars id with
+      | Some type_sub -> Halt (Function (args, substitute types type_sub))
+      | None -> Defer typ)
+    | _ -> Defer typ)
 ;;
 
 let generalize types typ =
   let env = Type.Param.Env_of_vars.create () in
-  Type.Expr.map_vars (substitute types typ) ~f:(Type.Param.Env_of_vars.find_or_add env)
+  Type.Expr.map
+    (substitute types typ)
+    ~var:(Type.Param.Env_of_vars.find_or_add env)
+    ~pf:(never_happens [%here])
+    ~f:(function
+      | Partial_function (args, id) -> Defer (Function (args, Var id))
+      | typ -> Defer typ)
 ;;

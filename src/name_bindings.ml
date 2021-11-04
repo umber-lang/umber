@@ -543,9 +543,9 @@ let import_without t path hiding =
 ;;
 
 let map_type_expr_names type_expr ~f =
-  Type.Expr.map type_expr ~f:(function
-    | Type_app (name, args) -> `Defer (Type.Expr.Type_app (f name, args))
-    | typ -> `Defer typ)
+  Type.Expr.map type_expr ~var:Fn.id ~pf:Fn.id ~f:(function
+    | Type_app (name, args) -> Defer (Type.Expr.Type_app (f name, args))
+    | typ -> Defer typ)
 ;;
 
 let absolutify_type_expr t =

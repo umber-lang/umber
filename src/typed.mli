@@ -36,6 +36,7 @@ module Expr : sig
   [@@deriving sexp]
 
   type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp]
+  type concrete = Type.Concrete.t t * Type.Concrete.t [@@deriving sexp]
 
   val of_untyped
     :  names:Name_bindings.t

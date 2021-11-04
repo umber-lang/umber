@@ -153,6 +153,7 @@ module Expr = struct
   [@@deriving sexp]
 
   type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp]
+  type concrete = Type.Concrete.t t * Type.Concrete.t [@@deriving sexp]
 
   let of_untyped ~names ~types expr =
     let rec of_untyped ~names ~types ~f_name expr =
@@ -171,6 +172,29 @@ module Expr = struct
             let arg, arg_type = of_untyped ~names ~types ~f_name arg in
             arg, (arg_type, Pattern.Names.empty))
         in
+        (* FIXME: handle partial application.
+           PROBLEM: need to basically unify the type with some kind of type like
+           Partial_function (args, var) or similar.
+           (This basically reimplementing the `arg -> ... -> 'a` we otherwise have.)
+           
+           Is changing function types like we did actually worth it then? Complicating the
+           type checker is very sad. We're already planning to have a lot of magic around
+           effects and `->` e.g. 
+           
+           - `->` at the end of a val declaration means `-> <Implicit>`
+           - `->` at the end of a higher-order function type subexpresion means `-> <e>`
+             and if present, changes the `->` at the end of the whole type expression to
+             mean `-> <e|Implicit>`
+           - `->` anywhere else means `-> <>` (total arrow, no effects)
+
+           We could eliminate this magic by:
+           - Having `->` mean `-> <>` always
+           - Forcing you to write out `-> <e>` when you mean it (actually seems good)
+           - Using `~>` to mean `-> <Implicit>`
+
+           If we use uncurried functions, then we have function arguments separated by
+           commas, and we can use `->` to mean `-> <Implicit>` always.
+           *)
         let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
         let result_type = Type.fresh_var () in
         Type_bindings.unify ~names ~types fun_type (Function (arg_types, result_type));
@@ -306,8 +330,9 @@ module Expr = struct
       | (Literal _ | Name (_, _)) as expr -> expr
       | Fun_call (fun_, args) ->
         let fun_ = map ~f ~f_binding ~f_type fun_ in
-        let args = Nonempty.map args ~f:(fun (arg, arg_type) ->
-          map ~f ~f_binding ~f_type arg, f_type arg_type)
+        let args =
+          Nonempty.map args ~f:(fun (arg, arg_type) ->
+            map ~f ~f_binding ~f_type arg, f_type arg_type)
         in
         Fun_call (fun_, args)
       | Lambda (args, body) -> Lambda (args, map ~f ~f_binding ~f_type body)
@@ -562,10 +587,10 @@ module Module = struct
         List.iter args ~f:(loop ~names aliases_seen)
       | Function (args, body) ->
         Nonempty.iter args ~f:(loop ~names aliases_seen);
-        loop ~names aliases_seen body;
-       
+        loop ~names aliases_seen body
       | Tuple items -> List.iter items ~f:(loop ~names aliases_seen)
       | Var _ -> ()
+      | Partial_function _ -> .
     in
     let aliases_seen = Hashtbl.create (module Type.Decl) in
     let name = Name_bindings.(Path.to_module_path (current_path names)), name in
@@ -792,9 +817,10 @@ module Module = struct
         | Type_bindings.Type_error (msg, Some (t1, t2)) ->
           (* Prevent unstable Var_ids from appearing in test output *)
           let env = Type.Param.Env_of_vars.create () in
+          let handle_var = Type.Param.Env_of_vars.find_or_add env in
           let map_type t =
-            Type.Expr.map_vars t ~f:(Type.Param.Env_of_vars.find_or_add env)
-            |> Type.Scheme.sexp_of_t
+            Type.Expr.map t ~var:handle_var ~pf:handle_var
+            |> [%sexp_of: (Type.Param.t, Type.Param.t) Type.Expr.t]
           in
           List
             [ Atom (Ustring.to_string msg); List [ List [ map_type t1; map_type t2 ] ] ]
