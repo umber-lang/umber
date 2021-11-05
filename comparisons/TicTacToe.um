@@ -1,0 +1,85 @@
+module :
+  type Board
+
+  type Piece = Nought | Cross @deriving(Eq)
+
+  module PlayState :
+    type PlayState =
+      | Playing
+      | GameWon Piece
+      | Tie
+
+    val game_over : PlayState -> Bool
+
+  type InvalidMove =
+    | SpaceOccupied
+    | OutOfTurn
+    | OutOfBounds
+  
+  val create : size:Nat -> Board
+
+  # IDEA:
+  # Type parameters with `'` are actually values. (Dependent types?) In this case, we have
+  # `'h : Heap`. You could have arrays with type `Array a 'n`. Not sure if this is crazy.
+  # If we go full dependent types idk if the distinction between types and values matters.
+  # We could also just special case this for mutability.
+  # (Q: What does Koka do? A: It special-cases the heap effect.)
+  # TODO: decide on `Mut 'h a` vs `mut'h a`. For the latter I think we also want some
+  # syntax sugar so if you leave out the `'h` it infers you meant that every `mut` on
+  # that definition shares the `'h`.
+  val make_move :
+    Mut 'h Board, (Nat, Nat), Piece -> <Mut 'h, Fail InvalidMove> PlayState
+  
+  val play_game :
+    (Iter i) => size:Nat, i ((Nat, Nat), Piece) -> Result PlayState InvalidMove
+
+type Board = {
+  rows : Array (Array (Option Piece)),
+  turn : Piece,
+}
+
+module Piece =
+  let other = match
+    | Nought -> Cross
+    | Cross -> Nought
+
+module PlayState =
+  let game_over = match
+    | Playing -> false
+    | GameWon _ | Tie -> true
+
+let create ~size =
+  { rows = Array.init size ~f:(\_ -> Array.init size ~f:(\_ -> None)), turn = Cross }
+
+let get_tile rows (x, y) = Array.get rows y (Array.get _ x)
+
+let update_tile rows (x, y) ~f = Array.update rows y ~f:(Array.update _ x ~f)
+
+let make_move { rows, turn } pos piece =
+  if piece != turn then raise OutOfTurn
+  else
+    handle
+      update_tile rows pos ~f:(match
+        | None -> piece
+        | Some _ -> raise SpaceOccupied));
+      update_play_state rows pos piece
+    | <raise 'OutOfBounds> _ -> raise OutOfBounds
+
+let update_play_state rows (x, y) piece =
+  let tiles_to_check = [
+    ((x - 1, y), (x + 1, y)),
+    ((x, y - 1), (x, y + 1)),
+    ((x - 1, y - 1), (x + 1, y + 1)),
+    ((x + 1, y - 1), (x - 1, y + 1)),
+  ]
+  if
+    Iter.any tiles_to_check ~f:\(pos, pos') ->
+      get_tile rows pos == piece && get_tile rows pos' == piece
+  then GameWon piece
+  else Playing
+
+let play_game ~size moves =
+  let board = create ~size
+  Result.try moves ~f:(Iter.fold' ~init:Playing ~f:(\_ (pos, piece) ->
+    let state = make_move board pos piece
+    if PlayState.game_over state then break state else state)) 
