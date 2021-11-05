@@ -17,4 +17,7 @@ type 'a t
 val create : unit -> 'a t
 val add_binding : 'a t -> 'a Binding.t -> Name_bindings.Path.t -> unit
 val of_bindings : ('a Binding.t * Name_bindings.Path.t) Sequence.t -> 'a t
-val to_regrouped_bindings : 'a t -> ('a Binding.t list * Name_bindings.Path.t) Sequence.t
+
+val to_regrouped_bindings
+  :  'a t
+  -> ('a Binding.t Nonempty.t * Name_bindings.Path.t) Sequence.t

@@ -101,7 +101,7 @@ val with_path : t -> Path.t -> f:(t -> t * 'a) -> t * 'a
 val import : t -> Module_name.t -> t
 val import_with : t -> Module_path.t -> Unidentified_name.t list -> t
 val import_all : t -> Module_path.t -> t
-val import_without : t -> Module_path.t -> Unidentified_name.t list -> t
+val import_without : t -> Module_path.t -> Unidentified_name.t Nonempty.t -> t
 
 val add_val
   :  t

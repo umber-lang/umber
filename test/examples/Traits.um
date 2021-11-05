@@ -1,7 +1,7 @@
 import Date
 
 trait Eq a :
-  val (==) : a -> a -> Bool
+  val (==) : a, a -> Bool
 
 type Person = {
   name : String,

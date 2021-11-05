@@ -210,7 +210,7 @@ module Decl = struct
     | Alias of Scheme.t
     (* TODO: variant constructors should probably support fixity declarations *)
     | Variants of (Cnstr_name.t * Scheme.t list) list
-    | Record of (Value_name.t * Scheme.t) list
+    | Record of (Value_name.t * Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
   type t = Param.t list * decl [@@deriving compare, equal, hash, sexp]
@@ -223,7 +223,7 @@ module Decl = struct
       | Abstract -> Abstract
       | Alias expr -> Alias (f expr)
       | Variants cnstrs -> Variants (List.map cnstrs ~f:(Tuple2.map_snd ~f:(List.map ~f)))
-      | Record fields -> Record (List.map fields ~f:(Tuple2.map_snd ~f)) )
+      | Record fields -> Record (Nonempty.map fields ~f:(Tuple2.map_snd ~f)) )
   ;;
 
   let fold_exprs (_, decl) ~init:acc ~f =
@@ -232,7 +232,7 @@ module Decl = struct
     | Alias expr -> f acc expr
     | Variants cnstrs ->
       List.fold cnstrs ~init:acc ~f:(fun acc -> snd >> List.fold ~init:acc ~f)
-    | Record fields -> List.fold fields ~init:acc ~f:(fun acc -> snd >> f acc)
+    | Record fields -> Nonempty.fold fields ~init:acc ~f:(fun acc -> snd >> f acc)
   ;;
 
   let iter_exprs decl ~f = fold_exprs decl ~init:() ~f:(fun () -> f)
@@ -249,6 +249,6 @@ module Decl = struct
         List.for_all cnstrs ~f:(fun (_, args) ->
           List.for_all args ~f:(check_params params))
       | Record fields ->
-        List.for_all fields ~f:(fun (_, field) -> check_params params field)
+        Nonempty.for_all fields ~f:(fun (_, field) -> check_params params field)
   ;;
 end

@@ -23,6 +23,8 @@ let rec occurs_in id : Type.t -> bool = function
     Nonempty.exists args ~f:(occurs_in id) || Type.Var_id.(id = id')
 ;;
 
+let fun_arg_number_mismatch = type_error "Function argument number mismatch"
+
 let rec unify ~names ~types t1 t2 =
   let is_bound = Hashtbl.mem types.vars in
   let get_type = Hashtbl.find_exn types.vars in
@@ -66,12 +68,32 @@ let rec unify ~names ~types t1 t2 =
         if not (phys_equal decl1 decl2) then type_error "Type application mismatch" t1 t2;
         iter2 args1 args2 ~f:(unify ~names ~types)))
   | Function (args1, res1), Function (args2, res2) ->
-    (match Nonempty.iter2_strict args1 args2 ~f:(unify ~names ~types) with
-    | Ok () -> ()
-    | Unequal_lengths -> type_error "Function argument number mismatch" t1 t2);
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Same_length -> ()
+    | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch t1 t2);
     unify ~names ~types res1 res2
+  | Partial_function (args1, id1), Partial_function (args2, id2) ->
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Left_trailing args1_trailing ->
+      unify ~names ~types (Partial_function (args1_trailing, id1)) (Var id2)
+    | Right_trailing args2_trailing ->
+      unify ~names ~types (Var id1) (Partial_function (args2_trailing, id2))
+    | Same_length -> unify ~names ~types (Var id1) (Var id2))
+  | Partial_function (args1, id), Function (args2, res) ->
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Left_trailing _ -> fun_arg_number_mismatch t1 t2
+    | Right_trailing args2_trailing ->
+      (* TODO: Should we be using partial functions to combine here? Similarly below *)
+      unify ~names ~types (Var id) (Function (args2_trailing, res))
+    | Same_length -> unify ~names ~types (Var id) res)
+  | Function (args2, res), Partial_function (args1, id) ->
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Left_trailing args1_trailing ->
+      unify ~names ~types (Function (args1_trailing, res)) (Var id)
+    | Right_trailing _ -> fun_arg_number_mismatch t1 t2
+    | Same_length -> unify ~names ~types res (Var id))
   | Tuple xs, Tuple ys -> iter2 ~f:(unify ~names ~types) xs ys
-  | _ ->
+  | (Type_app _ | Tuple _ | Function _ | Partial_function _), _ ->
     (* TODO: need nominal typing for records/type applications:
        to infer the type of records, unify the structural record type with the nominal type *)
     type_error "Fell through cases" t1 t2
@@ -86,11 +108,23 @@ let rec substitute types typ =
       | None -> Halt typ)
     | Partial_function (args, id) ->
       (* FIXME: Will this actually detect functions returning functions properly?
-           Is throwing away the partial function information here ok? *)
-      (match Hashtbl.find types.vars id with
-      | Some type_sub -> Halt (Function (args, substitute types type_sub))
-      | None -> Defer typ)
+         Is throwing away the partial function information here ok? *)
+      combine_partial_functions types typ args id
     | _ -> Defer typ)
+
+and combine_partial_functions types typ args id =
+  match Hashtbl.find types.vars id with
+  | None -> Defer typ
+  | Some type_sub ->
+    let args = Nonempty.map args ~f:(substitute types) in
+    (match substitute types type_sub with
+    | Partial_function (args', id') ->
+      let args' = Nonempty.map args' ~f:(substitute types) in
+      let args_combined = Nonempty.(args @ args') in
+      let typ = Type.Expr.Partial_function (args_combined, id') in
+      combine_partial_functions types typ args_combined id'
+    | (Var _ | Type_app _ | Tuple _ | Function _) as type_sub ->
+      Halt (Function (args, type_sub)))
 ;;
 
 let generalize types typ =

@@ -122,8 +122,9 @@ pattern_term:
 
 pattern:
   | p = pattern_term { p }
-  | cnstr = qualified(UPPER_NAME); args = nonempty_list(pattern_term)
-    { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings_unchecked cnstr, args) }
+  | cnstr = qualified(UPPER_NAME); args = nonempty(pattern_term)
+    { Pattern.Cnstr_appl (
+        Cnstr_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
   | left = pattern; PIPE; right = pattern { Pattern.Union (left, right) }
   | pat = pattern; AS; name = val_name
     { Pattern.As (pat, Value_name.of_ustring_unchecked name) }
@@ -159,8 +160,7 @@ expr_term:
     { Expr.Record_field_access (record, Value_name.of_ustring_unchecked field) }
 
 expr_op_term:
-  | f = expr_term; args = nonempty_list(expr_term)
-    { Expr.Fun_call (f, Nonempty.of_list_exn args) }
+  | f = expr_term; args = nonempty(expr_term) { Expr.Fun_call (f, args) }
   | e = expr_term { e }
 
 (* Expressions with binary operators are first parsed as if all operators were
@@ -177,12 +177,11 @@ match_branch:
     { Pattern.union left (fst right), snd right }
 
 match_branches:
-  | PIPE; branches = separated_nonempty_list(PIPE, match_branch)
-    { Nonempty.of_list_exn branches }
-  | INDENT; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch); DEDENT
-    { Nonempty.of_list_exn branches }
-  | LINE_SEP; PIPE; branches = separated_nonempty_list(line_sep_pipe, match_branch)
-    { Nonempty.of_list_exn branches }
+  | PIPE; branches = separated_nonempty(PIPE, match_branch) { branches }
+  | INDENT; PIPE; branches = separated_nonempty(line_sep_pipe, match_branch); DEDENT
+    { branches }
+  | LINE_SEP; PIPE; branches = separated_nonempty(line_sep_pipe, match_branch)
+    { branches }
 
 let_rec:
   | LET { true }
@@ -190,8 +189,8 @@ let_rec:
 
 let_binding_:
   | pat = pattern; equals; expr = expr { pat, expr }
-  | fun_name = pattern_name; args = nonempty_list(pattern_term); equals; body = expr
-    { Pattern.Catch_all fun_name, Expr.Lambda (Nonempty.of_list_exn args, body) }
+  | fun_name = pattern_name; args = nonempty(pattern_term); equals; body = expr
+    { Pattern.Catch_all fun_name, Expr.Lambda (args, body) }
 
 let_binding: b = with_loc(let_binding_) { b }
 
@@ -203,21 +202,21 @@ expr:
      wrap it *)
   | op_tree = expr_op_tree { Expr.Op_tree op_tree }
   | e = expr_op_term { e }
-  | BACKSLASH; args = nonempty_list(pattern_term); ARROW; body = expr
-    { Expr.Lambda (Nonempty.of_list_exn args, body) }
+  | BACKSLASH; args = nonempty(pattern_term); ARROW; body = expr
+    { Expr.Lambda (args, body) }
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
   | rec_ = let_rec; binding = let_binding_; LINE_SEP?; body = expr
     { Expr.Let { rec_; bindings = [binding]; body } }
-  | rec_ = let_rec; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding_);
+  | rec_ = let_rec; INDENT; bindings = separated_nonempty(LINE_SEP, let_binding_);
     DEDENT; body = expr
-    { Expr.Let { rec_; bindings = Nonempty.of_list_exn bindings; body } }
+    { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
 
 type_record:
-  | fields = braces(block_items_nonempty(type_annot(LOWER_NAME)))
-    { Type.Decl.Record (List.map fields ~f:(fun (name, typ) ->
+  | fields = braces(block_items_nonempty(type_annot_non_fun(LOWER_NAME)))
+    { Type.Decl.Record (Nonempty.map fields ~f:(fun (name, typ) ->
         Value_name.of_ustring_unchecked name, typ)) }
 
 type_term:
@@ -228,9 +227,12 @@ type_term:
 
 type_non_fun:
   | t = type_term { t }
-  | cnstr = qualified(UPPER_NAME); args = nonempty_list(type_term)
-    { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, args) }
+  | cnstr = qualified(UPPER_NAME); args = nonempty(type_term)
+    { Type.Expr.Type_app (
+        Type_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
 
+(* Writing this out like this instead of just using 
+   `separated_nonempty_list(COMMA< type_non_fun)` prevents conflicts for some reason. *)
 type_fun_args:
   | arg = type_non_fun { Nonempty.singleton arg }
   | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
@@ -240,11 +242,9 @@ type_expr:
   | args = type_fun_args; ARROW; body = type_non_fun { Type.Expr.Function (args, body) }
 
 %inline trait_bound:
-  | bounds = parens(block_items(pair(UPPER_NAME, nonempty_list(LOWER_NAME))));
+  | bounds = parens(block_items(pair(UPPER_NAME, type_params_nonempty)));
     FAT_ARROW
-    { List.map bounds ~f:(fun (trait, params) ->
-        Trait_name.of_ustring_unchecked trait,
-        List.map params ~f:Type_param_name.of_ustring_unchecked) }
+    { List.map bounds ~f:(Tuple2.map_fst ~f:Trait_name.of_ustring_unchecked) }
 
 %inline type_expr_bounded:
   | bound = loption(trait_bound); t = type_expr { (bound, t) }
@@ -254,18 +254,23 @@ type_cnstr_decl:
     { Cnstr_name.of_ustring_unchecked cnstr, args }
 
 type_decl_variants:
-  | PIPE?; branches = separated_nonempty_list(PIPE, type_cnstr_decl) { branches }
-  | INDENT; PIPE?; branches = separated_nonempty_list(line_sep_pipe, type_cnstr_decl);
+  | PIPE?; branches = separated_nonempty(PIPE, type_cnstr_decl)
+    { Nonempty.to_list branches }
+  | INDENT; PIPE?; branches = separated_nonempty(line_sep_pipe, type_cnstr_decl);
     DEDENT
-    { branches }
+    { Nonempty.to_list branches }
 
 type_decl:
   | PIPE { Type.Decl.Variants [] }
   | variants = type_decl_variants { Type.Decl.Variants variants }
   | r = block(type_record) { r }
 
-%inline type_param_list:
+%inline type_params:
   | params = list(LOWER_NAME) { List.map ~f:Type_param_name.of_ustring_unchecked params }
+
+%inline type_params_nonempty:
+  | params = nonempty(LOWER_NAME)
+    { Nonempty.map ~f:Type_param_name.of_ustring_unchecked params }
 
 val_name:
   | name = LOWER_NAME { name }
@@ -277,19 +282,19 @@ fixity:
   | INFIXR; n = INT { Fixity.(of_decl_exn Right n) }
 
 %inline import_module_path:
-  | IMPORT; path = separated_nonempty_list(PERIOD, UPPER_NAME)
-    { Module_path.of_ustrings_unchecked path }
+  | IMPORT; path = separated_nonempty(PERIOD, UPPER_NAME)
+    { Module_path.of_ustrings_unchecked (Nonempty.to_list path) }
 
 %inline import_item:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
-%inline import_items: items = separated_nonempty_list(COMMA, import_item) { items }
+%inline import_items: items = separated_nonempty(COMMA, import_item) { items }
 
 import_stmt:
   | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
   | path = import_module_path; WITH; ASTERISK { Module.Import_with (path, []) }
   | path = import_module_path; WITH; items = import_items
-    { Module.Import_with (path, items) }
+    { Module.Import_with (path, Nonempty.to_list items) }
   | path = import_module_path; WITHOUT; items = import_items
     { Module.Import_without (path, items) }
 
@@ -301,14 +306,14 @@ stmt_common:
     s = STRING
     { Module.Extern (
         Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
-  | TYPE; name = UPPER_NAME; params = type_param_list; decl = preceded(EQUALS, type_decl)?
+  | TYPE; name = UPPER_NAME; params = type_params; decl = preceded(EQUALS, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
-  | TYPE; ALIAS; name = UPPER_NAME; params = type_param_list; equals; e = type_expr
+  | TYPE; ALIAS; name = UPPER_NAME; params = type_params; equals; e = type_expr
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name, (params, Type.Decl.Alias e)) }
-  | TRAIT; name = UPPER_NAME; params = type_param_list; colon;
+  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; colon;
     sig_ = block(nonempty_lines(stmt_sig))
     { Module.Trait_sig (Trait_name.of_ustring_unchecked name, params, sig_) }
   | import = import_stmt { import }
@@ -331,17 +336,15 @@ optional_sig_def:
 stmt_:
   | s = stmt_common { Module.Common_def s }
   | LET; binding = let_binding { Module.Let [binding] }
-  | LET; INDENT; bindings = separated_nonempty_list(LINE_SEP, let_binding); DEDENT
+  | LET; INDENT; bindings = separated_nonempty(LINE_SEP, let_binding); DEDENT
     { Module.Let bindings }
   | MODULE; name = UPPER_NAME; body = optional_sig_def
     { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
-  | TRAIT; name = UPPER_NAME; params = type_param_list; body = optional_sig_def
+  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; body = optional_sig_def
     { Module.Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body) }
-  (* TODO: support multiple type parameters in trait impls
-     Should probably change `type_expr` to `nonempty_list(type_term)` *)
-  | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; typ = type_expr;
+  | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; args = nonempty(type_term);
     def = def
-    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, typ, def) }
+    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, args, def) }
 
 %inline stmt: s = with_loc(stmt_) { s }
 
@@ -356,9 +359,12 @@ prog:
 %inline with_loc(X): node = X { { Node.node ; span = Span.of_loc $loc } }
 
 %inline lines(X): x = separated_list(LINE_SEP?, X) { x }
-%inline nonempty_lines(X): x = separated_nonempty_list(LINE_SEP?, X) { x }
+
+(* TODO: converting back to a list probably doesn't make sense *)
+%inline nonempty_lines(X): x = separated_nonempty(LINE_SEP?, X) { Nonempty.to_list x }
 
 %inline type_annot(X): a = separated_pair(X, colon, type_expr) { a }
+%inline type_annot_non_fun(X): a = separated_pair(X, colon, type_non_fun) { a }
 %inline type_annot_bounded(X):
   | a = separated_pair(X, colon, type_expr_bounded) { a }
 
@@ -386,29 +392,24 @@ qualified(X):
 
 %inline block_items(X): items = flexible_list(COMMA, X); DEDENT* { items }
 %inline block_items_nonempty(X):
-  | items = flexible_nonempty_list(COMMA, X); DEDENT* { items }
+  | items = flexible_nonempty(COMMA, X); DEDENT* { items }
 
 %inline flexible_list(separator, X):
-  | xs = loption(flexible_nonempty_list(separator, X)) { xs }
+  | { [] }
+  | xs = flexible_nonempty(separator, X) { Nonempty.to_list xs }
 
-flexible_nonempty_list(separator, X):
-  | x = X { [ x ] }
-  | x = X; separator; xs = flexible_list(separator, X) { x :: xs }
+flexible_nonempty(separator, X):
+  | x = X { Nonempty.singleton x }
+  | x = X; separator; xs = flexible_list(separator, X) { Nonempty.(x :: xs) }
 
 flexible_optional_list(separator, X):
   | separator? { [] }
   | x = X; separator?; xs = flexible_optional_list(separator, X) { x :: xs }
 
-(* TODO: maybe look into trying this again (got reduce-reduce conflicts last time)
-   It must have been resolving them arbitrarily, somehow giving the standard library
-   functions precedence or something (??) *)
-(*nonempty(X):
-  | x = X { [ x ] }
-  | x = X; xs = nonempty(X) { x :: xs }
+%inline nonempty(X): xs = nonempty_list(X) { Nonempty.of_list_exn xs }
 
-separated_nonempty(separator, X):
-  | x = X { [ x ] }
-  | x = X; separator; xs = separated_nonempty(separator, X) { x :: xs }*)
+%inline separated_nonempty(separator, X):
+  | xs = separated_nonempty_list(separator, X) { Nonempty.of_list_exn xs }
 
 %inline maybe_delimited(opening, X, closing):
   | x = either(X, delimited(opening, X, closing)) { x }

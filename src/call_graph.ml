@@ -73,5 +73,5 @@ let to_regrouped_bindings t =
                  ~msg:[%message msg (module1 : Module_path.t) (module2 : Module_path.t)]);
              binding)
          in
-         binding :: bindings, path)
+         Nonempty.(binding :: bindings), path)
 ;;

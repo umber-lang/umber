@@ -65,6 +65,8 @@ include Monad.Make (struct
   let map = `Define_using_bind
 end)
 
+let mem xs = List.mem (to_list xs)
+
 let zip (x :: xs) (y :: ys) =
   let rec loop xs ys acc =
     match xs, ys with
@@ -120,9 +122,27 @@ let foldi t ~init ~f =
   fold t ~init:(0, init) ~f:(fun (i, acc) x -> i + 1, f i acc x) |> snd
 ;;
 
+module Fold2_result = struct
+  type nonrec ('a, 'b) t =
+    | Left_trailing of 'a t
+    | Right_trailing of 'b t
+    | Same_length
+end
+
+let fold2 xs ys ~init ~f =
+  let rec loop xs ys ~init:acc ~f =
+    match xs, ys with
+    | [], [] -> acc, Fold2_result.Same_length
+    | [], y :: ys -> acc, Right_trailing (y :: ys)
+    | x :: xs, [] -> acc, Left_trailing (x :: xs)
+    | x :: xs, y :: ys -> loop xs ys ~init:(f acc x y) ~f
+  in
+  loop (to_list xs) (to_list ys) ~init ~f
+;;
+
 let fold2_exn xs ys ~init ~f = List.fold2_exn (to_list xs) (to_list ys) ~init ~f
 let iteri t ~f = foldi t ~init:() ~f:(fun i () x -> f i x)
-let iter2_strict xs ys = List.iter2 (to_list xs) (to_list ys)
+let iter2 xs ys ~f = fold2 xs ys ~init:() ~f:(fun () x y -> f x y) |> snd
 let ( @ ) = append
 let is_empty _ = false
 let min_elt xs ~compare = List.min_elt (to_list xs) ~compare |> Option.value_exn
@@ -142,3 +162,5 @@ let%expect_test "cartesian product" =
   print_s [%sexp (cartesian_product_all [ [ 1; 2 ]; [ 3 ]; [ 4; 5 ] ] : int t t)];
   [%expect {| ((1 3 4) (1 3 5) (2 3 4) (2 3 5)) |}]
 ;;
+
+let sort xs ~compare = of_list_exn (List.sort (to_list xs) ~compare)

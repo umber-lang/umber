@@ -957,6 +957,9 @@ module Expr = struct
         | Primitive _ | Make_block _ ->
           compiler_bug [%message "Invalid function expression" (fun_ : t)])
       | Lambda (args, body), Function (arg_types, body_type) ->
+        (* TODO: Still need to try and coalesce lambdas/other function expressions for
+           function definitions which are partially applied. See example in
+           test/ast/TypeChecking.expected. *)
         Name (snd (add_lambda ~ctx ~args ~arg_types ~body ~body_type)), fun_defs
         (*let bound_names = Unique_name.Hash_set.create () in
         let closed_over = ref Unique_name.Set.empty in
@@ -1538,16 +1541,16 @@ let of_typed_module =
     ~ctx
     ~stmts
     ~fun_factory
-    (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t list)
+    (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t Nonempty.t)
     =
     let ctx =
-      List.fold bindings ~init:ctx ~f:(fun ctx { node = pattern, _; _ } ->
+      Nonempty.fold bindings ~init:ctx ~f:(fun ctx { node = pattern, _; _ } ->
         Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
           fst (Context.add_value_name ctx name)))
     in
     (* TODO: elide toplevel let bindings which bind no names (and are pure) *)
     (* TODO: warn about eliding toplevel let bindings *)
-    List.fold
+    Nonempty.fold
       bindings
       ~init:(ctx, stmts)
       ~f:(fun (ctx, stmts) { node = pat, ((_, type_) as expr); _ } ->

@@ -539,7 +539,7 @@ let import_with t path = function
 ;;
 
 let import_without t path hiding =
-  import_filtered t path ~f:(not << List.mem hiding ~equal:Unidentified_name.equal)
+  import_filtered t path ~f:(not << Nonempty.mem hiding ~equal:Unidentified_name.equal)
 ;;
 
 let map_type_expr_names type_expr ~f =

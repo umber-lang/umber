@@ -196,9 +196,13 @@ module Expr = struct
            commas, and we can use `->` to mean `-> <Implicit>` always.
            *)
         let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
-        let result_type = Type.fresh_var () in
-        Type_bindings.unify ~names ~types fun_type (Function (arg_types, result_type));
-        Fun_call (fun_, args), result_type
+        let result_var = Type.Var_id.create () in
+        Type_bindings.unify
+          ~names
+          ~types
+          fun_type
+          (Partial_function (arg_types, result_var));
+        Fun_call (fun_, args), Var result_var
       | Op_tree tree ->
         of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
       | Lambda (args, body) ->
@@ -538,7 +542,7 @@ module Module = struct
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
       match def.Node.node with
       | Let bindings ->
-        List.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
+        Nonempty.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
           Name_bindings.merge_names
             names
             (Pattern.Names.gather pat)
@@ -633,7 +637,7 @@ module Module = struct
         handle_sigs ~names ~handle_common sigs)
     in
     let handle_bindings ~names =
-      List.fold_map
+      Nonempty.fold_map
         ~init:names
         ~f:
           (Node.fold_map ~f:(fun names (pat, expr) ->
@@ -670,7 +674,7 @@ module Module = struct
       This is done by topologically sorting the strongly-connected components of the call
       graph (dependencies between bindings). *)
   let extract_binding_groups ~names (defs : intermediate_def Node.t list)
-    : _ * (_ Call_graph.Binding.t list * Name_bindings.Path.t) Sequence.t
+    : _ * (_ Call_graph.Binding.t Nonempty.t * Name_bindings.Path.t) Sequence.t
     =
     let rec gather_bindings_in_defs ~names defs acc =
       List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
@@ -678,7 +682,7 @@ module Module = struct
       match def.Node.node with
       | Let bindings' ->
         ( other_defs
-        , List.fold_right
+        , Nonempty.fold_right
             bindings'
             ~init:bindings
             ~f:(fun { Node.node = ((_, pat_names) as pat), expr; span } bindings ->
@@ -709,17 +713,17 @@ module Module = struct
        whole group. This is done to get a consistent ordering among bindings. *)
     let get_span { Call_graph.Binding.info = _, _, span; _ } = span in
     let bindings =
-      List.sort bindings ~compare:(fun b b' -> Span.compare (get_span b) (get_span b'))
+      Nonempty.sort bindings ~compare:(fun b b' -> Span.compare (get_span b) (get_span b'))
     in
-    let span = get_span (List.hd_exn bindings) in
+    let span = get_span (Nonempty.hd bindings) in
     let bindings =
       (* First, generalize the toplevel bindings *)
-      List.map bindings ~f:(fun { info = (((_, pat_type), _) as pat), expr, span; _ } ->
+      Nonempty.map bindings ~f:(fun { info = (((_, pat_type), _) as pat), expr, span; _ } ->
         let expr, expr_type = Expr.of_untyped ~names ~types expr in
         Type_bindings.unify ~names ~types pat_type expr_type;
         pat, expr, span)
     in
-    List.fold_map
+    Nonempty.fold_map
       bindings
       ~init:names
       ~f:(fun names (((pat, pat_type), pat_names), expr, span) ->

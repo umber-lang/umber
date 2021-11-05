@@ -12,8 +12,7 @@ type 'typ t =
   | As of 'typ t * Value_name.t
   | Cnstr_appl of Cnstr_name.Qualified.t * 'typ t list
   | Tuple of 'typ t list
-  (* TODO: record fields should be non-empty *)
-  | Record of (Value_name.t * 'typ t option) list
+  | Record of (Value_name.t * 'typ t option) Nonempty.t
   | Union of 'typ t * 'typ t
   | Type_annotation of 'typ t * 'typ
 [@@deriving sexp, variants]
@@ -30,7 +29,7 @@ let rec fold pat ~init ~f =
     | Cnstr_appl (_, fields) | Tuple fields ->
       List.fold fields ~init ~f:(fun init -> fold ~init ~f)
     | Record fields ->
-      List.fold fields ~init ~f:(fun init (_, pat) ->
+      Nonempty.fold fields ~init ~f:(fun init (_, pat) ->
         Option.fold pat ~init ~f:(fun init -> fold ~init ~f))
     | Union (pat1, pat2) ->
       let init = fold pat1 ~init ~f in
@@ -65,7 +64,7 @@ module Names = struct
       | As (pat, name) -> loop (f acc name) ~f pat
       | Cnstr_appl (_, items) | Tuple items -> List.fold items ~init:acc ~f:(loop ~f)
       | Record fields ->
-        List.fold fields ~init:acc ~f:(fun acc -> function
+        Nonempty.fold fields ~init:acc ~f:(fun acc -> function
           | name, None -> f acc name
           | _, Some pat -> loop acc ~f pat)
       | Union (pat, _) ->

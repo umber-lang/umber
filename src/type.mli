@@ -107,7 +107,7 @@ module Decl : sig
     | Variants of (Cnstr_name.t * Scheme.t list) list
     (* TODO: probably just make records a type expression - you can trivially get nominal
        records with a single variant and an inline record *)
-    | Record of (Value_name.t * Scheme.t) list
+    | Record of (Value_name.t * Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
   type t = Param.t list * decl [@@deriving compare, equal, hash, sexp]
