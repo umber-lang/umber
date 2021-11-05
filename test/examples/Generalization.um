@@ -1,0 +1,6 @@
+# See https://www.haskell.org/ghc/blog/20100930-LetGeneralisationInGhc7.html
+
+val f : a -> ((a, Char), (a, Bool))
+let f x =
+  let g y = (x, y)  # TODO: try type annotations here, and also completely without
+  (g 'v', g True)

@@ -156,7 +156,47 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
     type name = t
 
     module T = struct
-      type nonrec t = Module_path.t * t [@@deriving compare, equal, hash, sexp]
+      module U = struct
+        type nonrec t = Module_path.t * t [@@deriving compare, equal, hash]
+
+        let iter_chars (path, name) ~f =
+          List.iter path ~f:(fun module_name ->
+            Ustring.iter (Module_name.to_ustring module_name) ~f;
+            f (Uchar.of_char '.'));
+          Ustring.iter (to_ustring name) ~f
+        ;;
+
+        let total_len (path, name) =
+          List.fold
+            path
+            ~init:(Ustring.length (to_ustring name))
+            ~f:(fun len module_name ->
+              (* Add 1 additional char for the '.' *)
+              len + Ustring.length (Module_name.to_ustring module_name) + 1)
+        ;;
+
+        let to_string t =
+          let buf = Buffer.create ((total_len t + 3) / 4) in
+          iter_chars t ~f:(Uchar.add_to_buffer buf);
+          Buffer.contents buf
+        ;;
+
+        let to_ustring t =
+          let q = Queue.create ~capacity:(total_len t) () in
+          iter_chars t ~f:(Queue.enqueue q);
+          Queue.to_array q |> Ustring.of_array_unsafe
+        ;;
+
+        let of_string s =
+          match String.split s ~on:'.' |> list_split_last with
+          | Some (path, name) ->
+          List.map ~f:Module_name.of_string_exn path, of_string_exn name
+            | None -> failwithf "Bad qualified name: '%s'" s ()
+        ;;
+      end
+
+      include U
+      include Sexpable.Of_stringable (U)
     end
 
     include T
@@ -171,16 +211,6 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
 
     let of_ustrings_exn (path, name) =
       Module_path.of_ustrings_exn path, of_ustring_exn name
-    ;;
-
-    let to_ustring (path, name) =
-      let name = to_ustring name in
-      let q = Queue.create ~capacity:(Ustring.length name * 2) () in
-      List.iter path ~f:(fun s ->
-        Ustring.iter (Module_name.to_ustring s) ~f:(Queue.enqueue q);
-        Queue.enqueue q (Uchar.of_char '.'));
-      Ustring.iter name ~f:(Queue.enqueue q);
-      Queue.to_array q |> Ustring.of_array_unsafe
     ;;
   end
 end

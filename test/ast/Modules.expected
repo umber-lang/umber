@@ -9,10 +9,11 @@
            (Trait_sig D ()
             ((Common_sig (Val d () (() (Type_app (() Nat) ())))))))))
         (Module_sig D
-         ((Common_sig (Val wow () (() (Function (Var a) (Var a))))))))
+         ((Common_sig (Val wow () (() (Function ((Var a)) (Var a))))))))
        ((Module
          (D ()
-          ((Let (((Catch_all (wow)) (Lambda (Catch_all (x)) (Name (() x))))))
+          ((Let
+            (((Catch_all (wow)) (Lambda ((Catch_all (x))) (Name (() x))))))
            (Common_def (Type_decl Bacon (() (Variants ((Delicious ())))))))))))))))
   (Let
    (((Tuple ())
