@@ -219,8 +219,12 @@ type_record:
     { Type.Decl.Record (Nonempty.map fields ~f:(fun (name, typ) ->
         Value_name.of_ustring_unchecked name, typ)) }
 
+type_tuple_or_fun:
+  | t = tuple(type_non_fun) { single_or_list Type.Expr.tuple t }
+  | t = parens(type_fun) { t }
+
 type_term:
-  | e = tuple(type_expr) { single_or_list Type.Expr.tuple e }
+  | t = type_tuple_or_fun { t }
   | cnstr = qualified(UPPER_NAME)
     { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, []) }
   | param = LOWER_NAME { Type.Expr.Var (Type_param_name.of_ustring_unchecked param) }
@@ -237,9 +241,12 @@ type_fun_args:
   | arg = type_non_fun { Nonempty.singleton arg }
   | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
 
+%inline type_fun:
+  | args = type_fun_args; ARROW; body = type_non_fun { Type.Expr.Function (args, body) }
+
 type_expr:
   | t = type_non_fun { t }
-  | args = type_fun_args; ARROW; body = type_non_fun { Type.Expr.Function (args, body) }
+  | t = type_fun { t }
 
 %inline trait_bound:
   | bounds = parens(block_items(pair(UPPER_NAME, type_params_nonempty)));
@@ -299,8 +306,7 @@ import_stmt:
     { Module.Import_without (path, items) }
 
 stmt_common:
-  | VAL; name = val_name; fix = parens(fixity)?; colon;
-    t = block(type_expr_bounded)
+  | VAL; name = val_name; fix = parens(fixity)?; colon; t = block(type_expr_bounded)
     { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
   | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = block(type_expr); equals;
     s = STRING
