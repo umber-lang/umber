@@ -2,5 +2,5 @@
  ((kind Type_error)
   (msg
    ("Occurs check failed"
-    (((Function ((Type_app (() Bool) ())) (Var a)) (Var a)))))
+    (((Function ((Type_app Bool ())) (Var a)) (Var a)))))
   (filename ErrorPolymorphicRecursion.um)))

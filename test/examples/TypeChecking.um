@@ -12,10 +12,10 @@ let id_for_bools x = id x : Bool
 
 let (id_alias, five) = (id, 5)
 
-# `a -> (a -> b) -> b`
+# `a, (a -> b) -> b`
 let (|>) x f = f x
 
-# `(() -> a) -> (() -> a) -> Bool -> a`
+# `(() -> a), (() -> a), Bool -> a`
 let if_ then_ else_ = match
   | True -> then_ ()
   | False -> else_ ()

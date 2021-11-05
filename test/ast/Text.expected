@@ -1,39 +1,37 @@
 (Text ()
- ((Let (((Catch_all (c)) ((Literal (Char a)) (Type_app (() Char) ())))))
+ ((Let (((Catch_all (c)) ((Literal (Char a)) (Type_app Char ())))))
   (Let
    (((Catch_all (hello))
-     ((Literal (String "hello world!")) (Type_app (() String) ())))))
+     ((Literal (String "hello world!")) (Type_app String ())))))
   (Let
    (((Catch_all (spacing))
      ((Literal (String  "line 1\r\
-                       \n\t line 2")) (Type_app (() String) ())))))
+                       \n\t line 2")) (Type_app String ())))))
   (Let
    (((Catch_all (dec_code_exclam))
-     ((Literal (String !)) (Type_app (() String) ())))))
+     ((Literal (String !)) (Type_app String ())))))
   (Common_def
    (Val ++ ()
     (()
-     (Function (Type_app (() String) ())
-      (Function (Type_app (() String) ()) (Type_app (() String) ()))))))
+     (Function ((Type_app String ()) (Type_app String ()))
+      (Type_app String ())))))
   (Let
    (((Catch_all ())
-     ((Fun_call
-       (Fun_call (Name (() ++)) (Literal (String "hello\n"))
-        (Type_app (() String) ()))
-       (Literal (String "\bworld!")) (Type_app (() String) ()))
-      (Type_app (() String) ())))))
+     ((Fun_call (Name ++)
+       (((Literal (String "hello\n")) (Type_app String ()))
+        ((Literal (String "\bworld!")) (Type_app String ()))))
+      (Type_app String ())))))
   (Let
    (((Tuple ((Catch_all (a)) (Catch_all (b))))
      ((Let
        ((rec_ false)
         (bindings
-         ((((Catch_all (empty)) (Type_app (() String) ()))
-           (Literal (String "")))))
+         ((((Catch_all (empty)) (Type_app String ())) (Literal (String "")))))
         (body (Tuple ((Literal (Char a)) (Literal (Char b)))))))
-      (Tuple ((Type_app (() Char) ()) (Type_app (() Char) ())))))))
+      (Tuple ((Type_app Char ()) (Type_app Char ())))))))
   (Let
    (((Catch_all (_UNICODE_WORKS_TOO))
      ((Literal
        (String
         "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186"))
-      (Type_app (() String) ())))))))
+      (Type_app String ())))))))
