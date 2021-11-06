@@ -83,19 +83,20 @@ let rec unify ~names ~types t1 t2 =
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
     | Left_trailing _ -> fun_arg_number_mismatch t1 t2
     | Right_trailing args2_trailing ->
-      (* TODO: Should we be using partial functions to combine here? Similarly below *)
-      unify ~names ~types (Var id) (Function (args2_trailing, res))
+      let id' = Type.Var_id.create () in
+      unify ~names ~types (Var id') res;
+      unify ~names ~types (Var id) (Partial_function (args2_trailing, id'))
     | Same_length -> unify ~names ~types (Var id) res)
   | Function (args2, res), Partial_function (args1, id) ->
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
     | Left_trailing args1_trailing ->
-      unify ~names ~types (Function (args1_trailing, res)) (Var id)
+      let id' = Type.Var_id.create () in
+      unify ~names ~types res (Var id');
+      unify ~names ~types (Partial_function (args1_trailing, id')) (Var id)
     | Right_trailing _ -> fun_arg_number_mismatch t1 t2
     | Same_length -> unify ~names ~types res (Var id))
   | Tuple xs, Tuple ys -> iter2 ~f:(unify ~names ~types) xs ys
   | (Type_app _ | Tuple _ | Function _ | Partial_function _), _ ->
-    (* TODO: need nominal typing for records/type applications:
-       to infer the type of records, unify the structural record type with the nominal type *)
     type_error "Fell through cases" t1 t2
 ;;
 
@@ -106,10 +107,7 @@ let rec substitute types typ =
       (match Hashtbl.find types.vars id with
       | Some type_sub -> Retry type_sub
       | None -> Halt typ)
-    | Partial_function (args, id) ->
-      (* FIXME: Will this actually detect functions returning functions properly?
-         Is throwing away the partial function information here ok? *)
-      combine_partial_functions types typ args id
+    | Partial_function (args, id) -> combine_partial_functions types typ args id
     | _ -> Defer typ)
 
 and combine_partial_functions types typ args id =

@@ -213,7 +213,9 @@ module Expr = struct
         in
         let args, arg_types = Nonempty.unzip args_and_types in
         let body, body_type = of_untyped ~names ~types ~f_name body in
-        Lambda (args, body), Function (arg_types, body_type)
+        let body_var = Type.Var_id.create () in
+        Type_bindings.unify ~names ~types (Var body_var) body_type; 
+        Lambda (args, body), Partial_function (arg_types, body_var)
       | If (cond, then_, else_) ->
         let cond, cond_type = of_untyped ~names ~types ~f_name cond in
         let bool_type = Type.Concrete.cast Core.Bool.typ in
@@ -713,12 +715,15 @@ module Module = struct
        whole group. This is done to get a consistent ordering among bindings. *)
     let get_span { Call_graph.Binding.info = _, _, span; _ } = span in
     let bindings =
-      Nonempty.sort bindings ~compare:(fun b b' -> Span.compare (get_span b) (get_span b'))
+      Nonempty.sort bindings ~compare:(fun b b' ->
+        Span.compare (get_span b) (get_span b'))
     in
     let span = get_span (Nonempty.hd bindings) in
     let bindings =
       (* First, generalize the toplevel bindings *)
-      Nonempty.map bindings ~f:(fun { info = (((_, pat_type), _) as pat), expr, span; _ } ->
+      Nonempty.map
+        bindings
+        ~f:(fun { info = (((_, pat_type), _) as pat), expr, span; _ } ->
         let expr, expr_type = Expr.of_untyped ~names ~types expr in
         Type_bindings.unify ~names ~types pat_type expr_type;
         pat, expr, span)

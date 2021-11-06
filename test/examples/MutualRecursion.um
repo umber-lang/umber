@@ -4,6 +4,7 @@
 val f : Forest a
 let f = Nil
 
+# TODO: see if we can remove the explicit `forest` args again 
 # NOTE: this is not allowed in OCaml with the error:
   > This kind of expression is not allowed as right-hand side of `let rec'
   It works if the `forest` argument to `sum_forest` is written explicitly.

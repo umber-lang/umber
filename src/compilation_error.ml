@@ -23,7 +23,6 @@ exception Compilation_error of t [@@deriving sexp_of]
 
 let create ?filename ?span ?exn ~msg kind = { kind; msg; filename; span; exn }
 
-let raise ?filename ?span ?exn ~msg kind = raise (Compilation_error ({
-  kind ; msg ; filename ; span ; exn
-
-}))
+let raise ?filename ?span ?exn ~msg kind =
+  raise (Compilation_error { kind; msg; filename; span; exn })
+;;

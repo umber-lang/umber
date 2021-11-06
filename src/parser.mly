@@ -319,6 +319,7 @@ stmt_common:
   | TYPE; ALIAS; name = UPPER_NAME; params = type_params; equals; e = type_expr
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name, (params, Type.Decl.Alias e)) }
+  (* TODO: support trait bounds (inheritance) on traits *)
   | TRAIT; name = UPPER_NAME; params = type_params_nonempty; colon;
     sig_ = block(nonempty_lines(stmt_sig))
     { Module.Trait_sig (Trait_name.of_ustring_unchecked name, params, sig_) }
