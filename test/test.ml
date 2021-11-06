@@ -8,7 +8,7 @@ let concat_current dir = Filename.(concat (concat current_dir_name dir))
 let parse_only_tests = [ "Imports"; "Modules"; "Operators"; "Traits"; "Types" ]
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)
 
-(* These tests are just for type-checking as they are not ready to be converted to MIR.  *)
+(* These tests are just for type-checking as they are not ready to be converted to MIR. *)
 (* TODO: enable these for mir *)
 let type_only_tests =
   [ "LetBindingGroups" (* let rec *)
@@ -18,7 +18,7 @@ let type_only_tests =
 ;;
 
 let should_make_mir test =
-  (* FIXME: enable*)
+  (* FIXME: enable *)
   false
   && should_type_check test
   && not (List.mem ~equal:String.equal type_only_tests test)

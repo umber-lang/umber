@@ -172,29 +172,6 @@ module Expr = struct
             let arg, arg_type = of_untyped ~names ~types ~f_name arg in
             arg, (arg_type, Pattern.Names.empty))
         in
-        (* FIXME: handle partial application.
-           PROBLEM: need to basically unify the type with some kind of type like
-           Partial_function (args, var) or similar.
-           (This basically reimplementing the `arg -> ... -> 'a` we otherwise have.)
-           
-           Is changing function types like we did actually worth it then? Complicating the
-           type checker is very sad. We're already planning to have a lot of magic around
-           effects and `->` e.g. 
-           
-           - `->` at the end of a val declaration means `-> <Implicit>`
-           - `->` at the end of a higher-order function type subexpresion means `-> <e>`
-             and if present, changes the `->` at the end of the whole type expression to
-             mean `-> <e|Implicit>`
-           - `->` anywhere else means `-> <>` (total arrow, no effects)
-
-           We could eliminate this magic by:
-           - Having `->` mean `-> <>` always
-           - Forcing you to write out `-> <e>` when you mean it (actually seems good)
-           - Using `~>` to mean `-> <Implicit>`
-
-           If we use uncurried functions, then we have function arguments separated by
-           commas, and we can use `->` to mean `-> <Implicit>` always.
-           *)
         let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
         let result_var = Type.Var_id.create () in
         Type_bindings.unify
@@ -214,7 +191,7 @@ module Expr = struct
         let args, arg_types = Nonempty.unzip args_and_types in
         let body, body_type = of_untyped ~names ~types ~f_name body in
         let body_var = Type.Var_id.create () in
-        Type_bindings.unify ~names ~types (Var body_var) body_type; 
+        Type_bindings.unify ~names ~types (Var body_var) body_type;
         Lambda (args, body), Partial_function (arg_types, body_var)
       | If (cond, then_, else_) ->
         let cond, cond_type = of_untyped ~names ~types ~f_name cond in
