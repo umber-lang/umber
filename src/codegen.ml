@@ -63,7 +63,6 @@ let codegen_literal t lit =
     const typ x
   in
   match (lit : Literal.t) with
-  (* TODO: Int should really be an Int64.t *)
   | Int i -> with_type i64_type const_int i
   | Float x -> with_type double_type const_float x
   | Char c -> with_type i32_type const_int (Uchar.to_int c)

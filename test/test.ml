@@ -18,10 +18,7 @@ let type_only_tests =
 ;;
 
 let should_make_mir test =
-  (* FIXME: enable *)
-  false
-  && should_type_check test
-  && not (List.mem ~equal:String.equal type_only_tests test)
+  should_type_check test && not (List.mem ~equal:String.equal type_only_tests test)
 ;;
 
 (* TODO: expand this to more files *)

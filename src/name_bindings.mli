@@ -107,7 +107,7 @@ val add_val
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Type.Expr.Bounded.t
+  -> Type.Scheme_plain.Bounded.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
@@ -115,7 +115,7 @@ val add_extern
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Type.Expr.Bounded.t
+  -> Type.Scheme_plain.Bounded.t
   -> Extern_name.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t

@@ -29,6 +29,7 @@ let is_empty { name_diff; type_diff; module_diff } =
 ;;
 
 let compatible_type_schemes ~names scheme1 scheme2 =
+  (* TODO: do some kind of fold2 thing *)
   let type1, type2 = Type.Scheme.instantiate scheme1, Type.Scheme.instantiate scheme2 in
   try
     Type_bindings.unify ~names ~types:(Type_bindings.create ()) type1 type2;
@@ -64,21 +65,30 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
 
 (* TODO: test/look at this for correctness, there are probably bugs here *)
 let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, def_type) =
-  let for_all_zipped xs ys ~f =
-    match List.zip xs ys with
-    | Ok xys -> List.for_all xys ~f
+  let for_all2 xs ys ~f =
+    match List.for_all2 xs ys ~f with
+    | Ok b -> b
     | Unequal_lengths -> false
   in
   let unify_schemes ~names ~types params scheme1 scheme2 =
-    let expr1 = Type.Scheme.instantiate ~params scheme1 in
-    let expr2 = Type.Scheme.instantiate ~params scheme2 in
+    let expr1 = Type.Scheme_plain.instantiate ~params scheme1 in
+    let expr2 = Type.Scheme_plain.instantiate ~params scheme2 in
     Type_bindings.unify ~names ~types expr1 expr2;
     true
   in
   let types = Type_bindings.create () in
+  (* FIXME: I think this has a bug where it will say these are not compatible:
+     ```
+       module :
+         val id : b -> b
+       val id : a -> a
+       let id x = x
+     ``` 
+     Since it uses the same env for each, the names have to match up, which seems wrong.
+     Should write a test to demonstrate this, then fix it. *)
   let param_env = Type.Param.Env_to_vars.create () in
   try
-    for_all_zipped sig_params def_params ~f:(fun (sig_param, def_param) ->
+    for_all2 sig_params def_params ~f:(fun sig_param def_param ->
       let sig_param_type = Type.Param.Env_to_vars.find_or_add param_env sig_param in
       let def_param_type = Type.Param.Env_to_vars.find_or_add param_env def_param in
       Type_bindings.unify ~names ~types (Var sig_param_type) (Var def_param_type);
@@ -89,9 +99,9 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
     | Alias scheme1, Alias scheme2 ->
       unify_schemes ~names ~types param_env scheme1 scheme2
     | Variants cnstrs1, Variants cnstrs2 ->
-      for_all_zipped cnstrs1 cnstrs2 ~f:(fun ((cnstr1, args1), (cnstr2, args2)) ->
+      for_all2 cnstrs1 cnstrs2 ~f:(fun (cnstr1, args1) (cnstr2, args2) ->
         Cnstr_name.equal cnstr1 cnstr2
-        && for_all_zipped args1 args2 ~f:(fun (arg1, arg2) ->
+        && for_all2 args1 args2 ~f:(fun arg1 arg2 ->
              unify_schemes ~names ~types param_env arg1 arg2))
     | Record _, Record _ -> failwith "TODO: record types in compatibiltiy checks"
     | Record _, (Abstract | Alias _ | Variants _)

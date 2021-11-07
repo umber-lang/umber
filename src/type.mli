@@ -4,12 +4,9 @@ module Var_id : module type of Unique_id.Int ()
 
 module Param : sig
   (* TODO: consider adding support for weak type variables here *)
-  (* TODO: consider hiding/breaking this type equality *)
-  (* TODO: consider making this a unique int or something so that mapping over it can be
-     done across types. *)
-  type t = Type_param_name.t [@@deriving compare, equal, hash, sexp]
+  type t [@@deriving compare, equal, sexp_of]
 
-  include Comparable.S with type t := t
+  include Comparable.S_plain with type t := t
 
   module Map : sig
     include module type of Map
@@ -17,23 +14,29 @@ module Param : sig
     val hash_fold_t : (Hash.state -> 'a -> Hash.state) -> Hash.state -> 'a t -> Hash.state
   end
 
-  include Hashable.S with type t := t
+  include Hashable.S_plain with type t := t
 
   module Env_to_vars : sig
-    type param = t
     type t
 
     val create : unit -> t
-    val find_or_add : t -> param -> Var_id.t
+    val find_or_add : t -> Type_param_name.t -> Var_id.t
   end
 
   module Env_of_vars : sig
-    type param = t
     type t
 
     val create : unit -> t
-    val find_or_add : t -> Var_id.t -> param
+    val find_or_add : t -> Var_id.t -> Type_param_name.t
   end
+
+  val name : t -> Type_param_name.t
+  val id : t -> Var_id.t
+  val of_name : env:Env_to_vars.t -> Type_param_name.t -> t
+  val of_var : env:Env_of_vars.t -> Var_id.t -> t
+  val create : Var_id.t -> Type_param_name.t -> t
+  val equal_names : t -> t -> bool
+  val dummy : t
 end
 
 module Expr : sig
@@ -52,26 +55,29 @@ module Expr : sig
     -> pf:('pf1 -> 'pf2)
     -> ('v2, 'pf2) t
 
-  (* TODO: cleanup *)
-  (*val map_vars : ('v1, 'v1) t -> f:('v1 -> 'v2) -> ('v2, 'v2) t*)
-  val fold_vars : ('v, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
-  val for_all_vars : ('v, _) t -> f:('v -> bool) -> bool
+  val fold_until
+    :  ('v, 'pf) t
+    -> init:'acc
+    -> f:('acc -> ('v, 'pf) t -> ('acc, 'final) Fold_action.t)
+    -> ('acc, 'final) Fold_action.t
 
-  module Bounded : sig
-    type nonrec t = Trait_bound.t * (Param.t, Nothing.t) t
-    [@@deriving compare, equal, hash, sexp]
-  end
+  val for_all_vars : ('v, _) t -> f:('v -> bool) -> bool
+  val exists_var : ('v, _) t -> f:('v -> bool) -> bool
 end
 
 type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
 
 val fresh_var : unit -> t
 
-module Scheme : sig
-  type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
+module type Boundable = sig
+  type nonrec t [@@deriving compare, hash, equal, sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
+
+  module Bounded : sig
+    type nonrec t = Trait_bound.t * t [@@deriving compare, equal, hash, sexp]
+  end
 
   val instantiate
     :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
@@ -82,9 +88,16 @@ module Scheme : sig
   val instantiate_bounded
     :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
     -> ?params:Param.Env_to_vars.t
-    -> Expr.Bounded.t
+    -> Bounded.t
     -> (Var_id.t, _) Expr.t
+end
 
+module Scheme_plain : Boundable with type t = (Type_param_name.t, Nothing.t) Expr.t
+
+module Scheme : sig
+  include Boundable with type t = (Param.t, Nothing.t) Expr.t
+
+  val of_plain : ?env:Param.Env_to_vars.t -> Scheme_plain.t -> t
   val infer_param_map : template_type:t -> instance_type:t -> t Param.Map.t
 end
 
@@ -103,18 +116,18 @@ end
 module Decl : sig
   type decl =
     | Abstract
-    | Alias of Scheme.t
-    | Variants of (Cnstr_name.t * Scheme.t list) list
+    | Alias of Scheme_plain.t
+    | Variants of (Cnstr_name.t * Scheme_plain.t list) list
     (* TODO: probably just make records a type expression - you can trivially get nominal
        records with a single variant and an inline record *)
-    | Record of (Value_name.t * Scheme.t) Nonempty.t
+    | Record of (Value_name.t * Scheme_plain.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type t = Param.t list * decl [@@deriving compare, equal, hash, sexp]
+  type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]
 
   val arity : t -> int
-  val map_exprs : t -> f:(Scheme.t -> Scheme.t) -> t
-  val fold_exprs : t -> init:'acc -> f:('acc -> Scheme.t -> 'acc) -> 'acc
-  val iter_exprs : t -> f:(Scheme.t -> unit) -> unit
+  val map_exprs : t -> f:(Scheme_plain.t -> Scheme_plain.t) -> t
+  val fold_exprs : t -> init:'acc -> f:('acc -> Scheme_plain.t -> 'acc) -> 'acc
+  val iter_exprs : t -> f:(Scheme_plain.t -> unit) -> unit
   val no_free_params : t -> bool
 end

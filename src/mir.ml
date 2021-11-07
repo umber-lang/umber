@@ -9,7 +9,12 @@ module Value_kind = struct
   type immediate =
     [ `Int64
     | `Float64
-    | `Char (* Unicode scalar value: 4 bytes *)
+    | `Char
+      (* Unicode scalar value: 4 bytes (u32) *)
+      (* TODO: I think to make my runtime representation work, all my values will have to
+         be word-sized, so `Char (u32) should probably be promoted to `Int64 in basically
+         all cases. I think there's little point in this existing if you can't define
+         unboxed tuple/record types.*)
     ]
   [@@deriving compare, equal, hash, sexp]
 
@@ -56,6 +61,14 @@ module Value_kind = struct
   ;;
 end
 
+(* FIXME: rewrite to use `Type.Scheme` so we can do proper mapping. 
+   PROBLEM: How will hashing the param_kinds map work? We'd need to restrict it to just
+   the right subset of vars. Just using a concrete type seeems like it could be simpler.
+   - actually, a concrete type doesn't really work. We don't want a specific type
+     substitution - what we want is just the value_kind substituted. I suppose we could
+     use a `(Value_kind.t, Nothing.t) Type.Expr.t`. Hmm, actually this seems quite
+     reasonable.
+   *)
 module Monomorphic_type : sig
   type t [@@deriving compare, equal, hash, sexp_of]
 
@@ -69,13 +82,14 @@ module Monomorphic_type : sig
   val of_type_alias
     :  names:Name_bindings.t
     -> parent:t
-    -> alias:Type.Scheme.t
-    -> params:Type.Param.t list
+    -> alias:Type.Scheme_plain.t
+    -> params:Type_param_name.t list
     -> args:Type.Scheme.t list
     -> t
 
   val of_concrete : Type.Concrete.t -> t
   val instantiate_child : t -> Type.Scheme.t -> t
+  val instantiate_child_plain : t -> Type.Scheme_plain.t -> t
 end = struct
   module T = struct
     type t =
@@ -111,25 +125,51 @@ end = struct
     | Var param -> Map.find_exn param_kinds param
 
   and of_type_alias ~names ~parent ~alias ~params ~args =
+    let env = Type.Param.Env_to_vars.create () in
     let param_kinds =
       List.fold2_exn
         params
         args
-        ~init:parent.param_kinds
-        ~f:(fun param_kinds' param arg ->
+        ~init:Type.Param.Map.empty
+        ~f:(fun param_kinds param_name arg ->
         let arg_kind =
           to_value_kind ~names { param_kinds = parent.param_kinds; scheme = arg }
         in
-        Map.set param_kinds' ~key:param ~data:arg_kind)
+        Map.set param_kinds ~key:(Type.Param.of_name ~env param_name) ~data:arg_kind)
     in
-    { scheme = alias; param_kinds }
+    { scheme = Type.Scheme.of_plain ~env alias; param_kinds }
   ;;
 
+  (* TODO: remove? Is this used/needed? *)
   let of_concrete concrete =
     { scheme = Type.Concrete.cast concrete; param_kinds = Type.Param.Map.empty }
   ;;
 
-  let instantiate_child t scheme = { t with scheme }
+  let filter_to_used_params param_kinds scheme ~get_name =
+    (* Filter the map down to just the used params to get correct caching behavior *)
+    Map.filter_keys param_kinds ~f:(fun param ->
+      Type.Expr.exists_var scheme ~f:(fun v ->
+        Type_param_name.equal (get_name v) (Type.Param.name param)))
+  ;;
+
+  let instantiate_child { scheme = _; param_kinds } scheme =
+    { scheme
+    ; param_kinds = filter_to_used_params param_kinds scheme ~get_name:Type.Param.name
+    }
+  ;;
+
+  let instantiate_child_plain { scheme = _; param_kinds } scheme =
+    let params_by_name = Type_param_name.Table.create () in
+    Map.iter_keys param_kinds ~f:(fun param ->
+      Hashtbl.set params_by_name ~key:(Type.Param.name param) ~data:param);
+    { scheme =
+        Type.Expr.map
+          scheme
+          ~var:(Hashtbl.find_exn params_by_name)
+          ~pf:Nothing.unreachable_code
+    ; param_kinds = filter_to_used_params param_kinds scheme ~get_name:Fn.id
+    }
+  ;;
 
   include Comparable.Make_plain (T)
   include Hashable.Make_plain (T)
@@ -149,15 +189,16 @@ module Cnstr = struct
 
   module Tag : sig
     (** Constructor tags are represented as follows:
-    - For constant constructors (i.e. constructors with no arguments), the tag is given
-      inline as a 64-bit integer where the least significant bit is always set to 1.
-      This is identical to the OCaml representation.
-    - For non-constant constructors (i.e. those with arguments), the tag is given in a
-      block header as the first 16 bits. In that case, as with any block, the pointer to
-      the block will have its least signficiant bit set to 0. *)
+      - For constant constructors (i.e. constructors with no arguments), the tag is given
+        inline as a 64-bit integer where the least significant bit is always set to 1.
+        This is identical to the OCaml representation.
+      - For non-constant constructors (i.e. those with arguments), the tag is given in a
+        block header as the first 16 bits. In that case, as with any block, the pointer to
+        the block will have its least signficiant bit set to 0. *)
 
     (* TODO: what about putting constructor tags in the pointer sometimes? On 64-bit
-       platforms we should have 3 free bits. *)
+       platforms we should have 3 free bits. This could be especially helpful for
+       implementing unboxed options or similar types. *)
 
     type t [@@deriving compare, equal, hash, sexp]
 
@@ -245,9 +286,9 @@ end = struct
       | Tuple of Arg.t list
     [@@deriving sexp_of]
 
-    let make_arg_list ~names type_ args =
+    let make_arg_list ~instantiate_child ~names type_ args =
       List.fold_map args ~init:(0, 0) ~f:(fun (pointer_i, immediate_i) arg ->
-        let arg = Monomorphic_type.instantiate_child type_ arg in
+        let arg = instantiate_child type_ arg in
         let value_kind = Monomorphic_type.to_value_kind ~names arg in
         if Value_kind.is_pointer value_kind
         then (pointer_i + 1, immediate_i), (Block_index.processed pointer_i, arg)
@@ -263,9 +304,10 @@ end = struct
           ~f:(fun (constant_cnstrs, non_constant_cnstrs) (cnstr_name, args) ->
           if List.is_empty args
           then cnstr_name :: constant_cnstrs, non_constant_cnstrs
-          else
-            ( constant_cnstrs
-            , (cnstr_name, make_arg_list ~names type_ args) :: non_constant_cnstrs ))
+          else (
+            let instantiate_child = Monomorphic_type.instantiate_child_plain in
+            let args = make_arg_list ~instantiate_child ~names type_ args in
+            constant_cnstrs, (cnstr_name, args) :: non_constant_cnstrs))
       in
       Variants
         { constant_cnstrs = List.rev constant_cnstrs
@@ -273,22 +315,17 @@ end = struct
         }
     ;;
 
-    let of_tuple ~names type_ args = Tuple (make_arg_list ~names type_ args)
+    let of_tuple ~names type_ args =
+      let instantiate_child = Monomorphic_type.instantiate_child in
+      Tuple (make_arg_list ~names ~instantiate_child type_ args)
+    ;;
   end
 
-  (* TODO: should save function defs for polymorphic functions here - just make it a
-     hashtable (the parts which should be global can just be mutable)
-     - or we could also make it another type, might be a bit nicer to spread the
-       responsibility 
-       - this is the way to go since we can't use exprs here (circular dependency) *)
   type t =
     { names : Unique_name.t Ustring.Map.t
     ; name_bindings : Name_bindings.t [@sexp.opaque]
     ; cnstr_info_cache : Cnstr_info.t Monomorphic_type.Table.t
-    ; add_observer : Unique_name.t -> unit
-         [@sexp.opaque]
-         (* FIXME: add_observer is a confusing name, should be called adding_observer or
-            observer_of_adding, observe_adding, observer_of_add, etc. *)
+    ; add_observer : Unique_name.t -> unit [@sexp.opaque]
     ; find_observer : Unique_name.t -> unit [@sexp.opaque]
     }
   [@@deriving sexp_of]
@@ -459,8 +496,13 @@ end = struct
         Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name
       in
       (match decl with
-      | Alias alias -> get_cnstr_info_polymorphic_uncached t alias
-      | Variants variants -> `Variants variants
+      | Alias alias -> get_cnstr_info_polymorphic_uncached t (Type.Scheme.of_plain alias)
+      | Variants variants ->
+        let env = Type.Param.Env_to_vars.create () in
+        `Variants
+          (List.map
+             variants
+             ~f:(Tuple2.map_snd ~f:(List.map ~f:(Type.Scheme.of_plain ~env))))
       | Abstract | Record _ -> cnstr_lookup_failed scheme)
     | Tuple args -> `Tuple args
     | Function _ | Partial_function _ | Var _ -> cnstr_lookup_failed scheme
@@ -628,14 +670,11 @@ end = struct
     ;;
 
     let of_patterns Nonempty.(pattern :: patterns) =
-      List.fold_until
-        patterns
-        ~init:(of_pattern pattern)
-        ~f:(fun coverage pattern ->
-          match add_pattern coverage pattern with
-          | Exhaustive -> Stop Exhaustive
-          | coverage -> Continue coverage)
-        ~finish:Fn.id
+      List.fold_until patterns ~init:(of_pattern pattern) ~f:(fun coverage pattern ->
+        match add_pattern coverage pattern with
+        | Exhaustive -> Stop Exhaustive
+        | coverage -> Continue coverage)
+      |> Fold_action.finish ~f:Fn.id
     ;;
 
     let asterisk = Ustring.of_string_exn "*"
@@ -1105,7 +1144,11 @@ module Expr = struct
            statements (e.g. to define static functions/values) - not all lets should be
            global though e.g. for simple expressions like `let y = x + x; (y, y)` *)
         if rec_
-        then failwith "TODO: let rec in MIR expr"
+        then
+          (* TODO: implement let rec in MIR. I think the only tricky part is doing all the
+             Context calls to create unique names up-front, and then keeping track of
+             these names somehow instead of having them be shadowed. *)
+          failwith "TODO: let rec in MIR expr"
         else (
           let ctx, bindings =
             Nonempty.fold
@@ -1113,7 +1156,7 @@ module Expr = struct
               ~init:(ctx, [])
               ~f:(fun (ctx, bindings) ((pat, typ), expr) ->
               (* TODO: support unions in let bindings. For the non-rec case we should
-                   just be able to convert to a match *)
+                 just be able to convert to a match *)
               let pat =
                 Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"let bindings"
               in

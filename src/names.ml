@@ -188,10 +188,10 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
         ;;
 
         let of_string s =
-          match String.split s ~on:'.' |> list_split_last with
+          match String.split s ~on:'.' |> List.split_last with
           | Some (path, name) ->
-          List.map ~f:Module_name.of_string_exn path, of_string_exn name
-            | None -> failwithf "Bad qualified name: '%s'" s ()
+            List.map ~f:Module_name.of_string_exn path, of_string_exn name
+          | None -> failwithf "Bad qualified name: '%s'" s ()
         ;;
       end
 

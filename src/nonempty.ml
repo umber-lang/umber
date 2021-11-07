@@ -122,6 +122,8 @@ let foldi t ~init ~f =
   fold t ~init:(0, init) ~f:(fun (i, acc) x -> i + 1, f i acc x) |> snd
 ;;
 
+let fold_until t = List.fold_until (to_list t)
+
 module Fold2_result = struct
   type nonrec ('a, 'b) t =
     | Left_trailing of 'a t

@@ -25,6 +25,12 @@ val fold_right : 'a t -> init:'acc -> f:('a -> 'acc -> 'acc) -> 'acc
 val fold_map : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc * 'b) -> 'acc * 'b t
 val foldi : 'a t -> init:'acc -> f:(int -> 'acc -> 'a -> 'acc) -> 'acc
 
+val fold_until
+  :  'a t
+  -> init:'acc
+  -> f:('acc -> 'a -> ('acc, 'final) Fold_action.t)
+  -> ('acc, 'final) Fold_action.t
+
 module Fold2_result : sig
   type nonrec ('a, 'b) t =
     | Left_trailing of 'a t

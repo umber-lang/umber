@@ -11,8 +11,12 @@ module Pattern = struct
 
   (* TODO: either split up Untyped/Typed patterns into different types or stop returning
      a pattern from these functions *)
-  let of_untyped_with_names ~names ~types pat =
-    let rec of_untyped_with_names ~names ~types pat_names = function
+  let of_untyped_with_names ~names ~types (pat : Untyped.Pattern.t)
+    : Names.t * (t * Type.t)
+    =
+    let rec of_untyped_with_names ~names ~types pat_names
+      : Untyped.Pattern.t -> Names.t * (t * Type.t)
+      = function
       | Constant lit -> pat_names, (Constant lit, Type.Concrete.cast (Literal.typ lit))
       | Catch_all name ->
         let pat_names, typ =
@@ -105,7 +109,7 @@ module Pattern = struct
         pat_names, (As (pat, name), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
-          Type.Scheme.instantiate_bounded
+          Type.Scheme_plain.instantiate_bounded
             ~map_name:(Name_bindings.absolutify_type_name names)
             typ
         in
@@ -130,9 +134,9 @@ module Pattern = struct
   let generalize ~names ~types pat_names typ =
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
-        let typ = Name_bindings.Name_entry.typ entry in
-        let scheme = Type_bindings.generalize types typ in
-        Name_bindings.set_inferred_scheme names name scheme)
+        Name_bindings.Name_entry.typ entry
+        |> Type_bindings.generalize types
+        |> Name_bindings.set_inferred_scheme names name)
     in
     names, Type_bindings.generalize types typ
   ;;
@@ -152,8 +156,7 @@ module Expr = struct
     | Record_field_access of 'typ t * Value_name.t
   [@@deriving sexp]
 
-  type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp]
-  type concrete = Type.Concrete.t t * Type.Concrete.t [@@deriving sexp]
+  type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp_of]
 
   let of_untyped ~names ~types expr =
     let rec of_untyped ~names ~types ~f_name expr =
@@ -219,7 +222,7 @@ module Expr = struct
             (pat, branch), branch_type)
           |> Nonempty.unzip
         in
-        iter_pairs (branch_type :: rest) ~f:(Type_bindings.unify ~names ~types);
+        List.iter_pairs (branch_type :: rest) ~f:(Type_bindings.unify ~names ~types);
         Match (expr, (expr_type, Pattern.Names.empty), branches), branch_type
       | Let { rec_; bindings; body } ->
         let names, rec_, bindings =
@@ -291,7 +294,7 @@ module Expr = struct
       | Record_field_access (_record, _name) -> failwith "TODO: record3"
       | Type_annotation (expr, typ) ->
         let t1 =
-          Type.Scheme.instantiate_bounded
+          Type.Scheme_plain.instantiate_bounded
             ~map_name:(Name_bindings.absolutify_type_name names)
             typ
         in
@@ -359,8 +362,8 @@ end
 module Module = struct
   include Module
 
-  type nonrec t = (Pattern.t, Expr.generalized) t [@@deriving sexp]
-  type nonrec def = (Pattern.t, Expr.generalized) def [@@deriving sexp]
+  type nonrec t = (Pattern.t, Expr.generalized) t [@@deriving sexp_of]
+  type nonrec def = (Pattern.t, Expr.generalized) def [@@deriving sexp_of]
 
   let rec gather_names ~names ~f_common ?f_def module_name sigs defs =
     let names =
@@ -806,7 +809,7 @@ module Module = struct
           let handle_var = Type.Param.Env_of_vars.find_or_add env in
           let map_type t =
             Type.Expr.map t ~var:handle_var ~pf:handle_var
-            |> [%sexp_of: (Type.Param.t, Type.Param.t) Type.Expr.t]
+            |> [%sexp_of: (Type_param_name.t, Type_param_name.t) Type.Expr.t]
           in
           List
             [ Atom (Ustring.to_string msg); List [ List [ map_type t1; map_type t2 ] ] ]
