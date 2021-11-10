@@ -10,6 +10,11 @@ module type General_name = sig
   val to_ustring : t -> Ustring.t
 end
 
+(* TODO: add string/ustring interning. Should be super easy to just add it to a core
+   module like [General_name] that everything else includes and make the
+   [of_string]/[of_ustring], etc. do a global hashtable lookup. We can make the names be
+   represented as integers and then interning module paths will be fast as you can just
+   hash each int in the list. *)
 module type Unidentified_name = sig
   include General_name
 
@@ -285,6 +290,7 @@ module Unique_name : sig
 
   val of_ustring : Ustring.t -> t
   val base_name : t -> Ustring.t
+  val to_ustring : t -> Ustring.t
   val to_string : t -> string
   val map_id : t -> f:(int -> int) -> t
 end = struct
@@ -294,9 +300,8 @@ end = struct
     module U = struct
       type t = Ustring.t * Id.t [@@deriving compare, hash]
 
-      let to_string (ustr, id) =
-        String.concat [ Ustring.to_string ustr; "."; Id.to_string id ]
-      ;;
+      let to_string (ustr, id) = [%string "%{ustr#Ustring}.%{id#Id}"]
+      let to_ustring (ustr, id) = Ustring.(ustr ^ of_string_exn [%string ".%{id#Id}"])
 
       let of_string str =
         let name, id = String.rsplit2_exn str ~on:'.' in
