@@ -98,7 +98,6 @@ module Scheme : sig
   include Boundable with type t = (Param.t, Nothing.t) Expr.t
 
   val of_plain : ?env:Param.Env_to_vars.t -> Scheme_plain.t -> t
-  val infer_param_map : template_type:t -> instance_type:t -> t Param.Map.t
 end
 
 module Concrete : sig

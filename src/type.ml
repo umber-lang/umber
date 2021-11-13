@@ -218,41 +218,6 @@ module Scheme = struct
   let of_plain ?(env = Param.Env_to_vars.create ()) plain =
     Expr.map plain ~var:(Param.of_name ~env) ~pf:Nothing.unreachable_code
   ;;
-
-  let infer_param_map =
-    let add_consistent param_map ~key:param ~data:new_ =
-      Param.Map.update param_map param ~f:(function
-        | None -> new_
-        | Some existing ->
-          if equal existing new_
-          then existing
-          else
-            compiler_bug
-              [%message "Inconsistent type instantiation" (existing : t) (new_ : t)])
-    in
-    let rec loop param_map t t' =
-      match (t : t), (t' : t) with
-      | Var param, _ -> add_consistent param_map ~key:param ~data:t'
-      | Type_app (type_name, args), Type_app (type_name', args') ->
-        assert_or_compiler_bug
-          (Type_name.Qualified.equal type_name type_name')
-          ~here:[%here];
-        List.fold2_exn args args' ~init:param_map ~f:loop
-      | Tuple fields, Tuple fields' ->
-        List.fold2_exn fields fields' ~init:param_map ~f:loop
-      | Function (args, body), Function (args', body') ->
-        let param_map = Nonempty.fold2_exn args args' ~init:param_map ~f:loop in
-        loop param_map body body'
-      | (Type_app _ | Tuple _ | Function _), _ ->
-        compiler_bug
-          [%message
-            "infer_param_map: incompatible template and instance types"
-              ~template:(t : t)
-              ~instance:(t' : t)]
-      | Partial_function _, _ -> .
-    in
-    fun ~template_type:t ~instance_type:t' -> loop Param.Map.empty t t'
-  ;;
 end
 
 module Concrete = struct

@@ -54,11 +54,6 @@ module Value_kind = struct
       else None
     | _ :: _ -> None
   ;;
-
-  let of_type_scheme ~names:_ _ =
-    (* FIXME: change usages of this to handle monomorphization properly *)
-    failwith "Value_kind.of_type_scheme"
-  ;;
 end
 
 (* FIXME: rewrite to use `Type.Scheme` so we can do proper mapping. 
@@ -90,6 +85,20 @@ module Monomorphic_type : sig
   val of_concrete : Type.Concrete.t -> t
   val instantiate_child : t -> Type.Scheme.t -> t
   val instantiate_child_plain : t -> Type.Scheme_plain.t -> t
+
+  module Param_kinds : sig
+    type t = Value_kind.t Type.Param.Map.t
+
+    include Hashable.S_plain with type t := t
+  end
+
+  val param_kinds : t -> Value_kind.t Type.Param.Map.t
+
+  val infer_param_kinds
+    :  names:Name_bindings.t
+    -> template_type:Type.Scheme.t
+    -> instance_type:Type.Scheme.t
+    -> Param_kinds.t
 end = struct
   module T = struct
     type t =
@@ -110,9 +119,8 @@ end = struct
         let decl = Name_bindings.find_type_decl ~defs_only:true names type_name in
         match snd decl with
         | Alias alias ->
-          to_value_kind
-            ~names
-            (of_type_alias ~names ~parent:t ~alias ~params:(fst decl) ~args)
+          of_type_alias ~names ~parent:t ~alias ~params:(fst decl) ~args
+          |> to_value_kind ~names
         | Variants _ | Record _ -> `Block
         | Abstract ->
           (* TODO: We could allow abstract types in defs if the [Value_kind] was specified
@@ -122,7 +130,11 @@ end = struct
               "Type definition in def is abstract (missing a definition)"
                 (decl : Type.Decl.t)])
     | Tuple _ | Function _ | Partial_function _ -> `Block
-    | Var param -> Map.find_exn param_kinds param
+    | Var param ->
+      option_or_default (Map.find param_kinds param) ~f:(fun () ->
+        compiler_bug
+          [%message
+            "Missing var in monomorphic type param_kinds" (param : Type.Param.t) (t : t)])
 
   and of_type_alias ~names ~parent ~alias ~params ~args =
     let env = Type.Param.Env_to_vars.create () in
@@ -145,18 +157,7 @@ end = struct
     { scheme = Type.Concrete.cast concrete; param_kinds = Type.Param.Map.empty }
   ;;
 
-  let filter_to_used_params param_kinds scheme ~get_name =
-    (* Filter the map down to just the used params to get correct caching behavior *)
-    Map.filter_keys param_kinds ~f:(fun param ->
-      Type.Expr.exists_var scheme ~f:(fun v ->
-        Type_param_name.equal (get_name v) (Type.Param.name param)))
-  ;;
-
-  let instantiate_child { scheme = _; param_kinds } scheme =
-    { scheme
-    ; param_kinds = filter_to_used_params param_kinds scheme ~get_name:Type.Param.name
-    }
-  ;;
+  let instantiate_child { scheme = _; param_kinds } scheme = { scheme; param_kinds }
 
   let instantiate_child_plain { scheme = _; param_kinds } scheme =
     let params_by_name = Type_param_name.Table.create () in
@@ -167,8 +168,68 @@ end = struct
           scheme
           ~var:(Hashtbl.find_exn params_by_name)
           ~pf:Nothing.unreachable_code
-    ; param_kinds = filter_to_used_params param_kinds scheme ~get_name:Fn.id
+    ; param_kinds
     }
+  ;;
+
+  module Param_kinds = struct
+    module T = struct
+      type t = Value_kind.t Type.Param.Map.t [@@deriving compare, hash, sexp_of]
+    end
+
+    include T
+    include Hashable.Make_plain (T)
+  end
+
+  let param_kinds { scheme; param_kinds } =
+    (* Filter the map down to just the used params to get correct caching behavior *)
+    Map.filter_keys param_kinds ~f:(fun param ->
+      Type.Expr.exists_var scheme ~f:(Type.Param.equal_names param))
+  ;;
+
+  let infer_param_kinds =
+    let add_consistent ~names param_kinds ~param ~instance_type =
+      let new_kind =
+        create ~scheme:instance_type ~param_kinds:Type.Param.Map.empty
+        |> to_value_kind ~names
+      in
+      Map.update param_kinds param ~f:(function
+        | None -> new_kind
+        | Some existing_kind ->
+          if Value_kind.equal existing_kind new_kind
+          then existing_kind
+          else
+            compiler_bug
+              [%message
+                "Inconsistent type instantiation"
+                  (existing_kind : Value_kind.t)
+                  (new_kind : Value_kind.t)])
+    in
+    let rec loop ~names param_kinds template_type instance_type =
+      match (template_type : Type.Scheme.t), (instance_type : Type.Scheme.t) with
+      | Var param, _ -> add_consistent ~names param_kinds ~param ~instance_type
+      | Type_app (type_name, args), Type_app (type_name', args') ->
+        assert_or_compiler_bug
+          (Type_name.Qualified.equal type_name type_name')
+          ~here:[%here];
+        List.fold2_exn args args' ~init:param_kinds ~f:(loop ~names)
+      | Tuple fields, Tuple fields' ->
+        List.fold2_exn fields fields' ~init:param_kinds ~f:(loop ~names)
+      | Function (args, body), Function (args', body') ->
+        let param_kinds =
+          Nonempty.fold2_exn args args' ~init:param_kinds ~f:(loop ~names)
+        in
+        loop ~names param_kinds body body'
+      | (Type_app _ | Tuple _ | Function _), _ ->
+        compiler_bug
+          [%message
+            "infer_param_map: incompatible types"
+              (template_type : Type.Scheme.t)
+              (instance_type : Type.Scheme.t)]
+      | Partial_function _, _ -> .
+    in
+    fun ~names ~template_type ~instance_type ->
+      loop ~names Type.Param.Map.empty template_type instance_type
   ;;
 
   include Comparable.Make_plain (T)
@@ -859,7 +920,7 @@ module Expr = struct
      them to you - I think most of the uses do this anyway. We could also try to do
      clever stuff like noticing if a pattern binds only the empty name and no "real"
      names, and then returning no bindings. *)
-  (*let rec fold_pattern_bindings
+  let rec fold_pattern_bindings
     ?(add_name = Context.add_value_name)
     ~ctx
     ~init:acc
@@ -889,8 +950,6 @@ module Expr = struct
           let acc = add_let acc name mir_expr in
           ctx, name, acc
       in
-      (* FIXME: this is definitely incorrect in the pointers-first representation 
-         - we need to re-index constructor information in Context.t *)
       List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
         let arg_index, arg_type =
           Context.cnstr_arg_info ctx type_ cnstr (Block_index.raw i)
@@ -898,9 +957,9 @@ module Expr = struct
         let arg_expr = Get_block_field (arg_index, Name name) in
         fold_pattern_bindings ~ctx ~init:acc ~add_let arg arg_expr arg_type)
     | Constant _ -> ctx, acc
-  ;;*)
+  ;;
 
-  (*let rec condition_of_pattern ~ctx ~input_expr ~input_type pattern =
+  let rec condition_of_pattern ~ctx ~input_expr ~input_type pattern =
     match (pattern : Simple_pattern.t) with
     | Catch_all _ -> None
     | As (pattern, _) -> condition_of_pattern ~ctx ~input_expr ~input_type pattern
@@ -920,15 +979,6 @@ module Expr = struct
             condition_of_pattern ~ctx ~input_expr:arg_expr ~input_type:arg_type arg)
         in
         Some (List.fold conds ~init:tag_cond ~f:(fun cond cond' -> And (cond, cond'))))
-  ;;*)
-
-  (* FIXME: make this work *)
-  let fold_pattern_bindings ?add_name:_ ~ctx:_ ~init:_ ~add_let:_ _pat _mir_expr _type_ =
-    failwith "fold_pattern_bindings"
-  ;;
-
-  let condition_of_pattern ~ctx:_ ~input_expr:_ ~input_type:_ _pattern =
-    failwith "condition_of_pattern"
   ;;
 
   (* TODO: We need to insert conditional bindings in match statements
@@ -1019,15 +1069,16 @@ module Expr = struct
           Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
             of_typed_expr ~ctx arg (Monomorphic_type.instantiate_child expr_type arg_type))
         in
+        let body_type = Monomorphic_type.scheme expr_type in
         (match fun_ with
         | Name fun_name ->
-          call ~fun_name ~args ~arg_types;
+          call ~fun_name ~arg_types ~body_type;
           Fun_call (fun_name, args)
         | Let _ | Fun_call _ | Get_block_field _ | If _ | Catch _ | Break _ ->
           (* FIXME: does this make any sense? I suppose this is meant to hit the last
              defined function or something? *)
           let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
-          call ~fun_name ~args ~arg_types;
+          call ~fun_name ~arg_types ~body_type;
           Let (fun_name, fun_, Fun_call (fun_name, args))
         | Primitive _ | Make_block _ ->
           compiler_bug [%message "Invalid function expression" (fun_ : t)])
@@ -1035,7 +1086,8 @@ module Expr = struct
         (* TODO: Still need to try and coalesce lambdas/other function expressions for
            function definitions which are partially applied. See example in
            test/ast/TypeChecking.expected. *)
-        Name (snd (add_lambda ~ctx ~args ~arg_types ~body ~body_type))
+        let param_kinds = Monomorphic_type.param_kinds expr_type in
+        Name (snd (add_lambda ~ctx ~args ~arg_types ~body ~body_type ~param_kinds))
         (*let bound_names = Unique_name.Hash_set.create () in
         let closed_over = ref Unique_name.Set.empty in
         (* FIXME: cleaup. Need to bind all the args in the lambda, then create the body. *)
@@ -1171,13 +1223,9 @@ module Expr = struct
         let fun_def = { fun_name; closed_over = !closed_over; args; body; returns } in
         Name fun_name, fun_def :: fun_defs*)*)
       | Match (expr, input_type, arms), output_type ->
-        let input_expr =
-          of_typed_expr
-            ~ctx
-            expr
-            (Monomorphic_type.instantiate_child expr_type input_type)
-        in
         let output_type = Monomorphic_type.instantiate_child expr_type output_type in
+        let input_type = Monomorphic_type.instantiate_child expr_type input_type in
+        let input_expr = of_typed_expr ~ctx expr input_type in
         (match expr with
         | Name _ ->
           (* Skip binding [match_expr_name] when matching on a single variable *)
@@ -1275,6 +1323,7 @@ module Expr = struct
           patterns
       and loop ~coverage = function
         | [] ->
+          let input_type = Monomorphic_type.scheme input_type in
           (match Simple_pattern.Coverage.missing_cases ~ctx ~input_type coverage with
           | [] ->
             compiler_bug [%message "Pattern coverage/condition checking is out of sync"]
@@ -1380,7 +1429,11 @@ module Expr = struct
 end
 
 module Fun_def = struct
-  (* TODO: should we resolve closures in this pass? *)
+  (* TODO: If all uses of this end up including the fun_name, just put it in here *)
+  (* TODO: should we resolve closures in this pass? Split immediate/pointers and just
+     make it a block argument? Closure environments will have to GC'd like everything
+     else, so it makes sense. That does mean they're affected by monomorphization, though.
+     (The Value_kinds matter and need to be stored here.) *)
   type t =
     { closed_over : Unique_name.Set.t
     ; args : (Unique_name.t * Value_kind.t) Nonempty.t
@@ -1389,35 +1442,6 @@ module Fun_def = struct
     }
   [@@deriving sexp_of]
 end
-
-(* FIXME: we probably want to preserve already unified type variables rather than
-   re-create them here. *)
-(*module Unique_param : sig
-  type t [@@deriving compare, equal, hash, sexp]
-
-  val create : unit -> t
-
-include Comparable.S with type t := t
-  
-  module Kind_map : sig
-    type t = Value_kind.t Map.t
-
-    include module type of Map with type _ t := t
-
-    (* TODO: move this into some kind of interface (it's repeated in `Type.Param`) *)
-    val hash_fold_t : (Hash.state -> Value_kind.t -> Hash.state) -> Hash.state -> t -> Hash.state
-  end
-end = struct
-  module T = Unique_id.Int ()
-  include T
-
-  module Kind_map = struct
-    include Map
-    include Map.Provide_hash (T)
-
-    type nonrec t = Value_kind.t t
-  end
-end*)
 
 module Function_factory : sig
   type t
@@ -1430,7 +1454,7 @@ module Function_factory : sig
     -> arg_types:Type.Scheme.t Nonempty.t
     -> body_type:Type.Scheme.t
     -> definition:Type.Scheme.t Typed.Expr.t
-    -> unit
+    -> Context.t * Unique_name.t
 
   val add_lambda
     :  t
@@ -1439,7 +1463,7 @@ module Function_factory : sig
     -> arg_types:Type.Scheme.t Nonempty.t
     -> body:Type.Scheme.t Typed.Expr.t
     -> body_type:Type.Scheme.t
-    -> parent_type:Monomorphic_type.t
+    -> param_kinds:Monomorphic_type.Param_kinds.t
     -> Context.t * Unique_name.t
 
   (* FIXME: Problem: we want to call this recursively, with funcion calls inside other
@@ -1448,139 +1472,115 @@ module Function_factory : sig
   val call
     :  t
     -> fun_name:Unique_name.t
-    -> args:Expr.t Nonempty.t
     -> arg_types:Type.Scheme.t Nonempty.t
+    -> body_type:Type.Scheme.t
     -> unit
 
   val pop_fun_defs : t -> (Unique_name.t * Fun_def.t) list
 end = struct
-  (* TODO: things like closed_over, the arg names, etc. are not unique among instances,
-     they could be shared in the template *)
-  module Instance = struct
-    type t =
-      { closed_over : Unique_name.Set.t
-      ; args : (Unique_name.t * Value_kind.t) Nonempty.t
-      ; returns : Value_kind.t
-      ; body : t
-      }
-  end
-
   module Template = struct
-    module Id = Unique_id.Int ()
-
     type t =
       { ctx : Context.t
       ; args : (Typed.Pattern.t * Type.Scheme.t) Nonempty.t
       ; body : Type.Scheme.t Typed.Expr.t
       ; body_type : Type.Scheme.t
-      ; instances : Instance.t Type.Param.Table.t
+      ; instances : (Unique_name.t * Fun_def.t) Monomorphic_type.Param_kinds.Table.t
       }
 
     let create ~ctx ~args ~body ~body_type =
-      { ctx; args; body; body_type; instances = Type.Param.Table.create () }
+      let instances = Monomorphic_type.Param_kinds.Table.create () in
+      { ctx; args; body; body_type; instances }
     ;;
 
-    (*let create_fun_def ~ctx ~args ~arg_exprs ~body ~body_type =
+    let create_fun_def ~ctx ~args ~body ~body_type ~add_lambda ~call =
+      (* TODO: Could we just do this ourselves directly, instead of using add_observer? *)
+      (* Record all of the names bound in the function arguments *)
       let bound_names = Unique_name.Hash_set.create () in
-      let closed_over = ref Unique_name.Set.empty in
-      let args, bindings, fun_defs, body_ctx =
-        (* TODO: can this just be one ctx passed through? It isn't returned so it's fine.
-             Look at the previous code and copy what it does. *)
-        (* Record all of the names bound in the function arguments *)
-        let ctx = Context.with_add_observer ctx ~f:(Hash_set.add bound_names) in
-        Nonempty.fold2_exn
-          args
-          arg_types
-          ~init:([], [], fun_defs, ctx)
-          ~f:(fun (args, bindings, fun_defs) arg arg_type ->
+      let ctx = Context.with_add_observer ctx ~f:(Hash_set.add bound_names) in
+      let (ctx, bindings), args =
+        Nonempty.fold_map args ~init:(ctx, []) ~f:(fun (ctx, bindings) (arg, arg_type) ->
           let arg =
             Simple_pattern.flatten_typed_pattern_no_unions
               arg
               ~label:"function argument patterns"
           in
-          let arg_name, (ctx, bindings) =
+          let ctx, bindings, arg_name =
             match arg with
             | Catch_all (Some arg_name) ->
               (* Special-case named catch-all patterns (the dominant case) to skip the
                  [lambda_arg] step and use the name directly. *)
               let ctx, arg_name = Context.add_value_name ctx arg_name in
-              arg_name, (ctx, bindings)
+              ctx, bindings, arg_name
             | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
               let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
               let add_let acc name mir_expr = (name, mir_expr) :: acc in
-              ( arg_name
-              , fold_pattern_bindings
+              let ctx, bindings =
+                Expr.fold_pattern_bindings
                   ~ctx
                   arg
                   (Name arg_name)
                   arg_type
                   ~init:bindings
-                  ~add_let )
+                  ~add_let
+              in
+              ctx, bindings, arg_name
           in
           let arg =
             ( arg_name
             , Value_kind.of_type_scheme ~names:(Context.name_bindings ctx) arg_type )
           in
-          arg :: args, bindings, fun_defs, ctx)
+          (ctx, bindings), arg)
       in
-      let body_ctx =
+      let closed_over = ref Unique_name.Set.empty in
+      let ctx =
         (* Determine if names looked up were bound as function args or closed over *)
-        Context.with_find_observer body_ctx ~f:(fun parent_observer name ->
+        Context.with_find_observer ctx ~f:(fun parent_observer name ->
           if not (Hash_set.mem bound_names name)
           then (
             parent_observer name;
             closed_over := Set.add !closed_over name))
       in
-      let body, fun_defs = of_typed_expr ~ctx:body_ctx ~fun_defs (body, body_type) in
+      let body = Expr.of_typed_expr ~ctx ~add_lambda ~call body body_type in
       let body =
         List.fold_right bindings ~init:body ~f:(fun (name, mir_expr) body ->
-          Let (name, mir_expr, body))
+          Expr.Let (name, mir_expr, body))
       in
       let returns =
         Value_kind.of_type_scheme ~names:(Context.name_bindings ctx) body_type
       in
       (* TODO: see if we can get rid of `just_bound`? Responsibility can move to Context
-           or whatever does function definitions *)
+         or whatever does function definitions *)
       (* FIXME: Can we just leave the fun_name out of fun_def? *)
-      let fun_name =
+      (*let fun_name =
         match just_bound with
         | Some name -> Context.find_value_name ctx ([], name)
         | None -> snd (Context.add_value_name ctx Constant_names.fun_)
-      in
-      { fun_name; closed_over = !closed_over; args; body; returns }
-    ;;*)
+      in*)
+      { Fun_def.closed_over = !closed_over; args; returns; body }
+    ;;
 
-    (* FIXME: make this work *)
-    (*let instantiate { ctx; args; body; body_type; instances } ~args:arg_exprs ~arg_types =
-      let param_kinds =
-        Nonempty.fold2_exn
-          args
-          arg_types
-          ~init:Param_kind_map.empty
-          ~f:(fun param_kinds (_, template_type) instance_type ->
-          Map.merge
-            param_kinds
-            (Type.Scheme.infer_param_map ~template_type ~instance_type)
-            ~f:(fun ~key:param -> function
-            | `Left kind -> Some kind
-            | `Right type_ ->
-              (* FIXME: Problem: we may not get back a concrete type. We don't always have
-                 enough information to determine the value_kind here. We need help from
-                 outer scopes. (Since we may be in a polymorphic context with params
-                 passed down from above). We need to determine what those substitutions
-                 are. Note: it's not good enough to just rely on the type scheme! The
-                 names in there are reused constantly! They can't be used outside of it. *)
-              ()))
-      in
-      Hashtbl.find_or_add instances fun_type ~default:(fun () ->
-        create_fun_def ~ctx ~args ~arg_exprs ~body ~body_type ~param_kinds)
-    ;;*)
-
-    let instantiate _ ~args:_ ~arg_types:_ = failwith "instantiate"
+    let instantiate
+      { ctx; args; body; body_type; instances }
+      ~param_kinds
+      ~add_lambda
+      ~call
+      =
+      Hashtbl.find_or_add instances param_kinds ~default:(fun () ->
+        let args =
+          Nonempty.map args ~f:(fun (pat, scheme) ->
+            pat, Monomorphic_type.create ~scheme ~param_kinds)
+        in
+        let body_type = Monomorphic_type.create ~scheme:body_type ~param_kinds in
+        let fun_def = create_fun_def ~ctx ~args ~body ~body_type ~add_lambda ~call in
+        let fun_name =
+          Unique_name.of_ustring (Value_name.to_ustring Constant_names.fun_)
+        in
+        fun_name, fun_def)
+    ;;
   end
 
   type t =
-    { templates : Template.t Template.Id.Table.t
+    { templates : Template.t Unique_name.Table.t
     ; fun_defs : (Unique_name.t * Fun_def.t) Queue.t
     }
 
@@ -1588,7 +1588,7 @@ end = struct
 
   let define_fun { templates; _ } ~ctx ~arg_types ~body_type ~definition =
     let args, body =
-      match definition with
+      match (definition : _ Typed.Expr.t) with
       | Lambda (args, body) ->
         (* TODO: What if there are extra args (i.e. the lambda returns a function?) *)
         args, body
@@ -1599,32 +1599,41 @@ end = struct
             Pattern.Catch_all (Some name), (Typed.Expr.Name ([], name), typ))
           |> Nonempty.unzip
         in
-        synthetic_arg_patterns, Fun_call (expr, synthetic_arg_exprs)
+        synthetic_arg_patterns, Fun_call (definition, synthetic_arg_exprs)
     in
-    let template =
-      Template.create ~ctx ~args:(Nonempty.zip_exn args arg_types) ~body ~body_type
-    in
-    let template_id = Template.Id.create () in
-    Hashtbl.add_exn templates ~key:template_id ~data:template
-  ;;
-
-  let add_lambda { templates; _ } ~ctx ~args ~arg_types ~body ~body_type ~parent_type =
     let template =
       Template.create ~ctx ~args:(Nonempty.zip_exn args arg_types) ~body ~body_type
     in
     let ctx, fun_name = Context.add_value_name ctx Constant_names.fun_ in
-    let template_id = Template.Id.create () in
-    Hashtbl.add_exn templates ~key:template_id ~data:template;
+    Hashtbl.add_exn templates ~key:fun_name ~data:template;
     ctx, fun_name
   ;;
 
-  let call { templates; fun_defs } ~fun_name ~args ~arg_types =
+  let rec add_lambda t ~ctx ~args ~arg_types ~body ~body_type ~param_kinds =
     let template =
-      option_or_default (Hashtbl.find templates fun_name) ~f:(fun () ->
+      Template.create ~ctx ~args:(Nonempty.zip_exn args arg_types) ~body ~body_type
+    in
+    let fun_name, _ =
+      Template.instantiate template ~param_kinds ~add_lambda:(add_lambda t) ~call:(call t)
+    in
+    Hashtbl.add_exn t.templates ~key:fun_name ~data:template;
+    ctx, fun_name
+
+  and call t ~fun_name ~arg_types ~body_type =
+    let template =
+      option_or_default (Hashtbl.find t.templates fun_name) ~f:(fun () ->
         compiler_bug [%message "Function template not found" (fun_name : Unique_name.t)])
     in
-    let new_fun_def = Template.instantiate template ~args ~arg_types in
-    Queue.enqueue fun_defs new_fun_def
+    let param_kinds =
+      Monomorphic_type.infer_param_kinds
+        ~names:(Context.name_bindings template.ctx)
+        ~template_type:(Function (Nonempty.map ~f:snd template.args, template.body_type))
+        ~instance_type:(Function (arg_types, body_type))
+    in
+    let fun_def =
+      Template.instantiate template ~param_kinds ~add_lambda:(add_lambda t) ~call:(call t)
+    in
+    Queue.enqueue t.fun_defs fun_def
   ;;
 
   let pop_fun_defs { fun_defs; templates = _ } =
@@ -1723,9 +1732,18 @@ let of_typed_module =
            Similar to [just_bound]. I guess I can just keep using [just_bound] actually,
            it seems less hacky maybe? *)
         let ctx, _ =
-          Function_factory.add_lambda fun_factory ~ctx ~args ~arg_types ~definition:expr
+          Function_factory.define_fun
+            fun_factory
+            ~ctx
+            ~arg_types
+            ~body_type
+            ~definition:expr
         in
-        ctx, List.map ~f:Stmt.fun_def (Function_factory.pop_fun_defs fun_factory) @ stmts
+        ( ctx
+        , List.map
+            ~f:(Tuple2.uncurry Stmt.fun_def)
+            (Function_factory.pop_fun_defs fun_factory)
+          @ stmts )
       | None ->
         let typ = Monomorphic_type.create ~scheme:typ ~param_kinds:Type.Param.Map.empty in
         let mir_expr =
