@@ -230,6 +230,7 @@ module Value_name : sig
   include Name_qualified
 
   val of_cnstr_name : Cnstr_name.t -> t
+  val to_cnstr_name : t -> Cnstr_name.t Or_error.t
   val is_cnstr_name : t -> bool
 
   module Qualified : sig
@@ -241,7 +242,8 @@ end = struct
   include Lower_name_qualified
 
   let of_cnstr_name = of_ustring_unchecked << Cnstr_name.to_ustring
-  let is_cnstr_name = Or_error.is_ok << Cnstr_name.of_ustring << to_ustring
+  let to_cnstr_name = Cnstr_name.of_ustring << to_ustring
+  let is_cnstr_name = Or_error.is_ok << to_cnstr_name
 
   module Qualified = struct
     include Qualified

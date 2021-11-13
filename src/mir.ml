@@ -72,6 +72,7 @@ module Monomorphic_type : sig
 
   val create : scheme:Type.Scheme.t -> param_kinds:Value_kind.t Type.Param.Map.t -> t
   val scheme : t -> Type.Scheme.t
+  val param_kinds : t -> Value_kind.t Type.Param.Map.t
   val to_value_kind : names:Name_bindings.t -> t -> Value_kind.t
 
   val of_type_alias
@@ -91,8 +92,6 @@ module Monomorphic_type : sig
 
     include Hashable.S_plain with type t := t
   end
-
-  val param_kinds : t -> Value_kind.t Type.Param.Map.t
 
   val infer_param_kinds
     :  names:Name_bindings.t
@@ -157,7 +156,18 @@ end = struct
     { scheme = Type.Concrete.cast concrete; param_kinds = Type.Param.Map.empty }
   ;;
 
-  let instantiate_child { scheme = _; param_kinds } scheme = { scheme; param_kinds }
+  let filter_to_used_params scheme param_kinds ~get_name =
+    (* Filter the map down to just the used params to get correct caching behavior *)
+    Map.filter_keys param_kinds ~f:(fun param ->
+      Type.Expr.exists_var scheme ~f:(fun v ->
+        Type_param_name.equal (get_name v) (Type.Param.name param)))
+  ;;
+
+  let instantiate_child { scheme = _; param_kinds } scheme =
+    { scheme
+    ; param_kinds = filter_to_used_params scheme param_kinds ~get_name:Type.Param.name
+    }
+  ;;
 
   let instantiate_child_plain { scheme = _; param_kinds } scheme =
     let params_by_name = Type_param_name.Table.create () in
@@ -168,7 +178,7 @@ end = struct
           scheme
           ~var:(Hashtbl.find_exn params_by_name)
           ~pf:Nothing.unreachable_code
-    ; param_kinds
+    ; param_kinds = filter_to_used_params scheme param_kinds ~get_name:Fn.id
     }
   ;;
 
@@ -180,12 +190,6 @@ end = struct
     include T
     include Hashable.Make_plain (T)
   end
-
-  let param_kinds { scheme; param_kinds } =
-    (* Filter the map down to just the used params to get correct caching behavior *)
-    Map.filter_keys param_kinds ~f:(fun param ->
-      Type.Expr.exists_var scheme ~f:(Type.Param.equal_names param))
-  ;;
 
   let infer_param_kinds =
     let add_consistent ~names param_kinds ~param ~instance_type =
@@ -1009,64 +1013,43 @@ module Expr = struct
       match (expr : Type.Scheme.t Typed.Expr.t), Monomorphic_type.scheme expr_type with
       | Literal lit, _ -> Primitive lit
       | Name name, _ -> Name (Context.find_value_name ctx name)
-      | Fun_call (fun_, args_and_types), result_type ->
-        (* TODO: catch constructor applications - can either replace the function call in
-           the mir or add definitions for all the functions *)
-        (* FIXME: cleanup *)
-        (*let rec loop (f, f_type) arg args ~fun_defs =
-          match (f : _ Typed.Expr.t) with
-          | Fun_call (f', arg', arg_type') ->
-            let f' = f', Type.Expr.Function (arg_type', result_type) in
-            let arg, fun_defs = of_typed_expr ~ctx ~fun_defs arg in
-            loop f' (arg', arg_type') (arg :: args) ~fun_defs
-          | Name _ | Lambda _ | Match _ | Let _ ->
-            let fun_, fun_defs = of_typed_expr ~ctx ~fun_defs (f, f_type) in
-            let arg, fun_defs = of_typed_expr ~ctx ~fun_defs arg in
-            (match fun_ with
-            | Name fun_name -> Fun_call (fun_name, arg :: args), fun_defs
-            | Let _ | Get_block_field _ | If _ | Catch _ | Break _ ->
-              (* TODO: Allow `let`, `match`, `if`, etc. in function expressions *)
-              mir_error
-                [%message
-                  "This kind of expression is not allowed in a function call"
-                    (f : Type.Scheme.t Typed.Expr.t)]
-            | Primitive _ | Fun_call _ | Make_block _ ->
-              compiler_bug [%message "Invalid function expression" (fun_ : t)])
-          | Literal _
-          | Tuple _
-          | Record_literal _
-          | Record_update _
-          | Record_field_access _ ->
-            (* TODO: should be able to find where this is from a Node.t or something *)
-            mir_error
-              [%message
-                "This is not a function; it cannot be applied"
-                  (f : Type.Scheme.t Typed.Expr.t)]
-        in
-        loop (f, Function (arg_type, result_type)) (arg, arg_type) [] ~fun_defs*)
-        (* FIXME: maybe args should be used? *)
-        let _args, arg_types = Nonempty.unzip args_and_types in
-        let fun_type =
-          Monomorphic_type.instantiate_child expr_type (Function (arg_types, result_type))
-        in
-        let fun_ = of_typed_expr ~ctx fun_ fun_type in
-        let args =
-          Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
-            of_typed_expr ~ctx arg (Monomorphic_type.instantiate_child expr_type arg_type))
-        in
-        let body_type = Monomorphic_type.scheme expr_type in
-        (match fun_ with
-        | Name fun_name ->
-          call ~fun_name ~arg_types ~body_type;
-          Fun_call (fun_name, args)
-        | Let _ | Fun_call _ | Get_block_field _ | If _ | Catch _ | Break _ ->
-          (* FIXME: does this make any sense? I suppose this is meant to hit the last
+      | Fun_call (fun_, args_and_types), body_type ->
+        let fun_call () =
+          let arg_types = Nonempty.map ~f:snd args_and_types in
+          let fun_type =
+            Monomorphic_type.instantiate_child expr_type (Function (arg_types, body_type))
+          in
+          let fun_ = of_typed_expr ~ctx fun_ fun_type in
+          let args =
+            Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
+              of_typed_expr
+                ~ctx
+                arg
+                (Monomorphic_type.instantiate_child expr_type arg_type))
+          in
+          (* Special-case constructor applications *)
+          match fun_ with
+          | Name fun_name ->
+            call ~fun_name ~arg_types ~body_type;
+            Fun_call (fun_name, args)
+          | Let _ | Fun_call _ | Get_block_field _ | If _ | Catch _ | Break _ ->
+            (* FIXME: does this make any sense? I suppose this is meant to hit the last
              defined function or something? *)
-          let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
-          call ~fun_name ~arg_types ~body_type;
-          Let (fun_name, fun_, Fun_call (fun_name, args))
-        | Primitive _ | Make_block _ ->
-          compiler_bug [%message "Invalid function expression" (fun_ : t)])
+            let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
+            call ~fun_name ~arg_types ~body_type;
+            Let (fun_name, fun_, Fun_call (fun_name, args))
+          | Primitive _ | Make_block _ ->
+            compiler_bug [%message "Invalid function expression" (fun_ : t)]
+        in
+        (match fun_ with
+        | Name (_, name) ->
+          (match Value_name.to_cnstr_name name with
+          | Ok cnstr_name ->
+            let tag = Context.cnstr_tag ctx expr_type (Named cnstr_name) in
+            let fields, field_types = List.unzip (Nonempty.to_list args_and_types) in
+            make_block ~ctx ~expr_type ~tag ~fields ~field_types
+          | Error _ -> fun_call ())
+        | _ -> fun_call ())
       | Lambda (args, body), Function (arg_types, body_type) ->
         (* TODO: Still need to try and coalesce lambdas/other function expressions for
            function definitions which are partially applied. See example in
@@ -1127,24 +1110,7 @@ module Expr = struct
           List.fold bindings ~init:body ~f:(fun body (name, mir_expr) ->
             Let (name, mir_expr, body)))
       | Tuple fields, Tuple field_types ->
-        let pointers, immediates =
-          List.fold2_exn
-            fields
-            field_types
-            ~init:([], [])
-            ~f:(fun (pointers, immediates) field typ ->
-            let typ = Monomorphic_type.instantiate_child expr_type typ in
-            let field = of_typed_expr ~ctx field typ in
-            if Value_kind.is_pointer
-                 (Monomorphic_type.to_value_kind typ ~names:(Context.name_bindings ctx))
-            then field :: pointers, immediates
-            else pointers, field :: immediates)
-        in
-        Make_block
-          { tag = Cnstr.Tag.default
-          ; pointers = List.rev pointers
-          ; immediates = List.rev immediates
-          }
+        make_block ~ctx ~expr_type ~tag:Cnstr.Tag.default ~fields ~field_types
       | Record_literal _, _ | Record_update _, _ | Record_field_access _, _ ->
         failwith "TODO: records in MIR exprs"
       | ( Lambda _, (Var _ | Type_app _ | Tuple _)
@@ -1152,6 +1118,22 @@ module Expr = struct
         compiler_bug
           [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
       | _, Partial_function _ -> .
+    and make_block ~ctx ~expr_type ~tag ~fields ~field_types =
+      (* TODO: isn't this duplicating code from `Context.Arg_info`? *)
+      let pointers, immediates =
+        List.fold2_exn
+          fields
+          field_types
+          ~init:([], [])
+          ~f:(fun (pointers, immediates) field typ ->
+          let typ = Monomorphic_type.instantiate_child expr_type typ in
+          let field = of_typed_expr ~ctx field typ in
+          if Value_kind.is_pointer
+               (Monomorphic_type.to_value_kind typ ~names:(Context.name_bindings ctx))
+          then field :: pointers, immediates
+          else pointers, field :: immediates)
+      in
+      Make_block { tag; pointers = List.rev pointers; immediates = List.rev immediates }
     and handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms =
       let rec loop_one_arm ~pattern ~output_expr ~coverage arms =
         let patterns = Simple_pattern.flatten_typed_pattern pattern in
