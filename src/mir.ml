@@ -1450,20 +1450,27 @@ end = struct
     ctx, fun_name
 
   and call t ~fun_name ~arg_types ~body_type =
-    let template =
-      option_or_default (Hashtbl.find t.templates fun_name) ~f:(fun () ->
-        compiler_bug [%message "Function template not found" (fun_name : Unique_name.t)])
-    in
-    let param_kinds =
-      Monomorphic_type.infer_param_kinds
-        ~names:(Context.name_bindings template.ctx)
-        ~template_type:(Function (Nonempty.map ~f:snd template.args, template.body_type))
-        ~instance_type:(Function (arg_types, body_type))
-    in
-    let fun_def =
-      Template.instantiate template ~param_kinds ~add_lambda:(add_lambda t) ~call:(call t)
-    in
-    Queue.enqueue t.fun_defs fun_def
+    match Hashtbl.find t.templates fun_name with
+    | Some template ->
+      let param_kinds =
+        Monomorphic_type.infer_param_kinds
+          ~names:(Context.name_bindings template.ctx)
+          ~template_type:
+            (Function (Nonempty.map ~f:snd template.args, template.body_type))
+          ~instance_type:(Function (arg_types, body_type))
+      in
+      let fun_def =
+        Template.instantiate
+          template
+          ~param_kinds
+          ~add_lambda:(add_lambda t)
+          ~call:(call t)
+      in
+      Queue.enqueue t.fun_defs fun_def
+    | None ->
+      (* If we don't find a template, we must be inside a recursive call. We can just do
+         nothing as we are already in the middle of generating the template. *)
+      ()
   ;;
 
   let pop_fun_defs { fun_defs; templates = _ } =
