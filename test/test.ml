@@ -60,7 +60,7 @@ let run_tests () =
           if should_make_mir bare_filename
           then (
             match Mir.of_typed_module ~names ast with
-            | Ok mir ->
+            | Ok (_fun_factory, mir) ->
               let mir = Mir.renumber_ids mir in
               Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
               if should_make_llvm bare_filename

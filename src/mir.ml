@@ -1277,7 +1277,7 @@ module Fun_def = struct
 end
 
 module Function_factory : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val create : unit -> t
 
@@ -1316,6 +1316,7 @@ end = struct
       ; body_type : Type.Scheme.t
       ; instances : (Unique_name.t * Fun_def.t) Monomorphic_type.Param_kinds.Table.t
       }
+    [@@deriving sexp_of]
 
     let create ~ctx ~args ~body ~body_type =
       let instances = Monomorphic_type.Param_kinds.Table.create () in
@@ -1394,6 +1395,7 @@ end = struct
       ~param_kinds
       ~add_lambda
       ~call
+      ~on_new
       =
       Hashtbl.find_or_add instances param_kinds ~default:(fun () ->
         let args =
@@ -1405,7 +1407,9 @@ end = struct
         let fun_name =
           Unique_name.of_ustring (Value_name.to_ustring Constant_names.fun_)
         in
+        on_new (fun_name, fun_def);
         fun_name, fun_def)
+      |> fst
     ;;
   end
 
@@ -1413,6 +1417,7 @@ end = struct
     { templates : Template.t Unique_name.Table.t
     ; fun_defs : (Unique_name.t * Fun_def.t) Queue.t
     }
+  [@@deriving sexp_of]
 
   let create () = { templates = Unique_name.Table.create (); fun_defs = Queue.create () }
 
@@ -1443,8 +1448,13 @@ end = struct
     let template =
       Template.create ~ctx ~args:(Nonempty.zip_exn args arg_types) ~body ~body_type
     in
-    let fun_name, _ =
-      Template.instantiate template ~param_kinds ~add_lambda:(add_lambda t) ~call:(call t)
+    let fun_name =
+      Template.instantiate
+        template
+        ~param_kinds
+        ~add_lambda:(add_lambda t)
+        ~call:(call t)
+        ~on_new:(Queue.enqueue t.fun_defs)
     in
     Hashtbl.add_exn t.templates ~key:fun_name ~data:template;
     ctx, fun_name
@@ -1459,14 +1469,14 @@ end = struct
             (Function (Nonempty.map ~f:snd template.args, template.body_type))
           ~instance_type:(Function (arg_types, body_type))
       in
-      let fun_def =
-        Template.instantiate
-          template
-          ~param_kinds
-          ~add_lambda:(add_lambda t)
-          ~call:(call t)
-      in
-      Queue.enqueue t.fun_defs fun_def
+      ignore
+        (Template.instantiate
+           template
+           ~param_kinds
+           ~add_lambda:(add_lambda t)
+           ~call:(call t)
+           ~on_new:(Queue.enqueue t.fun_defs)
+          : Unique_name.t)
     | None ->
       (* If we don't find a template, we must be inside a recursive call. We can just do
          nothing as we are already in the middle of generating the template. *)
@@ -1622,20 +1632,25 @@ let of_typed_module =
       | Module (module_name, _sigs, defs) ->
         Context.with_module ctx module_name ~f:(fun ctx ->
           loop ~ctx ~stmts ~fun_factory defs)
-      | Trait (_, _, _, _) | Impl (_, _, _, _) -> failwith "TODO: MIR traits/impls"
-      | Common_def _ -> ctx, stmts)
+      | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
+      (* TODO: Should probably preserve extern declarations *)
+      | Common_def
+          ( Val _
+          | Extern _
+          | Type_decl _
+          | Trait_sig _
+          | Import _
+          | Import_with _
+          | Import_without _ ) -> ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     try
       let names = Name_bindings.into_module names module_name ~place:`Def in
+      let fun_factory = Function_factory.create () in
       let _ctx, stmts =
-        loop
-          ~ctx:(Context.of_name_bindings names)
-          ~stmts:[]
-          ~fun_factory:(Function_factory.create ())
-          defs
+        loop ~ctx:(Context.of_name_bindings names) ~stmts:[] ~fun_factory defs
       in
-      Ok (List.rev stmts)
+      Ok (fun_factory, List.rev stmts)
     with
     | Compilation_error.Compilation_error error -> Error error
     | Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
