@@ -178,7 +178,7 @@ let codegen_stmt t stmt =
     set_global_constant true value;
     Hashtbl.add_exn t.values ~key:name ~data:value;
     value
-  | Fun_def (fun_name, { closed_over; args; returns; body }) ->
+  | Fun_def { fun_name; closed_over; args; returns; body } ->
     if not (Set.is_empty closed_over)
     then raise_s [%message "TODO: closures" (closed_over : Unique_name.Set.t)];
     let arg_names, arg_kinds = Nonempty.unzip args in
