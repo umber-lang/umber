@@ -1,7 +1,9 @@
 open Core
 open Umber
 
-(* TODO: Could make Stage/Target GADTS and put the functions inside them *)
+(* TODO: Could make Stage/Target GADTS and put the functions inside them. I think GADTs
+   will probably ruin everything but I am kinda sad you still have to think about target/
+   stage dependencies a lot when writing this command. *)
 
 module Stage = struct
   module T = struct
@@ -53,7 +55,7 @@ module Target = struct
     | Untyped_ast -> flag "untyped-ast" no_arg ~doc:"Print parser output (untyped AST)"
     | Typed_ast -> flag "typed-ast" no_arg ~doc:"Print type-checker output (typed AST)"
     | Names -> flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
-    | Mir -> flag "mir" no_arg ~doc:"Print mid-level IR (MIR)"
+    | Mir -> flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
     | Templates -> flag "templates" no_arg ~doc:"Print polymorphic function templates"
     | Llvm -> flag "llvm" no_arg ~doc:"Print LLVM IR"
   ;;
@@ -142,7 +144,7 @@ let command =
              let fun_factory, mir = or_raise (Mir.of_typed_module ~names ast) in
              if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
              if Output.targets output Templates
-             then print_s [%sexp (fun_factory : Mir.Function_factory.t)];
+             then print_s [%sexp (fun_factory : Mir.Function_factory.Templates.t)];
              if Output.requires output Generating_llvm
              then
                Codegen.of_mir ~source_filename:filename mir

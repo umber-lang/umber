@@ -1307,14 +1307,23 @@ module Function_factory : sig
     -> unit
 
   val pop_fun_defs : t -> (Unique_name.t * Fun_def.t) list
+
+  module Templates : sig
+    (** Sexp representation for test output. More compact and doesn't duplicate
+        information in the statements. *)
+    type nonrec t = t [@@deriving sexp_of]
+
+    val map_names : t -> f:(Unique_name.t -> Unique_name.t) -> t
+  end
 end = struct
   module Template = struct
     type t =
-      { ctx : Context.t
+      { ctx : Context.t [@sexp_drop_if const true]
       ; args : (Typed.Pattern.t * Type.Scheme.t) Nonempty.t
       ; body : Type.Scheme.t Typed.Expr.t
       ; body_type : Type.Scheme.t
       ; instances : (Unique_name.t * Fun_def.t) Monomorphic_type.Param_kinds.Table.t
+           [@sexp.omit_nil]
       }
     [@@deriving sexp_of]
 
@@ -1488,6 +1497,27 @@ end = struct
     Queue.clear fun_defs;
     fun_defs'
   ;;
+
+  module Templates = struct
+    type nonrec t = t
+
+    let sexp_of_t { templates; fun_defs = _ } =
+      let templates =
+        Hashtbl.map templates ~f:(fun template ->
+          { template with instances = Monomorphic_type.Param_kinds.Table.create () })
+      in
+      [%sexp (templates : Template.t Unique_name.Table.t)]
+    ;;
+
+    let map_names t ~f =
+      { t with
+        templates =
+          Hashtbl.to_alist t.templates
+          |> List.map ~f:(Tuple2.map_fst ~f)
+          |> Unique_name.Table.of_alist_exn
+      }
+    ;;
+  end
 end
 
 module Stmt = struct
@@ -1524,7 +1554,10 @@ end
    processes/cache compilation. This would be separate to the main code targets as
    polymorphic code isn't Mir yet so isn't going to LLVM.)
 
-   Can look at: https://rustc-dev-guide.rust-lang.org/backend/monomorph.html *)
+   Can look at: https://rustc-dev-guide.rust-lang.org/backend/monomorph.html 
+   
+   I think I should consider the function templates a proper output target with tests.
+   Should be combined with Mir. *)
 type t = Stmt.t list [@@deriving sexp_of]
 
 let of_typed_module =
