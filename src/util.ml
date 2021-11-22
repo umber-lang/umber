@@ -37,6 +37,13 @@ module Fold_action = struct
     | Continue acc -> acc
     | Stop acc -> f acc
   ;;
+
+  let id = finish ~f:Fn.id
+
+  let result = function
+    | Continue x -> Ok x
+    | Stop err -> Error err
+  ;;
 end
 
 module List : sig
@@ -91,6 +98,12 @@ let compiler_bug msg = raise_s [%message "COMPILER BUG" (msg : Sexp.t)]
 let assert_or_compiler_bug ~here cond =
   if not cond
   then compiler_bug [%message "assertion failed" (here : Source_code_position.t)]
+;;
+
+let ok_or_compiler_bug ~here = function
+  | Ok x -> x
+  | Error error ->
+    compiler_bug [%message (error : Error.t) (here : Source_code_position.t)]
 ;;
 
 let never_happens here _ : Nothing.t =

@@ -61,6 +61,7 @@ module Expr : sig
     -> f:('acc -> ('v, 'pf) t -> ('acc, 'final) Fold_action.t)
     -> ('acc, 'final) Fold_action.t
 
+  val fold_vars : ('v, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
   val for_all_vars : ('v, _) t -> f:('v -> bool) -> bool
   val exists_var : ('v, _) t -> f:('v -> bool) -> bool
 end

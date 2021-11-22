@@ -96,7 +96,6 @@ module Expr = struct
   ;;
 
   let rec fold_until typ ~init ~f =
-    let open Fold_action.Let_syntax in
     match (f init typ : _ Fold_action.t) with
     | Stop _ as stop -> stop
     | Continue init as continue ->
@@ -105,7 +104,7 @@ module Expr = struct
       | Type_app (_, fields) | Tuple fields ->
         List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
       | Function (args, body) ->
-        let%bind init =
+        let%bind.Fold_action init =
           Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
         in
         fold_until body ~init ~f
@@ -113,18 +112,25 @@ module Expr = struct
         Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f))
   ;;
 
+  let fold_vars typ ~init ~f =
+    fold_until typ ~init ~f:(fun acc -> function
+      | Var var -> Continue (f acc var)
+      | _ -> Continue acc)
+    |> Fold_action.id
+  ;;
+
   let for_all_vars typ ~f =
     fold_until typ ~init:true ~f:(fun _ -> function
       | Var var -> if f var then Continue true else Stop false
       | _ -> Continue true)
-    |> Fold_action.finish ~f:Fn.id
+    |> Fold_action.id
   ;;
 
   let exists_var typ ~f =
     fold_until typ ~init:false ~f:(fun _ -> function
       | Var var -> if f var then Stop true else Continue false
       | _ -> Continue false)
-    |> Fold_action.finish ~f:Fn.id
+    |> Fold_action.id
   ;;
 end
 

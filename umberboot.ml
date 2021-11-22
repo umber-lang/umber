@@ -144,7 +144,7 @@ let command =
              let fun_factory, mir = or_raise (Mir.of_typed_module ~names ast) in
              if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
              if Output.targets output Templates
-             then print_s [%sexp (fun_factory : Mir.Function_factory.Templates.t)];
+             then print_s [%sexp (fun_factory : Mir.Function_factory.t)];
              if Output.requires output Generating_llvm
              then
                Codegen.of_mir ~source_filename:filename mir

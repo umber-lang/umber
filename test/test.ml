@@ -60,9 +60,12 @@ let run_tests () =
           if should_make_mir bare_filename
           then (
             match Mir.of_typed_module ~names ast with
-            | Ok (_fun_factory, mir) ->
+            | Ok (templates, mir) ->
               let mir = Mir.renumber_ids mir in
-              Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
+              let templates = Mir.Function_factory.Templates.renumber_ids templates in
+              Parsing.fprint_s
+                ~out:print_mir_to
+                [%sexp (mir : Mir.t), (templates : Mir.Function_factory.Templates.t)];
               if should_make_llvm bare_filename
               then
                 Out_channel.output_string

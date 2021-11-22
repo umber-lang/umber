@@ -70,9 +70,18 @@ module Monomorphic_type : sig
   include Comparable.S_plain with type t := t
   include Hashable.S_plain with type t := t
 
-  val create : scheme:Type.Scheme.t -> param_kinds:Value_kind.t Type.Param.Map.t -> t
+  module Param_kinds : sig
+    type t [@@deriving sexp_of]
+
+    val empty : t
+
+    include Hashable.S_plain with type t := t
+  end
+
+  val create : scheme:Type.Scheme.t -> param_kinds:Param_kinds.t -> t
+  val is_monomorphic : Type.Scheme.t -> bool
   val scheme : t -> Type.Scheme.t
-  val param_kinds : t -> Value_kind.t Type.Param.Map.t
+  val param_kinds : t -> Param_kinds.t
   val to_value_kind : names:Name_bindings.t -> t -> Value_kind.t
 
   val of_type_alias
@@ -87,29 +96,73 @@ module Monomorphic_type : sig
   val instantiate_child : t -> Type.Scheme.t -> t
   val instantiate_child_plain : t -> Type.Scheme_plain.t -> t
 
-  module Param_kinds : sig
-    type t = Value_kind.t Type.Param.Map.t
-
-    include Hashable.S_plain with type t := t
-  end
-
   val infer_param_kinds
     :  names:Name_bindings.t
     -> template_type:Type.Scheme.t
     -> instance_type:Type.Scheme.t
     -> Param_kinds.t
 end = struct
+  module Param_kinds = struct
+    module T = struct
+      type t = Value_kind.t Type.Param.Map.t [@@deriving compare, equal, hash, sexp_of]
+    end
+
+    let empty = Type.Param.Map.empty
+
+    include T
+    include Hashable.Make_plain (T)
+  end
+
   module T = struct
     type t =
       { scheme : Type.Scheme.t
-      ; param_kinds : Value_kind.t Type.Param.Map.t
+      ; param_kinds : Param_kinds.t
       }
     [@@deriving compare, equal, fields, hash, sexp_of]
   end
 
   include T
 
-  let create = Fields.create
+  let missing_var_msg t param =
+    [%message
+      "Missing var in monomorphic type param_kinds" (param : Type.Param.t) (t : t)]
+  ;;
+
+  (* FIXME: This doesn't validate that param_kinds don't contain unused values.
+     We also hash param_kinds in places. Check this is correct and can't cause cache
+     misses. *)
+  let create' ~scheme ~param_kinds =
+    print_s
+      [%message
+        "monomorphic type create'" (scheme : Type.Scheme.t) (param_kinds : Param_kinds.t)];
+    (* Remove unused parameters, and assert all used parameters are mapped. *)
+    let%bind.Or_error param_kinds =
+      Type.Expr.fold_until scheme ~init:Param_kinds.empty ~f:(fun param_kinds' -> function
+        | Var param ->
+          (match Map.find param_kinds param with
+          | Some kind -> Continue (Map.set param_kinds' ~key:param ~data:kind)
+          | None -> Stop (Error.create_s (missing_var_msg { scheme; param_kinds } param)))
+        | _ -> Continue param_kinds')
+      |> Fold_action.result
+    in
+    Ok { scheme; param_kinds }
+  ;;
+
+  let create ~scheme ~param_kinds =
+    print_s
+      [%message
+        "monomorphic type create (no tick)"
+          (scheme : Type.Scheme.t)
+          (param_kinds : Param_kinds.t)];
+    create' ~scheme ~param_kinds |> ok_or_compiler_bug ~here:[%here]
+  ;;
+
+  let is_monomorphic scheme =
+    print_s [%message "is_monomorphic" (scheme : Type.Scheme.t)];
+    let result = Result.is_ok (create' ~scheme ~param_kinds:Param_kinds.empty) in
+    print_s [%message (result : bool)];
+    result
+  ;;
 
   let rec to_value_kind ~names ({ scheme; param_kinds } as t) =
     match scheme with
@@ -131,9 +184,7 @@ end = struct
     | Tuple _ | Function _ | Partial_function _ -> `Block
     | Var param ->
       option_or_default (Map.find param_kinds param) ~f:(fun () ->
-        compiler_bug
-          [%message
-            "Missing var in monomorphic type param_kinds" (param : Type.Param.t) (t : t)])
+        compiler_bug (missing_var_msg t param))
 
   and of_type_alias ~names ~parent ~alias ~params ~args =
     let env = Type.Param.Env_to_vars.create () in
@@ -182,20 +233,10 @@ end = struct
     }
   ;;
 
-  module Param_kinds = struct
-    module T = struct
-      type t = Value_kind.t Type.Param.Map.t [@@deriving compare, hash, sexp_of]
-    end
-
-    include T
-    include Hashable.Make_plain (T)
-  end
-
   let infer_param_kinds =
     let add_consistent ~names param_kinds ~param ~instance_type =
       let new_kind =
-        create ~scheme:instance_type ~param_kinds:Type.Param.Map.empty
-        |> to_value_kind ~names
+        to_value_kind ~names { scheme = instance_type; param_kinds = Param_kinds.empty }
       in
       Map.update param_kinds param ~f:(function
         | None -> new_kind
@@ -750,7 +791,7 @@ end = struct
         match add_pattern coverage pattern with
         | Exhaustive -> Stop Exhaustive
         | coverage -> Continue coverage)
-      |> Fold_action.finish ~f:Fn.id
+      |> Fold_action.id
     ;;
 
     let asterisk = Ustring.of_string_exn "*"
@@ -804,15 +845,17 @@ end = struct
   end
 end
 
-let rec type_get_function ~names typ =
-  match (typ : Type.Scheme.t) with
-  | Function (args, result) -> Some (args, result)
-  | Var _ | Tuple _ -> None
-  | Type_app (type_name, _) ->
-    (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
-    | Alias alias -> type_get_function ~names (Type.Scheme.of_plain alias)
-    | Variants _ | Record _ | Abstract -> None)
-  | Partial_function _ -> .
+let fold_functions =
+  let rec loop ~names typ ~init ~f =
+    Type.Expr.fold_until typ ~init ~f:(fun init -> function
+      | Function (args, result) -> Continue (f init args result)
+      | Type_app (type_name, _) ->
+        (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
+        | Alias alias -> loop ~names alias ~init ~f
+        | Variants _ | Record _ | Abstract -> Continue init)
+      | _ -> Continue init)
+  in
+  fun ~names typ ~init ~f -> loop ~names typ ~init ~f |> Fold_action.id
 ;;
 
 module Expr = struct
@@ -1011,7 +1054,9 @@ module Expr = struct
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match (expr : Type.Scheme.t Typed.Expr.t), Monomorphic_type.scheme expr_type with
       | Literal lit, _ -> Primitive lit
-      | Name name, _ -> Name (Context.find_value_name ctx name)
+      | Name name, _ ->
+        (* FIXME: We need to also monomorphize for regular values any time you look up a name *)
+        Name (Context.find_value_name ctx name)
       | Fun_call (fun_, args_and_types), body_type ->
         let fun_call () =
           let arg_types = Nonempty.map ~f:snd args_and_types in
@@ -1026,9 +1071,9 @@ module Expr = struct
                 arg
                 (Monomorphic_type.instantiate_child expr_type arg_type))
           in
-          (* Special-case constructor applications *)
           match fun_ with
           | Name fun_name ->
+            (* FIXME: Will this call the right name? It needs to call the monomorphic one *)
             call ~fun_name ~arg_types ~body_type;
             Fun_call (fun_name, args)
           | Let _ | Fun_call _ | Get_block_field _ | If _ | Catch _ | Break _ ->
@@ -1042,6 +1087,7 @@ module Expr = struct
         in
         (match fun_ with
         | Name (_, name) ->
+          (* Special-case constructor applications *)
           (match Value_name.to_cnstr_name name with
           | Ok cnstr_name ->
             let tag = Context.cnstr_tag ctx expr_type (Named cnstr_name) in
@@ -1262,12 +1308,29 @@ module Expr = struct
   ;;
 end
 
+let renumber_ids_aux x ~map_names =
+  let name_table = Ustring.Table.create () in
+  map_names x ~f:(fun name ->
+    Unique_name.map_id name ~f:(fun id ->
+      let name = Unique_name.base_name name in
+      match Hashtbl.find name_table name with
+      | None ->
+        let id_table = Int.Table.create () in
+        Hashtbl.set id_table ~key:id ~data:0;
+        Hashtbl.set name_table ~key:name ~data:id_table;
+        0
+      | Some id_table ->
+        Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
+;;
+
 module Fun_def = struct
   (* TODO: If all uses of this end up including the fun_name, just put it in here *)
   (* TODO: should we resolve closures in this pass? Split immediate/pointers and just
      make it a block argument? Closure environments will have to GC'd like everything
      else, so it makes sense. That does mean they're affected by monomorphization, though.
      (The Value_kinds matter and need to be stored here.) *)
+  (* FIXME: Should only close over variables bound in an outer scope within the same
+     expression, not random other names defined elsewhere. *)
   type t =
     { fun_name : Unique_name.t
     ; closed_over : Unique_name.Set.t
@@ -1278,7 +1341,11 @@ module Fun_def = struct
   [@@deriving fields, sexp_of]
 end
 
-module Function_factory : sig
+(* TODO: Will probably want to split the MIR stage into two stages (before and after
+   monomorphization) if we ever want to compile to different targets e.g. JavaScript that
+   support polymorphism. *)
+
+module Templates : sig
   type t [@@deriving sexp_of]
 
   val create : unit -> t
@@ -1312,21 +1379,23 @@ module Function_factory : sig
 
   val pop_fun_defs : t -> Fun_def.t list
 
-  module Templates : sig
+  module Compact : sig
     (** Sexp representation for test output. More compact and doesn't duplicate
         information also in the statements. *)
     type nonrec t = t [@@deriving sexp_of]
 
-    val map_names : t -> f:(Unique_name.t -> Unique_name.t) -> t
+    val renumber_ids : t -> t
   end
 end = struct
+  (* FIXME: Need to also represent non-function values (any type), but we need to store
+     special information just for functions I think e.g. closed_over. *)
   module Template = struct
     type t =
       { ctx : Context.t [@sexp_drop_if const true]
-      ; args : (Typed.Pattern.t * Type.Scheme.t) Nonempty.t
+      ; args : (Typed.Pattern.t * Type.Scheme.t) list (* no args => not a function *)
       ; body : Type.Scheme.t Typed.Expr.t
       ; body_type : Type.Scheme.t
-      ; instances : Fun_def.t Monomorphic_type.Param_kinds.Table.t [@sexp.omit_nil]
+      ; instances : Stmt.t Monomorphic_type.Param_kinds.Table.t [@sexp.omit_nil]
       }
     [@@deriving sexp_of]
 
@@ -1400,13 +1469,15 @@ end = struct
     ;;
 
     let instantiate
-      { ctx; args; body; body_type; instances }
+      ({ ctx; args; body; body_type; instances } as t)
       ~param_kinds
       ~add_lambda
       ~call
       ~on_new
       ~just_bound
       =
+      print_s
+        [%message "instantiate" (param_kinds : Monomorphic_type.Param_kinds.t) (t : t)];
       Hashtbl.find_or_add instances param_kinds ~default:(fun () ->
         let args =
           Nonempty.map args ~f:(fun (pat, scheme) ->
@@ -1430,15 +1501,12 @@ end = struct
 
   let create () = { templates = Unique_name.Table.create (); fun_defs = Queue.create () }
 
-  (* FIXME: a type having type variables is not sufficient to say that it is polymorphic,
-     as the type variables may be unused. *)
-  let type_has_var = Type.Expr.exists_var ~f:(const true)
-
   let rec add_lambda t ~ctx ~args ~arg_types ~body ~body_type ~param_kinds ~just_bound =
     let template =
       Template.create ~ctx ~args:(Nonempty.zip_exn args arg_types) ~body ~body_type
     in
     let fun_name = instantiate_template t template ~param_kinds ~just_bound in
+    print_s [%message "add_lambda" (fun_name : Unique_name.t) (template : Template.t)];
     Hashtbl.add_exn t.templates ~key:fun_name ~data:template;
     ctx, fun_name
 
@@ -1487,23 +1555,31 @@ end = struct
     let template =
       Template.create ~ctx ~args:(Nonempty.zip_exn args arg_types) ~body ~body_type
     in
+    print_s
+      [%message
+        "checking defined fun"
+          (arg_types : Type.Scheme.t Nonempty.t)
+          (body_type : Type.Scheme.t)];
+    (* Try to instantiate monomorphic function definitions immediately. *)
     let ctx, fun_name =
-      if Nonempty.exists ~f:type_has_var arg_types || type_has_var body_type
-      then Context.add_value_name ctx Constant_names.fun_
-      else (
+      if Nonempty.for_all ~f:Monomorphic_type.is_monomorphic arg_types
+         && Monomorphic_type.is_monomorphic body_type
+      then (
         (* FIXME: might get a context without the function name, seems wrong. *)
-        (* Try to instantiate monomorphic function definitions immediately. *)
         let fun_name =
           Template.instantiate
             template
-            ~param_kinds:Type.Param.Map.empty
+            ~param_kinds:Monomorphic_type.Param_kinds.empty
             ~add_lambda:(add_lambda t)
             ~call:(call t)
             ~on_new:(Queue.enqueue t.fun_defs)
             ~just_bound
         in
         ctx, fun_name)
+      else Context.add_value_name ctx Constant_names.fun_
     in
+    print_s
+      [%message "define_fun (add)" (fun_name : Unique_name.t) (template : Template.t)];
     Hashtbl.add_exn t.templates ~key:fun_name ~data:template;
     ctx, fun_name
   ;;
@@ -1514,15 +1590,15 @@ end = struct
     fun_defs'
   ;;
 
-  module Templates = struct
+  module Compact = struct
     type nonrec t = t
 
     let sexp_of_t { templates; fun_defs = _ } =
       let templates =
         (* Filter out template instances and monomorphic templates *)
         Hashtbl.filter_map templates ~f:(fun template ->
-          if Nonempty.exists ~f:(type_has_var << snd) template.args
-             || type_has_var template.body_type
+          if Nonempty.exists ~f:(Monomorphic_type.is_monomorphic << snd) template.args
+             || Monomorphic_type.is_monomorphic template.body_type
           then
             Some
               { template with instances = Monomorphic_type.Param_kinds.Table.create () }
@@ -1534,13 +1610,40 @@ end = struct
     let map_names t ~f =
       let templates = Unique_name.Table.create () in
       Hashtbl.iteri t.templates ~f:(fun ~key:fun_name ~data ->
-        Hashtbl.add_exn templates ~key:(f fun_name) ~data);
+        let new_name = f fun_name in
+        print_s
+          [%message
+            "map_names"
+              (fun_name : Unique_name.t)
+              (new_name : Unique_name.t)
+              (data : Template.t)];
+        Hashtbl.add_exn templates ~key:new_name ~data);
       { t with templates }
     ;;
+
+    let renumber_ids = renumber_ids_aux ~map_names
   end
 end
 
 module Stmt = struct
+  (* TODO: The way this is set up now, other modules requiring new instances of
+     polymorphic functions can change what the output of the MIR for this module should be
+     (since those function instances are meant to be defined here). I think this should 
+     make doing incremental compilation pretty tricky, since you can't just compile each
+     module in isolation all the way to native code - you may have to keep incrementally
+     adding more functions which then have to get passed onto the LLVM stage. 
+     
+     Can look at how Rust handles some of this:
+       https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
+       
+     What about having `Mir.t` be an abstract type that provides function calls through
+     its api, basically how `Function_factory.t` works. This modifies itself, but you
+     can set up something to listen to these updates, allowing you to incrementally add
+     LLVM IR by adding new functions to `Codegen.t`. This sounds pretty good.
+     
+     For now, we can just assume compilation will be done monolithically I think. We can't
+     compile submodules to LLVM atomically as more uses may arise, but I suppose we can
+     turn the whole file into Mir before doing this (?). *)
   type t =
     | Value_def of Unique_name.t * Expr.t
     | Fun_def of Fun_def.t
@@ -1564,13 +1667,10 @@ end
 type t = Stmt.t list [@@deriving sexp_of]
 
 let of_typed_module =
-  let pop_fun_defs fun_factory =
-    Function_factory.pop_fun_defs fun_factory |> List.map ~f:Stmt.fun_def
-  in
   let handle_let_bindings
     ~ctx
     ~stmts
-    ~fun_factory
+    ~templates
     (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t Nonempty.t)
     =
     let ctx =
@@ -1611,27 +1711,46 @@ let of_typed_module =
            
          Summary: Non-function values are always monomorphic. Functions can be treated as
          always polymorphic. *)
+      (* FIXME: This is wrong! e.g. `((\x -> x, 5) : (a -> a, Int))` is actually
+         polymorphic, since it contains polymorphic functions. Uses of this value actually
+         have to refer to different values (!) depending on the type.
+         
+         When using any name, you have to find out the proper monomorphic instance. *)
       (* TODO: should share code between toplevel let bindings and recursive let bindings *)
-      match type_get_function ~names:(Context.name_bindings ctx) typ with
-      | Some (arg_types, body_type) ->
-        (* FIXME: support not adding a new name and instead using one already bound
+      let ctx, found_function =
+        fold_functions
+          ~names:(Context.name_bindings ctx typ)
+          ~init:(ctx, false)
+          ~f:(fun (ctx, _) arg_types body_type ->
+          (* FIXME: support not adding a new name and instead using one already bound
            Similar to [just_bound]. I guess I can just keep using [just_bound] actually,
            it seems less hacky maybe? *)
-        let ctx, _ =
-          Function_factory.define_fun
-            fun_factory
-            ~ctx
-            ~arg_types
-            ~body_type
-            ~definition:expr
-            ~just_bound
-        in
-        ctx, pop_fun_defs fun_factory @ stmts
+          let ctx, _ =
+            Function_factory.define_fun
+              fun_factory
+              ~ctx
+              ~arg_types
+              ~body_type
+              ~definition:expr
+              ~just_bound
+          in
+          ctx, true)
+      in
+      match type_get_function ~names:(Context.name_bindings ctx) typ with
+      | Some (arg_types, body_type) -> ()
       | None ->
         (* All non-function values are monomorphic, in the sense that while they may have
           unbound type variables in their type, these must be unused. (e.g. the `a` in
           `(None : Option a)`). *)
-        let typ = Monomorphic_type.create ~scheme:typ ~param_kinds:Type.Param.Map.empty in
+        (* FIXME: values can contain functions! This doesn't work! e.g. tuple of functions *)
+        print_s
+          [%message
+            "toplevel monomorphic" (pat' : Simple_pattern.t) (typ : Type.Scheme.t)];
+        let typ =
+          Monomorphic_type.create
+            ~scheme:typ
+            ~param_kinds:Monomorphic_type.Param_kinds.empty
+        in
         let mir_expr =
           Expr.of_typed_expr
             ?just_bound
@@ -1697,19 +1816,7 @@ let of_typed_module =
 ;;
 
 let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
-
-let renumber_ids stmts =
-  let name_table = Ustring.Table.create () in
-  map_names stmts ~f:(fun name ->
-    Unique_name.map_id name ~f:(fun id ->
-      let name = Unique_name.base_name name in
-      match Hashtbl.find name_table name with
-      | None ->
-        Hashtbl.set name_table ~key:name ~data:(Int.Table.create ());
-        0
-      | Some id_table ->
-        Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
-;;
+let renumber_ids = renumber_ids_aux ~map_names
 
 (* Goals should be:
    - Remove unnecessary type information (definitions, etc.)
