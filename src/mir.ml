@@ -1078,7 +1078,8 @@ module Expr = struct
             Fun_call (fun_name, args)
           | Let _ | Fun_call _ | Get_block_field _ | If _ | Catch _ | Break _ ->
             (* FIXME: does this make any sense? I suppose this is meant to hit the last
-               defined function or something? *)
+               defined function or something? I think this just seems wrong though? It's
+               adding a new name, so it can't refer to some already existing name, right? *)
             let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
             call ~fun_name ~arg_types ~body_type;
             Let (fun_name, fun_, Fun_call (fun_name, args))
@@ -1341,6 +1342,45 @@ module Fun_def = struct
   [@@deriving fields, sexp_of]
 end
 
+module Stmt = struct
+  (* TODO: The way this is set up now, other modules requiring new instances of
+     polymorphic functions can change what the output of the MIR for this module should be
+     (since those function instances are meant to be defined here). I think this should 
+     make doing incremental compilation pretty tricky, since you can't just compile each
+     module in isolation all the way to native code - you may have to keep incrementally
+     adding more functions which then have to get passed onto the LLVM stage. 
+     
+     Can look at how Rust handles some of this:
+       https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
+       
+     What about having `Mir.t` be an abstract type that provides function calls through
+     its api, basically how `Function_factory.t` works. This modifies itself, but you
+     can set up something to listen to these updates, allowing you to incrementally add
+     LLVM IR by adding new functions to `Codegen.t`. This sounds pretty good.
+     
+     For now, we can just assume compilation will be done monolithically I think. We can't
+     compile submodules to LLVM atomically as more uses may arise, but I suppose we can
+     turn the whole file into Mir before doing this (?). *)
+  type t =
+    | Value_def of Unique_name.t * Expr.t
+    | Fun_def of Fun_def.t
+  [@@deriving sexp_of, variants]
+
+  let map_names stmt ~f =
+    match stmt with
+    | Value_def (name, expr) ->
+      let name = f name in
+      let expr = Expr.map_names expr ~f in
+      Value_def (name, expr)
+    | Fun_def { fun_name; closed_over; args; returns; body } ->
+      let fun_name = f fun_name in
+      let closed_over = Unique_name.Set.map closed_over ~f in
+      let args = Nonempty.map args ~f:(Tuple2.map_fst ~f) in
+      let body = Expr.map_names body ~f in
+      Fun_def { fun_name; closed_over; args; returns; body }
+  ;;
+end
+
 (* TODO: Will probably want to split the MIR stage into two stages (before and after
    monomorphization) if we ever want to compile to different targets e.g. JavaScript that
    support polymorphism. *)
@@ -1349,6 +1389,12 @@ module Templates : sig
   type t [@@deriving sexp_of]
 
   val create : unit -> t
+
+  (* FIXME: Need to incorporate regular values too.
+  
+     I think we should also distinguish between polymorphic and monomorphic names.
+     (Maybe polymorphic names should just not exist?) Could have Unique_name and
+     Template_name maybe? *)
 
   val define_fun
     :  t
@@ -1381,14 +1427,14 @@ module Templates : sig
 
   module Compact : sig
     (** Sexp representation for test output. More compact and doesn't duplicate
-        information also in the statements. *)
+          information also in the statements. *)
     type nonrec t = t [@@deriving sexp_of]
 
     val renumber_ids : t -> t
   end
 end = struct
   (* FIXME: Need to also represent non-function values (any type), but we need to store
-     special information just for functions I think e.g. closed_over. *)
+       special information just for functions I think e.g. closed_over. *)
   module Template = struct
     type t =
       { ctx : Context.t [@sexp_drop_if const true]
@@ -1524,7 +1570,7 @@ end = struct
         (instantiate_template t template ~param_kinds ~just_bound:None : Unique_name.t)
     | None ->
       (* If we don't find a template, we must be inside a recursive call. We can just do
-         nothing as we are already in the middle of generating the template. *)
+           nothing as we are already in the middle of generating the template. *)
       ()
 
   and instantiate_template t template ~param_kinds ~just_bound =
@@ -1623,45 +1669,6 @@ end = struct
 
     let renumber_ids = renumber_ids_aux ~map_names
   end
-end
-
-module Stmt = struct
-  (* TODO: The way this is set up now, other modules requiring new instances of
-     polymorphic functions can change what the output of the MIR for this module should be
-     (since those function instances are meant to be defined here). I think this should 
-     make doing incremental compilation pretty tricky, since you can't just compile each
-     module in isolation all the way to native code - you may have to keep incrementally
-     adding more functions which then have to get passed onto the LLVM stage. 
-     
-     Can look at how Rust handles some of this:
-       https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
-       
-     What about having `Mir.t` be an abstract type that provides function calls through
-     its api, basically how `Function_factory.t` works. This modifies itself, but you
-     can set up something to listen to these updates, allowing you to incrementally add
-     LLVM IR by adding new functions to `Codegen.t`. This sounds pretty good.
-     
-     For now, we can just assume compilation will be done monolithically I think. We can't
-     compile submodules to LLVM atomically as more uses may arise, but I suppose we can
-     turn the whole file into Mir before doing this (?). *)
-  type t =
-    | Value_def of Unique_name.t * Expr.t
-    | Fun_def of Fun_def.t
-  [@@deriving sexp_of, variants]
-
-  let map_names stmt ~f =
-    match stmt with
-    | Value_def (name, expr) ->
-      let name = f name in
-      let expr = Expr.map_names expr ~f in
-      Value_def (name, expr)
-    | Fun_def { fun_name; closed_over; args; returns; body } ->
-      let fun_name = f fun_name in
-      let closed_over = Unique_name.Set.map closed_over ~f in
-      let args = Nonempty.map args ~f:(Tuple2.map_fst ~f) in
-      let body = Expr.map_names body ~f in
-      Fun_def { fun_name; closed_over; args; returns; body }
-  ;;
 end
 
 type t = Stmt.t list [@@deriving sexp_of]
