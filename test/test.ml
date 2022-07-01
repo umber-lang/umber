@@ -62,10 +62,10 @@ let run_tests () =
             match Mir.of_typed_module ~names ast with
             | Ok (templates, mir) ->
               let mir = Mir.renumber_ids mir in
-              let templates = Mir.Function_factory.Templates.renumber_ids templates in
+              let templates = Mir.Templates.Compact.renumber_ids templates in
               Parsing.fprint_s
                 ~out:print_mir_to
-                [%sexp (mir : Mir.t), (templates : Mir.Function_factory.Templates.t)];
+                [%sexp (mir : Mir.t), (templates : Mir.Templates.Compact.t)];
               if should_make_llvm bare_filename
               then
                 Out_channel.output_string
@@ -83,7 +83,7 @@ let run_tests () =
     Out_channel.close print_mir_to;
     Out_channel.close print_llvm_to
   in
-  Array.iter (Sys.readdir Filename.(concat current_dir_name "examples")) ~f:test
+  Array.iter (Util.sorted_files_in_local_dir "examples") ~f:test
 ;;
 
 let () = run_tests ()

@@ -25,13 +25,11 @@ let handle_dir dir bare_filename =
 ;;
 
 let () =
-  Array.iter
-    (Sys.readdir Filename.(concat current_dir_name "examples"))
-    ~f:(fun filename ->
-      let bare_filename = Filename.chop_extension filename in
-      handle_dir "tokens" bare_filename;
-      handle_dir "ast" bare_filename;
-      handle_dir "mir" bare_filename
-      (* FIXME: re-enable llvm tests once mir tested are unborked *)
-      (*handle_dir "llvm" bare_filename*))
+  Array.iter (Util.sorted_files_in_local_dir "examples") ~f:(fun filename ->
+    let bare_filename = Filename.chop_extension filename in
+    handle_dir "tokens" bare_filename;
+    handle_dir "ast" bare_filename;
+    handle_dir "mir" bare_filename
+    (* FIXME: re-enable llvm tests once mir tested are unborked *)
+    (*handle_dir "llvm" bare_filename*))
 ;;
