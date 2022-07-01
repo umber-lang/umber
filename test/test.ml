@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Umber
 
 let concat_current dir = Filename.(concat (concat current_dir_name dir))

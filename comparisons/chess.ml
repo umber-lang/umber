@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Pos = struct
   type t = private int * int

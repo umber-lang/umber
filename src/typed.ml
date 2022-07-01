@@ -198,7 +198,7 @@ module Expr = struct
         Lambda (args, body), Partial_function (arg_types, body_var)
       | If (cond, then_, else_) ->
         let cond, cond_type = of_untyped ~names ~types ~f_name cond in
-        let bool_type = Type.Concrete.cast Core.Bool.typ in
+        let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
         Type_bindings.unify ~names ~types cond_type bool_type;
         let (then_, then_type), (else_, else_type) =
           of_untyped ~names ~types ~f_name then_, of_untyped ~names ~types ~f_name else_
@@ -210,7 +210,8 @@ module Expr = struct
         ( Match
             ( cond
             , (bool_type, Pattern.Names.empty)
-            , [ cnstr Core.Bool.true_, then_; cnstr Core.Bool.false_, else_ ] )
+            , [ cnstr Intrinsics.Bool.true_, then_; cnstr Intrinsics.Bool.false_, else_ ]
+            )
         , then_type )
       | Match (expr, branches) ->
         let expr, expr_type = of_untyped ~names ~types ~f_name expr in

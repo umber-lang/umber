@@ -1,3 +1,3 @@
-include Core_kernel
+include Core
 include Util
-module Uchar = Umber__.Uchar (* Shadows Core_kernel.Uchar *)
+module Uchar = Umber__.Uchar (* Shadows Core.Uchar *)

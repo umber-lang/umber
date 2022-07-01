@@ -43,13 +43,13 @@ module Value_kind = struct
        We should probably not need to give [String] either *)
     match path with
     | [] ->
-      if Type_name.(type_name = Core.Int.name)
+      if Type_name.(type_name = Intrinsics.Int.name)
       then Some `Int64
-      else if Type_name.(type_name = Core.Float.name)
+      else if Type_name.(type_name = Intrinsics.Float.name)
       then Some `Float64
-      else if Type_name.(type_name = Core.Char.name)
+      else if Type_name.(type_name = Intrinsics.Char.name)
       then Some `Char
-      else if Type_name.(type_name = Core.String.name)
+      else if Type_name.(type_name = Intrinsics.String.name)
       then Some `Block
       else None
     | _ :: _ -> None
@@ -1525,7 +1525,7 @@ end = struct
         [%message "instantiate" (param_kinds : Monomorphic_type.Param_kinds.t) (t : t)];
       Hashtbl.find_or_add instances param_kinds ~default:(fun () ->
         let args =
-          Nonempty.map args ~f:(fun (pat, scheme) ->
+          List.map args ~f:(fun (pat, scheme) ->
             pat, Monomorphic_type.create ~scheme ~param_kinds)
         in
         let body_type = Monomorphic_type.create ~scheme:body_type ~param_kinds in

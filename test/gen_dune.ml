@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 let make_rule dir name : Sexp.t =
   List

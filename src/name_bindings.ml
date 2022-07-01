@@ -157,7 +157,6 @@ type t =
   }
 
 and sigs = Nothing.t bindings
-
 and defs = sigs bindings
 
 (* TODO: may want to add a separate field for imports *)
@@ -201,7 +200,9 @@ let empty = { current_path = []; toplevel = empty_bindings }
 let without_std t =
   { t with
     toplevel =
-      { t.toplevel with modules = Map.remove t.toplevel.modules Core.std_module_name }
+      { t.toplevel with
+        modules = Map.remove t.toplevel.modules Intrinsics.std_module_name
+      }
   }
 ;;
 
@@ -282,7 +283,7 @@ let core =
             ~init:empty_bindings.types
             ~f:(fun types (name, decl) ->
               Map.set types ~key:name ~data:(Some (Local decl)))
-            Core.
+            Intrinsics.
               [ Bool.name, Bool.decl
               ; Int.name, Int.decl
               ; Float.name, Float.decl
@@ -290,11 +291,15 @@ let core =
               ; String.name, String.decl
               ]
       ; names =
-          List.fold Core.Bool.cnstrs ~init:empty_bindings.names ~f:(fun names cnstr ->
+          List.fold
+            Intrinsics.Bool.cnstrs
+            ~init:empty_bindings.names
+            ~f:(fun names cnstr ->
             Map.set
               names
               ~key:(Value_name.of_cnstr_name cnstr)
-              ~data:(Local (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
+              ~data:
+                (Local (Name_entry.val_declared (Type.Concrete.cast Intrinsics.Bool.typ))))
       }
   }
 ;;
@@ -555,7 +560,7 @@ let absolutify_type_expr t =
 let std_prelude =
   lazy
     (let t = into_parent (t_of_sexp (Sexp.of_string Prelude.names_sexp)) in
-     import_all t Core.prelude_module_path)
+     import_all t Intrinsics.prelude_module_path)
 ;;
 
 let add_val_or_extern
@@ -779,20 +784,21 @@ let find_sigs_and_defs t path module_name =
     find
       t
       (path, module_name)
-      ~f:(fun _ module_name -> function
-        | Sigs _ ->
-          compiler_bug
-            [%message
-              "Name_bindings.find_sigs_and_defs found only sigs"
-                (path : Module_path.t)
-                (module_name : Module_name.t)
-                (t : t)]
-        | Defs bindings ->
-          (match%bind Map.find bindings.modules module_name with
-          | Imported (path, ()) ->
-            let%bind path, module_name = List.split_last path in
-            Some (loop t path module_name)
-          | Local sigs_and_defs -> Some sigs_and_defs))
+      ~f:
+        (fun _ module_name -> function
+          | Sigs _ ->
+            compiler_bug
+              [%message
+                "Name_bindings.find_sigs_and_defs found only sigs"
+                  (path : Module_path.t)
+                  (module_name : Module_name.t)
+                  (t : t)]
+          | Defs bindings ->
+            (match%bind Map.find bindings.modules module_name with
+            | Imported (path, ()) ->
+              let%bind path, module_name = List.split_last path in
+              Some (loop t path module_name)
+            | Local sigs_and_defs -> Some sigs_and_defs))
       ~to_ustring:(fun (path, module_name) ->
         Module_path.to_ustring (path @ [ module_name ]))
   in
