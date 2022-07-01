@@ -415,21 +415,15 @@ end = struct
 
     let of_variants ~names type_ variants =
       let constant_cnstrs, non_constant_cnstrs =
-        List.fold
-          variants
-          ~init:([], [])
-          ~f:(fun (constant_cnstrs, non_constant_cnstrs) (cnstr_name, args) ->
+        List.partition_map variants ~f:(fun (cnstr_name, args) ->
           if List.is_empty args
-          then cnstr_name :: constant_cnstrs, non_constant_cnstrs
+          then First cnstr_name
           else (
             let instantiate_child = Monomorphic_type.instantiate_child_plain in
             let args = make_arg_list ~instantiate_child ~names type_ args in
-            constant_cnstrs, (cnstr_name, args) :: non_constant_cnstrs))
+            Second (cnstr_name, args)))
       in
-      Variants
-        { constant_cnstrs = List.rev constant_cnstrs
-        ; non_constant_cnstrs = List.rev non_constant_cnstrs
-        }
+      Variants { constant_cnstrs; non_constant_cnstrs }
     ;;
 
     let of_tuple ~names type_ args =
@@ -1366,6 +1360,11 @@ module Stmt = struct
     | Fun_def of Fun_def.t
   [@@deriving sexp_of, variants]
 
+  let name = function
+    | Value_def (name, _) -> name
+    | Fun_def { fun_name; _ } -> fun_name
+  ;;
+
   let map_names stmt ~f =
     match stmt with
     | Value_def (name, expr) ->
@@ -1534,8 +1533,8 @@ end = struct
           create_fun_def ~ctx ~args ~body ~body_type ~add_lambda ~call ~just_bound
         in
         on_new fun_def;
-        fun_def)
-      |> Fun_def.fun_name
+        Fun_def fun_def)
+      |> Stmt.name
     ;;
   end
 
@@ -1790,10 +1789,10 @@ let of_typed_module =
         in
         Expr.fold_pattern_bindings ~add_name ~ctx pat' mir_expr typ ~init:stmts ~add_let)
   in
-  let rec loop ~ctx ~stmts ~fun_factory (defs : Typed.Module.def Node.t list) =
+  let rec loop ~ctx ~stmts ~templates (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.Node.node with
-      | Let bindings -> handle_let_bindings ~ctx ~stmts ~fun_factory bindings
+      | Let bindings -> handle_let_bindings ~ctx ~stmts ~templates bindings
       | Module (module_name, _sigs, defs) ->
         Context.with_module ctx module_name ~f:(fun ctx ->
           loop ~ctx ~stmts ~fun_factory defs)
@@ -1811,12 +1810,12 @@ let of_typed_module =
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     try
       let names = Name_bindings.into_module names module_name ~place:`Def in
-      let fun_factory = Function_factory.create () in
+      let templates = Templates.create () in
       let _ctx, stmts =
-        loop ~ctx:(Context.of_name_bindings names) ~stmts:[] ~fun_factory defs
+        loop ~ctx:(Context.of_name_bindings names) ~stmts:[] ~templates defs
       in
-      assert_or_compiler_bug ~here:[%here] (List.is_empty (pop_fun_defs fun_factory));
-      Ok (fun_factory, List.rev stmts)
+      assert_or_compiler_bug ~here:[%here] (List.is_empty (Templates.pop_stmts templates));
+      Ok (templates, List.rev stmts)
     with
     | Compilation_error.Compilation_error error -> Error error
     | Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
