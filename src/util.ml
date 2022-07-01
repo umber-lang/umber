@@ -81,9 +81,8 @@ end = struct
     match list with
     | [] -> Continue init
     | x :: xs ->
-      (match (f init x : _ Fold_action.t) with
-      | Stop _ as stop -> stop
-      | Continue init -> fold_until xs ~init ~f)
+      let%bind.Fold_action init = f init x in
+      fold_until xs ~init ~f
   ;;
 end
 

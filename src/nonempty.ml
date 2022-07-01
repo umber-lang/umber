@@ -20,7 +20,7 @@ let cons x = function
   | y :: ys -> x :: y :: ys
 ;;
 
-let to_list (x :: xs) : 'a list = x :: xs
+let to_list (x :: xs) : _ list = x :: xs
 
 let rev (x :: xs) =
   let rec loop acc = function
@@ -49,6 +49,19 @@ include Container.Make (struct
   let iter = `Define_using_fold
 end)
 
+(* FIXME: including Container.Make is shadowing to_list, which is quite sad. We should
+   explicitly enumerate what we're including. We should also fix Monad.Make, and any other
+   includes. *)
+let to_list (x :: xs) : _ list = x :: xs
+
+let map (x :: xs) ~f =
+  let rec loop acc = function
+    | [] -> rev acc
+    | x :: xs -> loop (f x :: to_list acc) xs
+  in
+  loop [ f x ] xs
+;;
+
 let concat_map (x :: xs) ~f =
   let rec loop acc = function
     | [] -> rev acc
@@ -62,7 +75,7 @@ include Monad.Make (struct
 
   let return x = [ x ]
   let bind = concat_map
-  let map = `Define_using_bind
+  let map = `Custom map
 end)
 
 let mem xs = List.mem (to_list xs)
