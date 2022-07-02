@@ -133,7 +133,7 @@ end = struct
       Queue.enqueue q (Uchar.of_char '.');
       Ustring.iter (Module_name.to_ustring s) ~f:(Queue.enqueue q));
     ignore (Queue.dequeue q : Uchar.t option);
-    Queue.to_array q |> Ustring.of_array_unsafe
+    Queue.to_array q |> Ustring.of_array_unchecked
   ;;
 end
 
@@ -189,7 +189,7 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
         let to_ustring t =
           let q = Queue.create ~capacity:(total_len t) () in
           iter_chars t ~f:(Queue.enqueue q);
-          Queue.to_array q |> Ustring.of_array_unsafe
+          Queue.to_array q |> Ustring.of_array_unchecked
         ;;
 
         let of_string s =

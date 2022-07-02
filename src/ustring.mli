@@ -15,7 +15,7 @@ val index_exn : t -> elt -> int
 val concat : t list -> t
 val sub : (t, t) Blit.sub
 val subo : (t, t) Blit.subo
-val of_array_unsafe : Uchar.t array -> t
+val of_array_unchecked : Uchar.t array -> t
 val of_string_exn : string -> t
 val of_ustring : t -> t
 val to_string : t -> string

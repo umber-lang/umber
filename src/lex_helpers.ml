@@ -1,4 +1,4 @@
-let lexeme lexbuf = Sedlexing.lexeme lexbuf |> Ustring.of_array_unsafe
+let lexeme lexbuf = Sedlexing.lexeme lexbuf |> Ustring.of_array_unchecked
 let digit = [%sedlex.regexp? '0' .. '9']
 
 let lex_lower_name lexbuf =
