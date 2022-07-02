@@ -1497,6 +1497,9 @@ end = struct
           in
           (ctx, bindings), arg)
       in
+      (* FIXME: closed_over is including the functions own name - why? because its
+         recursive? Shouldn't happen if the name is unused. I'm probably using the wrong
+         context somewhere with the find observer/add observer *)
       let closed_over = ref Unique_name.Set.empty in
       let ctx =
         (* Determine if names looked up were bound as function args or closed over *)
