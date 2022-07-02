@@ -1,8 +1,9 @@
 let source = "everything depends on me"
 
 module A =
+  # FIXME: LEXER BUG: This doesn't lex right if you remove the second # below
   # FIXME: need to figure out some way to place restrictions on what you can have in
-    recursive bindings - recursive calls need to be to functions?
+  # recursive bindings - recursive calls need to be to functions?
   let a = b  # TODO: this should probably error out at the mir stage
   let b = a
 
