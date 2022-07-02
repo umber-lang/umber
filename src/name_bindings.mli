@@ -135,6 +135,8 @@ module Sigs_or_defs : sig
   val find_module : name_bindings -> t -> Module_name.t -> t option
 end
 
+(* TODO: Maybe this should have a return type more like [Sigs.t option * Defs.t]. This
+   would be clearer to use.*)
 val find_sigs_and_defs
   :  t
   -> Module_path.t
