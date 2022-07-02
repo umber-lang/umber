@@ -65,7 +65,7 @@ let run_tests () =
               let templates = Mir.Templates.Compact.renumber_ids templates in
               Parsing.fprint_s
                 ~out:print_mir_to
-                [%sexp (mir : Mir.t), (templates : Mir.Templates.Compact.t)];
+                [%sexp { mir : Mir.t; templates : Mir.Templates.Compact.t }];
               if should_make_llvm bare_filename
               then
                 Out_channel.output_string

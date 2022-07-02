@@ -142,7 +142,9 @@ end = struct
         | Var param ->
           (match Map.find param_kinds param with
           | Some kind -> Continue (Map.set param_kinds' ~key:param ~data:kind)
-          | None -> Stop (Error.create_s (missing_var_msg { scheme; param_kinds } param)))
+          | None ->
+            Stop
+              (Error.of_lazy_sexp (lazy (missing_var_msg { scheme; param_kinds } param))))
         | _ -> Continue param_kinds')
       |> Fold_action.result
     in
