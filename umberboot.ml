@@ -48,6 +48,9 @@ module Target = struct
     | Llvm -> Generating_llvm
   ;;
 
+  (* TODO: This should probably just be a single -outputs flag with comma-separated
+     inputs. It seems simpler from both a user and implementaiton perspective. This would
+     also more easily let us enforce that at least one output is asked for. *)
   let param =
     let open Command.Param in
     function
@@ -105,7 +108,7 @@ let command =
   Command.basic
     ~summary:"Umberboot is a compiler for Umber written in OCaml."
     (let%map_open.Command () = return ()
-     and filename = anon ("filename" %: Filename.arg_type)
+     and filename = anon ("filename" %: Filename_unix.arg_type)
      and output = Output.param
      and no_std = flag "no-std" no_arg ~doc:"Don't include the standard library"
      and parent =
@@ -141,10 +144,10 @@ let command =
            if Output.targets output Names then print_s [%sexp (names : Name_bindings.t)];
            if Output.requires output Generating_mir
            then (
-             let fun_factory, mir = or_raise (Mir.of_typed_module ~names ast) in
+             let templates, mir = or_raise (Mir.of_typed_module ~names ast) in
              if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
              if Output.targets output Templates
-             then print_s [%sexp (fun_factory : Mir.Function_factory.t)];
+             then print_s [%sexp (templates : Mir.Templates.Compact.t)];
              if Output.requires output Generating_llvm
              then
                Codegen.of_mir ~source_filename:filename mir
@@ -157,4 +160,4 @@ let command =
               print_s [%sexp (error : Compilation_error.t)]))
 ;;
 
-let () = Command.run command
+let () = Command_unix.run command
