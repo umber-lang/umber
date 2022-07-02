@@ -49,8 +49,7 @@ module Target = struct
   ;;
 
   (* TODO: This should probably just be a single -outputs flag with comma-separated
-     inputs. It seems simpler from both a user and implementaiton perspective. This would
-     also more easily let us enforce that at least one output is asked for. *)
+     inputs. It seems simpler from both a user and implementaiton perspective. *)
   let param =
     let open Command.Param in
     function
@@ -157,7 +156,8 @@ let command =
        then
          Parsing.lex_file filename ~print_tokens_to:stdout
          |> Result.iter_error ~f:(fun error ->
-              print_s [%sexp (error : Compilation_error.t)]))
+              print_s [%sexp (error : Compilation_error.t)])
+       else failwith "No output argument supplied")
 ;;
 
 let () = Command_unix.run command
