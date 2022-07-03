@@ -257,15 +257,6 @@
  (action (no-infer (diff mir/LetPattern.expected mir/LetPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff tokens/Modules.expected tokens/Modules.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff ast/Modules.expected ast/Modules.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action (no-infer (diff mir/Modules.expected mir/Modules.out))))
-
-(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ModuleSig.expected tokens/ModuleSig.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -273,6 +264,15 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff mir/ModuleSig.expected mir/ModuleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Modules.expected tokens/Modules.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Modules.expected ast/Modules.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/Modules.expected mir/Modules.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
