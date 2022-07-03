@@ -1116,8 +1116,11 @@ let of_typed_module =
       in
       let mir_expr, stmts =
         let stmts = ref stmts in
-        let add_fun_def fun_def = stmts := Stmt.Fun_def fun_def :: !stmts in
-        Expr.of_typed_expr ?just_bound ~ctx ~add_fun_def expr typ, !stmts
+        let add_fun_def fun_def =
+          stmts := Stmt.Fun_def fun_def :: !stmts
+        in
+        let mir_expr = Expr.of_typed_expr ?just_bound ~ctx ~add_fun_def expr typ in
+        mir_expr, !stmts
       in
       let add_let stmts name mir_expr =
         match (mir_expr : Expr.t) with
@@ -1143,7 +1146,7 @@ let of_typed_module =
   in
   let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
-      match def.Node.node with
+      match def.node with
       | Let bindings -> handle_let_bindings ~ctx ~stmts bindings
       | Module (module_name, _sigs, defs) ->
         Context.with_module ctx module_name ~f:(fun ctx -> loop ~ctx ~stmts defs)
