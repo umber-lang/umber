@@ -1,16 +1,13 @@
-((mir
-  ((Value_def Text.c.0 (Primitive (Char a)))
-   (Value_def Text.hello.0 (Primitive (String "hello world!")))
-   (Value_def Text.spacing.0 (Primitive (String  "line 1\r\
-                                                \n\t line 2")))
-   (Value_def Text.dec_code_exclam.0 (Primitive (String !)))
-   (Value_def .0
-    (Let Text.empty.0 (Primitive (String ""))
-     (Make_block (tag 0)
-      (immediates ((Primitive (Char a)) (Primitive (Char b)))))))
-   (Value_def Text.a.0 (Get_block_field 0 (Name .0)))
-   (Value_def Text.b.0 (Get_block_field 1 (Name .0)))
-   (Value_def Text._UNICODE_WORKS_TOO.0
-    (Primitive
-     (String "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186")))))
- (templates ()))
+((Value_def Text.c.0 (Primitive (Char a)))
+ (Value_def Text.hello.0 (Primitive (String "hello world!")))
+ (Value_def Text.spacing.0 (Primitive (String  "line 1\r\
+                                              \n\t line 2")))
+ (Value_def Text.dec_code_exclam.0 (Primitive (String !)))
+ (Value_def .0
+  (Let Text.empty.0 (Primitive (String ""))
+   (Make_block (tag 0) (fields ((Primitive (Char a)) (Primitive (Char b)))))))
+ (Value_def Text.a.0 (Get_block_field 0 (Name .0)))
+ (Value_def Text.b.0 (Get_block_field 1 (Name .0)))
+ (Value_def Text._UNICODE_WORKS_TOO.0
+  (Primitive
+   (String "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186"))))
