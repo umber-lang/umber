@@ -50,13 +50,6 @@ let block_type context =
 
 let block_pointer_type context = pointer_type (block_type context)
 
-let type_value_kind t : Mir.Value_kind.t -> lltype = function
-  | `Int64 -> i64_type t.context
-  | `Float64 -> double_type t.context
-  | `Char -> i32_type t.context
-  | `Block -> block_pointer_type t.context
-;;
-
 let codegen_literal t lit =
   let with_type make_type const x =
     let typ = make_type t.context in
@@ -97,13 +90,12 @@ let rec codegen_expr t expr =
     in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     build_call fun_ args fun_call_name t.builder
-  | Make_block { tag; pointers; immediates } ->
-    if List.is_empty pointers && List.is_empty immediates
+  | Make_block { tag; fields } ->
+    if List.is_empty fields
     then codegen_constant_tag t tag
     else (
-      let pointers = List.map pointers ~f:(codegen_expr t) in
-      let immediates = List.map immediates ~f:(codegen_expr t) in
-      box t ~tag ~pointers ~immediates)
+      let fields = List.map fields ~f:(codegen_expr t) in
+      box t ~tag ~fields)
   | Get_block_field (i, expr) ->
     const_gep
       (codegen_expr t expr)
@@ -153,20 +145,18 @@ and codegen_cond t cond =
     make_equals (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
   | And _ -> failwith "TODO: And conditions"
 
-and box ?(tag = Mir.Cnstr.Tag.default) t ~pointers ~immediates =
+and box ?(tag = Mir.Cnstr.Tag.default) t ~fields =
   (* TODO: Heap allocation. Also, GC. (Actually, for now, let's just try to plug in a
      conservative GC e.g. Boehm) *)
   let block_header =
     const_named_struct
       (block_header_type t.context)
       [| codegen_non_constant_tag t tag
-       ; const_int (block_index_type t.context) (List.length pointers)
-       ; const_int (block_index_type t.context) (List.length immediates)
+       ; const_int (block_index_type t.context) (List.length fields)
       |]
   in
-  let pointers = const_struct t.context (Array.of_list pointers) in
-  let immediates = const_struct t.context (Array.of_list immediates) in
-  const_struct t.context [| block_header; pointers; immediates |]
+  let fields = const_struct t.context (Array.of_list fields) in
+  const_struct t.context [| block_header; fields |]
 ;;
 
 let codegen_stmt t stmt =
@@ -178,18 +168,14 @@ let codegen_stmt t stmt =
     set_global_constant true value;
     Hashtbl.add_exn t.values ~key:name ~data:value;
     value
-  | Fun_def { fun_name; closed_over; args; returns; body } ->
+  | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
     then raise_s [%message "TODO: closures" (closed_over : Unique_name.Set.t)];
-    let arg_names, arg_kinds = Nonempty.unzip args in
-    let fun_type =
-      function_type
-        (type_value_kind t returns)
-        (Array.of_list_map ~f:(type_value_kind t) (Nonempty.to_list arg_kinds))
-    in
+    let type_ = block_pointer_type t.context in
+    let fun_type = function_type type_ (Array.create type_ ~len:(Nonempty.length args)) in
     let fun_ = define_function (Unique_name.to_string fun_name) fun_type t.module_ in
     let fun_params = params fun_ in
-    Nonempty.iteri arg_names ~f:(fun i arg_name ->
+    Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
       set_value_name (Unique_name.to_string arg_name) arg_value;
       Hashtbl.add_exn t.values ~key:arg_name ~data:arg_value);

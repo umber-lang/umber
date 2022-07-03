@@ -75,8 +75,8 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
     | Unequal_lengths -> false
   in
   let unify_schemes ~names ~types params scheme1 scheme2 =
-    let expr1 = Type.Scheme_plain.instantiate ~params scheme1 in
-    let expr2 = Type.Scheme_plain.instantiate ~params scheme2 in
+    let expr1 = Type.Scheme.instantiate ~params scheme1 in
+    let expr2 = Type.Scheme.instantiate ~params scheme2 in
     try_unify ~names ~types expr1 expr2
   in
   let types = Type_bindings.create () in

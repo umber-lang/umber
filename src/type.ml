@@ -7,15 +7,7 @@ module Param = struct
      Can probably wait a bit though -- it's needed for subtyping
      Variance can maybe be added as constraints on the type scheme *)
 
-  module T = struct
-    type t = Var_id.t * Type_param_name.t
-
-    let compare (id, _) (id', _) = Var_id.compare id id'
-    let hash_fold_t state (var, _) = Var_id.hash_fold_t state var
-    let hash (id, _) = Var_id.hash id
-    let sexp_of_t (_, name) = [%sexp (name : Type_param_name.t)]
-  end
-
+  module T = Type_param_name
   include T
   include Comparable.Make_plain (T)
   include Hashable.Make_plain (T)
@@ -24,6 +16,8 @@ module Param = struct
     include Map
     include Map.Provide_hash (T)
   end
+
+  let dummy = Type_param_name.default
 
   module Env_to_vars : sig
     type t
@@ -59,14 +53,6 @@ module Param = struct
         param)
     ;;
   end
-
-  let create = Tuple2.create
-  let id = fst
-  let name = snd
-  let equal_names (_, name) (_, name') = Type_param_name.(name = name')
-  let dummy = Var_id.create (), Type_param_name.default
-  let of_name ~env name = Env_to_vars.find_or_add env name, name
-  let of_var ~env var = var, Env_of_vars.find_or_add env var
 end
 
 module Expr = struct
@@ -138,35 +124,12 @@ type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
 
 let fresh_var () = Expr.Var (Var_id.create ())
 
-module type Boundable = sig
-  type nonrec t [@@deriving compare, hash, equal, sexp]
-
-  include Comparable.S with type t := t
-  include Hashable.S with type t := t
-
-  module Bounded : sig
-    type nonrec t = Trait_bound.t * t [@@deriving compare, equal, hash, sexp]
+module Scheme = struct
+  module T = struct
+    (* TODO: add trait constraints to this type here *)
+    type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
   end
 
-  val instantiate
-    :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
-    -> ?params:Param.Env_to_vars.t
-    -> t
-    -> (Var_id.t, _) Expr.t
-
-  val instantiate_bounded
-    :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
-    -> ?params:Param.Env_to_vars.t
-    -> Bounded.t
-    -> (Var_id.t, _) Expr.t
-end
-
-module Make_boundable (T : sig
-  type var
-  type t = (var, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
-
-  val param_name_of_var : var -> Type_param_name.t
-end) : Boundable with type t = T.t = struct
   include T
   include Comparable.Make (T)
   include Hashable.Make (T)
@@ -179,7 +142,7 @@ end) : Boundable with type t = T.t = struct
     let params = option_or_default params ~f:Param.Env_to_vars.create in
     Expr.map
       typ
-      ~var:(Param.Env_to_vars.find_or_add params << param_name_of_var)
+      ~var:(Param.Env_to_vars.find_or_add params)
       ~f:(function
         | Type_app (name, args) -> Defer (Expr.Type_app (map_name name, args))
         | typ -> Defer typ)
@@ -191,38 +154,6 @@ end) : Boundable with type t = T.t = struct
     match typ with
     | [], typ -> instantiate ?map_name ?params typ
     | _ -> raise_s [%message "Trait bounds not yet implemented"]
-  ;;
-end
-
-module Scheme_plain = Make_boundable (struct
-  type var = Type_param_name.t
-  type t = (Type_param_name.t, Nothing.t) Expr.t [@@deriving compare, equal, hash, sexp]
-
-  let param_name_of_var = Fn.id
-end)
-
-module Scheme = struct
-  include Make_boundable (struct
-    type var = Param.t
-
-    (* TODO: add trait constraints to this type here *)
-    type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp_of]
-
-    let param_name_of_var = Param.name
-
-    let t_of_sexp sexp =
-      let env = Param.Env_to_vars.create () in
-      let param_of_sexp sexp =
-        let name = [%of_sexp: Type_param_name.t] sexp in
-        let id = Param.Env_to_vars.find_or_add env name in
-        id, name
-      in
-      Expr.t_of_sexp param_of_sexp [%of_sexp: Nothing.t] sexp
-    ;;
-  end)
-
-  let of_plain ?(env = Param.Env_to_vars.create ()) plain =
-    Expr.map plain ~var:(Param.of_name ~env) ~pf:Nothing.unreachable_code
   ;;
 end
 
@@ -246,10 +177,10 @@ end
 module Decl = struct
   type decl =
     | Abstract
-    | Alias of Scheme_plain.t
+    | Alias of Scheme.t
     (* TODO: variant constructors should probably support fixity declarations *)
-    | Variants of (Cnstr_name.t * Scheme_plain.t list) list
-    | Record of (Value_name.t * Scheme_plain.t) Nonempty.t
+    | Variants of (Cnstr_name.t * Scheme.t list) list
+    | Record of (Value_name.t * Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
   type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]

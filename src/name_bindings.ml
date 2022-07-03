@@ -581,7 +581,6 @@ let add_val_or_extern
           | None ->
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
           | Some (Local existing_entry) ->
-            let scheme = Type.Scheme.of_plain scheme in
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
             Local
               (Name_entry.merge
@@ -632,14 +631,12 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
         (match decl with
         | params, Variants cnstrs ->
           (* Add constructors as functions to the namespace *)
-          let env = Type.Param.Env_to_vars.create () in
           let result_type : Type.Scheme.t =
             let path = Path.to_module_path current_path in
-            let params = List.map params ~f:(Type.Expr.var << Type.Param.of_name ~env) in
+            let params = List.map params ~f:Type.Expr.var in
             Type_app ((path, type_name), params)
           in
           List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
-            let args = List.map args ~f:(Type.Scheme.of_plain ~env) in
             let entry =
               Name_entry.val_declared
                 (match Nonempty.of_list args with

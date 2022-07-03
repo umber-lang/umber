@@ -109,7 +109,7 @@ module Pattern = struct
         pat_names, (As (pat, name), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
-          Type.Scheme_plain.instantiate_bounded
+          Type.Scheme.instantiate_bounded
             ~map_name:(Name_bindings.absolutify_type_name names)
             typ
         in
@@ -295,7 +295,7 @@ module Expr = struct
       | Record_field_access (_record, _name) -> failwith "TODO: record3"
       | Type_annotation (expr, typ) ->
         let t1 =
-          Type.Scheme_plain.instantiate_bounded
+          Type.Scheme.instantiate_bounded
             ~map_name:(Name_bindings.absolutify_type_name names)
             typ
         in

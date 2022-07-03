@@ -4,8 +4,8 @@ open Names
 type ('pat, 'expr) t = Module_name.t * sig_ Node.t list * ('pat, 'expr) def Node.t list
 
 and common =
-  | Val of Value_name.t * Fixity.t option * Type.Scheme_plain.Bounded.t
-  | Extern of Value_name.t * Fixity.t option * Type.Scheme_plain.t * Extern_name.t
+  | Val of Value_name.t * Fixity.t option * Type.Scheme.Bounded.t
+  | Extern of Value_name.t * Fixity.t option * Type.Scheme.t * Extern_name.t
   | Type_decl of Type_name.t * Type.Decl.t
   | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * sig_ Node.t list
   (* TODO: Allow importing paths all at once
@@ -35,7 +35,7 @@ and ('pat, 'expr) def =
   | Impl of
       Trait_bound.t
       * Trait_name.t
-      * Type.Scheme_plain.t Nonempty.t
+      * Type.Scheme.t Nonempty.t
       * ('pat, 'expr) def Node.t list
 [@@deriving sexp_of]
 

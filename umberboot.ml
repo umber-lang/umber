@@ -32,7 +32,6 @@ module Target = struct
       | Typed_ast
       | Names
       | Mir
-      | Templates
       | Llvm
     [@@deriving compare, enumerate, sexp]
   end
@@ -44,7 +43,7 @@ module Target = struct
     | Tokens -> Lexing
     | Untyped_ast -> Parsing
     | Typed_ast | Names -> Type_checking
-    | Mir | Templates -> Generating_mir
+    | Mir -> Generating_mir
     | Llvm -> Generating_llvm
   ;;
 
@@ -58,7 +57,6 @@ module Target = struct
     | Typed_ast -> flag "typed-ast" no_arg ~doc:"Print type-checker output (typed AST)"
     | Names -> flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
     | Mir -> flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
-    | Templates -> flag "templates" no_arg ~doc:"Print polymorphic function templates"
     | Llvm -> flag "llvm" no_arg ~doc:"Print LLVM IR"
   ;;
 end
@@ -143,10 +141,8 @@ let command =
            if Output.targets output Names then print_s [%sexp (names : Name_bindings.t)];
            if Output.requires output Generating_mir
            then (
-             let templates, mir = or_raise (Mir.of_typed_module ~names ast) in
+             let mir = or_raise (Mir.of_typed_module ~names ast) in
              if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
-             if Output.targets output Templates
-             then print_s [%sexp (templates : Mir.Templates.Compact.t)];
              if Output.requires output Generating_llvm
              then
                Codegen.of_mir ~source_filename:filename mir

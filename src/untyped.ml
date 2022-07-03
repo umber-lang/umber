@@ -7,7 +7,7 @@ open Names
 module Pattern = struct
   include Pattern
 
-  type nonrec t = Type.Scheme_plain.Bounded.t t [@@deriving sexp]
+  type nonrec t = Type.Scheme.Bounded.t t [@@deriving sexp]
 end
 
 module Expr = struct
@@ -26,7 +26,7 @@ module Expr = struct
     | Record_literal of (Value_name.t * t option) Nonempty.t
     | Record_update of t * (Value_name.t * t option) Nonempty.t
     | Record_field_access of t * Value_name.t
-    | Type_annotation of t * Type.Scheme_plain.Bounded.t
+    | Type_annotation of t * Type.Scheme.Bounded.t
   [@@deriving sexp, variants]
 
   (** Get all the external names referenced by an expression. Names local to the

@@ -4,7 +4,9 @@ module Var_id : module type of Unique_id.Int ()
 
 module Param : sig
   (* TODO: consider adding support for weak type variables here *)
-  type t [@@deriving compare, equal, sexp_of]
+  type t = Type_param_name.t [@@deriving compare, equal, sexp_of]
+
+  val dummy : t
 
   include Comparable.S_plain with type t := t
 
@@ -29,14 +31,6 @@ module Param : sig
     val create : unit -> t
     val find_or_add : t -> Var_id.t -> Type_param_name.t
   end
-
-  val name : t -> Type_param_name.t
-  val id : t -> Var_id.t
-  val of_name : env:Env_to_vars.t -> Type_param_name.t -> t
-  val of_var : env:Env_of_vars.t -> Var_id.t -> t
-  val create : Var_id.t -> Type_param_name.t -> t
-  val equal_names : t -> t -> bool
-  val dummy : t
 end
 
 module Expr : sig
@@ -70,8 +64,8 @@ type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
 
 val fresh_var : unit -> t
 
-module type Boundable = sig
-  type nonrec t [@@deriving compare, hash, equal, sexp]
+module Scheme : sig
+  type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
@@ -93,14 +87,6 @@ module type Boundable = sig
     -> (Var_id.t, _) Expr.t
 end
 
-module Scheme_plain : Boundable with type t = (Type_param_name.t, Nothing.t) Expr.t
-
-module Scheme : sig
-  include Boundable with type t = (Param.t, Nothing.t) Expr.t
-
-  val of_plain : ?env:Param.Env_to_vars.t -> Scheme_plain.t -> t
-end
-
 module Concrete : sig
   type t = (Nothing.t, Nothing.t) Expr.t [@@deriving compare, equal, hash, sexp]
 
@@ -116,18 +102,19 @@ end
 module Decl : sig
   type decl =
     | Abstract
-    | Alias of Scheme_plain.t
-    | Variants of (Cnstr_name.t * Scheme_plain.t list) list
+    | Alias of Scheme.t
+    | Variants of (Cnstr_name.t * Scheme.t list) list
     (* TODO: probably just make records a type expression - you can trivially get nominal
-       records with a single variant and an inline record *)
-    | Record of (Value_name.t * Scheme_plain.t) Nonempty.t
+       records with a single variant and an inline record. One problem with this is you
+       can no longer define recursive record types, which is a bit annoying. *)
+    | Record of (Value_name.t * Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
   type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]
 
   val arity : t -> int
-  val map_exprs : t -> f:(Scheme_plain.t -> Scheme_plain.t) -> t
-  val fold_exprs : t -> init:'acc -> f:('acc -> Scheme_plain.t -> 'acc) -> 'acc
-  val iter_exprs : t -> f:(Scheme_plain.t -> unit) -> unit
+  val map_exprs : t -> f:(Scheme.t -> Scheme.t) -> t
+  val fold_exprs : t -> init:'acc -> f:('acc -> Scheme.t -> 'acc) -> 'acc
+  val iter_exprs : t -> f:(Scheme.t -> unit) -> unit
   val no_free_params : t -> bool
 end
