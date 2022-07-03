@@ -217,7 +217,9 @@ end = struct
     match (type_ : Type.Scheme.t) with
     | Type_app (type_name, _args) ->
       Hashtbl.find_or_add t.cnstr_info_cache type_ ~default:(fun () ->
-        match snd (Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name) with
+        match
+          snd (Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name)
+        with
         | Alias alias -> get_cnstr_info t alias
         | Variants variants -> Cnstr_info.of_variants variants
         | Abstract | Record _ -> cnstr_lookup_failed type_)
@@ -507,20 +509,6 @@ end = struct
     ;;
   end
 end
-
-(* FIXME: remove *)
-(* let fold_functions =
-  let rec loop ~names typ ~init ~f =
-    Type.Expr.fold_until typ ~init ~f:(fun init -> function
-      | Function (args, result) -> Continue (f init args result)
-      | Type_app (type_name, _) ->
-        (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
-        | Alias alias -> loop ~names (Type.Scheme.of_plain alias) ~init ~f
-        | Variants _ | Record _ | Abstract -> Continue init)
-      | _ -> Continue init)
-  in
-  fun ~names typ ~init ~f -> loop ~names typ ~init ~f |> Fold_action.id
-;; *)
 
 module Expr = struct
   module Break_label : sig
@@ -1000,40 +988,7 @@ module Expr = struct
   ;;
 end
 
-let renumber_ids_aux x ~map_names =
-  let name_table = Ustring.Table.create () in
-  map_names x ~f:(fun name ->
-    Unique_name.map_id name ~f:(fun id ->
-      let name = Unique_name.base_name name in
-      match Hashtbl.find name_table name with
-      | None ->
-        let id_table = Int.Table.create () in
-        Hashtbl.set id_table ~key:id ~data:0;
-        Hashtbl.set name_table ~key:name ~data:id_table;
-        0
-      | Some id_table ->
-        Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
-;;
-
 module Stmt = struct
-  (* TODO: The way this is set up now, other modules requiring new instances of
-     polymorphic functions can change what the output of the MIR for this module should be
-     (since those function instances are meant to be defined here). I think this should 
-     make doing incremental compilation pretty tricky, since you can't just compile each
-     module in isolation all the way to native code - you may have to keep incrementally
-     adding more functions which then have to get passed onto the LLVM stage. 
-     
-     Can look at how Rust handles some of this:
-       https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
-       
-     What about having `Mir.t` be an abstract type that provides function calls through
-     its api, basically how `Function_factory.t` works. This modifies itself, but you
-     can set up something to listen to these updates, allowing you to incrementally add
-     LLVM IR by adding new functions to `Codegen.t`. This sounds pretty good.
-     
-     For now, we can just assume compilation will be done monolithically I think. We can't
-     compile submodules to LLVM atomically as more uses may arise, but I suppose we can
-     turn the whole file into Mir before doing this (?). *)
   type t =
     | Value_def of Unique_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
@@ -1159,10 +1114,6 @@ let of_typed_module =
         | Catch_all name -> name
         | Constant _ | As _ | Cnstr_appl _ -> None
       in
-      (* FIXME: new code here: 
-         - check if type is monomorphic 
-         - if monomorphic, just go ahead and create the expr
-         - If not, need to define a template instead *)
       let mir_expr, stmts =
         let stmts = ref stmts in
         let add_fun_def fun_def = stmts := Stmt.Fun_def fun_def :: !stmts in
@@ -1176,11 +1127,11 @@ let of_typed_module =
         | _ -> Stmt.Value_def (name, mir_expr) :: stmts
       in
       (* TODO: Support pattern unions in toplevel let bindings - should work roughly
-           the same as recursive bindings in expressions *)
+         the same as recursive bindings in expressions *)
       let add_name ctx name =
         (* TODO: this seems error-prone, especially since we use names like
-             [Value_name.empty] elsewhere in the AST, e.g. for match variables.
-             Might be a good idea to add a variant for constant names, or something. *)
+           [Value_name.empty] elsewhere in the AST, e.g. for match variables.
+           Might be a good idea to add a variant for constant names, or something. *)
         if Constant_names.mem name
         then (* Constant names are always made-up anew *)
           Context.add_value_name ctx name
@@ -1218,7 +1169,21 @@ let of_typed_module =
 ;;
 
 let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
-let renumber_ids = renumber_ids_aux ~map_names
+
+let renumber_ids stmts =
+  let name_table = Ustring.Table.create () in
+  map_names stmts ~f:(fun name ->
+    Unique_name.map_id name ~f:(fun id ->
+      let name = Unique_name.base_name name in
+      match Hashtbl.find name_table name with
+      | None ->
+        let id_table = Int.Table.create () in
+        Hashtbl.set id_table ~key:id ~data:0;
+        Hashtbl.set name_table ~key:name ~data:id_table;
+        0
+      | Some id_table ->
+        Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
+;;
 
 (* Goals should be:
    - Remove unnecessary type information (definitions, etc.)
