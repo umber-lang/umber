@@ -1,0 +1,30 @@
+LET
+(LOWER_NAME count_up)
+(LOWER_NAME start_at)
+(LOWER_NAME count_by)
+(LOWER_NAME end_after)
+EQUALS
+INDENT
+LET
+(LOWER_NAME loop)
+(LOWER_NAME current)
+EQUALS
+INDENT
+IF
+(LOWER_NAME current)
+(OPERATOR <)
+(LOWER_NAME end_after)
+THEN
+(LOWER_NAME loop)
+L_PAREN
+(LOWER_NAME current)
+(OPERATOR +)
+(LOWER_NAME count_by)
+R_PAREN
+ELSE
+(LOWER_NAME current)
+DEDENT
+(LOWER_NAME loop)
+(LOWER_NAME start_at)
+DEDENT
+EOF

@@ -26,6 +26,15 @@
  (action (no-infer (diff mir/Classics.expected mir/Classics.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Closures.expected tokens/Closures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Closures.expected ast/Closures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/Closures.expected mir/Closures.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
    (diff tokens/CrossModuleUsage.expected tokens/CrossModuleUsage.out))))
