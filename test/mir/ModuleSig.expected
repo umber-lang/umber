@@ -1,14 +1,12 @@
 ((Fun_def
   ((fun_name ModuleSig.Range.between.0) (closed_over ())
-   (args ((ModuleSig.Range.lo.0 Block) (ModuleSig.Range.hi.0 Block)))
-   (returns Block)
+   (args (ModuleSig.Range.lo.0 ModuleSig.Range.hi.0))
    (body
     (Make_block (tag 0)
-     (pointers ((Name ModuleSig.Range.lo.0) (Name ModuleSig.Range.hi.0)))))))
+     (fields ((Name ModuleSig.Range.lo.0) (Name ModuleSig.Range.hi.0)))))))
  (Fun_def
-  ((fun_name ModuleSig.Range.in.0)
-   (closed_over (Std.Prelude.Operators.&&.0 Std.Prelude.Operators.<=.0))
-   (args ((ModuleSig.Range.x.0 Block) (*lambda_arg.0 Block))) (returns Block)
+  ((fun_name ModuleSig.Range.in.0) (closed_over ())
+   (args (ModuleSig.Range.x.0 *lambda_arg.0))
    (body
     (Let ModuleSig.Range.lo.1 (Get_block_field 0 (Name *lambda_arg.0))
      (Let ModuleSig.Range.hi.1 (Get_block_field 1 (Name *lambda_arg.0))

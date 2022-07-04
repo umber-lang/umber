@@ -828,7 +828,7 @@ module Expr = struct
                let ctx, bindings =
                  fold_pattern_bindings ~ctx arg mir_expr arg_type ~init:bindings ~add_let
                in
-               (ctx, bindings), arg_name)
+               (ctx, List.rev bindings), arg_name)
       in
       (* FIXME: Shouldn't include [fun_name] in [bound_names] if recursive. *)
       let fun_name =
