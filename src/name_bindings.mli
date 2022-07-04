@@ -23,7 +23,7 @@ module Name_entry : sig
 end
 
 module Path : sig
-  type t [@@deriving sexp]
+  type t [@@deriving compare, equal, hash, sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
