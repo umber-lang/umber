@@ -23,3 +23,8 @@ let (|>) x f = f x
 let if_ then_ else_ = match
   | True -> then_ ()
   | False -> else_ ()
+
+# `(() -> a), (() -> a), Bool -> a`
+let if' then_ else_ cond = match cond
+  | True -> then_ ()
+  | False -> else_ ()

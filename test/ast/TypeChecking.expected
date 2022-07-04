@@ -45,4 +45,16 @@
            (Fun_call (Name else_) (((Tuple ()) (Tuple ())))))))))
       (Function
        ((Function ((Tuple ())) (Var a)) (Function ((Tuple ())) (Var a)))
-       (Function ((Type_app Bool ())) (Var a)))))))))
+       (Function ((Type_app Bool ())) (Var a)))))))
+  (Let
+   (((Catch_all (if'))
+     ((Lambda ((Catch_all (then_)) (Catch_all (else_)) (Catch_all (cond)))
+       (Match (Name cond) (Type_app Bool ())
+        (((Cnstr_appl True ())
+          (Fun_call (Name then_) (((Tuple ()) (Tuple ())))))
+         ((Cnstr_appl False ())
+          (Fun_call (Name else_) (((Tuple ()) (Tuple ()))))))))
+      (Function
+       ((Function ((Tuple ())) (Var a)) (Function ((Tuple ())) (Var a))
+        (Type_app Bool ()))
+       (Var a))))))))
