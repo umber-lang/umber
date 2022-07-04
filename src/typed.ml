@@ -258,17 +258,13 @@ module Expr = struct
               | _ :: _, _ -> ()
             in
             let bindings =
-              Nonempty.map
-                bindings
-                ~f:(Tuple2.map_snd ~f:(of_untyped ~f_name ~names ~types))
-            in
-            ( names
-            , !used_a_bound_name
-            , Nonempty.map
-                bindings
-                ~f:(fun (((_, (pat_type, _)) as pat), (expr, expr_type)) ->
+              Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
+                let expr, expr_type = of_untyped expr ~f_name ~names ~types in
                 Type_bindings.unify ~names ~types pat_type expr_type;
-                pat, expr) ))
+                (pat, (pat_type, pat_names)), expr)
+            in
+            let rec_ = !used_a_bound_name in
+            names, rec_, bindings)
           else (
             (* Process bindings in order without any recursion *)
             let names, bindings =
