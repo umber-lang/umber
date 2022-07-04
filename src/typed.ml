@@ -307,56 +307,59 @@ module Expr = struct
     |> Tuple2.map_snd ~f:(Type_bindings.substitute types)
   ;;
 
-  let rec map expr ~f ~f_binding ~f_type =
+  let rec map expr ~f ~f_type =
     match f expr with
     | `Halt expr -> expr
-    | `Retry expr -> map ~f ~f_binding ~f_type expr
+    | `Retry expr -> map ~f ~f_type expr
     | `Defer expr ->
       (match expr with
-      | Let bindings -> Let (f_binding bindings)
+      | Let { rec_; bindings; body } ->
+        let bindings =
+          Nonempty.map bindings ~f:(fun ((pat, typ), expr) ->
+            (pat, f_type typ), map ~f ~f_type expr)
+        in
+        let body = map ~f ~f_type body in
+        Let { rec_; bindings; body }
       | (Literal _ | Name (_, _)) as expr -> expr
       | Fun_call (fun_, args) ->
-        let fun_ = map ~f ~f_binding ~f_type fun_ in
+        let fun_ = map ~f ~f_type fun_ in
         let args =
           Nonempty.map args ~f:(fun (arg, arg_type) ->
-            map ~f ~f_binding ~f_type arg, f_type arg_type)
+            map ~f ~f_type arg, f_type arg_type)
         in
         Fun_call (fun_, args)
-      | Lambda (args, body) -> Lambda (args, map ~f ~f_binding ~f_type body)
+      | Lambda (args, body) -> Lambda (args, map ~f ~f_type body)
       | Match (expr, expr_type, branches) ->
-        let expr = map ~f ~f_binding ~f_type expr in
+        let expr = map ~f ~f_type expr in
         Match
           ( expr
           , f_type expr_type
-          , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map ~f ~f_binding ~f_type)) )
-      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~f_binding ~f_type))
+          , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map ~f ~f_type)) )
+      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~f_type))
       | Record_literal fields ->
         Record_literal
-          (List.map
-             fields
-             ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_binding ~f_type))))
+          (List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_type))))
       | Record_update (expr, fields) ->
-        let expr = map ~f ~f_binding ~f_type expr in
+        let expr = map ~f ~f_type expr in
         Record_update
-          ( expr
-          , List.map
-              fields
-              ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_binding ~f_type))) )
+          (expr, List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_type))))
       | Record_field_access (record, field) ->
-        Record_field_access (map ~f ~f_binding ~f_type record, field))
+        Record_field_access (map ~f ~f_type record, field))
   ;;
 
   let rec generalize_let_bindings ~names ~types =
     map
-      ~f_binding:(fun { rec_; bindings; body } ->
-        let bindings =
-          Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
-            let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
-            (pat, scheme), generalize_let_bindings ~names ~types expr)
-        in
-        { rec_; bindings; body = generalize_let_bindings ~names ~types body })
       ~f_type:(fun (typ, _) -> Type_bindings.generalize types typ)
-      ~f:(fun expr -> `Defer expr)
+      ~f:(function
+        | Let { rec_; bindings; body } ->
+          let bindings =
+            Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
+              let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
+              (pat, scheme), generalize_let_bindings ~names ~types expr)
+          in
+          let body = generalize_let_bindings ~names ~types body in
+          `Halt (Let { rec_; bindings; body })
+        | expr -> `Defer expr)
   ;;
 end
 
