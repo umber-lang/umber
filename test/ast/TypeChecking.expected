@@ -1,60 +1,69 @@
 (TypeChecking ()
- ((Let (((Tuple ()) ((Tuple ()) (Tuple ())))))
-  (Let
-   (((Catch_all (id))
-     ((Lambda ((Catch_all (x))) (Name x)) (Function ((Var a)) (Var a))))))
-  (Let
-   (((Catch_all (id_for_ints))
-     ((Lambda ((Catch_all (x))) (Name x))
-      (Function ((Type_app Int ())) (Type_app Int ()))))))
+ ((Let (rec_ true) (bindings (((Tuple ()) ((Tuple ()) (Tuple ()))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (id))
+      ((Lambda ((Catch_all (x))) (Name x)) (Function ((Var a)) (Var a)))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (id_for_ints))
+      ((Lambda ((Catch_all (x))) (Name x))
+       (Function ((Type_app Int ())) (Type_app Int ())))))))
   (Common_def
    (Val id_for_floats ()
     (() (Function ((Type_app Float ())) (Type_app Float ())))))
-  (Let
-   (((Catch_all (id_for_floats))
-     ((Lambda ((Catch_all (x))) (Name x))
-      (Function ((Type_app Float ())) (Type_app Float ()))))))
-  (Let
-   (((Catch_all (id_for_chars))
-     ((Name id) (Function ((Type_app Char ())) (Type_app Char ()))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (id_for_floats))
+      ((Lambda ((Catch_all (x))) (Name x))
+       (Function ((Type_app Float ())) (Type_app Float ())))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (id_for_chars))
+      ((Name id) (Function ((Type_app Char ())) (Type_app Char ())))))))
   (Common_def
    (Val id_for_chars ()
     (() (Function ((Type_app Char ())) (Type_app Char ())))))
-  (Let
-   (((Catch_all (id_for_bools))
-     ((Lambda ((Catch_all (x)))
-       (Fun_call (Name id) (((Name x) (Type_app Bool ())))))
-      (Function ((Type_app Bool ())) (Type_app Bool ()))))))
-  (Let
-   (((Tuple ((Catch_all (id_alias)) (Catch_all (five))))
-     ((Tuple ((Name id) (Literal (Int 5))))
-      (Tuple ((Function ((Var a)) (Var a)) (Type_app Int ())))))))
-  (Let
-   (((Catch_all (|>))
-     ((Lambda ((Catch_all (x)) (Catch_all (f)))
-       (Fun_call (Name f) (((Name x) (Var a)))))
-      (Function ((Var a) (Function ((Var a)) (Var b))) (Var b))))))
-  (Let
-   (((Catch_all (if_))
-     ((Lambda ((Catch_all (then_)) (Catch_all (else_)))
-       (Lambda ((Catch_all ("")))
-        (Match (Name "") (Type_app Bool ())
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (id_for_bools))
+      ((Lambda ((Catch_all (x)))
+        (Fun_call (Name id) (((Name x) (Type_app Bool ())))))
+       (Function ((Type_app Bool ())) (Type_app Bool ())))))))
+  (Let (rec_ true)
+   (bindings
+    (((Tuple ((Catch_all (id_alias)) (Catch_all (five))))
+      ((Tuple ((Name id) (Literal (Int 5))))
+       (Tuple ((Function ((Var a)) (Var a)) (Type_app Int ()))))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (|>))
+      ((Lambda ((Catch_all (x)) (Catch_all (f)))
+        (Fun_call (Name f) (((Name x) (Var a)))))
+       (Function ((Var a) (Function ((Var a)) (Var b))) (Var b)))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (if_))
+      ((Lambda ((Catch_all (then_)) (Catch_all (else_)))
+        (Lambda ((Catch_all ("")))
+         (Match (Name "") (Type_app Bool ())
+          (((Cnstr_appl True ())
+            (Fun_call (Name then_) (((Tuple ()) (Tuple ())))))
+           ((Cnstr_appl False ())
+            (Fun_call (Name else_) (((Tuple ()) (Tuple ())))))))))
+       (Function
+        ((Function ((Tuple ())) (Var a)) (Function ((Tuple ())) (Var a)))
+        (Function ((Type_app Bool ())) (Var a))))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (if'))
+      ((Lambda ((Catch_all (then_)) (Catch_all (else_)) (Catch_all (cond)))
+        (Match (Name cond) (Type_app Bool ())
          (((Cnstr_appl True ())
            (Fun_call (Name then_) (((Tuple ()) (Tuple ())))))
           ((Cnstr_appl False ())
-           (Fun_call (Name else_) (((Tuple ()) (Tuple ())))))))))
-      (Function
-       ((Function ((Tuple ())) (Var a)) (Function ((Tuple ())) (Var a)))
-       (Function ((Type_app Bool ())) (Var a)))))))
-  (Let
-   (((Catch_all (if'))
-     ((Lambda ((Catch_all (then_)) (Catch_all (else_)) (Catch_all (cond)))
-       (Match (Name cond) (Type_app Bool ())
-        (((Cnstr_appl True ())
-          (Fun_call (Name then_) (((Tuple ()) (Tuple ())))))
-         ((Cnstr_appl False ())
-          (Fun_call (Name else_) (((Tuple ()) (Tuple ()))))))))
-      (Function
-       ((Function ((Tuple ())) (Var a)) (Function ((Tuple ())) (Var a))
-        (Type_app Bool ()))
-       (Var a))))))))
+           (Fun_call (Name else_) (((Tuple ()) (Tuple ()))))))))
+       (Function
+        ((Function ((Tuple ())) (Var a)) (Function ((Tuple ())) (Var a))
+         (Type_app Bool ()))
+        (Var a)))))))))

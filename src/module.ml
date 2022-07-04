@@ -24,9 +24,10 @@ and sig_ =
 and ('pat, 'expr) def =
   | Common_def of common
   | Module of ('pat, 'expr) t
-  (* TODO: use Let_binding.t here, with the rec tag initially set, but we should turn it
-     off if the value is not actually using recursion - this will help later stages *)
-  | Let of ('pat * 'expr) Node.t Nonempty.t
+  | Let of
+      { rec_ : bool
+      ; bindings : ('pat * 'expr) Node.t Nonempty.t
+      }
   | Trait of
       Trait_name.t
       * Type_param_name.t Nonempty.t
@@ -51,4 +52,3 @@ let with_filename (_, sigs, defs) filename =
 ;;
 
 let module_name : _ t -> Module_name.t = Tuple3.get1
-let let_ bindings = Let bindings

@@ -9,4 +9,5 @@
        (Bad_style_though ((Type_app Option ((Tuple ()))))))))))
   (Common_def (Import_with (Number Int) ()))
   (Common_def (Import_without (Number Float) (pi)))
-  (Common_def (Import_with (Number) (*))) (Let (((Catch_all (*)) (Name *))))))
+  (Common_def (Import_with (Number) (*)))
+  (Let (rec_ true) (bindings (((Catch_all (*)) (Name *)))))))

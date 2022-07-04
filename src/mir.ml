@@ -1146,7 +1146,7 @@ let of_typed_module =
   let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.node with
-      | Let bindings -> handle_let_bindings ~ctx ~stmts bindings
+      | Let { bindings; rec_ = _ } -> handle_let_bindings ~ctx ~stmts bindings
       | Module (module_name, _sigs, defs) ->
         Context.with_module ctx module_name ~f:(fun ctx -> loop ~ctx ~stmts defs)
       | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"

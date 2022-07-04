@@ -1,29 +1,35 @@
 (CrossModuleUsage ()
- ((Let
-   (((Catch_all (source))
-     ((Literal (String "everything depends on me")) (Type_app String ())))))
+ ((Let (rec_ true)
+   (bindings
+    (((Catch_all (source))
+      ((Literal (String "everything depends on me")) (Type_app String ()))))))
   (Module
    (A ()
-    ((Let
-      (((Catch_all (a)) ((Name b) (Var a)))
-       ((Catch_all (b)) ((Name a) (Var a)))))
-     (Let
-      (((Catch_all (print))
-        ((Name Std.Prelude.print)
-         (Function ((Type_app String ())) (Tuple ()))))))
-     (Let
-      (((Catch_all (print_source))
-        ((Lambda ((Tuple ()))
-          (Fun_call (Name print) (((Name source) (Type_app String ())))))
-         (Function ((Tuple ())) (Tuple ())))))))))
-  (Let
-   (((Catch_all (print_source))
-     ((Lambda ((Tuple ()))
-       (Fun_call (Name ";")
-        (((Fun_call (Name A.print_source) (((Tuple ()) (Tuple ()))))
-          (Tuple ()))
-         ((Fun_call (Name print) (((Name source) (Type_app String ()))))
-          (Tuple ())))))
-      (Function ((Tuple ())) (Tuple ()))))))
+    ((Let (rec_ true)
+      (bindings
+       (((Catch_all (a)) ((Name b) (Var a)))
+        ((Catch_all (b)) ((Name a) (Var a))))))
+     (Let (rec_ true)
+      (bindings
+       (((Catch_all (print))
+         ((Name Std.Prelude.print)
+          (Function ((Type_app String ())) (Tuple ())))))))
+     (Let (rec_ true)
+      (bindings
+       (((Catch_all (print_source))
+         ((Lambda ((Tuple ()))
+           (Fun_call (Name print) (((Name source) (Type_app String ())))))
+          (Function ((Tuple ())) (Tuple ()))))))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (print_source))
+      ((Lambda ((Tuple ()))
+        (Fun_call (Name ";")
+         (((Fun_call (Name A.print_source) (((Tuple ()) (Tuple ()))))
+           (Tuple ()))
+          ((Fun_call (Name print) (((Name source) (Type_app String ()))))
+           (Tuple ())))))
+       (Function ((Tuple ())) (Tuple ())))))))
   (Common_def (Val empty () (() (Type_app List ((Var a))))))
-  (Let (((Catch_all (empty)) ((Name Nil) (Type_app List ((Var a)))))))))
+  (Let (rec_ true)
+   (bindings (((Catch_all (empty)) ((Name Nil) (Type_app List ((Var a))))))))))

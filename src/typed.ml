@@ -526,8 +526,8 @@ module Module = struct
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
-      match def.Node.node with
-      | Let bindings ->
+      match def.node with
+      | Let { bindings; rec_ = _ } ->
         Nonempty.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
           Name_bindings.merge_names
             names
@@ -643,7 +643,9 @@ module Module = struct
         ~init:names
         ~f:
           (Node.fold_map ~f:(fun names -> function
-             | Let bindings -> handle_bindings ~names bindings |> Tuple2.map_snd ~f:let_
+             | Let { bindings; rec_ } ->
+               handle_bindings ~names bindings
+               |> Tuple2.map_snd ~f:(fun bindings -> Let { rec_; bindings })
              | Module (module_name, sigs, defs) ->
                let names, defs =
                  handle_value_bindings ~names ~types module_name sigs defs
@@ -666,7 +668,7 @@ module Module = struct
       List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
     and gather_bindings ~names def (other_defs, bindings) =
       match def.Node.node with
-      | Let bindings' ->
+      | Let { bindings = bindings'; rec_ = _ } ->
         ( other_defs
         , Nonempty.fold_right
             bindings'
@@ -722,7 +724,9 @@ module Module = struct
          getting generalized here as well, which is probably wrong *)
       let expr = Expr.generalize_let_bindings ~names ~types expr in
       names, { Node.node = pat, (expr, scheme); span })
-    |> Tuple2.map_snd ~f:(fun bindings -> { Node.node = Let bindings; span })
+    |> Tuple2.map_snd ~f:(fun bindings ->
+         (* FIXME: Can we infer when rec isn't needed? *)
+         { Node.node = Let { rec_ = true; bindings }; span })
   ;;
 
   (** Reintegrate the re-ordered binding groups from [extract_binding_groups] back into

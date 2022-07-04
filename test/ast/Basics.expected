@@ -1,12 +1,15 @@
 (Basics ()
- ((Let (((Catch_all (false)) ((Name False) (Type_app Bool ())))))
-  (Let (((Catch_all (true)) ((Name True) (Type_app Bool ())))))
-  (Let
-   (((Catch_all ())
-     ((Match (Name false) (Type_app Bool ())
-       (((Cnstr_appl True ()) (Literal (Float 1)))
-        ((Cnstr_appl False ()) (Literal (Float 2.5)))))
-      (Type_app Float ())))))
+ ((Let (rec_ true)
+   (bindings (((Catch_all (false)) ((Name False) (Type_app Bool ()))))))
+  (Let (rec_ true)
+   (bindings (((Catch_all (true)) ((Name True) (Type_app Bool ()))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all ())
+      ((Match (Name false) (Type_app Bool ())
+        (((Cnstr_appl True ()) (Literal (Float 1)))
+         ((Cnstr_appl False ()) (Literal (Float 2.5)))))
+       (Type_app Float ()))))))
   (Common_def (Type_decl Bottom (() (Variants ()))))
   (Common_def (Type_decl Color (() (Variants ((Red ()) (Blue ()))))))
   (Common_def
@@ -23,10 +26,11 @@
     (()
      (Variants
       ((Point3 ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))))))))
-  (Let
-   (((Catch_all (xyz))
-     ((Fun_call (Name Point3)
-       (((Literal (Int 1)) (Type_app Int ()))
-        ((Literal (Int 2)) (Type_app Int ()))
-        ((Literal (Int 3)) (Type_app Int ()))))
-      (Type_app Basics.Point3 ())))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (xyz))
+      ((Fun_call (Name Point3)
+        (((Literal (Int 1)) (Type_app Int ()))
+         ((Literal (Int 2)) (Type_app Int ()))
+         ((Literal (Int 3)) (Type_app Int ()))))
+       (Type_app Basics.Point3 ()))))))))

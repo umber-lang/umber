@@ -342,9 +342,9 @@ optional_sig_def:
 
 stmt_:
   | s = stmt_common { Module.Common_def s }
-  | LET; binding = let_binding { Module.Let [binding] }
+  | LET; binding = let_binding { Module.Let { rec_ = true ; bindings = [binding] } }
   | LET; INDENT; bindings = separated_nonempty(LINE_SEP, let_binding); DEDENT
-    { Module.Let bindings }
+    { Module.Let { rec_ = true ; bindings } }
   | MODULE; name = UPPER_NAME; body = optional_sig_def
     { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
   | TRAIT; name = UPPER_NAME; params = type_params_nonempty; body = optional_sig_def

@@ -1,27 +1,28 @@
 (Closures ()
- ((Let
-   (((Catch_all (count_up))
-     ((Lambda
-       ((Catch_all (start_at)) (Catch_all (count_by))
-        (Catch_all (end_after)))
-       (Let
-        ((rec_ true)
-         (bindings
-          ((((Catch_all (loop))
-             (Function ((Type_app Int ())) (Type_app Int ())))
-            (Lambda ((Catch_all (current)))
-             (Match
-              (Fun_call (Name <)
-               (((Name current) (Type_app Int ()))
-                ((Name end_after) (Type_app Int ()))))
-              (Type_app Bool ())
-              (((Cnstr_appl True ())
-                (Fun_call (Name loop)
-                 (((Fun_call (Name +)
-                    (((Name current) (Type_app Int ()))
-                     ((Name count_by) (Type_app Int ()))))
-                   (Type_app Int ())))))
-               ((Cnstr_appl False ()) (Name current))))))))
-         (body (Fun_call (Name loop) (((Name start_at) (Type_app Int ()))))))))
-      (Function ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))
-       (Type_app Int ()))))))))
+ ((Let (rec_ true)
+   (bindings
+    (((Catch_all (count_up))
+      ((Lambda
+        ((Catch_all (start_at)) (Catch_all (count_by))
+         (Catch_all (end_after)))
+        (Let
+         ((rec_ true)
+          (bindings
+           ((((Catch_all (loop))
+              (Function ((Type_app Int ())) (Type_app Int ())))
+             (Lambda ((Catch_all (current)))
+              (Match
+               (Fun_call (Name <)
+                (((Name current) (Type_app Int ()))
+                 ((Name end_after) (Type_app Int ()))))
+               (Type_app Bool ())
+               (((Cnstr_appl True ())
+                 (Fun_call (Name loop)
+                  (((Fun_call (Name +)
+                     (((Name current) (Type_app Int ()))
+                      ((Name count_by) (Type_app Int ()))))
+                    (Type_app Int ())))))
+                ((Cnstr_appl False ()) (Name current))))))))
+          (body (Fun_call (Name loop) (((Name start_at) (Type_app Int ()))))))))
+       (Function ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))
+        (Type_app Int ())))))))))

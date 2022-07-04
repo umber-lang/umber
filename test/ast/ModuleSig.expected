@@ -13,30 +13,34 @@
     ((Common_def
       (Type_decl Range
        (() (Alias (Tuple ((Type_app Int ()) (Type_app Int ())))))))
-     (Let
-      (((Catch_all (between))
-        ((Lambda ((Catch_all (lo)) (Catch_all (hi)))
-          (Tuple ((Name lo) (Name hi))))
-         (Function ((Var a) (Var b)) (Tuple ((Var a) (Var b))))))))
-     (Let
-      (((Catch_all (in))
-        ((Lambda
-          ((Catch_all (x)) (Tuple ((Catch_all (lo)) (Catch_all (hi)))))
-          (Fun_call (Name &&)
-           (((Fun_call (Name <=) (((Name lo) (Var a)) ((Name x) (Var a))))
-             (Type_app Bool ()))
-            ((Fun_call (Name <=) (((Name x) (Var a)) ((Name hi) (Var a))))
-             (Type_app Bool ())))))
-         (Function ((Var a) (Tuple ((Var a) (Var a)))) (Type_app Bool ())))))))))
-  (Let
-   (((Catch_all (my_range))
-     ((Fun_call (Name Range.between)
-       (((Literal (Int 1)) (Type_app Int ()))
-        ((Literal (Int 10)) (Type_app Int ()))))
-      (Type_app ModuleSig.Range.Range ())))))
-  (Let
-   (((Catch_all (is_10_in_range))
-     ((Fun_call (Name Range.in)
-       (((Literal (Int 10)) (Type_app Int ()))
-        ((Name my_range) (Type_app ModuleSig.Range.Range ()))))
-      (Type_app Bool ())))))))
+     (Let (rec_ true)
+      (bindings
+       (((Catch_all (between))
+         ((Lambda ((Catch_all (lo)) (Catch_all (hi)))
+           (Tuple ((Name lo) (Name hi))))
+          (Function ((Var a) (Var b)) (Tuple ((Var a) (Var b)))))))))
+     (Let (rec_ true)
+      (bindings
+       (((Catch_all (in))
+         ((Lambda
+           ((Catch_all (x)) (Tuple ((Catch_all (lo)) (Catch_all (hi)))))
+           (Fun_call (Name &&)
+            (((Fun_call (Name <=) (((Name lo) (Var a)) ((Name x) (Var a))))
+              (Type_app Bool ()))
+             ((Fun_call (Name <=) (((Name x) (Var a)) ((Name hi) (Var a))))
+              (Type_app Bool ())))))
+          (Function ((Var a) (Tuple ((Var a) (Var a)))) (Type_app Bool ()))))))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (my_range))
+      ((Fun_call (Name Range.between)
+        (((Literal (Int 1)) (Type_app Int ()))
+         ((Literal (Int 10)) (Type_app Int ()))))
+       (Type_app ModuleSig.Range.Range ()))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all (is_10_in_range))
+      ((Fun_call (Name Range.in)
+        (((Literal (Int 10)) (Type_app Int ()))
+         ((Name my_range) (Type_app ModuleSig.Range.Range ()))))
+       (Type_app Bool ()))))))))
