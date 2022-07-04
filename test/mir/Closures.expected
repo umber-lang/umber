@@ -1,0 +1,21 @@
+((Fun_def
+  ((fun_name Closures.loop.0)
+   (closed_over (Closures.count_by.0 Closures.end_after.0))
+   (args (Closures.current.0))
+   (body
+    (Let match.0
+     (Fun_call Std.Prelude.Operators.<.0
+      ((Name Closures.current.0) (Name Closures.end_after.0)))
+     (Catch (label 0)
+      (body
+       (If (cond (Constant_tag_equals (Name match.0) 1)) (then_ (Break 0))
+        (else_
+         (Catch (label 1) (body (Break 1)) (with_ (Name Closures.current.0))))))
+      (with_
+       (Fun_call Closures.loop.0
+        ((Fun_call Std.Prelude.Operators.+.0
+          ((Name Closures.current.0) (Name Closures.count_by.0)))))))))))
+ (Fun_def
+  ((fun_name Closures.count_up.0) (closed_over ())
+   (args (Closures.start_at.0 Closures.count_by.0 Closures.end_after.0))
+   (body (Fun_call Closures.loop.0 ((Name Closures.start_at.0)))))))

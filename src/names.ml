@@ -116,6 +116,8 @@ module Module_path : sig
   val of_ustrings_exn : Ustring.t list -> t
   val to_ustring : t -> Ustring.t
 end = struct
+  (* TODO: Maybe the sexp of this type should use the nice ustring representation, rather
+     than just being a sexp list. *)
   module T = struct
     type t = Module_name.t list [@@deriving compare, equal, hash, sexp]
   end
@@ -290,7 +292,7 @@ module Unique_name : sig
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 
-  val of_ustring : Ustring.t -> t
+  val create : Ustring.t -> t
   val base_name : t -> Ustring.t
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
@@ -319,7 +321,7 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let of_ustring ustr = ustr, Id.create ()
+  let create ustr = ustr, Id.create ()
   let base_name = fst
   let map_id t ~f = Tuple2.map_snd t ~f:(Id.of_int_exn << f << Id.to_int_exn)
 end
