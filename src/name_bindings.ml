@@ -27,7 +27,7 @@ module Name_entry = struct
     type t =
       | Type of Type.t
       | Scheme of Type.Scheme.t
-    [@@deriving sexp]
+    [@@deriving equal, sexp]
   end
 
   type t =
@@ -37,7 +37,7 @@ module Name_entry = struct
     ; fixity : Fixity.t option [@sexp.option]
     ; extern_name : Extern_name.t option [@sexp.option]
     }
-  [@@deriving fields, sexp]
+  [@@deriving equal, fields, sexp]
 
   let typ entry =
     match entry.typ with

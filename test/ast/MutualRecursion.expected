@@ -1,6 +1,6 @@
 (MutualRecursion ()
  ((Common_def (Val f () (() (Type_app Forest ((Var a))))))
-  (Let (rec_ true)
+  (Let (rec_ false)
    (bindings
     (((Catch_all (f))
       ((Name Nil) (Type_app MutualRecursion.Forest ((Var a))))))))
@@ -91,7 +91,7 @@
                 ((Literal (Int 1)) (Type_app Int ()))))
               (Type_app Int ()))))))))
        (Function ((Type_app Int ())) (Type_app Bool ())))))))
-  (Let (rec_ true)
+  (Let (rec_ false)
    (bindings
     (((Catch_all (number))
       ((Let

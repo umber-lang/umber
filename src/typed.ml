@@ -158,7 +158,7 @@ module Expr = struct
 
   type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp_of]
 
-  let of_untyped ~names ~types expr =
+  let of_untyped, type_recursive_let_bindings =
     let rec of_untyped ~names ~types ~f_name expr =
       match (expr : Untyped.Expr.t) with
       | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit)
@@ -229,42 +229,14 @@ module Expr = struct
         let names, rec_, bindings =
           if rec_
           then (
-            (* Process all bindings at once, allowing mutual recursion *)
-            let (names, all_bound_names), bindings =
-              Nonempty.fold_map
-                bindings
-                ~init:(names, Pattern.Names.empty)
-                ~f:(fun (names, all_bound_names) (pat, expr) ->
+            let names, bindings =
+              Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
                 let names, (pat_names, (pat, pat_type)) =
                   Pattern.of_untyped_into ~names ~types pat
                 in
-                let all_bound_names =
-                  Pattern.Names.merge
-                    all_bound_names
-                    pat_names
-                    ~combine:(fun ~key:_ v _ -> v)
-                in
-                (names, all_bound_names), ((pat, (pat_type, pat_names)), expr))
+                names, ((pat, (pat_type, pat_names)), expr))
             in
-            let used_a_bound_name = ref false in
-            let f_name name name_entry =
-              f_name name name_entry;
-              match name with
-              | [], name ->
-                if Option.exists
-                     ~f:(phys_equal name_entry)
-                     (Pattern.Names.find all_bound_names name)
-                then used_a_bound_name := true
-              | _ :: _, _ -> ()
-            in
-            let bindings =
-              Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
-                let expr, expr_type = of_untyped expr ~f_name ~names ~types in
-                Type_bindings.unify ~names ~types pat_type expr_type;
-                (pat, (pat_type, pat_names)), expr)
-            in
-            let rec_ = !used_a_bound_name in
-            names, rec_, bindings)
+            type_recursive_let_bindings ~names ~types ~f_name bindings)
           else (
             (* Process bindings in order without any recursion *)
             let names, bindings =
@@ -298,9 +270,44 @@ module Expr = struct
         let expr, t2 = of_untyped ~names ~types ~f_name expr in
         Type_bindings.unify ~names ~types t1 t2;
         expr, t1
+    and type_recursive_let_bindings ~names ~types ~f_name bindings =
+      let all_bound_names =
+        Nonempty.fold
+          bindings
+          ~init:Pattern.Names.empty
+          ~f:(fun all_bound_names ((_, (_, pat_names)), _) ->
+          let all_bound_names =
+            Pattern.Names.merge all_bound_names pat_names ~combine:(fun ~key:_ v _ -> v)
+          in
+          all_bound_names)
+      in
+      let used_a_bound_name = ref false in
+      let f_name name name_entry =
+        f_name name name_entry;
+        (* FIXME: phys_equal is questionable, is there a better way? Or is that not the problem?
+           Could regular equality work? If not, could assign an id to name entries. *)
+        match name with
+        | [], name ->
+          if Option.exists
+               ~f:(Name_bindings.Name_entry.equal name_entry)
+               (Pattern.Names.find all_bound_names name)
+          then used_a_bound_name := true
+        | _ :: _, _ -> ()
+      in
+      let bindings =
+        Nonempty.map bindings ~f:(fun (((_, (pat_type, _)) as pat), expr) ->
+          let expr, expr_type = of_untyped expr ~f_name ~names ~types in
+          Type_bindings.unify ~names ~types pat_type expr_type;
+          pat, expr)
+      in
+      let rec_ = !used_a_bound_name in
+      names, rec_, bindings
     in
-    of_untyped ~names ~types ~f_name:(fun _ _ -> ()) expr
-    |> Tuple2.map_snd ~f:(Type_bindings.substitute types)
+    let of_untyped ~names ~types expr =
+      of_untyped ~names ~types ~f_name:(fun _ _ -> ()) expr
+      |> Tuple2.map_snd ~f:(Type_bindings.substitute types)
+    in
+    of_untyped, type_recursive_let_bindings ~f_name:(fun _ _ -> ())
   ;;
 
   let rec map expr ~f ~f_type =
@@ -523,7 +530,8 @@ module Module = struct
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
       match def.node with
-      | Let { bindings; rec_ = _ } ->
+      | Let { bindings; rec_ } ->
+        assert_or_compiler_bug ~here:[%here] rec_;
         Nonempty.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
           Name_bindings.merge_names
             names
@@ -586,7 +594,7 @@ module Module = struct
   ;;
 
   type intermediate_def =
-    ((Pattern.t * Type.t) * Pattern.Names.t, Untyped.Expr.t) Module.def
+    (Pattern.t * (Type.t * Pattern.Names.t), Untyped.Expr.t) Module.def
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
@@ -619,36 +627,30 @@ module Module = struct
         handle_sigs ~names ~handle_common sigs)
     in
     let handle_bindings ~names =
-      Nonempty.fold_map
-        ~init:names
-        ~f:
-          (Node.fold_map ~f:(fun names (pat, expr) ->
-             let pat_names, pat = Pattern.of_untyped_with_names ~names ~types pat in
-             let names =
-               (* Unify pattern bindings with local type information (e.g. val declarations) *)
-               Name_bindings.merge_names names pat_names ~combine:(fun _ entry entry' ->
-                 let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
-                 Type_bindings.unify ~names ~types typ typ';
-                 Name_bindings.Name_entry.merge entry entry')
-             in
-             names, ((pat, pat_names), expr)))
+      Nonempty.fold_map ~init:names ~f:(fun binding ->
+        Node.fold_map binding ~f:(fun names (pat, expr) ->
+          let pat_names, pat = Pattern.of_untyped_with_names ~names ~types pat in
+          let names =
+            (* Unify pattern bindings with local type information (e.g. val declarations) *)
+            Name_bindings.merge_names names pat_names ~combine:(fun _ entry entry' ->
+              let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
+              Type_bindings.unify ~names ~types typ typ';
+              Name_bindings.Name_entry.merge entry entry')
+          in
+          let pat, pat_type = pat in
+          names, ((pat, (pat_type, pat_names)), expr)))
     in
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
-      List.fold_map
-        defs
-        ~init:names
-        ~f:
-          (Node.fold_map ~f:(fun names -> function
-             | Let { bindings; rec_ } ->
-               handle_bindings ~names bindings
-               |> Tuple2.map_snd ~f:(fun bindings -> Let { rec_; bindings })
-             | Module (module_name, sigs, defs) ->
-               let names, defs =
-                 handle_value_bindings ~names ~types module_name sigs defs
-               in
-               names, Module (module_name, sigs, defs)
-             | Common_def common as def -> handle_common ~names common, def
-             | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls")))
+      List.fold_map defs ~init:names ~f:(fun def ->
+        Node.fold_map def ~f:(fun names -> function
+          | Let { bindings; rec_ } ->
+            handle_bindings ~names bindings
+            |> Tuple2.map_snd ~f:(fun bindings -> Let { rec_; bindings })
+          | Module (module_name, sigs, defs) ->
+            let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
+            names, Module (module_name, sigs, defs)
+          | Common_def common as def -> handle_common ~names common, def
+          | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls")))
   ;;
 
   (* TODO: add type annotations to these functions *)
@@ -662,14 +664,15 @@ module Module = struct
     =
     let rec gather_bindings_in_defs ~names defs acc =
       List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
-    and gather_bindings ~names def (other_defs, bindings) =
-      match def.Node.node with
-      | Let { bindings = bindings'; rec_ = _ } ->
+    and gather_bindings ~names (def : intermediate_def Node.t) (other_defs, bindings) =
+      match def.node with
+      | Let { bindings = bindings'; rec_ } ->
+        assert_or_compiler_bug ~here:[%here] rec_;
         ( other_defs
         , Nonempty.fold_right
             bindings'
             ~init:bindings
-            ~f:(fun { Node.node = ((_, pat_names) as pat), expr; span } bindings ->
+            ~f:(fun { Node.node = ((_, (_, pat_names)) as pat), expr; span } bindings ->
             let current_path = Name_bindings.current_path names in
             let bound_names = Map.key_set pat_names in
             let used_names = Untyped.Expr.names_used ~names expr in
@@ -697,32 +700,32 @@ module Module = struct
        whole group. This is done to get a consistent ordering among bindings. *)
     let get_span { Call_graph.Binding.info = _, _, span; _ } = span in
     let bindings =
-      Nonempty.sort bindings ~compare:(fun b b' ->
-        Span.compare (get_span b) (get_span b'))
+      Nonempty.sort bindings ~compare:(Comparable.lift [%compare: Span.t] ~f:get_span)
     in
     let span = get_span (Nonempty.hd bindings) in
-    let bindings =
-      (* First, generalize the toplevel bindings *)
-      Nonempty.map
+    let bindings, spans =
+      Nonempty.fold_right
         bindings
-        ~f:(fun { info = (((_, pat_type), _) as pat), expr, span; _ } ->
-        let expr, expr_type = Expr.of_untyped ~names ~types expr in
-        Type_bindings.unify ~names ~types pat_type expr_type;
-        pat, expr, span)
+        ~init:([], [])
+        ~f:(fun { info = pat, expr, span; _ } (bindings, spans) ->
+        (pat, expr) :: bindings, span :: spans)
+    in
+    let bindings = Nonempty.of_list_exn bindings in
+    let spans = Nonempty.of_list_exn spans in
+    let (_ : Name_bindings.t), rec_, bindings =
+      Expr.type_recursive_let_bindings ~names ~types bindings
     in
     Nonempty.fold_map
-      bindings
+      (Nonempty.zip_exn bindings spans)
       ~init:names
-      ~f:(fun names (((pat, pat_type), pat_names), expr, span) ->
+      ~f:(fun names (((pat, (pat_type, pat_names)), expr), span) ->
       let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
       (* Generalize local let bindings just after the parent binding *)
       (* TODO: Look into the concept of type variable scope - parent variables are
          getting generalized here as well, which is probably wrong *)
       let expr = Expr.generalize_let_bindings ~names ~types expr in
       names, { Node.node = pat, (expr, scheme); span })
-    |> Tuple2.map_snd ~f:(fun bindings ->
-         (* FIXME: Can we infer when rec isn't needed? *)
-         { Node.node = Let { rec_ = true; bindings }; span })
+    |> Tuple2.map_snd ~f:(fun bindings -> { Node.node = Let { rec_; bindings }; span })
   ;;
 
   (** Reintegrate the re-ordered binding groups from [extract_binding_groups] back into

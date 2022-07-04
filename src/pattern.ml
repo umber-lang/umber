@@ -36,7 +36,8 @@ let rec fold pat ~init ~f =
       fold pat2 ~init ~f)
 ;;
 
-(* TODO: consider abstracting this *)
+(* TODO: consider abstracting this. It would help out with the verbosity of type errors
+   for some of the complex types in typed.ml. *)
 module Names = struct
   type t = Name_bindings.Name_entry.t Value_name.Map.t [@@deriving sexp]
 

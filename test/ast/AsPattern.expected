@@ -1,5 +1,5 @@
 (AsPattern ()
- ((Let (rec_ true)
+ ((Let (rec_ false)
    (bindings
     (((As (Tuple ((Catch_all (one)) (Catch_all (two)))) pair)
       ((Tuple ((Literal (Int 1)) (Literal (Int 2))))

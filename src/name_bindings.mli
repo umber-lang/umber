@@ -11,7 +11,7 @@ module Name_entry : sig
     [@@deriving equal, sexp]
   end
 
-  type t [@@deriving sexp]
+  type t [@@deriving equal, sexp]
 
   val typ : t -> Type.t
   val scheme : t -> Type.Scheme.t option

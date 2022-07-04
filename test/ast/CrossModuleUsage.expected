@@ -1,5 +1,5 @@
 (CrossModuleUsage ()
- ((Let (rec_ true)
+ ((Let (rec_ false)
    (bindings
     (((Catch_all (source))
       ((Literal (String "everything depends on me")) (Type_app String ()))))))
@@ -9,18 +9,18 @@
       (bindings
        (((Catch_all (a)) ((Name b) (Var a)))
         ((Catch_all (b)) ((Name a) (Var a))))))
-     (Let (rec_ true)
+     (Let (rec_ false)
       (bindings
        (((Catch_all (print))
          ((Name Std.Prelude.print)
           (Function ((Type_app String ())) (Tuple ())))))))
-     (Let (rec_ true)
+     (Let (rec_ false)
       (bindings
        (((Catch_all (print_source))
          ((Lambda ((Tuple ()))
            (Fun_call (Name print) (((Name source) (Type_app String ())))))
           (Function ((Tuple ())) (Tuple ()))))))))))
-  (Let (rec_ true)
+  (Let (rec_ false)
    (bindings
     (((Catch_all (print_source))
       ((Lambda ((Tuple ()))
@@ -31,5 +31,5 @@
            (Tuple ())))))
        (Function ((Tuple ())) (Tuple ())))))))
   (Common_def (Val empty () (() (Type_app List ((Var a))))))
-  (Let (rec_ true)
+  (Let (rec_ false)
    (bindings (((Catch_all (empty)) ((Name Nil) (Type_app List ((Var a))))))))))

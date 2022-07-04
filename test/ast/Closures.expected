@@ -1,5 +1,5 @@
 (Closures ()
- ((Let (rec_ true)
+ ((Let (rec_ false)
    (bindings
     (((Catch_all (count_up))
       ((Lambda
