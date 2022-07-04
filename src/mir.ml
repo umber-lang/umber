@@ -92,8 +92,11 @@ module Context : sig
   val of_name_bindings : Name_bindings.t -> t
   val add_value_name : t -> Value_name.t -> t * Unique_name.t
   val find_value_name : t -> Value_name.Qualified.t -> Unique_name.t
-  val with_add_observer : t -> f:(Unique_name.t -> unit) -> t
-  val with_find_observer : t -> f:((Unique_name.t -> unit) -> Unique_name.t -> unit) -> t
+  val find_value_name' : t -> Value_name.Qualified.t -> Unique_name.t option
+
+  type find_observer := Value_name.Qualified.t -> Unique_name.t -> unit
+
+  val with_find_observer : t -> f:(find_observer -> find_observer) -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
   val cnstr_arg_type : t -> Type.Scheme.t -> Cnstr.t -> Block_index.t -> Type.Scheme.t
   val cnstrs : t -> Type.Scheme.t -> Cnstr.Set.t
@@ -123,8 +126,7 @@ end = struct
     { names : Unique_name.t Ustring.Map.t
     ; name_bindings : Name_bindings.t [@sexp.opaque]
     ; cnstr_info_cache : Cnstr_info.t Type.Scheme.Table.t
-    ; add_observer : Unique_name.t -> unit [@sexp.opaque]
-    ; find_observer : Unique_name.t -> unit [@sexp.opaque]
+    ; find_observer : Value_name.Qualified.t -> Unique_name.t -> unit [@sexp.opaque]
     }
   [@@deriving sexp_of]
 
@@ -141,7 +143,6 @@ end = struct
   let add t name =
     let name = Value_name.Qualified.to_ustring name in
     let name' = Unique_name.of_ustring name in
-    t.add_observer name';
     { t with names = Map.set t.names ~key:name ~data:name' }, name'
   ;;
 
@@ -178,9 +179,9 @@ end = struct
 
   let find_value_name t name =
     match find_value_name' t name with
-    | Some name ->
-      t.find_observer name;
-      name
+    | Some name' ->
+      t.find_observer name name';
+      name'
     | None ->
       compiler_bug
         [%message
@@ -189,7 +190,6 @@ end = struct
             (t.names : Unique_name.t Ustring.Map.t)]
   ;;
 
-  let with_add_observer t ~f = { t with add_observer = f }
   let with_find_observer t ~f = { t with find_observer = f t.find_observer }
 
   let of_name_bindings name_bindings =
@@ -197,8 +197,7 @@ end = struct
       { names = Ustring.Map.empty
       ; name_bindings
       ; cnstr_info_cache = Type.Scheme.Table.create ()
-      ; add_observer = ignore
-      ; find_observer = ignore
+      ; find_observer = (fun _ _ -> ())
       }
     in
     Name_bindings.fold_local_names name_bindings ~init:t ~f:(fun t name _entry ->
@@ -276,14 +275,14 @@ end = struct
           (cnstr_name : Cnstr_name.t option)]
   ;;
 
-  let rec get_cnstr_info_polymorphic_uncached t scheme =
+  let rec get_cnstr_info t scheme =
     match (scheme : Type.Scheme.t) with
     | Type_app (type_name, _args) ->
       let _params, decl =
         Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name
       in
       (match decl with
-      | Alias alias -> get_cnstr_info_polymorphic_uncached t alias
+      | Alias alias -> get_cnstr_info t alias
       | Variants variants -> `Variants variants
       | Abstract | Record _ -> cnstr_lookup_failed scheme)
     | Tuple args -> `Tuple args
@@ -291,14 +290,14 @@ end = struct
   ;;
 
   let cnstrs t scheme =
-    match get_cnstr_info_polymorphic_uncached t scheme with
+    match get_cnstr_info t scheme with
     | `Variants variants -> List.map variants ~f:(Cnstr.named << fst) |> Cnstr.Set.of_list
     | `Tuple _ -> Cnstr.Set.singleton Tuple
   ;;
 
   let cnstr_arg_type t scheme cnstr index =
     let index = Block_index.to_int index in
-    match get_cnstr_info_polymorphic_uncached t scheme, (cnstr : Cnstr.t) with
+    match get_cnstr_info t scheme, (cnstr : Cnstr.t) with
     | `Variants variants, Named cnstr_name ->
       List.find_map_exn variants ~f:(fun (cnstr_name', args) ->
         if Cnstr_name.(cnstr_name = cnstr_name')
@@ -804,10 +803,10 @@ module Expr = struct
           [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
       | _, Partial_function _ -> .
     and add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound =
-      (* TODO: Could we just do this ourselves directly, instead of using add_observer? *)
-      (* Record all of the names bound in the function arguments *)
-      let bound_names = Unique_name.Hash_set.create () in
-      let ctx = Context.with_add_observer ctx ~f:(Hash_set.add bound_names) in
+      (* FIXME: I think this probably doesn't handle [closed_over] interacting with
+         [just_bound] in both the recursive and non-recursive cases. *)
+      (* Keep track of the parent context before binding any variables. *)
+      let parent_ctx = ctx in
       let (ctx, bindings), args =
         Nonempty.zip_exn args arg_types
         |> Nonempty.fold_map ~init:(ctx, []) ~f:(fun (ctx, bindings) (arg, arg_type) ->
@@ -819,44 +818,49 @@ module Expr = struct
              match arg with
              | Catch_all (Some arg_name) ->
                (* Special-case named catch-all patterns (the dominant case) to skip the
-                    [lambda_arg] step and use the name directly. *)
+                  [lambda_arg] step and use the name directly. *)
                let ctx, arg_name = Context.add_value_name ctx arg_name in
                (ctx, bindings), arg_name
              | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
                let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
                let add_let acc name mir_expr = (name, mir_expr) :: acc in
+               let mir_expr = Name arg_name in
                let ctx, bindings =
-                 fold_pattern_bindings
-                   ~ctx
-                   arg
-                   (Name arg_name)
-                   arg_type
-                   ~init:bindings
-                   ~add_let
+                 fold_pattern_bindings ~ctx arg mir_expr arg_type ~init:bindings ~add_let
                in
                (ctx, bindings), arg_name)
       in
-      (* FIXME: closed_over is including the functions own name - why? because its
-         recursive? Shouldn't happen if the name is unused. I'm probably using the wrong
-         context somewhere with the find observer/add observer *)
+      (* FIXME: Shouldn't include [fun_name] in [bound_names] if recursive. *)
+      let fun_name =
+        match just_bound with
+        | Some name -> Context.find_value_name ctx ([], name)
+        | None -> snd (Context.add_value_name ctx Constant_names.fun_)
+      in
       let closed_over = ref Unique_name.Set.empty in
       let ctx =
-        (* Determine if names looked up were bound as function args or closed over *)
-        Context.with_find_observer ctx ~f:(fun parent_observer name ->
-          if not (Hash_set.mem bound_names name)
-          then (
-            parent_observer name;
-            closed_over := Set.add !closed_over name))
+        let from_which_context name unique_name =
+          let in_context ctx =
+            Context.find_value_name' ctx name
+            |> Option.value_map ~default:false ~f:(Unique_name.equal unique_name)
+          in
+          if in_context outer_ctx
+          then `From_outer_stmts
+          else if in_context parent_ctx
+          then `Closed_over_from_parent
+          else `Newly_bound
+        in
+        (* Determine if names looked up were closed over from the parent context. *)
+        Context.with_find_observer ctx ~f:(fun parent_observer name unique_name ->
+          match from_which_context name unique_name with
+          | `Newly_bound | `From_outer_stmts -> ()
+          | `Closed_over_from_parent ->
+            parent_observer name unique_name;
+            closed_over := Set.add !closed_over unique_name)
       in
       let body = of_typed_expr ~ctx body body_type in
       let body =
         List.fold_right bindings ~init:body ~f:(fun (name, mir_expr) body ->
           Let (name, mir_expr, body))
-      in
-      let fun_name =
-        match just_bound with
-        | Some name -> Context.find_value_name ctx ([], name)
-        | None -> snd (Context.add_value_name ctx Constant_names.fun_)
       in
       add_fun_def { Fun_def.fun_name; closed_over = !closed_over; args; body };
       fun_name
@@ -1116,9 +1120,7 @@ let of_typed_module =
       in
       let mir_expr, stmts =
         let stmts = ref stmts in
-        let add_fun_def fun_def =
-          stmts := Stmt.Fun_def fun_def :: !stmts
-        in
+        let add_fun_def fun_def = stmts := Stmt.Fun_def fun_def :: !stmts in
         let mir_expr = Expr.of_typed_expr ?just_bound ~ctx ~add_fun_def expr typ in
         mir_expr, !stmts
       in

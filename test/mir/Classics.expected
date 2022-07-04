@@ -1,8 +1,5 @@
 ((Fun_def
-  ((fun_name Classics.fact.0)
-   (closed_over
-    (Classics.fact.0 Std.Prelude.Operators.*.0 Std.Prelude.Operators.-.0))
-   (args ((.0 Int64))) (returns Int64)
+  ((fun_name Classics.fact.0) (closed_over ()) (args (.0))
    (body
     (Catch (label 0)
      (body
@@ -19,10 +16,7 @@
                  ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
      (with_ (Primitive (Int 1)))))))
  (Fun_def
-  ((fun_name Classics.fib.0)
-   (closed_over
-    (Classics.fib.0 Std.Prelude.Operators.+.0 Std.Prelude.Operators.-.0))
-   (args ((Classics.n.1 Int64))) (returns Int64)
+  ((fun_name Classics.fib.0) (closed_over ()) (args (Classics.n.1))
    (body
     (Catch (label 0)
      (body

@@ -4,17 +4,13 @@
  (Value_def CrossModuleUsage.A.b.0 (Name CrossModuleUsage.A.a.0))
  (Value_def CrossModuleUsage.A.print.0 (Name Std.Prelude.print.0))
  (Fun_def
-  ((fun_name CrossModuleUsage.A.print_source.0)
-   (closed_over (CrossModuleUsage.source.0 CrossModuleUsage.A.print.0))
-   (args ((*lambda_arg.0 Block))) (returns Block)
+  ((fun_name CrossModuleUsage.A.print_source.0) (closed_over ())
+   (args (*lambda_arg.0))
    (body
     (Fun_call CrossModuleUsage.A.print.0 ((Name CrossModuleUsage.source.0))))))
  (Fun_def
-  ((fun_name CrossModuleUsage.print_source.0)
-   (closed_over
-    (Std.Prelude.print.0 CrossModuleUsage.source.0
-     "Std.Prelude.Operators.;.0" CrossModuleUsage.A.print_source.0))
-   (args ((*lambda_arg.0 Block))) (returns Block)
+  ((fun_name CrossModuleUsage.print_source.0) (closed_over ())
+   (args (*lambda_arg.1))
    (body
     (Fun_call "Std.Prelude.Operators.;.0"
      ((Fun_call CrossModuleUsage.A.print_source.0 ((Make_block (tag 0))))
