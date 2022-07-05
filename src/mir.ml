@@ -715,6 +715,52 @@ module Expr = struct
       | _ -> Let (name, mir_expr, body))
   ;;
 
+  let generate_let_bindings
+    ~ctx
+    ~rec_
+    ~(of_typed_expr : ?just_bound:Just_bound.t -> _)
+    bindings
+    =
+    let ctx =
+      if not rec_
+      then ctx
+      else
+        Nonempty.fold bindings ~init:ctx ~f:(fun ctx ((pattern, _), _) ->
+          Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
+            fst (Context.add_value_name ctx name)))
+    in
+    (* TODO: Warn about let bindings which bind no names and are pure. *)
+    Nonempty.fold bindings ~init:(ctx, []) ~f:(fun (ctx, bindings) ((pat, typ), expr) ->
+      (* TODO: support unions in let bindings. For the non-rec case we should
+         just be able to convert to a match *)
+      let pat' =
+        Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"let bindings"
+      in
+      let missing_cases =
+        Simple_pattern.Coverage.(of_pattern pat' |> missing_cases ~ctx ~input_type:typ)
+      in
+      if not (List.is_empty missing_cases)
+      then
+        mir_error
+          [%message
+            "The pattern in this let binding is not exhaustive"
+              ~pattern:(pat : Typed.Pattern.t)
+              (missing_cases : Simple_pattern.t list)];
+      let ctx, names_bound =
+        Simple_pattern.names_bound pat'
+        |> Set.fold ~init:(ctx, Unique_name.Set.empty) ~f:(fun (ctx, names_bound) name ->
+             let ctx, name = Context.add_value_name ctx name in
+             ctx, Set.add names_bound name)
+      in
+      let mir_expr = of_typed_expr ~just_bound:{ rec_; names_bound } ~ctx expr typ in
+      let add_let bindings name mir_expr = (name, mir_expr) :: bindings in
+      let add_name ctx name =
+        (* We already added all the names to the context above. *)
+        ctx, Context.find_value_name ctx ([], name)
+      in
+      fold_pattern_bindings ~ctx pat' mir_expr typ ~init:bindings ~add_let ~add_name)
+  ;;
+
   let of_typed_expr
     ~just_bound:outer_just_bound
     ~ctx:outer_ctx
@@ -723,12 +769,6 @@ module Expr = struct
     outer_type
     =
     let create_break_label = unstage (Break_label.make_creator_for_whole_expression ()) in
-    (* FIXME: We can use a different type - all exprs should be monomorphic types, yeah? 
-       - roughly, there could be some missing params e.g. `a` from `Option a` in `None`
-       - we should be able to detect this somehow - I guess if it doesn't appear bound by
-         the monomorphic type, this is just fine. We should not require that all params
-         are bound, then. I think this should probably just work as-is, since we will not
-         look at `a` when doing `to_value_kind` on `Option a` *)
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match (expr : Type.Scheme.t Typed.Expr.t), (expr_type : Type.Scheme.t) with
       | Literal lit, _ -> Primitive lit
@@ -785,51 +825,7 @@ module Expr = struct
         (* TODO: let statements in expressions should be able to be made into global
            statements (e.g. to define static functions/values) - not all lets should be
            global though e.g. for simple expressions like `let y = x + x; (y, y)` *)
-        let ctx =
-          if not rec_
-          then ctx
-          else
-            (* TODO: implement let rec in MIR. I think the only tricky part is doing all the
-             Context calls to create unique names up-front, and then keeping track of
-             these names somehow instead of having them be shadowed. Actually, didn't we
-             already write this code to handle toplevel rec bindings? Should be shared. *)
-            (* FIXME: copied code from topevel rec handling. Should check it works, then
-                de-dup. May need to add nodes to let bindings in expressions to get it to
-                work. *)
-            Nonempty.fold bindings ~init:ctx ~f:(fun ctx ((pattern, _), _) ->
-              Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
-                fst (Context.add_value_name ctx name)))
-        in
-        let ctx, bindings =
-          Nonempty.fold
-            bindings
-            ~init:(ctx, [])
-            ~f:(fun (ctx, bindings) ((pat, typ), expr) ->
-            (* TODO: support unions in let bindings. For the non-rec case we should
-               just be able to convert to a match *)
-            let pat =
-              Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"let bindings"
-            in
-            (* FIXME: Want to pass the new just_bound type with all the names. We can get
-               that from fold_pattern_bindings, but need to generate the mir_expr after! *)
-            let ctx, names_bound =
-              Simple_pattern.names_bound pat
-              |> Set.fold
-                   ~init:(ctx, Unique_name.Set.empty)
-                   ~f:(fun (ctx, names_bound) name ->
-                   let ctx, name = Context.add_value_name ctx name in
-                   ctx, Set.add names_bound name)
-            in
-            let mir_expr =
-              of_typed_expr ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
-            in
-            let add_let bindings name mir_expr = (name, mir_expr) :: bindings in
-            let add_name ctx name =
-              (* We already added all the names to the context above. *)
-              ctx, Context.find_value_name ctx ([], name)
-            in
-            fold_pattern_bindings ~ctx pat mir_expr typ ~init:bindings ~add_let ~add_name)
-        in
+        let ctx, bindings = generate_let_bindings ~ctx ~rec_ ~of_typed_expr bindings in
         let body = of_typed_expr ~ctx body body_type in
         add_let_bindings ~bindings ~body
       | Tuple fields, Tuple field_types ->
@@ -1074,10 +1070,37 @@ let rec type_get_function ~names typ =
   | Partial_function _ -> .
 ;;
 
+(* FIXME: Let's apply this after de-duping the existing code. *)
+(* FIXME: this needs to apply to expressions too. Also, maybe it would be nicer to give
+   this error earlier? We can still give it in the mir stage, but let's do it before we
+   compile! *)
+(* let rec check_rec_binding_expr expr =
+  match (expr : _ Typed.Expr.t) with
+  | Name _ ->
+    Compilation_error.raise
+      Mir_error
+      ~msg:
+        [%message
+          "This kind of expression is not allowed on the right-hand side of a recursive \
+           let binding"
+            (expr : _ Typed.Expr.t)]
+  | Match (_, _, arms) -> Nonempty.iter arms ~f:(check_rec_binding_expr << snd)
+  | Let { body; bindings = _; rec_ = _ } -> check_rec_binding_expr body
+  | Fun_call _
+  | Lambda _
+  | Tuple _
+  | Record_literal _
+  | Record_update _
+  | Record_field_access _ -> ()
+  | Literal _ ->
+    compiler_bug [%message "Impossible expr in recursive binding" (expr : _ Typed.Expr.t)]
+;; *)
+
 let of_typed_module =
   let handle_let_bindings
     ~ctx
     ~stmts
+    ~rec_:_
     (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t Nonempty.t)
     =
     let ctx =
@@ -1090,6 +1113,8 @@ let of_typed_module =
       bindings
       ~init:(ctx, stmts)
       ~f:(fun (ctx, stmts) { node = pat, (expr, typ); _ } ->
+      (* FIXME: re-add *)
+      (* if rec_ then check_rec_binding_expr expr; *)
       let pat' =
         Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"toplevel let bindings"
       in
@@ -1146,7 +1171,7 @@ let of_typed_module =
   let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.node with
-      | Let { bindings; rec_ = _ } -> handle_let_bindings ~ctx ~stmts bindings
+      | Let { rec_; bindings } -> handle_let_bindings ~ctx ~stmts ~rec_ bindings
       | Module (module_name, _sigs, defs) ->
         Context.with_module ctx module_name ~f:(fun ctx -> loop ~ctx ~stmts defs)
       | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
