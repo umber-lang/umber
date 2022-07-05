@@ -1,18 +1,6 @@
-((Value_def CrossModuleUsage.source.0
-  (Primitive (String "everything depends on me")))
- (Value_def CrossModuleUsage.A.a.0 (Name CrossModuleUsage.A.b.0))
- (Value_def CrossModuleUsage.A.b.0 (Name CrossModuleUsage.A.a.0))
- (Value_def CrossModuleUsage.A.print.0 (Name Std.Prelude.print.0))
- (Fun_def
-  ((fun_name CrossModuleUsage.A.print_source.0) (closed_over ())
-   (args (*lambda_arg.0))
-   (body
-    (Fun_call CrossModuleUsage.A.print.0 ((Name CrossModuleUsage.source.0))))))
- (Fun_def
-  ((fun_name CrossModuleUsage.print_source.0) (closed_over ())
-   (args (*lambda_arg.1))
-   (body
-    (Fun_call "Std.Prelude.Operators.;.0"
-     ((Fun_call CrossModuleUsage.A.print_source.0 ((Make_block (tag 0))))
-      (Fun_call Std.Prelude.print.0 ((Name CrossModuleUsage.source.0))))))))
- (Value_def CrossModuleUsage.empty.0 (Name Std.Prelude.List.Nil.0)))
+("Compilation error"
+ ((kind Mir_error)
+  (msg
+   ("This kind of expression is not allowed on the right-hand side of a recursive let binding"
+    (expr (Name b))))
+  (filename CrossModuleUsage.um)))

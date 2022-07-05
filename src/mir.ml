@@ -715,6 +715,29 @@ module Expr = struct
       | _ -> Let (name, mir_expr, body))
   ;;
 
+  let rec check_rec_binding_expr expr =
+    match (expr : _ Typed.Expr.t) with
+    | Name _ ->
+      Compilation_error.raise
+        Mir_error
+        ~msg:
+          [%message
+            "This kind of expression is not allowed on the right-hand side of a \
+             recursive let binding"
+              (expr : _ Typed.Expr.t)]
+    | Match (_, _, arms) -> Nonempty.iter arms ~f:(check_rec_binding_expr << snd)
+    | Let { body; bindings = _; rec_ = _ } -> check_rec_binding_expr body
+    | Fun_call _
+    | Lambda _
+    | Tuple _
+    | Record_literal _
+    | Record_update _
+    | Record_field_access _ -> ()
+    | Literal _ ->
+      compiler_bug
+        [%message "Impossible expr in recursive binding" (expr : _ Typed.Expr.t)]
+  ;;
+
   let generate_let_bindings
     ~ctx
     ~rec_
@@ -736,8 +759,7 @@ module Expr = struct
     (* TODO: Warn about let bindings which bind no names and are pure. *)
     Nonempty.fold bindings ~init:(ctx, init) ~f:(fun (ctx, acc) binding ->
       let pat, typ, expr = extract_binding binding in
-      (* FIXME: re-add *)
-      (* if rec_ then check_rec_binding_expr expr; *)
+      if rec_ then check_rec_binding_expr expr;
       (* TODO: support unions in let bindings. For the non-rec case we should
          just be able to convert to a match *)
       let pat' =
@@ -1093,32 +1115,6 @@ let rec type_get_function ~names typ =
     | Variants _ | Record _ | Abstract -> None)
   | Partial_function _ -> .
 ;;
-
-(* FIXME: Let's apply this after de-duping the existing code. *)
-(* FIXME: this needs to apply to expressions too. Also, maybe it would be nicer to give
-   this error earlier? We can still give it in the mir stage, but let's do it before we
-   compile! *)
-(* let rec check_rec_binding_expr expr =
-  match (expr : _ Typed.Expr.t) with
-  | Name _ ->
-    Compilation_error.raise
-      Mir_error
-      ~msg:
-        [%message
-          "This kind of expression is not allowed on the right-hand side of a recursive \
-           let binding"
-            (expr : _ Typed.Expr.t)]
-  | Match (_, _, arms) -> Nonempty.iter arms ~f:(check_rec_binding_expr << snd)
-  | Let { body; bindings = _; rec_ = _ } -> check_rec_binding_expr body
-  | Fun_call _
-  | Lambda _
-  | Tuple _
-  | Record_literal _
-  | Record_update _
-  | Record_field_access _ -> ()
-  | Literal _ ->
-    compiler_bug [%message "Impossible expr in recursive binding" (expr : _ Typed.Expr.t)]
-;; *)
 
 let of_typed_module =
   let handle_let_bindings
