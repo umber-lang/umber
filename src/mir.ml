@@ -718,19 +718,26 @@ module Expr = struct
   let generate_let_bindings
     ~ctx
     ~rec_
-    ~(of_typed_expr : ?just_bound:Just_bound.t -> _)
+    ~init
+    ~add_let
+    ~extract_binding
+    ~process_expr
     bindings
     =
     let ctx =
       if not rec_
       then ctx
       else
-        Nonempty.fold bindings ~init:ctx ~f:(fun ctx ((pattern, _), _) ->
+        Nonempty.fold bindings ~init:ctx ~f:(fun ctx binding ->
+          let pattern, _, _ = extract_binding binding in
           Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
             fst (Context.add_value_name ctx name)))
     in
     (* TODO: Warn about let bindings which bind no names and are pure. *)
-    Nonempty.fold bindings ~init:(ctx, []) ~f:(fun (ctx, bindings) ((pat, typ), expr) ->
+    Nonempty.fold bindings ~init:(ctx, init) ~f:(fun (ctx, acc) binding ->
+      let pat, typ, expr = extract_binding binding in
+      (* FIXME: re-add *)
+      (* if rec_ then check_rec_binding_expr expr; *)
       (* TODO: support unions in let bindings. For the non-rec case we should
          just be able to convert to a match *)
       let pat' =
@@ -752,13 +759,20 @@ module Expr = struct
              let ctx, name = Context.add_value_name ctx name in
              ctx, Set.add names_bound name)
       in
-      let mir_expr = of_typed_expr ~just_bound:{ rec_; names_bound } ~ctx expr typ in
-      let add_let bindings name mir_expr = (name, mir_expr) :: bindings in
-      let add_name ctx name =
-        (* We already added all the names to the context above. *)
-        ctx, Context.find_value_name ctx ([], name)
+      let acc, mir_expr =
+        process_expr acc ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
       in
-      fold_pattern_bindings ~ctx pat' mir_expr typ ~init:bindings ~add_let ~add_name)
+      let add_name ctx name =
+        if Constant_names.mem name
+        then
+          (* Constant names are always made-up anew, since they come from code generated
+             by the compiler, not the user. *)
+          Context.add_value_name ctx name
+        else
+          (* We already added all the names to the context above. *)
+          ctx, Context.find_value_name ctx ([], name)
+      in
+      fold_pattern_bindings ~ctx pat' mir_expr typ ~init:acc ~add_let ~add_name)
   ;;
 
   let of_typed_expr
@@ -825,7 +839,17 @@ module Expr = struct
         (* TODO: let statements in expressions should be able to be made into global
            statements (e.g. to define static functions/values) - not all lets should be
            global though e.g. for simple expressions like `let y = x + x; (y, y)` *)
-        let ctx, bindings = generate_let_bindings ~ctx ~rec_ ~of_typed_expr bindings in
+        let ctx, bindings =
+          generate_let_bindings
+            ~ctx
+            ~rec_
+            ~init:[]
+            ~add_let:(fun bindings name mir_expr -> (name, mir_expr) :: bindings)
+            ~extract_binding:(fun ((pat, typ), expr) -> pat, typ, expr)
+            ~process_expr:(fun bindings ~just_bound ~ctx expr typ ->
+              bindings, of_typed_expr ~just_bound ~ctx expr typ)
+            bindings
+        in
         let body = of_typed_expr ~ctx body body_type in
         add_let_bindings ~bindings ~body
       | Tuple fields, Tuple field_types ->
@@ -1100,73 +1124,30 @@ let of_typed_module =
   let handle_let_bindings
     ~ctx
     ~stmts
-    ~rec_:_
+    ~rec_
     (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t Nonempty.t)
     =
-    let ctx =
-      Nonempty.fold bindings ~init:ctx ~f:(fun ctx { node = pattern, _; _ } ->
-        Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
-          fst (Context.add_value_name ctx name)))
+    let process_expr stmts ~just_bound ~ctx expr typ =
+      let stmts = ref stmts in
+      let add_fun_def fun_def = stmts := Stmt.Fun_def fun_def :: !stmts in
+      let expr = Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def expr typ in
+      !stmts, expr
     in
-    (* TODO: Warn about toplevel let bindings which bind no names and are pure. *)
-    Nonempty.fold
+    let add_let stmts name mir_expr =
+      match (mir_expr : Expr.t) with
+      | Name name' when Unique_name.(name = name') ->
+        (* Don't make a Value_def in the case where all we did is make a Fun_def *)
+        stmts
+      | _ -> Stmt.Value_def (name, mir_expr) :: stmts
+    in
+    Expr.generate_let_bindings
       bindings
-      ~init:(ctx, stmts)
-      ~f:(fun (ctx, stmts) { node = pat, (expr, typ); _ } ->
-      (* FIXME: re-add *)
-      (* if rec_ then check_rec_binding_expr expr; *)
-      let pat' =
-        Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"toplevel let bindings"
-      in
-      let missing_cases =
-        Simple_pattern.Coverage.(of_pattern pat' |> missing_cases ~ctx ~input_type:typ)
-      in
-      if not (List.is_empty missing_cases)
-      then
-        mir_error
-          [%message
-            "The pattern in this let binding is not exhaustive"
-              ~pattern:(pat : Typed.Pattern.t)
-              (missing_cases : Simple_pattern.t list)];
-      (* FIXME: copy-pasted code from expr handling *)
-      let ctx, names_bound =
-        Simple_pattern.names_bound pat'
-        |> Set.fold ~init:(ctx, Unique_name.Set.empty) ~f:(fun (ctx, names_bound) name ->
-             let ctx, name = Context.add_value_name ctx name in
-             ctx, Set.add names_bound name)
-      in
-      let just_bound = { Expr.Just_bound.rec_ = true; names_bound } in
-      let mir_expr, stmts =
-        let stmts = ref stmts in
-        let add_fun_def fun_def = stmts := Stmt.Fun_def fun_def :: !stmts in
-        let mir_expr = Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def expr typ in
-        mir_expr, !stmts
-      in
-      let add_let stmts name mir_expr =
-        match (mir_expr : Expr.t) with
-        | Name name' when Unique_name.(name = name') ->
-          (* Don't make a Value_def in the case where all we did is make a Fun_def *)
-          stmts
-        | _ -> Stmt.Value_def (name, mir_expr) :: stmts
-      in
-      (* FIXME: copy-pasted code *)
-      (* TODO: Support pattern unions in toplevel let bindings - should work roughly
-         the same as recursive bindings in expressions *)
-      let add_name ctx name =
-        (* TODO: this seems error-prone, especially since we use names like
-           [Value_name.empty] elsewhere in the AST, e.g. for match variables.
-           Might be a good idea to add a variant for constant names, or something. *)
-        if Constant_names.mem name
-        then (* Constant names are always made-up anew *)
-          Context.add_value_name ctx name
-        else
-          (* FIXME: Why are constant names always made up anew? Cleanup. *)
-          (* Look up non-constant names added at the beginning *)
-          (* ctx, Context.find_value_name ctx ([], name) *)
-          (* We already added all the names to the context above. *)
-          ctx, Context.find_value_name ctx ([], name)
-      in
-      Expr.fold_pattern_bindings ~add_name ~ctx pat' mir_expr typ ~init:stmts ~add_let)
+      ~ctx
+      ~rec_
+      ~init:stmts
+      ~add_let
+      ~extract_binding:(fun { Node.node = pat, (expr, typ); _ } -> pat, typ, expr)
+      ~process_expr
   in
   let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->

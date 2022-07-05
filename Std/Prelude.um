@@ -110,7 +110,7 @@ module Operators =
   extern (>) (infix 4) : a, a -> Bool = "%gt"
   extern (>=) (infix 4) : a, a -> Bool = "%gte"
 
-  val (&&) (infixl 3) : Bool; Bool -> Bool
+  val (&&) (infixl 3) : Bool, Bool -> Bool
   let (&&) a b = if a then b else False
   
   val (||) (infixl 2) : Bool, Bool -> Bool
