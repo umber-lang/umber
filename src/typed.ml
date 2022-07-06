@@ -193,9 +193,7 @@ module Expr = struct
         in
         let args, arg_types = Nonempty.unzip args_and_types in
         let body, body_type = of_untyped ~names ~types ~f_name body in
-        let body_var = Type.Var_id.create () in
-        Type_bindings.unify ~names ~types (Var body_var) body_type;
-        Lambda (args, body), Partial_function (arg_types, body_var)
+        Lambda (args, body), Function (arg_types, body_type)
       | If (cond, then_, else_) ->
         let cond, cond_type = of_untyped ~names ~types ~f_name cond in
         let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
@@ -204,8 +202,9 @@ module Expr = struct
           of_untyped ~names ~types ~f_name then_, of_untyped ~names ~types ~f_name else_
         in
         Type_bindings.unify ~names ~types then_type else_type;
-        (* TODO: should really be referring to Bool as a primitive of some kind
-           Could have it be qualified like `_Primitives.Bool` *)
+        (* TODO: should really be referring to Bool as a primitive of some kind since
+           otherwise you could shadow it. Could have it be qualified like
+           `_Primitives.Bool` *)
         let cnstr name = Pattern.Cnstr_appl (name, []) in
         ( Match
             ( cond

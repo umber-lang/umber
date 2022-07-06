@@ -717,7 +717,14 @@ module Expr = struct
 
   let rec check_rec_binding_expr expr =
     match (expr : _ Typed.Expr.t) with
-    | Name _ ->
+    | Lambda _ | Tuple _ | Record_literal _ -> ()
+    | Let { body; bindings = _; rec_ = _ } -> check_rec_binding_expr body
+    | Match (_, _, arms) ->
+      Nonempty.iter arms ~f:(fun (_, expr) -> check_rec_binding_expr expr)
+    | Name _ | Fun_call _ | Record_update _ | Record_field_access _ ->
+      (* TODO: Consider relaxing this to allow more kinds of expressions e.g. function
+         calls which don't mention the recursive names.
+         See: https://v2.ocaml.org/manual/letrecvalues.html *)
       Compilation_error.raise
         Mir_error
         ~msg:
@@ -725,14 +732,6 @@ module Expr = struct
             "This kind of expression is not allowed on the right-hand side of a \
              recursive let binding"
               (expr : _ Typed.Expr.t)]
-    | Match (_, _, arms) -> Nonempty.iter arms ~f:(check_rec_binding_expr << snd)
-    | Let { body; bindings = _; rec_ = _ } -> check_rec_binding_expr body
-    | Fun_call _
-    | Lambda _
-    | Tuple _
-    | Record_literal _
-    | Record_update _
-    | Record_field_access _ -> ()
     | Literal _ ->
       compiler_bug
         [%message "Impossible expr in recursive binding" (expr : _ Typed.Expr.t)]

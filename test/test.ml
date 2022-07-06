@@ -10,12 +10,7 @@ let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests 
 
 (* These tests are just for type-checking as they are not ready to be converted to MIR. *)
 (* TODO: enable these for mir *)
-let type_only_tests =
-  [ "LetBindingGroups" (* let rec *)
-  ; "LetPattern" (* unions in toplevel let bindings *)
-  ; "MutualRecursion" (* let rec *)
-  ]
-;;
+let type_only_tests = [ "LetPattern" (* unions in toplevel let bindings *) ]
 
 let should_make_mir test =
   should_type_check test && not (List.mem ~equal:String.equal type_only_tests test)
