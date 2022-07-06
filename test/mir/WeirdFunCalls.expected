@@ -1,0 +1,26 @@
+((Value_def .0 (Fun_call Std.Prelude.print.0 ((Primitive (String plain)))))
+ (Fun_def
+  ((fun_name *fun.0) (closed_over ()) (args (*lambda_arg.0))
+   (body (Fun_call Std.Prelude.print.0 ((Primitive (String "fun call")))))))
+ (Fun_def
+  ((fun_name WeirdFunCalls.fun_call.0) (closed_over ())
+   (args (*lambda_arg.1)) (body (Name *fun.0))))
+ (Value_def .1
+  (Let *fun.1 (Fun_call WeirdFunCalls.fun_call.0 ((Make_block (tag 0))))
+   (Fun_call *fun.1 ((Make_block (tag 0))))))
+ (Fun_def
+  ((fun_name WeirdFunCalls.print_twice.0) (closed_over ())
+   (args (WeirdFunCalls.msg.0))
+   (body
+    (Fun_call "Std.Prelude.Operators.;.0"
+     ((Fun_call Std.Prelude.print.0 ((Name WeirdFunCalls.msg.0)))
+      (Fun_call Std.Prelude.print.0 ((Name WeirdFunCalls.msg.0))))))))
+ (Value_def WeirdFunCalls.if_.0
+  (Let *fun.2
+   (Catch (label 0)
+    (body
+     (If (cond (Constant_tag_equals (Name True.0) 1)) (then_ (Break 0))
+      (else_
+       (Catch (label 1) (body (Break 1)) (with_ (Name Std.Prelude.print.0))))))
+    (with_ (Name WeirdFunCalls.print_twice.0)))
+   (Fun_call *fun.2 ((Primitive (String if)))))))

@@ -96,8 +96,10 @@ let rec unify ~names ~types t1 t2 =
     | Right_trailing _ -> fun_arg_number_mismatch t1 t2
     | Same_length -> unify ~names ~types res (Var id))
   | Tuple xs, Tuple ys -> iter2 ~f:(unify ~names ~types) xs ys
-  | (Type_app _ | Tuple _ | Function _ | Partial_function _), _ ->
-    type_error "Fell through cases" t1 t2
+  | Type_app _, (Tuple _ | Function _ | Partial_function _)
+  | Tuple _, (Type_app _ | Function _ | Partial_function _)
+  | Function _, (Type_app _ | Tuple _)
+  | Partial_function _, (Type_app _ | Tuple _) -> type_error "Types do not match" t1 t2
 ;;
 
 let rec substitute types typ =

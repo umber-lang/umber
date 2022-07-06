@@ -898,7 +898,6 @@ module Expr = struct
                in
                (ctx, bindings), arg_name)
       in
-      (* FIXME: Shouldn't include [fun_name] in [bound_names] if recursive. *)
       let fun_name =
         match just_bound with
         | Some { names_bound; _ } when Set.length names_bound = 1 ->

@@ -215,6 +215,7 @@ expr:
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
 
 type_record:
+  (* TODO Support function types directly as record fields *)
   | fields = braces(block_items_nonempty(type_annot_non_fun(LOWER_NAME)))
     { Type.Decl.Record (Nonempty.map fields ~f:(fun (name, typ) ->
         Value_name.of_ustring_unchecked name, typ)) }

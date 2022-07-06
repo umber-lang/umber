@@ -351,3 +351,13 @@
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff mir/Types.expected mir/Types.out))))
 
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff tokens/WeirdFunCalls.expected tokens/WeirdFunCalls.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/WeirdFunCalls.expected ast/WeirdFunCalls.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/WeirdFunCalls.expected mir/WeirdFunCalls.out))))
+
