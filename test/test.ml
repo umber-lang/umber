@@ -5,11 +5,12 @@ let concat_current dir = Filename.(concat (concat current_dir_name dir))
 
 (* These tests are currently for parsing only as their related type system features have
    not yet been implemented. *)
+(* TODO: enable these tests for type-checking. *)
 let parse_only_tests = [ "Imports"; "Modules"; "Operators"; "Traits"; "Types" ]
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)
 
 (* These tests are just for type-checking as they are not ready to be converted to MIR. *)
-(* TODO: enable these for mir *)
+(* TODO: enable these for mir. *)
 let type_only_tests = [ "LetPattern" (* unions in toplevel let bindings *) ]
 
 let should_make_mir test =

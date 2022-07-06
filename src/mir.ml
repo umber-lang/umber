@@ -807,9 +807,6 @@ module Expr = struct
           match fun_ with
           | Name fun_name -> Fun_call (fun_name, args)
           | Let _ | Fun_call _ | Get_block_field _ | If _ | Catch _ | Break _ ->
-            (* FIXME: does this make any sense? I suppose this is meant to hit the last
-               defined function or something? I think this just seems wrong though? It's
-               adding a new name, so it can't refer to some already existing name, right? *)
             let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
             Let (fun_name, fun_, Fun_call (fun_name, args))
           | Primitive _ | Make_block _ ->
@@ -870,8 +867,6 @@ module Expr = struct
           [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
       | _, Partial_function _ -> .
     and add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound =
-      (* FIXME: I think this probably doesn't handle [closed_over] interacting with
-         [just_bound] in both the recursive and non-recursive cases. *)
       (* Keep track of the parent context before binding any variables. This lets us
          check which variables are captured by closures later on. *)
       let parent_ctx = ctx in
