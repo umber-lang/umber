@@ -319,7 +319,6 @@ module Simple_pattern : sig
 
   val flatten_typed_pattern : Typed.Pattern.t -> t Nonempty.t
   val flatten_typed_pattern_no_unions : Typed.Pattern.t -> label:string -> t
-  val names_bound : t -> Value_name.Set.t
 
   module Coverage : sig
     type simple_pattern = t
@@ -394,16 +393,6 @@ end = struct
     | _ :: _ :: _ ->
       let msg = [%string "Pattern unions in %{label} are not supported"] in
       mir_error [%message msg (pattern : Typed.Pattern.t)]
-  ;;
-
-  let names_bound =
-    let rec loop names = function
-      | Constant _ | Catch_all None -> names
-      | Catch_all (Some name) -> Set.add names name
-      | As (pat, name) -> loop (Set.add names name) pat
-      | Cnstr_appl ((_ : Cnstr.t), args) -> List.fold args ~init:names ~f:loop
-    in
-    loop Value_name.Set.empty
   ;;
 
   module Coverage = struct
@@ -617,42 +606,40 @@ module Expr = struct
      them to you - I think most of the uses do this anyway. We could also try to do
      clever stuff like noticing if a pattern binds only the empty name and no "real"
      names, and then returning no bindings. *)
-  let rec fold_pattern_bindings
-    ?(add_name = Context.add_value_name)
-    ~ctx
-    ~init:acc
-    ~add_let
-    pat
-    mir_expr
-    type_
-    =
-    match (pat : Simple_pattern.t) with
-    | Catch_all None ->
-      (* TODO: warn about unused expressions. NOTE: we can only elide the bound expression
+  let fold_pattern_bindings =
+    let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
+      match (pat : Simple_pattern.t) with
+      | Catch_all None ->
+        (* TODO: warn about unused expressions. NOTE: we can only elide the bound expression
          as we are currently assuming purity. Later we should check for effects. *)
-      ctx, acc
-    | Catch_all (Some name) ->
-      let ctx, name = add_name ctx name in
-      ctx, add_let acc name mir_expr
-    | As (pattern, name) ->
-      let ctx, name = add_name ctx name in
-      let acc = add_let acc name mir_expr in
-      fold_pattern_bindings ~ctx ~init:acc ~add_let pattern (Name name) type_
-    | Cnstr_appl (cnstr, args) ->
-      let ctx, name, acc =
-        match mir_expr with
-        | Name name -> ctx, name, acc
-        | _ ->
-          let ctx, name = add_name ctx Constant_names.empty in
-          let acc = add_let acc name mir_expr in
-          ctx, name, acc
-      in
-      List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
-        let arg_index = Block_index.of_int i in
-        let arg_type = Context.cnstr_arg_type ctx type_ cnstr arg_index in
-        let arg_expr = Get_block_field (arg_index, Name name) in
-        fold_pattern_bindings ~ctx ~init:acc ~add_let arg arg_expr arg_type)
-    | Constant _ -> ctx, acc
+        ctx, acc
+      | Catch_all (Some name) ->
+        let ctx, name = add_name ctx name in
+        ctx, add_let acc name mir_expr
+      | As (pattern, name) ->
+        let ctx, name = add_name ctx name in
+        let acc = add_let acc name mir_expr in
+        loop ~ctx ~add_let ~add_name acc pattern (Name name) type_
+      | Cnstr_appl (cnstr, args) ->
+        let ctx, name, acc =
+          match mir_expr with
+          | Name name -> ctx, name, acc
+          | _ ->
+            (* When adding an empty name, this should always create a new entry in the
+               context, so we bypass `add_name`. *)
+            let ctx, name = Context.add_value_name ctx Constant_names.empty in
+            let acc = add_let acc name mir_expr in
+            ctx, name, acc
+        in
+        List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
+          let arg_index = Block_index.of_int i in
+          let arg_type = Context.cnstr_arg_type ctx type_ cnstr arg_index in
+          let arg_expr = Get_block_field (arg_index, Name name) in
+          loop ~ctx ~add_let ~add_name acc arg arg_expr arg_type)
+      | Constant _ -> ctx, acc
+    in
+    fun ?(add_name = Context.add_value_name) ~ctx ~init ~add_let pat mir_expr type_ ->
+      loop ~ctx ~add_let ~add_name init pat mir_expr type_
   ;;
 
   let rec condition_of_pattern ~ctx ~input_expr ~input_type pattern =
@@ -746,17 +733,25 @@ module Expr = struct
     ~process_expr
     bindings
     =
-    let ctx =
-      if not rec_
-      then ctx
-      else
-        Nonempty.fold bindings ~init:ctx ~f:(fun ctx binding ->
-          let pattern, _, _ = extract_binding binding in
-          Pattern.Names.fold pattern ~init:ctx ~f:(fun ctx name ->
-            fst (Context.add_value_name ctx name)))
+    let ctx_for_body, bindings =
+      Nonempty.fold_map bindings ~init:ctx ~f:(fun ctx_for_body binding ->
+        let pattern, _, _ = extract_binding binding in
+        let ctx_for_body, names_bound =
+          Pattern.Names.fold
+            pattern
+            ~init:(ctx_for_body, Unique_name.Set.empty)
+            ~f:(fun (ctx_for_body, names_bound) name ->
+            let ctx, name = Context.add_value_name ctx_for_body name in
+            ctx, Set.add names_bound name)
+        in
+        ctx_for_body, (binding, names_bound))
     in
+    let ctx = if rec_ then ctx_for_body else ctx in
     (* TODO: Warn about let bindings which bind no names and are pure. *)
-    Nonempty.fold bindings ~init:(ctx, init) ~f:(fun (ctx, acc) binding ->
+    Nonempty.fold
+      bindings
+      ~init:(ctx_for_body, init)
+      ~f:(fun (ctx_for_body, acc) (binding, names_bound) ->
       let pat, typ, expr = extract_binding binding in
       if rec_ then check_rec_binding_expr expr;
       (* TODO: support unions in let bindings. For the non-rec case we should
@@ -774,26 +769,18 @@ module Expr = struct
             "The pattern in this let binding is not exhaustive"
               ~pattern:(pat : Typed.Pattern.t)
               (missing_cases : Simple_pattern.t list)];
-      let ctx, names_bound =
-        Simple_pattern.names_bound pat'
-        |> Set.fold ~init:(ctx, Unique_name.Set.empty) ~f:(fun (ctx, names_bound) name ->
-             let ctx, name = Context.add_value_name ctx name in
-             ctx, Set.add names_bound name)
-      in
       let acc, mir_expr =
         process_expr acc ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
       in
-      let add_name ctx name =
-        if Constant_names.mem name
-        then
-          (* Constant names are always made-up anew, since they come from code generated
-             by the compiler, not the user. *)
-          Context.add_value_name ctx name
-        else
-          (* We already added all the names to the context above. *)
-          ctx, Context.find_value_name ctx ([], name)
-      in
-      fold_pattern_bindings ~ctx pat' mir_expr typ ~init:acc ~add_let ~add_name)
+      let add_name ctx name = ctx, Context.find_value_name ctx ([], name) in
+      fold_pattern_bindings
+        ~ctx:ctx_for_body
+        pat'
+        mir_expr
+        typ
+        ~init:acc
+        ~add_let
+        ~add_name)
   ;;
 
   let of_typed_expr
