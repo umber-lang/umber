@@ -92,7 +92,9 @@ let option_or_default x ~f =
   | None -> f ()
 ;;
 
-let compiler_bug msg = raise_s [%message "COMPILER BUG" (msg : Sexp.t)]
+exception Compiler_bug of Sexp.t
+
+let compiler_bug msg = raise (Compiler_bug msg)
 
 let assert_or_compiler_bug ~here cond =
   if not cond

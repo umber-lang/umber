@@ -1,5 +1,3 @@
-(* Generating LLVM IR for the AST *)
-
 open Import
 open Names
 open Llvm
@@ -25,7 +23,7 @@ let create ~source_filename =
 let block_index_type context = i16_type context
 
 let block_header_type context =
-  let typ = named_struct_type context "header" in
+  let typ = named_struct_type context "umber_header" in
   struct_set_body
     typ
     [| i16_type context (* tag *)
@@ -37,7 +35,7 @@ let block_header_type context =
 ;;
 
 let block_type context =
-  let block_type = named_struct_type context "block" in
+  let block_type = named_struct_type context "umber_block" in
   struct_set_body
     block_type
     [| block_header_type context
@@ -76,7 +74,6 @@ let get_block_tag t value =
   build_gep value [| const_int (block_index_type t.context) 0 |] "tag" t.builder
 ;;
 
-(* TODO: monomorphize polymorphic functions by Value_kind - should be done in mir, I think *)
 let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
@@ -189,11 +186,19 @@ let codegen_stmt t stmt =
     fun_
 ;;
 
-let of_mir ~source_filename mir =
+let of_mir_exn ~source_filename mir =
   let t = create ~source_filename in
   List.iter mir ~f:(ignore << codegen_stmt t);
   Llvm_analysis.assert_valid_module t.module_;
   t
+;;
+
+let of_mir ~source_filename mir =
+  Compilation_error.try_with
+    ~filename:source_filename
+    Codegen_error
+    ~msg:[%message "LLVM codegen failed"]
+    (fun () -> of_mir_exn ~source_filename mir)
 ;;
 
 let to_string t = string_of_llmodule t.module_

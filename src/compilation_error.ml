@@ -6,6 +6,7 @@ module Kind = struct
     | Name_error
     | Type_error
     | Mir_error
+    | Codegen_error
     | Other
   [@@deriving sexp]
 end
@@ -22,6 +23,12 @@ type t =
 exception Compilation_error of t [@@deriving sexp_of]
 
 let create ?filename ?span ?exn ~msg kind = { kind; msg; filename; span; exn }
+
+let try_with ?filename ?span kind ~msg f =
+  try Ok (f ()) with
+  | Compiler_bug _ as exn -> raise exn
+  | exn -> Error { kind; msg; filename; span; exn = Some exn }
+;;
 
 let raise ?filename ?span ?exn ~msg kind =
   raise (Compilation_error { kind; msg; filename; span; exn })

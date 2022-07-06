@@ -145,7 +145,7 @@ let command =
              if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
              if Output.requires output Generating_llvm
              then
-               Codegen.of_mir ~source_filename:filename mir
+               Codegen.of_mir_exn ~source_filename:filename mir
                |> Codegen.to_string
                |> print_endline)))
        else if Output.targets output Tokens

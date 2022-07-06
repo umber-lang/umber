@@ -27,7 +27,7 @@ let should_make_llvm test =
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =
   let exn =
     match error.kind with
-    | Other -> error.exn
+    | Codegen_error | Other -> error.exn
     | _ -> None
   in
   Parsing.fprint_s
@@ -37,6 +37,7 @@ let print_compilation_error ~out ~filename (error : Compilation_error.t) =
       , ({ error with filename = Some filename; exn } : Compilation_error.t)]
 ;;
 
+(* TODO: should really clean up this function *)
 let run_tests () =
   let test filename =
     let bare_filename = Filename.chop_extension filename in
@@ -60,13 +61,12 @@ let run_tests () =
               let mir = Mir.renumber_ids mir in
               Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
               if should_make_llvm bare_filename
-              then
-                Out_channel.output_string
-                  print_llvm_to
-                  (try
-                     Codegen.of_mir ~source_filename:filename mir |> Codegen.to_string
-                   with
-                  | exn -> Exn.to_string exn)
+              then (
+                match Codegen.of_mir ~source_filename:filename mir with
+                | Ok llvm ->
+                  Out_channel.output_string print_llvm_to (Codegen.to_string llvm)
+                | Error error ->
+                  print_compilation_error ~out:print_llvm_to ~filename error)
             | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
         | Error error -> print_compilation_error ~out:print_ast_to ~filename error)
       else Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Untyped.Module.t)]
