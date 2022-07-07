@@ -26,7 +26,6 @@ let create ?filename ?span ?exn ~msg kind = { kind; msg; filename; span; exn }
 
 let try_with ?filename ?span kind ~msg f =
   try Ok (f ()) with
-  | Compiler_bug _ as exn -> raise exn
   | exn -> Error { kind; msg; filename; span; exn = Some exn }
 ;;
 

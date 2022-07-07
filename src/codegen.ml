@@ -22,46 +22,100 @@ let create ~source_filename =
   }
 ;;
 
-let block_index_type context = Llvm.i16_type context
+module Tag = struct
+  (* let no_scan = 0x8000 *)
+  let int = 0x8001
+  let char = 0x8002
+  let float = 0x8003
+  let string = 0x8004
+end
 
-let block_header_type context =
-  let typ = Llvm.named_struct_type context "umber_header" in
-  Llvm.struct_set_body
-    typ
-    [| Llvm.i16_type context (* tag *)
-     ; block_index_type context (* # of pointers *)
-     ; block_index_type context (* # of immediates *)
-    |]
-    false;
-  typ
+let block_tag_type = Llvm.i16_type
+let block_index_type = Llvm.i16_type
+let block_padding_type = Llvm.i32_type
+
+let with_type_memo t ~name ~f =
+  Option.value_or_thunk (Llvm.type_by_name t.module_ name) ~default:f
 ;;
 
-let block_type context =
-  let block_type = Llvm.named_struct_type context "umber_block" in
-  Llvm.struct_set_body
-    block_type
-    [| block_header_type context
-     ; Llvm.array_type (Llvm.pointer_type block_type) 0
-     ; Llvm.array_type (Llvm.i64_type context) 0
+let block_header_type t =
+  let name = "umber_header" in
+  with_type_memo t ~name ~f:(fun () ->
+    let typ = Llvm.named_struct_type t.context name in
+    Llvm.struct_set_body
+      typ
+      [| block_tag_type t.context (* tag *)
+       ; block_index_type t.context (* length *)
+       ; block_padding_type t.context (* padding *)
+      |]
+      false;
+    typ)
+;;
+
+let const_block_header t ~tag ~len =
+  Llvm.const_named_struct
+    (block_header_type t)
+    [| Llvm.const_int (block_tag_type t.context) tag
+     ; Llvm.const_int (block_index_type t.context) len
+     ; Llvm.undef (block_padding_type t.context)
     |]
-    false;
-  block_type
+;;
+
+let block_type t =
+  let name = "umber_block" in
+  with_type_memo t ~name ~f:(fun () ->
+    let block_type = Llvm.named_struct_type t.context name in
+    (* FIXME: array type has zero elements? Is that correct? *)
+    Llvm.struct_set_body
+      block_type
+      [| block_header_type t; Llvm.array_type (Llvm.i64_type t.context) 0 |]
+      false;
+    block_type)
 ;;
 
 let block_pointer_type context = Llvm.pointer_type (block_type context)
 
+let constant_block_type t ~name constant_type =
+  let name = [%string "umber_constant_block_%{name}"] in
+  with_type_memo t ~name ~f:(fun () ->
+    let block_type = Llvm.named_struct_type t.context name in
+    Llvm.struct_set_body block_type [| block_header_type t; constant_type |] false;
+    block_type)
+;;
+
+let constant_block t ~name ~tag ~len constant_type constant_value =
+  let block_header = const_block_header t ~tag ~len in
+  Llvm.const_named_struct
+    (constant_block_type t ~name constant_type)
+    [| block_header; constant_value |]
+;;
+
+(* FIXME: need to box things *)
 let codegen_literal t lit =
-  let with_type make_type const x =
-    let typ = make_type t.context in
-    const typ x
-  in
   match (lit : Literal.t) with
-  | Int i -> with_type Llvm.i64_type Llvm.const_int i
-  | Float x -> with_type Llvm.double_type Llvm.const_float x
-  | Char c -> with_type Llvm.i32_type Llvm.const_int (Uchar.to_int c)
+  | Int i ->
+    let type_ = Llvm.i64_type t.context in
+    constant_block t ~name:"int" ~tag:Tag.int ~len:1 type_ (Llvm.const_int type_ i)
+  | Float x ->
+    let type_ = Llvm.double_type t.context in
+    constant_block t ~name:"float" ~tag:Tag.float ~len:1 type_ (Llvm.const_float type_ x)
+  | Char c ->
+    let c = Uchar.to_int c in
+    let type_ = Llvm.i32_type t.context in
+    constant_block t ~name:"char" ~tag:Tag.char ~len:1 type_ (Llvm.const_int type_ c)
   | String s ->
     let s = Ustring.to_string s in
-    Llvm.const_string t.context s
+    let len = String.length s in
+    (* FIXME: Using 0 - ok? Need to have the type be the same rn. Options are to
+       un-memoize the type or keep 0 as the length*)
+    let type_ = Llvm.array_type (Llvm.i8_type t.context) 0 in
+    constant_block
+      t
+      ~name:"string"
+      ~tag:Tag.string
+      ~len
+      type_
+      (Llvm.const_string t.context s)
 ;;
 
 let codegen_constant_tag t tag =
@@ -85,7 +139,10 @@ let rec codegen_expr t expr =
     codegen_expr t body
   | Fun_call (fun_name, args) ->
     let fun_ =
-      Option.value_exn (Llvm.lookup_function (Unique_name.to_string fun_name) t.module_)
+      Option.value_or_thunk
+        (Llvm.lookup_function (Unique_name.to_string fun_name) t.module_)
+        ~default:(fun () ->
+          compiler_bug [%message "Llvm.lookup_function failed" (fun_name : Unique_name.t)])
     in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     Llvm.build_call fun_ args fun_call_name t.builder
@@ -149,7 +206,7 @@ and box ?(tag = Mir.Cnstr.Tag.default) t ~fields =
      conservative GC e.g. Boehm) *)
   let block_header =
     Llvm.const_named_struct
-      (block_header_type t.context)
+      (block_header_type t)
       [| codegen_non_constant_tag t tag
        ; Llvm.const_int (block_index_type t.context) (List.length fields)
       |]
@@ -170,7 +227,7 @@ let codegen_stmt t stmt =
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
     then raise_s [%message "TODO: closures" (closed_over : Unique_name.Set.t)];
-    let type_ = block_pointer_type t.context in
+    let type_ = block_pointer_type t in
     let fun_type =
       Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
     in

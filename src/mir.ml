@@ -611,7 +611,7 @@ module Expr = struct
       match (pat : Simple_pattern.t) with
       | Catch_all None ->
         (* TODO: warn about unused expressions. NOTE: we can only elide the bound expression
-         as we are currently assuming purity. Later we should check for effects. *)
+           as we are currently assuming purity. Later we should check for effects. *)
         ctx, acc
       | Catch_all (Some name) ->
         let ctx, name = add_name ctx name in

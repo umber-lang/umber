@@ -92,7 +92,7 @@ let option_or_default x ~f =
   | None -> f ()
 ;;
 
-exception Compiler_bug of Sexp.t
+exception Compiler_bug of Sexp.t [@@deriving sexp_of]
 
 let compiler_bug msg = raise (Compiler_bug msg)
 
