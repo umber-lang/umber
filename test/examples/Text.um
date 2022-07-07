@@ -9,7 +9,7 @@ let dec_code_exclam = "\033"
 
 #[here's a nice bracket comment (yeah, except bracket comments are gone)]#
 
-# FIXME: This file doesn't define (++)! This should be an error
+# TODO: This file doesn't define (++)! This should be an error
 val (++) : String, String -> String  # should later be defined on Seq
 let _ = "hello\n" ++ "\bworld!"
 #watch out for the spaces ....   

@@ -57,7 +57,7 @@ let const_block_header t ~tag ~len =
     (block_header_type t)
     [| Llvm.const_int (block_tag_type t.context) tag
      ; Llvm.const_int (block_index_type t.context) len
-     ; Llvm.undef (block_padding_type t.context)
+     ; Llvm.poison (block_padding_type t.context)
     |]
 ;;
 
@@ -75,6 +75,9 @@ let block_type t =
 
 let block_pointer_type context = Llvm.pointer_type (block_type context)
 
+(* FIXME: Maybe we should ditch all the constant block types and just use the regular
+   block type for everything? It seems simpler. We can always add them back in later if
+   needed. *)
 let constant_block_type t ~name constant_type =
   let name = [%string "umber_constant_block_%{name}"] in
   with_type_memo t ~name ~f:(fun () ->
