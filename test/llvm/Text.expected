@@ -1,0 +1,15 @@
+; ModuleID = 'Text.um'
+source_filename = "Text.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16 }
+
+@Text.c.0 = constant %umber_block { %umber_header { i16 -32766, i16 1 }, i32 97 }
+@Text.hello.0 = constant %umber_block { %umber_header { i16 -32764, i16 12 }, [12 x i8] c"hello world!" }
+@Text.spacing.0 = constant %umber_block { %umber_header { i16 -32764, i16 16 }, [16 x i8] c"line 1\0D\0A\09 line 2" }
+@Text.dec_code_exclam.0 = constant %umber_block { %umber_header { i16 -32764, i16 1 }, [1 x i8] c"!" }
+@.0 = constant { %umber_header, { %umber_block, %umber_block } } { %umber_header { i16 0, i16 2 }, { %umber_block, %umber_block } { %umber_block { %umber_header { i16 -32766, i16 1 }, i32 97 }, %umber_block { %umber_header { i16 -32766, i16 1 }, i32 98 } } }
+@Text.a.0 = constant { %umber_header, { %umber_block, %umber_block } }* getelementptr inbounds ({ %umber_header, { %umber_block, %umber_block } }, { %umber_header, { %umber_block, %umber_block } }* @.0, i16 1)
+@Text.b.0 = constant { %umber_header, { %umber_block, %umber_block } }* getelementptr ({ %umber_header, { %umber_block, %umber_block } }, { %umber_header, { %umber_block, %umber_block } }* @.0, i16 2)
+@Text._UNICODE_WORKS_TOO.0 = constant %umber_block { %umber_header { i16 -32764, i16 15 }, [15 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA" }
