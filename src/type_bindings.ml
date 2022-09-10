@@ -137,3 +137,6 @@ let generalize types typ =
       | Partial_function (args, id) -> Defer (Function (args, Var id))
       | typ -> Defer typ)
 ;;
+
+(* FIXME: add unit test for cyclic type variables. Also consider if we want to implement
+   path compression. *)
