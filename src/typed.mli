@@ -51,8 +51,8 @@ module Module : sig
   type nonrec def = (Pattern.t, Expr.generalized) def [@@deriving sexp_of]
 
   val of_untyped
-    :  ?names:Name_bindings.t
-    -> ?types:Type_bindings.t
+    :  names:Name_bindings.t
+    -> types:Type_bindings.t
     -> Untyped.Module.t
     -> (Name_bindings.t * t, Compilation_error.t) Result.t
 end

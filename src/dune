@@ -1,6 +1,14 @@
 (library
  (name umber)
- (libraries core_kernel sedlex menhirLib ocamlgraph llvm llvm.analysis)
+ (libraries
+  core_kernel
+  sedlex
+  menhirLib
+  ocamlgraph
+  llvm
+  llvm.analysis
+  llvm.irreader
+  umber_std)
  (preprocess
   (staged_pps ppx_import sedlex.ppx ppx_jane))
  (inline_tests)

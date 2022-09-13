@@ -128,14 +128,19 @@ let command =
          if Output.requires output Type_checking
          then (
            let names =
-             if no_std then Name_bindings.core else Lazy.force Name_bindings.std_prelude
+             if no_std
+             then Name_bindings.core
+             else Name_bindings.of_prelude_sexp (force Umber_std.Prelude.names)
            in
            let names =
              match parent with
              | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
              | None -> names
            in
-           let names, ast = or_raise (Ast.Typed.Module.of_untyped ~names ast) in
+           let names, ast =
+             or_raise
+               (Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast)
+           in
            if Output.targets output Typed_ast
            then print_s [%sexp (ast : Ast.Typed.Module.t)];
            if Output.targets output Names then print_s [%sexp (names : Name_bindings.t)];
@@ -144,10 +149,16 @@ let command =
              let mir = or_raise (Mir.of_typed_module ~names ast) in
              if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
              if Output.requires output Generating_llvm
-             then
-               Codegen.of_mir_exn ~source_filename:filename mir
+             then (
+               let context = Llvm.create_context () in
+               let values =
+                 if no_std
+                 then Codegen.Value_table.create ()
+                 else Codegen.Value_table.parse context (force Umber_std.Prelude.llvm)
+               in
+               Codegen.of_mir_exn ~context ~source_filename:filename ~values mir
                |> Codegen.to_string
-               |> print_endline)))
+               |> print_endline))))
        else if Output.targets output Tokens
        then
          Parsing.lex_file filename ~print_tokens_to:stdout

@@ -557,10 +557,9 @@ let absolutify_type_expr t =
   map_type_expr_names ~f:(fun name -> absolutify_type_name t name)
 ;;
 
-let std_prelude =
-  lazy
-    (let t = into_parent (t_of_sexp (Sexp.of_string Prelude.names_sexp)) in
-     import_all t Intrinsics.prelude_module_path)
+let of_prelude_sexp sexp =
+  let t = into_parent (t_of_sexp sexp) in
+  import_all t Intrinsics.prelude_module_path
 ;;
 
 let add_val_or_extern

@@ -51,7 +51,12 @@ let run_tests () =
     | Ok ast ->
       if should_type_check bare_filename
       then (
-        match Ast.Typed.Module.of_untyped ast with
+        match
+          Ast.Typed.Module.of_untyped
+            ~names:(Name_bindings.of_prelude_sexp (force Umber_std.Prelude.names))
+            ~types:(Type_bindings.create ())
+            ast
+        with
         | Ok (names, ast) ->
           Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Typed.Module.t)];
           if should_make_mir bare_filename
@@ -62,7 +67,11 @@ let run_tests () =
               Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
               if should_make_llvm bare_filename
               then (
-                match Codegen.of_mir ~source_filename:filename mir with
+                let context = Llvm.create_context () in
+                let values =
+                  Codegen.Value_table.parse context (force Umber_std.Prelude.llvm)
+                in
+                match Codegen.of_mir ~context ~source_filename:filename ~values mir with
                 | Ok llvm ->
                   Out_channel.output_string print_llvm_to (Codegen.to_string llvm)
                 | Error error ->

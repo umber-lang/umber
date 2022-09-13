@@ -3,24 +3,67 @@ open Names
 
 let fun_call_name = "fun_call"
 
+let data_layout_string =
+  (* See https://llvm.org/docs/LangRef.html#data-layout *)
+  "i32:64-i64:64-p:64:64-f64:64"
+;;
+
+module Value_table : sig
+  type t
+
+  val create : unit -> t
+  val parse : Llvm.llcontext -> string -> t
+  val add : t -> Unique_name.t -> Llvm.llvalue -> unit
+  val find : t -> kind:[ `Function | `Unknown ] -> Unique_name.t -> Llvm.llvalue
+end = struct
+  type t =
+    { local : Llvm.llvalue Unique_name.Table.t
+    ; existing : Llvm.llmodule option
+    }
+
+  let create () = { local = Unique_name.Table.create (); existing = None }
+
+  let parse context ll_string =
+    { local = Unique_name.Table.create ()
+    ; existing =
+        Some (Llvm_irreader.parse_ir context (Llvm.MemoryBuffer.of_string ll_string))
+    }
+  ;;
+
+  let add { local; existing = _ } name value =
+    match Hashtbl.add local ~key:name ~data:value with
+    | `Ok -> ()
+    | `Duplicate ->
+      compiler_bug
+        [%message "Tried to add duplicate LLVM value definition" (name : Unique_name.t)]
+  ;;
+
+  let find { local; existing } ~(kind : [ `Function | `Unknown ]) name =
+    match Hashtbl.find local name with
+    | Some value -> value
+    | None ->
+      let result =
+        let name_str = Unique_name.to_string name in
+        let%bind.Option existing = existing in
+        match Llvm.lookup_function name_str existing, kind with
+        | (Some _ as value), _ ->
+          (* FIXME: Do we need to emit a declaration when we hit this case or the below one? *)
+          value
+        | None, `Function -> None
+        | None, _ -> Llvm.lookup_global name_str existing
+      in
+      Option.value_or_thunk result ~default:(fun () ->
+        compiler_bug
+          [%message "Failed to find LLVM value for name" (name : Unique_name.t)])
+  ;;
+end
+
 type t =
   { context : Llvm.llcontext
   ; builder : Llvm.llbuilder
   ; module_ : Llvm.llmodule
-  ; values : Llvm.llvalue Unique_name.Table.t
+  ; values : Value_table.t
   }
-
-let create ~source_filename =
-  let context = Llvm.create_context () in
-  { context
-  ; builder = Llvm.builder context
-  ; module_ =
-      (* TODO: need to manually free modules and possible other things: see e.g.
-         `dispose_module` *)
-      Llvm.create_module context source_filename
-  ; values = Unique_name.Table.create ()
-  }
-;;
 
 module Tag = struct
   (* let no_scan = 0x8000 *)
@@ -32,7 +75,6 @@ end
 
 let block_tag_type = Llvm.i16_type
 let block_index_type = Llvm.i16_type
-let block_padding_type = Llvm.i32_type
 
 let with_type_memo t ~name ~f =
   Option.value_or_thunk (Llvm.type_by_name t.module_ name) ~default:f
@@ -44,10 +86,7 @@ let block_header_type t =
     let typ = Llvm.named_struct_type t.context name in
     Llvm.struct_set_body
       typ
-      [| block_tag_type t.context (* tag *)
-       ; block_index_type t.context (* length *)
-       ; block_padding_type t.context (* padding *)
-      |]
+      [| block_tag_type t.context (* tag *); block_index_type t.context (* length *) |]
       false;
     typ)
 ;;
@@ -57,7 +96,6 @@ let const_block_header t ~tag ~len =
     (block_header_type t)
     [| Llvm.const_int (block_tag_type t.context) tag
      ; Llvm.const_int (block_index_type t.context) len
-     ; Llvm.poison (block_padding_type t.context)
     |]
 ;;
 
@@ -65,7 +103,6 @@ let block_type t =
   let name = "umber_block" in
   with_type_memo t ~name ~f:(fun () ->
     let block_type = Llvm.named_struct_type t.context name in
-    (* FIXME: array type has zero elements? Is that correct? *)
     Llvm.struct_set_body
       block_type
       [| block_header_type t; Llvm.array_type (Llvm.i64_type t.context) 0 |]
@@ -73,52 +110,33 @@ let block_type t =
     block_type)
 ;;
 
+(* TODO: If we use LLVM 15 it just has opaque pointers enabled by default, then we don't
+   have to worry about pointer types. See https://llvm.org/docs/OpaquePointers.html. It
+   looks like the OCaml bindings only support up to version 13, though. *)
 let block_pointer_type context = Llvm.pointer_type (block_type context)
 
-(* FIXME: Maybe we should ditch all the constant block types and just use the regular
-   block type for everything? It seems simpler. We can always add them back in later if
-   needed. *)
-let constant_block_type t ~name constant_type =
-  let name = [%string "umber_constant_block_%{name}"] in
-  with_type_memo t ~name ~f:(fun () ->
-    let block_type = Llvm.named_struct_type t.context name in
-    Llvm.struct_set_body block_type [| block_header_type t; constant_type |] false;
-    block_type)
-;;
-
-let constant_block t ~name ~tag ~len constant_type constant_value =
+let constant_block t ~tag ~len constant_value =
   let block_header = const_block_header t ~tag ~len in
-  Llvm.const_named_struct
-    (constant_block_type t ~name constant_type)
-    [| block_header; constant_value |]
+  Llvm.const_named_struct (block_type t) [| block_header; constant_value |]
 ;;
 
-(* FIXME: need to box things *)
 let codegen_literal t lit =
   match (lit : Literal.t) with
   | Int i ->
     let type_ = Llvm.i64_type t.context in
-    constant_block t ~name:"int" ~tag:Tag.int ~len:1 type_ (Llvm.const_int type_ i)
+    constant_block t ~tag:Tag.int ~len:1 (Llvm.const_int type_ i)
   | Float x ->
     let type_ = Llvm.double_type t.context in
-    constant_block t ~name:"float" ~tag:Tag.float ~len:1 type_ (Llvm.const_float type_ x)
+    constant_block t ~tag:Tag.float ~len:1 (Llvm.const_float type_ x)
   | Char c ->
     let c = Uchar.to_int c in
     let type_ = Llvm.i32_type t.context in
-    constant_block t ~name:"char" ~tag:Tag.char ~len:1 type_ (Llvm.const_int type_ c)
+    constant_block t ~tag:Tag.char ~len:1 (Llvm.const_int type_ c)
   | String s ->
+    (* FIXME: Strings will need handling of the final word, similar to how OCaml does it *)
     let s = Ustring.to_string s in
     let len = String.length s in
-    (* FIXME: Using 0 - ok? Need to have the type be the same rn. Options are to
-       un-memoize the type or keep 0 as the length*)
-    let type_ = Llvm.array_type (Llvm.i8_type t.context) 0 in
-    constant_block
-      t
-      ~name:"string"
-      ~tag:Tag.string
-      ~len
-      type_
-      (Llvm.const_string t.context s)
+    constant_block t ~tag:Tag.string ~len (Llvm.const_string t.context s)
 ;;
 
 let codegen_constant_tag t tag =
@@ -136,17 +154,14 @@ let get_block_tag t value =
 let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
-  | Name name -> Hashtbl.find_exn t.values name
+  | Name name -> Value_table.find t.values ~kind:`Unknown name
   | Let (name, expr, body) ->
-    Hashtbl.add_exn t.values ~key:name ~data:(codegen_expr t expr);
+    (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
+       and maybe allow recursive lets too. (?) *)
+    Value_table.add t.values name (codegen_expr t expr);
     codegen_expr t body
   | Fun_call (fun_name, args) ->
-    let fun_ =
-      Option.value_or_thunk
-        (Llvm.lookup_function (Unique_name.to_string fun_name) t.module_)
-        ~default:(fun () ->
-          compiler_bug [%message "Llvm.lookup_function failed" (fun_name : Unique_name.t)])
-    in
+    let fun_ = Value_table.find t.values ~kind:`Function fun_name in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     Llvm.build_call fun_ args fun_call_name t.builder
   | Make_block { tag; fields } ->
@@ -225,7 +240,7 @@ let codegen_stmt t stmt =
       Llvm.define_global (Unique_name.to_string name) (codegen_expr t expr) t.module_
     in
     Llvm.set_global_constant true value;
-    Hashtbl.add_exn t.values ~key:name ~data:value;
+    Value_table.add t.values name value;
     value
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
@@ -239,30 +254,95 @@ let codegen_stmt t stmt =
     Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
       Llvm.set_value_name (Unique_name.to_string arg_name) arg_value;
-      Hashtbl.add_exn t.values ~key:arg_name ~data:arg_value);
-    let entry_block = Llvm.append_block t.context "entry" fun_ in
+      Value_table.add t.values arg_name arg_value);
+    let entry_block = Llvm.entry_block fun_ in
     Llvm.position_at_end entry_block t.builder;
     let return_value = codegen_expr t body in
     ignore (Llvm.build_ret return_value t.builder : Llvm.llvalue);
-    (* FIXME: probably re-enable *)
-    (*Llvm.llvm_analysis.assert_valid_function fun_;*)
-    Hashtbl.add_exn t.values ~key:fun_name ~data:fun_;
+    (* TODO: see if we can use [verify_function] instead, so we don't abort on failure. *)
+    (* FIXME: re-enable *)
+    (* Llvm_analysis.assert_valid_function fun_; *)
+    Value_table.add t.values fun_name fun_;
     fun_
 ;;
 
-let of_mir_exn ~source_filename mir =
-  let t = create ~source_filename in
-  List.iter mir ~f:(ignore << codegen_stmt t);
-  Llvm_analysis.assert_valid_module t.module_;
-  t
+(* FIXME: remove *)
+(* TODO: Do this as less of a hack. We should be able to treat the prelude basically like
+   importing any other file. *)
+(* NOTE: This function only works for the subset of the prelude we need. *)
+(* let llvm_type_of_type_scheme t scheme =
+  match (scheme : Type.Scheme.t) with
+  | Type_app _ | Var _ | Tuple _ -> block_pointer_type t
+  | Function (arg_types, _) ->
+    let type_ = block_pointer_type t in
+    Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length arg_types))
+  | Partial_function _ -> .
 ;;
 
-let of_mir ~source_filename mir =
+let add_prelude t =
+  Name_bindings.fold_local_names
+    (force Name_bindings.std_prelude)
+    ~init:t
+    ~f:(fun t name name_entry ->
+    let name = Value_name.Qualified.to_ustring name in
+    let extern_name =
+      match Name_bindings.Name_entry.extern_name name_entry with
+      | Some extern_name -> Extern_name.to_ustring extern_name
+      | None -> name
+    in
+    let name = Unique_name.create name in
+    match Name_bindings.Name_entry.scheme name_entry with
+    | None ->
+      compiler_bug
+        [%message
+          "Missing type scheme on Prelude name entry"
+            (name_entry : Name_bindings.Name_entry.t)]
+    | Some scheme ->
+      let is_function =
+        match scheme with
+        | Function _ -> true
+        | _ -> false
+      in
+      let type_ = llvm_type_of_type_scheme t scheme in
+      let value =
+        if is_function
+        then Llvm.declare_function (Ustring.to_string extern_name) type_ t.module_
+        else (
+          let global =
+            Llvm.declare_global type_ (Ustring.to_string extern_name) t.module_
+          in
+          Llvm.set_global_constant true global;
+          global)
+      in
+      Value_table.add t.values name value;
+      t)
+;; *)
+
+let create ~context ~source_filename ~values =
+  let module_ =
+    (* TODO: need to manually free modules and possibly other things: see e.g.
+       `dispose_module` *)
+    Llvm.create_module context source_filename
+  in
+  Llvm.set_data_layout data_layout_string module_;
+  { context; builder = Llvm.builder context; module_; values }
+;;
+
+let of_mir_exn ~context ~source_filename ~values mir =
+  let t = create ~context ~source_filename ~values in
+  List.iter mir ~f:(ignore << codegen_stmt t);
+  match Llvm_analysis.verify_module t.module_ with
+  | None -> t
+  | Some error ->
+    compiler_bug [%message "Llvm_analysis found invalid module" (error : string)]
+;;
+
+let of_mir ~context ~source_filename ~values mir =
   Compilation_error.try_with
     ~filename:source_filename
     Codegen_error
     ~msg:[%message "LLVM codegen failed"]
-    (fun () -> of_mir_exn ~source_filename mir)
+    (fun () -> of_mir_exn ~context ~source_filename ~values mir)
 ;;
 
 let to_string t = Llvm.string_of_llmodule t.module_
