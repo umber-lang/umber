@@ -557,13 +557,9 @@ let absolutify_type_expr t =
   map_type_expr_names ~f:(fun name -> absolutify_type_name t name)
 ;;
 
-(* TODO: Make prelude inclusion less special-cased and hacky. We should be able to handle
-   it similarly to just importing from a specific file (with the caveat that compiling it
-   one should not depend on itself, obviously). *)
-let std_prelude =
-  lazy
-    (let t = into_parent (t_of_sexp (Sexp.of_string Prelude.names_sexp)) in
-     import_all t Intrinsics.prelude_module_path)
+let of_prelude_sexp sexp =
+  let t = into_parent (t_of_sexp sexp) in
+  import_all t Intrinsics.prelude_module_path
 ;;
 
 let add_val_or_extern

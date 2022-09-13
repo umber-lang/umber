@@ -783,11 +783,7 @@ module Module = struct
       names, reintegrate_binding_groups path other_defs binding_groups)
   ;;
 
-  let of_untyped ?names ?types (module_name, sigs, defs) =
-    let names =
-      option_or_default names ~f:(fun () -> Lazy.force Name_bindings.std_prelude)
-    in
-    let types = option_or_default types ~f:Type_bindings.create in
+  let of_untyped ~names ~types (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
       let names = gather_name_placeholders ~names module_name sigs defs in

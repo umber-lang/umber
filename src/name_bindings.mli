@@ -41,7 +41,7 @@ val name_error_msg : string -> Ustring.t -> 'a
 (* Handling of default values *)
 val empty : t
 val core : t
-val std_prelude : t Lazy.t
+val of_prelude_sexp : Sexp.t -> t
 val without_std : t -> t
 
 (* Querying/updating names *)

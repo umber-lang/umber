@@ -8,11 +8,60 @@ let data_layout_string =
   "i32:64-i64:64-p:64:64-f64:64"
 ;;
 
+module Value_table : sig
+  type t
+
+  val create : unit -> t
+  val parse : Llvm.llcontext -> string -> t
+  val add : t -> Unique_name.t -> Llvm.llvalue -> unit
+  val find : t -> Unique_name.t -> Llvm.llvalue
+end = struct
+  type t =
+    { local : Llvm.llvalue Unique_name.Table.t
+    ; existing : Llvm.llmodule option
+    }
+
+  let create () = { local = Unique_name.Table.create (); existing = None }
+
+  let parse context ll_string =
+    { local = Unique_name.Table.create ()
+    ; existing =
+        Some (Llvm_irreader.parse_ir context (Llvm.MemoryBuffer.of_string ll_string))
+    }
+  ;;
+
+  let add { local; existing = _ } name value =
+    match Hashtbl.add local ~key:name ~data:value with
+    | `Ok -> ()
+    | `Duplicate ->
+      compiler_bug
+        [%message "Tried to add duplicate LLVM value definition" (name : Unique_name.t)]
+  ;;
+
+  let find { local; existing } name =
+    match Hashtbl.find local name with
+    | Some value -> value
+    | None ->
+      let result =
+        let name_str = Unique_name.to_string name in
+        let%bind.Option existing = existing in
+        match Llvm.lookup_function name_str existing with
+        | Some _ as value ->
+          (* FIXME: Do we need to emit a declaration when we hit this case or the below one? *)
+          value
+        | None -> Llvm.lookup_global name_str existing
+      in
+      Option.value_or_thunk result ~default:(fun () ->
+        compiler_bug
+          [%message "Failed to find LLVM value for name" (name : Unique_name.t)])
+  ;;
+end
+
 type t =
   { context : Llvm.llcontext
   ; builder : Llvm.llbuilder
   ; module_ : Llvm.llmodule
-  ; values : Llvm.llvalue Unique_name.Table.t
+  ; values : Value_table.t
   }
 
 module Tag = struct
@@ -70,7 +119,6 @@ let constant_block t ~tag ~len constant_value =
   Llvm.const_named_struct (block_type t) [| block_header; constant_value |]
 ;;
 
-(* FIXME: need to box things *)
 let codegen_literal t lit =
   match (lit : Literal.t) with
   | Int i ->
@@ -105,11 +153,11 @@ let get_block_tag t value =
 let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
-  | Name name -> Hashtbl.find_exn t.values name
+  | Name name -> Value_table.find t.values name
   | Let (name, expr, body) ->
     (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
        and maybe allow recursive lets too. (?) *)
-    Hashtbl.add_exn t.values ~key:name ~data:(codegen_expr t expr);
+    Value_table.add t.values name (codegen_expr t expr);
     codegen_expr t body
   | Fun_call (fun_name, args) ->
     let fun_ =
@@ -196,7 +244,7 @@ let codegen_stmt t stmt =
       Llvm.define_global (Unique_name.to_string name) (codegen_expr t expr) t.module_
     in
     Llvm.set_global_constant true value;
-    Hashtbl.add_exn t.values ~key:name ~data:value;
+    Value_table.add t.values name value;
     value
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
@@ -213,20 +261,21 @@ let codegen_stmt t stmt =
     Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
       Llvm.set_value_name (Unique_name.to_string arg_name) arg_value;
-      Hashtbl.add_exn t.values ~key:arg_name ~data:arg_value);
+      Value_table.add t.values arg_name arg_value);
     let entry_block = Llvm.entry_block fun_ in
     Llvm.position_at_end entry_block t.builder;
     ignore (Llvm.build_ret return_value t.builder : Llvm.llvalue);
     (* TODO: see if we can use [verify_function] instead, so we don't abort on failure. *)
     Llvm_analysis.assert_valid_function fun_;
-    Hashtbl.add_exn t.values ~key:fun_name ~data:fun_;
+    Value_table.add t.values fun_name fun_;
     fun_
 ;;
 
+(* FIXME: remove *)
 (* TODO: Do this as less of a hack. We should be able to treat the prelude basically like
    importing any other file. *)
 (* NOTE: This function only works for the subset of the prelude we need. *)
-let llvm_type_of_type_scheme t scheme =
+(* let llvm_type_of_type_scheme t scheme =
   match (scheme : Type.Scheme.t) with
   | Type_app _ | Var _ | Tuple _ -> block_pointer_type t
   | Function (arg_types, _) ->
@@ -270,30 +319,22 @@ let add_prelude t =
           Llvm.set_global_constant true global;
           global)
       in
-      Hashtbl.add_exn t.values ~key:name ~data:value;
+      Value_table.add t.values name value;
       t)
-;;
+;; *)
 
-let create ~source_filename =
-  let context = Llvm.create_context () in
+let create ~context ~source_filename ~values =
   let module_ =
     (* TODO: need to manually free modules and possibly other things: see e.g.
        `dispose_module` *)
     Llvm.create_module context source_filename
   in
   Llvm.set_data_layout data_layout_string module_;
-  let t =
-    { context
-    ; builder = Llvm.builder context
-    ; module_
-    ; values = Unique_name.Table.create ()
-    }
-  in
-  add_prelude t
+  { context; builder = Llvm.builder context; module_; values }
 ;;
 
-let of_mir_exn ~source_filename mir =
-  let t = create ~source_filename in
+let of_mir_exn ~context ~source_filename ~values mir =
+  let t = create ~context ~source_filename ~values in
   List.iter mir ~f:(ignore << codegen_stmt t);
   match Llvm_analysis.verify_module t.module_ with
   | None -> t
@@ -301,12 +342,12 @@ let of_mir_exn ~source_filename mir =
     compiler_bug [%message "Llvm_analysis found invalid module" (error : string)]
 ;;
 
-let of_mir ~source_filename mir =
+let of_mir ~context ~source_filename ~values mir =
   Compilation_error.try_with
     ~filename:source_filename
     Codegen_error
     ~msg:[%message "LLVM codegen failed"]
-    (fun () -> of_mir_exn ~source_filename mir)
+    (fun () -> of_mir_exn ~context ~source_filename ~values mir)
 ;;
 
 let to_string t = Llvm.string_of_llmodule t.module_
