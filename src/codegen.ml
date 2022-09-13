@@ -14,7 +14,7 @@ module Value_table : sig
   val create : unit -> t
   val parse : Llvm.llcontext -> string -> t
   val add : t -> Unique_name.t -> Llvm.llvalue -> unit
-  val find : t -> Unique_name.t -> Llvm.llvalue
+  val find : t -> kind:[ `Function | `Unknown ] -> Unique_name.t -> Llvm.llvalue
 end = struct
   type t =
     { local : Llvm.llvalue Unique_name.Table.t
@@ -38,18 +38,19 @@ end = struct
         [%message "Tried to add duplicate LLVM value definition" (name : Unique_name.t)]
   ;;
 
-  let find { local; existing } name =
+  let find { local; existing } ~(kind : [ `Function | `Unknown ]) name =
     match Hashtbl.find local name with
     | Some value -> value
     | None ->
       let result =
         let name_str = Unique_name.to_string name in
         let%bind.Option existing = existing in
-        match Llvm.lookup_function name_str existing with
-        | Some _ as value ->
+        match Llvm.lookup_function name_str existing, kind with
+        | (Some _ as value), _ ->
           (* FIXME: Do we need to emit a declaration when we hit this case or the below one? *)
           value
-        | None -> Llvm.lookup_global name_str existing
+        | None, `Function -> None
+        | None, _ -> Llvm.lookup_global name_str existing
       in
       Option.value_or_thunk result ~default:(fun () ->
         compiler_bug
@@ -153,19 +154,14 @@ let get_block_tag t value =
 let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
-  | Name name -> Value_table.find t.values name
+  | Name name -> Value_table.find t.values ~kind:`Unknown name
   | Let (name, expr, body) ->
     (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
        and maybe allow recursive lets too. (?) *)
     Value_table.add t.values name (codegen_expr t expr);
     codegen_expr t body
   | Fun_call (fun_name, args) ->
-    let fun_ =
-      Option.value_or_thunk
-        (Llvm.lookup_function (Unique_name.to_string fun_name) t.module_)
-        ~default:(fun () ->
-          compiler_bug [%message "Llvm.lookup_function failed" (fun_name : Unique_name.t)])
-    in
+    let fun_ = Value_table.find t.values ~kind:`Function fun_name in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     Llvm.build_call fun_ args fun_call_name t.builder
   | Make_block { tag; fields } ->
@@ -249,12 +245,9 @@ let codegen_stmt t stmt =
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
     then raise_s [%message "TODO: closures" (closed_over : Unique_name.Set.t)];
-    let return_value = codegen_expr t body in
     let type_ = block_pointer_type t in
     let fun_type =
-      Llvm.function_type
-        (Llvm.type_of return_value)
-        (Array.create type_ ~len:(Nonempty.length args))
+      Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
     in
     let fun_ = Llvm.define_function (Unique_name.to_string fun_name) fun_type t.module_ in
     let fun_params = Llvm.params fun_ in
@@ -264,9 +257,11 @@ let codegen_stmt t stmt =
       Value_table.add t.values arg_name arg_value);
     let entry_block = Llvm.entry_block fun_ in
     Llvm.position_at_end entry_block t.builder;
+    let return_value = codegen_expr t body in
     ignore (Llvm.build_ret return_value t.builder : Llvm.llvalue);
     (* TODO: see if we can use [verify_function] instead, so we don't abort on failure. *)
-    Llvm_analysis.assert_valid_function fun_;
+    (* FIXME: re-enable *)
+    (* Llvm_analysis.assert_valid_function fun_; *)
     Value_table.add t.values fun_name fun_;
     fun_
 ;;
