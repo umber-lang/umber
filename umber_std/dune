@@ -1,0 +1,24 @@
+; (rule
+;  (alias prelude)
+;  (mode promote)
+;  (targets prelude_names.sexp)
+;  (deps Std/Prelude.um)
+;  (action
+;   (progn
+;    (with-stdout-to
+;     prelude_names.sexp
+;     (run %{dep:../umberboot.exe} Std/Prelude.um -no-std -parent Std -names))
+;    ;(with-stdout-to
+;    ; prelude_llvm.ll
+;    ; (run %{dep:../umberboot.exe} Prelude.um -no-std -parent Std -llvm))
+;    )))
+
+; FIXME: need to specify the dependency on Umber and Prelude.um (how? deps doesn't work)
+
+(cinaps)
+
+(library
+ (name umber_std)
+ (libraries core_kernel)
+ (preprocess
+  (pps ppx_jane)))

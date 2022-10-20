@@ -9,7 +9,7 @@ let data_layout_string =
 ;;
 
 module Value_table : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val create : unit -> t
   val parse : Llvm.llcontext -> string -> t
@@ -17,9 +17,10 @@ module Value_table : sig
   val find : t -> kind:[ `Function | `Unknown ] -> Unique_name.t -> Llvm.llvalue
 end = struct
   type t =
-    { local : Llvm.llvalue Unique_name.Table.t
-    ; existing : Llvm.llmodule option
+    { local : Llvm_sexp.llvalue Unique_name.Table.t
+    ; existing : Llvm_sexp.llmodule option
     }
+  [@@deriving sexp_of]
 
   let create () = { local = Unique_name.Table.create (); existing = None }
 
@@ -30,15 +31,16 @@ end = struct
     }
   ;;
 
-  let add { local; existing = _ } name value =
+  let add ({ local; existing = _ } as t) name value =
     match Hashtbl.add local ~key:name ~data:value with
     | `Ok -> ()
     | `Duplicate ->
       compiler_bug
-        [%message "Tried to add duplicate LLVM value definition" (name : Unique_name.t)]
+        [%message
+          "Tried to add duplicate LLVM value definition" (name : Unique_name.t) (t : t)]
   ;;
 
-  let find { local; existing } ~(kind : [ `Function | `Unknown ]) name =
+  let find ({ local; existing } as t) ~(kind : [ `Function | `Unknown ]) name =
     match Hashtbl.find local name with
     | Some value -> value
     | None ->
@@ -54,7 +56,7 @@ end = struct
       in
       Option.value_or_thunk result ~default:(fun () ->
         compiler_bug
-          [%message "Failed to find LLVM value for name" (name : Unique_name.t)])
+          [%message "Failed to find LLVM value for name" (name : Unique_name.t) (t : t)])
   ;;
 end
 

@@ -53,7 +53,7 @@ let run_tests () =
       then (
         match
           Ast.Typed.Module.of_untyped
-            ~names:(Name_bindings.of_prelude_sexp (force Umber_std.Prelude.names))
+            ~names:(Name_bindings.of_prelude_sexp Umber_std.Prelude.names)
             ~types:(Type_bindings.create ())
             ast
         with
@@ -68,9 +68,7 @@ let run_tests () =
               if should_make_llvm bare_filename
               then (
                 let context = Llvm.create_context () in
-                let values =
-                  Codegen.Value_table.parse context (force Umber_std.Prelude.llvm)
-                in
+                let values = Codegen.Value_table.parse context Umber_std.Prelude.llvm in
                 match Codegen.of_mir ~context ~source_filename:filename ~values mir with
                 | Ok llvm ->
                   Out_channel.output_string print_llvm_to (Codegen.to_string llvm)
