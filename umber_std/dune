@@ -1,3 +1,4 @@
+; FIXME: cleanup
 ; (rule
 ;  (alias prelude)
 ;  (mode promote)
@@ -13,9 +14,11 @@
 ;    ; (run %{dep:../umberboot.exe} Prelude.um -no-std -parent Std -llvm))
 ;    )))
 
-; FIXME: need to specify the dependency on Umber and Prelude.um (how? deps doesn't work)
-
-(cinaps)
+(cinaps
+ (files prelude.ml)
+ (libraries umberboot)
+ (preprocess
+  (pps ppx_jane)))
 
 (library
  (name umber_std)
