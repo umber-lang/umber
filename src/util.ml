@@ -86,6 +86,7 @@ end = struct
   ;;
 end
 
+(* TODO: This should be replaced with [Option.value_or_thunk] *)
 let option_or_default x ~f =
   match x with
   | Some x -> x

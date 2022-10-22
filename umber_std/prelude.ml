@@ -16,8 +16,7 @@ open! Core
 $*)
 
 (*$ let () = compile_and_print ~name:"names" ~is_sexp:true Names *)
-let names =
-  {|
+let names = {|
 ((current_path "Std(d)")
  (toplevel
   ((names
@@ -405,11 +404,9 @@ let names =
                           (type_source Let_inferred))))))
                      (types ()) (modules ()))))))))))))))))))))))
 |}
-  |> Sexp.of_string
-;;
-
+|> Sexp.of_string
 (*$*)
 
-(*$ let () = compile_and_print ~name:"llvm" ~is_sexp:false Llvm *)
+(* let () = compile_and_print ~name:"llvm" ~is_sexp:false Llvm *)
 let llvm = "placeholder"
-(*$*)
+(**)

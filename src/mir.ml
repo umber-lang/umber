@@ -86,6 +86,90 @@ end = struct
   let mem = Hash_set.mem constant_names_table
 end
 
+module Cnstr_info : sig
+  type t [@@deriving sexp_of]
+
+  (* TODO: Consider exposing a function to zip with the list of args. I think the
+     callsites generally do that, which leads to looking up each constructor separately. *)
+
+  val tag : t -> Cnstr.t -> Cnstr.Tag.t
+  val arg_type : t -> Cnstr.t -> Block_index.t -> Type.Scheme.t
+  val cnstrs : t -> Cnstr.t list
+
+  val fold
+    :  t
+    -> init:'acc
+    -> f:('acc -> Cnstr.t -> Cnstr.Tag.t -> Type.Scheme.t list -> 'acc)
+    -> 'acc
+
+  val of_variants : (Cnstr_name.t * Type.Scheme.t list) list -> t
+  val of_tuple : Type.Scheme.t list -> t
+end = struct
+  (* TODO: The constant/non-constant split might not be that useful really. Probably get
+     rid of it. *)
+  type t =
+    | Variants of
+        { constant_cnstrs : Cnstr_name.t list
+        ; non_constant_cnstrs : (Cnstr_name.t * Type.Scheme.t list) list
+        }
+    | Tuple of Type.Scheme.t list
+  [@@deriving sexp_of]
+
+  let of_variants variants =
+    let constant_cnstrs, non_constant_cnstrs =
+      List.partition_map variants ~f:(fun (cnstr_name, args) ->
+        if List.is_empty args then First cnstr_name else Second (cnstr_name, args))
+    in
+    Variants { constant_cnstrs; non_constant_cnstrs }
+  ;;
+
+  let of_tuple args = Tuple args
+
+  let fold t ~init:acc ~f =
+    match t with
+    | Variants { constant_cnstrs; non_constant_cnstrs } ->
+      let acc =
+        List.foldi constant_cnstrs ~init:acc ~f:(fun i acc cnstr_name ->
+          f acc (Cnstr.Named cnstr_name) (Cnstr.Tag.of_int i) [])
+      in
+      List.foldi non_constant_cnstrs ~init:acc ~f:(fun i acc (cnstr_name, args) ->
+        f acc (Named cnstr_name) (Cnstr.Tag.of_int i) args)
+    | Tuple args -> f acc Tuple Cnstr.Tag.default args
+  ;;
+
+  let cnstrs t = List.rev (fold t ~init:[] ~f:(fun acc cnstr _tag _args -> cnstr :: acc))
+
+  let lookup_cnstr t cnstr =
+    match t, (cnstr : Cnstr.t) with
+    | Variants { constant_cnstrs; non_constant_cnstrs }, Named cnstr_name ->
+      (match
+         List.findi constant_cnstrs ~f:(fun (_ : int) -> Cnstr_name.( = ) cnstr_name)
+       with
+      | Some (i, (_ : Cnstr_name.t)) -> Cnstr.Tag.of_int i, []
+      | None ->
+        (match
+           List.findi non_constant_cnstrs ~f:(fun _ -> Cnstr_name.( = ) cnstr_name << fst)
+         with
+        | Some (i, (_, args)) -> Cnstr.Tag.of_int i, args
+        | None ->
+          compiler_bug
+            [%message
+              "Constructor name lookup failed"
+                (cnstr_name : Cnstr_name.t)
+                ~cnstr_info:(t : t)]))
+    | Tuple args, Tuple -> Cnstr.Tag.default, args
+    | Variants _, Tuple | Tuple _, Named _ ->
+      compiler_bug
+        [%message "Incompatible cnstr info" (cnstr : Cnstr.t) ~cnstr_info:(t : t)]
+  ;;
+
+  let tag t cnstr = fst (lookup_cnstr t cnstr)
+
+  let arg_type t cnstr index =
+    List.nth_exn (snd (lookup_cnstr t cnstr)) (Block_index.to_int index)
+  ;;
+end
+
 module Context : sig
   type t [@@deriving sexp_of]
 
@@ -98,34 +182,13 @@ module Context : sig
 
   val with_find_observer : t -> f:(find_observer -> find_observer) -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
-  val cnstr_arg_type : t -> Type.Scheme.t -> Cnstr.t -> Block_index.t -> Type.Scheme.t
-  val cnstrs : t -> Type.Scheme.t -> Cnstr.Set.t
-  val cnstr_tag : t -> Type.Scheme.t -> Cnstr.t -> Cnstr.Tag.t
-  val cnstr_type : t -> Type.Scheme.t -> Cnstr.t -> Block_index.t -> Type.Scheme.t
   val name_bindings : t -> Name_bindings.t
+  val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
+  val find_cnstr_info_from_decl : t -> Type.Decl.decl -> Cnstr_info.t option
 end = struct
-  module Cnstr_info = struct
-    type t =
-      | Variants of
-          { constant_cnstrs : Cnstr_name.t list
-          ; non_constant_cnstrs : (Cnstr_name.t * Type.Scheme.t list) list
-          }
-      | Tuple of Type.Scheme.t list
-    [@@deriving sexp_of]
-
-    let of_variants variants =
-      let constant_cnstrs, non_constant_cnstrs =
-        List.partition_map variants ~f:(fun (cnstr_name, args) ->
-          if List.is_empty args then First cnstr_name else Second (cnstr_name, args))
-      in
-      Variants { constant_cnstrs; non_constant_cnstrs }
-    ;;
-  end
-
   type t =
     { names : Unique_name.t Ustring.Map.t
     ; name_bindings : Name_bindings.t [@sexp.opaque]
-    ; cnstr_info_cache : Cnstr_info.t Type.Scheme.Table.t
     ; find_observer : Value_name.Qualified.t -> Unique_name.t -> unit [@sexp.opaque]
     }
   [@@deriving sexp_of]
@@ -194,118 +257,36 @@ end = struct
 
   let of_name_bindings name_bindings =
     let t =
-      { names = Ustring.Map.empty
-      ; name_bindings
-      ; cnstr_info_cache = Type.Scheme.Table.create ()
-      ; find_observer = (fun _ _ -> ())
-      }
+      { names = Ustring.Map.empty; name_bindings; find_observer = (fun _ _ -> ()) }
     in
     Name_bindings.fold_local_names name_bindings ~init:t ~f:(fun t name _entry ->
       fst (add t name))
   ;;
 
-  let cnstr_lookup_failed ?cnstr_name type_ =
-    compiler_bug
-      [%message
-        "Constructor lookup failed"
-          (type_ : Type.Scheme.t)
-          (cnstr_name : Cnstr_name.t option)]
+  let cnstr_info_lookup_failed type_ =
+    compiler_bug [%message "Constructor info lookup failed" (type_ : Type.Scheme.t)]
   ;;
 
-  let rec get_cnstr_info t type_ =
+  let rec find_cnstr_info_internal t type_ =
     match (type_ : Type.Scheme.t) with
     | Type_app (type_name, _args) ->
-      Hashtbl.find_or_add t.cnstr_info_cache type_ ~default:(fun () ->
-        match
-          snd (Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name)
-        with
-        | Alias alias -> get_cnstr_info t alias
-        | Variants variants -> Cnstr_info.of_variants variants
-        | Abstract | Record _ -> cnstr_lookup_failed type_)
-    | Tuple args ->
-      Hashtbl.find_or_add t.cnstr_info_cache type_ ~default:(fun () ->
-        Cnstr_info.Tuple args)
-    | Function _ | Partial_function _ | Var _ -> cnstr_lookup_failed type_
-  ;;
-
-  let lookup_cnstr t type_ cnstr =
-    match get_cnstr_info t type_, (cnstr : Cnstr.t) with
-    | Variants { constant_cnstrs; non_constant_cnstrs }, Named cnstr_name ->
-      (match List.findi constant_cnstrs ~f:(fun _ -> Cnstr_name.( = ) cnstr_name) with
-      | Some (i, _) -> `Variants (Cnstr.Tag.of_int i, [])
-      | None ->
-        (match
-           List.findi non_constant_cnstrs ~f:(fun _ -> Cnstr_name.( = ) cnstr_name << fst)
-         with
-        | Some (i, (_, args)) -> `Variants (Cnstr.Tag.of_int i, args)
-        | None -> cnstr_lookup_failed ~cnstr_name type_))
-    | Tuple args, Tuple -> `Tuple args
-    | cnstr_info, cnstr ->
-      compiler_bug
-        [%message "Incompatible cnstr info" (cnstr : Cnstr.t) (cnstr_info : Cnstr_info.t)]
-  ;;
-
-  let cnstr_type t typ cnstr_name arg_index =
-    let (`Variants (_, args) | `Tuple args) = lookup_cnstr t typ cnstr_name in
-    List.nth_exn args (Block_index.to_int arg_index)
-  ;;
-
-  let cnstr_tag t typ cnstr =
-    match lookup_cnstr t typ cnstr with
-    | `Variants (index, _) -> index
-    | `Tuple _ -> Cnstr.Tag.default
-  ;;
-
-  (* TODO: remove awkward split/duplication between cached monomorphic code and uncached
-     polymorphic code. *)
-  (*let cnstrs t typ =
-    match get_cnstr_info t typ with
-    | Variants { constant_cnstrs; non_constant_cnstrs } ->
-      Cnstr.Set.of_list
-        (List.map constant_cnstrs ~f:Cnstr.named
-        @ List.map non_constant_cnstrs ~f:(Cnstr.named << fst))
-    | Tuple _ -> Cnstr.Set.singleton Tuple
-  ;;*)
-
-  let cnstr_lookup_failed ?cnstr_name scheme =
-    compiler_bug
-      [%message
-        "Constructor lookup failed"
-          (scheme : Type.Scheme.t)
-          (cnstr_name : Cnstr_name.t option)]
-  ;;
-
-  let rec get_cnstr_info t scheme =
-    match (scheme : Type.Scheme.t) with
-    | Type_app (type_name, _args) ->
-      let _params, decl =
-        Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name
+      let decl =
+        snd (Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name)
       in
-      (match decl with
-      | Alias alias -> get_cnstr_info t alias
-      | Variants variants -> `Variants variants
-      | Abstract | Record _ -> cnstr_lookup_failed scheme)
-    | Tuple args -> `Tuple args
-    | Function _ | Partial_function _ | Var _ -> cnstr_lookup_failed scheme
+      find_cnstr_info_from_decl t decl
+    | Tuple args -> Some (Cnstr_info.of_tuple args)
+    | Function _ | Partial_function _ | Var _ -> cnstr_info_lookup_failed type_
+
+  and find_cnstr_info_from_decl t decl =
+    match (decl : Type.Decl.decl) with
+    | Alias alias -> find_cnstr_info_internal t alias
+    | Variants variants -> Some (Cnstr_info.of_variants variants)
+    | Abstract | Record _ -> None
   ;;
 
-  let cnstrs t scheme =
-    match get_cnstr_info t scheme with
-    | `Variants variants -> List.map variants ~f:(Cnstr.named << fst) |> Cnstr.Set.of_list
-    | `Tuple _ -> Cnstr.Set.singleton Tuple
-  ;;
-
-  let cnstr_arg_type t scheme cnstr index =
-    let index = Block_index.to_int index in
-    match get_cnstr_info t scheme, (cnstr : Cnstr.t) with
-    | `Variants variants, Named cnstr_name ->
-      List.find_map_exn variants ~f:(fun (cnstr_name', args) ->
-        if Cnstr_name.(cnstr_name = cnstr_name')
-        then Some (List.nth_exn args index)
-        else None)
-    | `Tuple fields, Tuple -> List.nth_exn fields index
-    | _ ->
-      compiler_bug [%message "Context.cnstr_arg_type: invalid cnstr" (cnstr : Cnstr.t)]
+  let find_cnstr_info t type_ =
+    option_or_default (find_cnstr_info_internal t type_) ~f:(fun () ->
+      compiler_bug [%message "Constructor info lookup failed" (type_ : Type.Scheme.t)])
   ;;
 end
 
@@ -472,7 +453,8 @@ end = struct
             | String s -> String (Ustring.( ^ ) asterisk s))
         ]
       | By_cnstr coverage_by_cnstr ->
-        let all_cnstrs = Context.cnstrs ctx input_type in
+        let cnstr_info = Context.find_cnstr_info ctx input_type in
+        let all_cnstrs = Cnstr_info.cnstrs cnstr_info |> Cnstr.Set.of_list in
         let arity = Set.length all_cnstrs in
         let missing_cnstrs =
           Set.diff all_cnstrs (Map.key_set coverage_by_cnstr)
@@ -489,7 +471,7 @@ end = struct
                  let missing_cases_per_arg =
                    Nonempty.mapi args ~f:(fun i arg ->
                      let input_type =
-                       Context.cnstr_arg_type ctx input_type cnstr (Block_index.of_int i)
+                       Cnstr_info.arg_type cnstr_info cnstr (Block_index.of_int i)
                      in
                      missing_cases ~ctx ~input_type arg)
                  in
@@ -631,9 +613,10 @@ module Expr = struct
             let acc = add_let acc name mir_expr in
             ctx, name, acc
         in
+        let cnstr_info = Context.find_cnstr_info ctx type_ in
         List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
           let arg_index = Block_index.of_int i in
-          let arg_type = Context.cnstr_arg_type ctx type_ cnstr arg_index in
+          let arg_type = Cnstr_info.arg_type cnstr_info cnstr arg_index in
           let arg_expr = Get_block_field (arg_index, Name name) in
           loop ~ctx ~add_let ~add_name acc arg arg_expr arg_type)
       | Constant _ -> ctx, acc
@@ -648,7 +631,8 @@ module Expr = struct
     | As (pattern, _) -> condition_of_pattern ~ctx ~input_expr ~input_type pattern
     | Constant lit -> Some (Equals (input_expr, lit))
     | Cnstr_appl (cnstr, args) ->
-      let tag = Context.cnstr_tag ctx input_type cnstr in
+      let cnstr_info = Context.find_cnstr_info ctx input_type in
+      let tag = Cnstr_info.tag cnstr_info cnstr in
       if List.is_empty args
       then Some (Constant_tag_equals (input_expr, tag))
       else (
@@ -656,7 +640,7 @@ module Expr = struct
         let conds =
           List.filter_mapi args ~f:(fun i arg ->
             let arg_index = Block_index.of_int i in
-            let arg_type = Context.cnstr_arg_type ctx input_type cnstr arg_index in
+            let arg_type = Cnstr_info.arg_type cnstr_info cnstr arg_index in
             let arg_expr = Get_block_field (arg_index, input_expr) in
             condition_of_pattern ~ctx ~input_expr:arg_expr ~input_type:arg_type arg)
         in
@@ -817,7 +801,8 @@ module Expr = struct
           (* Special-case constructor applications *)
           (match Value_name.to_cnstr_name name with
           | Ok cnstr_name ->
-            let tag = Context.cnstr_tag ctx expr_type (Named cnstr_name) in
+            let cnstr_info = Context.find_cnstr_info ctx expr_type in
+            let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
             let fields, field_types = List.unzip (Nonempty.to_list args_and_types) in
             make_block ~ctx ~tag ~fields ~field_types
           | Error _ -> fun_call ())
@@ -1125,6 +1110,37 @@ let of_typed_module =
       ~extract_binding:(fun { Node.node = pat, (expr, typ); _ } -> pat, typ, expr)
       ~process_expr
   in
+  let generate_variant_constructor_values ~ctx ~stmts decl =
+    match Context.find_cnstr_info_from_decl ctx decl with
+    | None -> stmts
+    | Some cnstr_info ->
+      Cnstr_info.fold cnstr_info ~init:stmts ~f:(fun stmts cnstr tag args ->
+        match cnstr with
+        | Tuple -> stmts
+        | Named cnstr_name ->
+          let _ctx, name =
+            Context.add_value_name ctx (Value_name.of_cnstr_name cnstr_name)
+          in
+          let stmt : Stmt.t =
+            let arg_count = List.length args in
+            if arg_count = 0
+            then Value_def (name, Make_block { tag; fields = [] })
+            else (
+              let arg_names =
+                List.init arg_count ~f:(fun i ->
+                  snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
+              in
+              Fun_def
+                { fun_name = name
+                ; closed_over = Unique_name.Set.empty
+                ; args = arg_names |> Nonempty.of_list_exn
+                ; body =
+                    Make_block
+                      { tag; fields = List.map arg_names ~f:(fun name -> Expr.Name name) }
+                })
+          in
+          stmt :: stmts)
+  in
   let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.node with
@@ -1133,14 +1149,13 @@ let of_typed_module =
         Context.with_module ctx module_name ~f:(fun ctx -> loop ~ctx ~stmts defs)
       | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
       (* TODO: Should probably preserve extern declarations *)
+      | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
+        (* FIXME: Need to generate variant constructor values/functions *)
+        let stmts = generate_variant_constructor_values ~ctx ~stmts decl in
+        ctx, stmts
       | Common_def
-          ( Val _
-          | Extern _
-          | Type_decl _
-          | Trait_sig _
-          | Import _
-          | Import_with _
-          | Import_without _ ) -> ctx, stmts)
+          (Val _ | Extern _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
+        -> ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     try

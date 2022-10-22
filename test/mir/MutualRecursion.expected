@@ -47,6 +47,14 @@
             (Fun_call MutualRecursion.sum_forest.0
              ((Name MutualRecursion.forest.2))))))))))
      (with_ (Primitive (Int 0)))))))
+ (Value_def MutualRecursion.Nil.0 (Make_block (tag 0)))
+ (Fun_def
+  ((fun_name MutualRecursion.Cons.0) (closed_over ()) (args (arg0.0 arg1.0))
+   (body (Make_block (tag 0) (fields ((Name arg0.0) (Name arg1.0)))))))
+ (Value_def MutualRecursion.Leaf.0 (Make_block (tag 0)))
+ (Fun_def
+  ((fun_name MutualRecursion.Node.0) (closed_over ()) (args (arg0.1 arg1.1))
+   (body (Make_block (tag 0) (fields ((Name arg0.1) (Name arg1.1)))))))
  (Fun_def
   ((fun_name MutualRecursion.even.0) (closed_over ())
    (args (MutualRecursion.x.1))

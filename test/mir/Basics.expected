@@ -1,5 +1,20 @@
 ((Value_def Basics.false.0 (Name False.0))
  (Value_def Basics.true.0 (Name True.0))
+ (Value_def Basics.Red.0 (Make_block (tag 0)))
+ (Value_def Basics.Blue.0 (Make_block (tag 1)))
+ (Value_def Basics.Green.0 (Make_block (tag 0)))
+ (Value_def Basics.Yellow.0 (Make_block (tag 1)))
+ (Value_def Basics.Purple.0 (Make_block (tag 2)))
+ (Fun_def
+  ((fun_name Basics.Regular.0) (closed_over ()) (args (arg0.0))
+   (body (Make_block (tag 0) (fields ((Name arg0.0)))))))
+ (Fun_def
+  ((fun_name Basics.Expanded.0) (closed_over ()) (args (arg0.1))
+   (body (Make_block (tag 1) (fields ((Name arg0.1)))))))
+ (Fun_def
+  ((fun_name Basics.Point3.0) (closed_over ()) (args (arg0.2 arg1.0 arg2.0))
+   (body
+    (Make_block (tag 0) (fields ((Name arg0.2) (Name arg1.0) (Name arg2.0)))))))
  (Value_def Basics.xyz.0
   (Make_block (tag 0)
    (fields ((Primitive (Int 1)) (Primitive (Int 2)) (Primitive (Int 3)))))))
