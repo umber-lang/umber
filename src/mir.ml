@@ -145,18 +145,19 @@ end = struct
       (match
          List.findi constant_cnstrs ~f:(fun (_ : int) -> Cnstr_name.( = ) cnstr_name)
        with
-      | Some (i, (_ : Cnstr_name.t)) -> Cnstr.Tag.of_int i, []
-      | None ->
-        (match
-           List.findi non_constant_cnstrs ~f:(fun _ -> Cnstr_name.( = ) cnstr_name << fst)
-         with
-        | Some (i, (_, args)) -> Cnstr.Tag.of_int i, args
-        | None ->
-          compiler_bug
-            [%message
-              "Constructor name lookup failed"
-                (cnstr_name : Cnstr_name.t)
-                ~cnstr_info:(t : t)]))
+       | Some (i, (_ : Cnstr_name.t)) -> Cnstr.Tag.of_int i, []
+       | None ->
+         (match
+            List.findi non_constant_cnstrs ~f:(fun _ ->
+              Cnstr_name.( = ) cnstr_name << fst)
+          with
+          | Some (i, (_, args)) -> Cnstr.Tag.of_int i, args
+          | None ->
+            compiler_bug
+              [%message
+                "Constructor name lookup failed"
+                  (cnstr_name : Cnstr_name.t)
+                  ~cnstr_info:(t : t)]))
     | Tuple args, Tuple -> Cnstr.Tag.default, args
     | Variants _, Tuple | Tuple _, Named _ ->
       compiler_bug
@@ -203,8 +204,16 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
-  let add t name =
+  (* TODO: Creating new unique names here means uses of imported names are
+     different in different files, which is weird. Maybe [Name_bindings] should be
+     responsible for assigning unique names for names in its own file? *)
+  let add ?extern_name t name =
     let name = Value_name.Qualified.to_ustring name in
+    let name =
+      match extern_name with
+      | None -> name
+      | Some extern_name -> Ustring.( ^ ) name (Extern_name.to_ustring extern_name)
+    in
     let name' = Unique_name.create name in
     { t with names = Map.set t.names ~key:name ~data:name' }, name'
   ;;
@@ -219,17 +228,14 @@ end = struct
 
   let find { names; name_bindings; _ } name =
     match Map.find names (Value_name.Qualified.to_ustring name) with
-    | Some _ as name ->
-      name
+    | Some _ as name -> name
     | None ->
+      (* FIXME: What does this case do? I don't think it makes sense. *)
       (match Name_bindings.find_entry name_bindings name with
-      | exception Name_bindings.Name_error _ -> None
-      | entry ->
-        (* TODO: Creating new unique names here means uses of imported names are
-           different in different files, which is weird. Maybe [Name_bindings] should be
-           responsible for assigning unique names for names in its own file? *)
-        Name_bindings.Name_entry.extern_name entry
-        |> Option.map ~f:(Unique_name.create << Extern_name.to_ustring))
+       | exception Name_bindings.Name_error _ -> None
+       | entry ->
+         Name_bindings.Name_entry.extern_name entry
+         |> Option.map ~f:(Unique_name.create << Extern_name.to_ustring))
   ;;
 
   let find_value_name' t name =
@@ -260,11 +266,13 @@ end = struct
   let with_find_observer t ~f = { t with find_observer = f t.find_observer }
 
   let of_name_bindings name_bindings =
+    (* FIXME: We add all these names, but then still allow looking them up from the name
+       bindings later. I don't think this makes sense. *)
     let t =
       { names = Ustring.Map.empty; name_bindings; find_observer = (fun _ _ -> ()) }
     in
-    Name_bindings.fold_local_names name_bindings ~init:t ~f:(fun t name _entry ->
-      fst (add t name))
+    Name_bindings.fold_local_names name_bindings ~init:t ~f:(fun t name entry ->
+      fst (add t name ?extern_name:(Name_bindings.Name_entry.extern_name entry)))
   ;;
 
   let cnstr_info_lookup_failed type_ =
@@ -403,14 +411,14 @@ end = struct
         Inexhaustive
           { largest_seen =
               (match x, y with
-              | Int i, Int i' -> Int (max i i')
-              | Float x, Float x' -> Float (Float.max x x')
-              | Char c, Char c' -> Char (Uchar.max c c')
-              | String s, String s' -> String (Ustring.max s s')
-              | _ ->
-                compiler_bug
-                  [%message
-                    "Incompatible literals in pattern" (x : Literal.t) (y : Literal.t)])
+               | Int i, Int i' -> Int (max i i')
+               | Float x, Float x' -> Float (Float.max x x')
+               | Char c, Char c' -> Char (Uchar.max c c')
+               | String s, String s' -> String (Ustring.max s s')
+               | _ ->
+                 compiler_bug
+                   [%message
+                     "Incompatible literals in pattern" (x : Literal.t) (y : Literal.t)])
           }
       | Inexhaustive _, (By_cnstr _ as by_cnstr)
       | (By_cnstr _ as by_cnstr), Inexhaustive _ -> by_cnstr
@@ -429,10 +437,10 @@ end = struct
       | Inexhaustive _ -> of_pattern pattern
       | By_cnstr coverage_by_cnstr ->
         (match of_pattern pattern with
-        | Exhaustive -> Exhaustive
-        | Inexhaustive _ -> coverage
-        | By_cnstr coverage_by_cnstr' ->
-          merge_by_cnstr coverage_by_cnstr coverage_by_cnstr')
+         | Exhaustive -> Exhaustive
+         | Inexhaustive _ -> coverage
+         | By_cnstr coverage_by_cnstr' ->
+           merge_by_cnstr coverage_by_cnstr coverage_by_cnstr')
     ;;
 
     let of_patterns Nonempty.(pattern :: patterns) =
@@ -451,10 +459,10 @@ end = struct
       | Inexhaustive { largest_seen } ->
         [ Constant
             (match largest_seen with
-            | Int i -> Int (i + 1)
-            | Float x -> Float (x +. 1.)
-            | Char c -> Char (Option.value (Uchar.succ c) ~default:Uchar.min_value)
-            | String s -> String (Ustring.( ^ ) asterisk s))
+             | Int i -> Int (i + 1)
+             | Float x -> Float (x +. 1.)
+             | Char c -> Char (Option.value (Uchar.succ c) ~default:Uchar.min_value)
+             | String s -> String (Ustring.( ^ ) asterisk s))
         ]
       | By_cnstr coverage_by_cnstr ->
         let cnstr_info = Context.find_cnstr_info ctx input_type in
@@ -803,16 +811,16 @@ module Expr = struct
             compiler_bug [%message "Invalid function expression" (fun_ : t)]
         in
         (match fun_ with
-        | Name (_, name) ->
-          (* Special-case constructor applications *)
-          (match Value_name.to_cnstr_name name with
-          | Ok cnstr_name ->
-            let cnstr_info = Context.find_cnstr_info ctx expr_type in
-            let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
-            let fields, field_types = List.unzip (Nonempty.to_list args_and_types) in
-            make_block ~ctx ~tag ~fields ~field_types
-          | Error _ -> fun_call ())
-        | _ -> fun_call ())
+         | Name (_, name) ->
+           (* Special-case constructor applications *)
+           (match Value_name.to_cnstr_name name with
+            | Ok cnstr_name ->
+              let cnstr_info = Context.find_cnstr_info ctx expr_type in
+              let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
+              let fields, field_types = List.unzip (Nonempty.to_list args_and_types) in
+              make_block ~ctx ~tag ~fields ~field_types
+            | Error _ -> fun_call ())
+         | _ -> fun_call ())
       | Lambda (args, body), Function (arg_types, body_type) ->
         (* TODO: Still need to try and coalesce lambdas/other function expressions for
            function definitions which are partially applied. See example in
@@ -821,16 +829,16 @@ module Expr = struct
       | Match (expr, input_type, arms), output_type ->
         let input_expr = of_typed_expr ~ctx expr input_type in
         (match expr with
-        | Name _ ->
-          (* Skip binding [match_expr_name] when matching on a single variable *)
-          handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
-        | _ ->
-          let ctx, match_expr_name = Context.add_value_name ctx Constant_names.match_ in
-          let body =
-            let input_expr = Name match_expr_name in
-            handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
-          in
-          Let (match_expr_name, input_expr, body))
+         | Name _ ->
+           (* Skip binding [match_expr_name] when matching on a single variable *)
+           handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
+         | _ ->
+           let ctx, match_expr_name = Context.add_value_name ctx Constant_names.match_ in
+           let body =
+             let input_expr = Name match_expr_name in
+             handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
+           in
+           Let (match_expr_name, input_expr, body))
       | Let { rec_; bindings; body }, body_type ->
         (* TODO: let statements in expressions should be able to be made into global
            statements (e.g. to define static functions/values) - not all lets should be
@@ -948,13 +956,13 @@ module Expr = struct
       and loop ~coverage = function
         | [] ->
           (match Simple_pattern.Coverage.missing_cases ~ctx ~input_type coverage with
-          | [] ->
-            compiler_bug [%message "Pattern coverage/condition checking is out of sync"]
-          | missing_cases ->
-            mir_error
-              [%message
-                "This pattern match is not exhaustive"
-                  (missing_cases : Simple_pattern.t list)])
+           | [] ->
+             compiler_bug [%message "Pattern coverage/condition checking is out of sync"]
+           | missing_cases ->
+             mir_error
+               [%message
+                 "This pattern match is not exhaustive"
+                   (missing_cases : Simple_pattern.t list)])
         | (pattern, output_expr) :: arms ->
           loop_one_arm ~pattern ~output_expr ~coverage:(Some coverage) arms
       in
@@ -984,15 +992,15 @@ module Expr = struct
             output_expr
           | Some cond ->
             (match Nonempty.of_list patterns, fallback with
-            | Some patterns, _ ->
-              let _ctx, else_ = loop patterns in
-              If { cond; then_ = output_expr; else_ }
-            | None, Some fallback ->
-              let else_ = fallback () in
-              If { cond; then_ = output_expr; else_ }
-            | None, None ->
-              (* This is the last case, so just elide the condition *)
-              output_expr)
+             | Some patterns, _ ->
+               let _ctx, else_ = loop patterns in
+               If { cond; then_ = output_expr; else_ }
+             | None, Some fallback ->
+               let else_ = fallback () in
+               If { cond; then_ = output_expr; else_ }
+             | None, None ->
+               (* This is the last case, so just elide the condition *)
+               output_expr)
         in
         ctx', output_expr'
       in
@@ -1082,8 +1090,8 @@ let rec type_get_function ~names typ =
   | Var _ | Tuple _ -> None
   | Type_app (type_name, _args) ->
     (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
-    | Alias alias -> type_get_function ~names alias
-    | Variants _ | Record _ | Abstract -> None)
+     | Alias alias -> type_get_function ~names alias
+     | Variants _ | Record _ | Abstract -> None)
   | Partial_function _ -> .
 ;;
 

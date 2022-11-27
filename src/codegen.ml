@@ -40,7 +40,6 @@ end = struct
           "Tried to add duplicate LLVM value definition" (name : Unique_name.t) (t : t)]
   ;;
 
-
   let find ({ local; existing } as t) ~(kind : [ `Function | `Unknown ]) name =
     match Hashtbl.find local name with
     | Some value -> value
@@ -156,12 +155,12 @@ let get_block_tag t value =
 
 let find_value t ~kind name =
   (* TODO: It would be nice to have something less hacky/special-cased for intrinsics,
-     and just deal with them like any other module.*)
+     and just deal with them like any other module. *)
   let intrinsic_value =
-    match Unique_name.base_name name |> Ustring.to_string with
-    | "%false" -> Some 0
-    | "%true" -> Some 1
-    | _ -> None
+    match Unique_name.base_name name |> Ustring.to_string |> String.lsplit2 ~on:'%' with
+    | Some (_, "false") -> Some 0
+    | Some (_, "true") -> Some 1
+    | None | Some _ -> None
   in
   match intrinsic_value with
   | None -> Value_table.find t.values ~kind name
