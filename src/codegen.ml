@@ -1,8 +1,6 @@
 open Import
 open Names
 
-let fun_call_name = "fun_call"
-
 let data_layout_string =
   (* See https://llvm.org/docs/LangRef.html#data-layout *)
   "i32:64-i64:64-p:64:64-f64:64"
@@ -65,14 +63,15 @@ type t =
   ; builder : Llvm.llbuilder
   ; module_ : Llvm.llmodule
   ; values : Value_table.t
+  ; literal_cache : Llvm.llvalue Literal.Table.t
   }
 
 module Tag = struct
   (* let no_scan = 0x8000 *)
-  let int = 0x8001
-  let char = 0x8002
-  let float = 0x8003
-  let string = 0x8004
+  let int = Mir.Cnstr.Tag.of_int 0x8001
+  let char = Mir.Cnstr.Tag.of_int 0x8002
+  let float = Mir.Cnstr.Tag.of_int 0x8003
+  let string = Mir.Cnstr.Tag.of_int 0x8004
 end
 
 let block_tag_type = Llvm.i16_type
@@ -88,17 +87,12 @@ let block_header_type t =
     let typ = Llvm.named_struct_type t.context name in
     Llvm.struct_set_body
       typ
-      [| block_tag_type t.context (* tag *); block_index_type t.context (* length *) |]
+      [| block_tag_type t.context (* tag *)
+       ; block_index_type t.context (* length *)
+       ; Llvm.i32_type t.context (* padding *)
+      |]
       false;
     typ)
-;;
-
-let const_block_header t ~tag ~len =
-  Llvm.const_named_struct
-    (block_header_type t)
-    [| Llvm.const_int (block_tag_type t.context) tag
-     ; Llvm.const_int (block_index_type t.context) len
-    |]
 ;;
 
 let block_type t =
@@ -115,38 +109,65 @@ let block_type t =
 (* TODO: If we use LLVM 15 it just has opaque pointers enabled by default, then we don't
    have to worry about pointer types. See https://llvm.org/docs/OpaquePointers.html. It
    looks like the OCaml bindings only support up to version 13, though. *)
-let block_pointer_type context = Llvm.pointer_type (block_type context)
-
-let constant_block t ~tag ~len constant_value =
-  let block_header = const_block_header t ~tag ~len in
-  Llvm.const_named_struct (block_type t) [| block_header; constant_value |]
-;;
-
-let codegen_literal t lit =
-  match (lit : Literal.t) with
-  | Int i ->
-    let type_ = Llvm.i64_type t.context in
-    constant_block t ~tag:Tag.int ~len:1 (Llvm.const_int type_ i)
-  | Float x ->
-    let type_ = Llvm.double_type t.context in
-    constant_block t ~tag:Tag.float ~len:1 (Llvm.const_float type_ x)
-  | Char c ->
-    let c = Uchar.to_int c in
-    let type_ = Llvm.i32_type t.context in
-    constant_block t ~tag:Tag.char ~len:1 (Llvm.const_int type_ c)
-  | String s ->
-    (* FIXME: Strings will need handling of the final word, similar to how OCaml does it *)
-    let s = Ustring.to_string s in
-    let len = String.length s in
-    constant_block t ~tag:Tag.string ~len (Llvm.const_string t.context s)
-;;
+let block_pointer_type = Llvm.pointer_type << block_type
 
 let codegen_constant_tag t tag =
-  Llvm.const_int (Llvm.integer_type t.context 63) (Mir.Cnstr.Tag.to_int tag)
+  (* Put the int63 into an int64 and make the bottom bit 1. *)
+  let int63_value = Mir.Cnstr.Tag.to_int tag |> Int64.of_int in
+  let int64_value = Int64.shift_left int63_value 1 |> Int64.( + ) Int64.one in
+  (* FIXME: What is this bool? *)
+  Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value true
 ;;
 
 let codegen_non_constant_tag t tag =
   Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr.Tag.to_int tag)
+;;
+
+let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
+
+let const_block_header t ~tag ~len =
+  Llvm.const_named_struct
+    (block_header_type t)
+    [| codegen_non_constant_tag t tag; codegen_block_len t len |]
+;;
+
+let constant_block t ~tag ~len ~name ~str constant_value =
+  let block_header = const_block_header t ~tag ~len in
+  let value = Llvm.const_named_struct (block_type t) [| block_header; constant_value |] in
+  let global_name = [%string "%{name}.%{str}"] in
+  let global = Llvm.define_global global_name value t.module_ in
+  Llvm.set_global_constant true global;
+  global
+;;
+
+let codegen_literal t literal =
+  Hashtbl.find_or_add t.literal_cache literal ~default:(fun () ->
+    match literal with
+    | Int i ->
+      let type_ = Llvm.i64_type t.context in
+      let str = Int.to_string i in
+      constant_block t ~tag:Tag.int ~len:1 ~name:"int" ~str (Llvm.const_int type_ i)
+    | Float x ->
+      let type_ = Llvm.double_type t.context in
+      let str = Float.to_string x in
+      constant_block t ~tag:Tag.float ~len:1 ~name:"float" ~str (Llvm.const_float type_ x)
+    | Char c ->
+      let str = Uchar.to_string c in
+      let c = Uchar.to_int c in
+      let type_ = Llvm.i32_type t.context in
+      constant_block t ~tag:Tag.char ~len:1 ~name:"char" ~str (Llvm.const_int type_ c)
+    | String s ->
+      (* FIXME: Strings will need handling of the final word, similar to how OCaml does it *)
+      let s = Ustring.to_string s in
+      let len = String.length s in
+      let str = [%string "%{String.prefix s 10}.%{String.hash s#Int}"] in
+      constant_block
+        t
+        ~tag:Tag.string
+        ~len
+        ~name:"string"
+        ~str
+        (Llvm.const_string t.context s))
 ;;
 
 let get_block_tag t value =
@@ -163,10 +184,8 @@ let find_value t ~kind name =
     | None | Some _ -> None
   in
   match intrinsic_value with
+  | Some i -> codegen_literal t (Int i)
   | None -> Value_table.find t.values ~kind name
-  | Some i ->
-    let type_ = Llvm.i64_type t.context in
-    constant_block t ~tag:Tag.int ~len:1 (Llvm.const_int type_ i)
 ;;
 
 let codegen_expr t expr =
@@ -181,9 +200,32 @@ let codegen_expr t expr =
       Value_table.add t.values name (codegen_expr t expr);
       codegen_expr t body
     | Fun_call (fun_name, args) ->
-      let fun_ = find_value t ~kind:`Function fun_name in
+      let fun_ =
+        let fun_value = find_value t ~kind:`Function fun_name in
+        match Llvm.classify_value fun_value with
+        | Function -> fun_value
+        | Argument ->
+          let arg_type = block_pointer_type t in
+          let fun_pointer_type =
+            Llvm.pointer_type
+              (Llvm.function_type
+                 arg_type
+                 (Array.create arg_type ~len:(Nonempty.length args)))
+          in
+          let fun_name = Unique_name.to_string fun_name in
+          Llvm.build_bitcast fun_value fun_pointer_type fun_name t.builder
+        | value_kind ->
+          compiler_bug
+            [%message
+              "Unexpected LLVM value kind for function"
+                (fun_name : Unique_name.t)
+                (value_kind : Llvm_sexp.Value_kind.t)]
+      in
+      (* let fun_pointer = 
+        Llvm.build_bitcast fun_value () "fun_call" t.builder
+      in *)
       let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
-      Llvm.build_call fun_ args fun_call_name t.builder
+      Llvm.build_call fun_ args "fun_call" t.builder
     | Make_block { tag; fields } ->
       if List.is_empty fields
       then codegen_constant_tag t tag
@@ -256,15 +298,58 @@ let codegen_expr t expr =
   and box ?(tag = Mir.Cnstr.Tag.default) t ~fields =
     (* TODO: Heap allocation. Also, GC. (Actually, for now, let's just try to plug in a
      conservative GC e.g. Boehm) *)
-    let block_header =
-      Llvm.const_named_struct
-        (block_header_type t)
-        [| codegen_non_constant_tag t tag
-         ; Llvm.const_int (block_index_type t.context) (List.length fields)
-        |]
+    (* FIXME: Need to call a function in the runtime to allocate. Let's try malloc and
+       just leak memory. *)
+    (* FIXME: Abstract over allocating a struct and filling in a bunch of fields.
+       We should also probably just generate one function that does this so the generated
+       IR isn't completely unreadable. *)
+    let block_field_num = List.length fields in
+    let heap_pointer =
+      Llvm.build_array_malloc
+        (Llvm.i64_type t.context)
+        (Llvm.const_int (Llvm.i32_type t.context) (block_field_num + 1))
+        "box"
+        t.builder
     in
-    let fields = Llvm.const_struct t.context (Array.of_list fields) in
-    Llvm.const_struct t.context [| block_header; fields |]
+    let heap_pointer_16 =
+      Llvm.build_bitcast
+        heap_pointer
+        (Llvm.pointer_type (Llvm.i16_type t.context))
+        "box"
+        t.builder
+    in
+    ignore
+      (Llvm.build_store (codegen_non_constant_tag t tag) heap_pointer_16 t.builder
+        : Llvm.llvalue);
+    ignore
+      (let heap_pointer =
+         Llvm.build_gep
+           heap_pointer_16
+           [| Llvm.const_int (Llvm.i64_type t.context) 1 |]
+           "box"
+           t.builder
+       in
+       Llvm.build_store (codegen_block_len t block_field_num) heap_pointer t.builder
+        : Llvm.llvalue);
+    List.iteri fields ~f:(fun i field_value ->
+      ignore
+        (let heap_pointer =
+           Llvm.build_bitcast
+             heap_pointer
+             (Llvm.pointer_type (block_pointer_type t))
+             "box"
+             t.builder
+         in
+         let heap_pointer =
+           Llvm.build_gep
+             heap_pointer
+             [| Llvm.const_int (Llvm.i64_type t.context) (i + 1) |]
+             "box"
+             t.builder
+         in
+         Llvm.build_store field_value heap_pointer t.builder
+          : Llvm.llvalue));
+    Llvm.build_bitcast heap_pointer (block_pointer_type t) "box" t.builder
   in
   codegen_expr t expr
 ;;
@@ -361,8 +446,16 @@ let create ~context ~source_filename ~values =
     Llvm.create_module context source_filename
   in
   Llvm.set_data_layout data_layout_string module_;
-  { context; builder = Llvm.builder context; module_; values }
+  { context
+  ; builder = Llvm.builder context
+  ; module_
+  ; values
+  ; literal_cache = Literal.Table.create ()
+  }
 ;;
+
+let to_string t = Llvm.string_of_llmodule t.module_
+let print t ~to_:file = Llvm.print_module file t.module_
 
 let of_mir_exn ~context ~source_filename ~values mir =
   let t = create ~context ~source_filename ~values in
@@ -370,6 +463,9 @@ let of_mir_exn ~context ~source_filename ~values mir =
   match Llvm_analysis.verify_module t.module_ with
   | None -> t
   | Some error ->
+    (* FIXME: remove writing to files *)
+    Out_channel.write_all "/tmp/llvm_error.txt" ~data:error;
+    Out_channel.write_all "/tmp/llvm_module.llvm" ~data:(to_string t);
     compiler_bug [%message "Llvm_analysis found invalid module" (error : string)]
 ;;
 
@@ -380,6 +476,3 @@ let of_mir ~context ~source_filename ~values mir =
     ~msg:[%message "LLVM codegen failed"]
     (fun () -> of_mir_exn ~context ~source_filename ~values mir)
 ;;
-
-let to_string t = Llvm.string_of_llmodule t.module_
-let print t ~to_:file = Llvm.print_module file t.module_
