@@ -30,10 +30,11 @@ module Name_entry = struct
     [@@deriving equal, sexp]
   end
 
+  (* TODO: Consider having this type be responsible for assigning/tracking unique names,
+     rather than doing it in the MIR. *)
   type t =
     { typ : Type_or_scheme.t
-    ; type_source : Type_source.t
-         [@default Type_source.Val_declared] [@sexp_drop_default.equal]
+    ; type_source : Type_source.t [@default Val_declared] [@sexp_drop_default.equal]
     ; fixity : Fixity.t option [@sexp.option]
     ; extern_name : Extern_name.t option [@sexp.option]
     }
@@ -294,24 +295,18 @@ let core =
           List.fold
             Intrinsics.Bool.cnstrs
             ~init:empty_bindings.names
-            ~f:(fun names cnstr ->
+            ~f:(fun names (cnstr_name, extern_name) ->
             Map.set
               names
-              ~key:(Value_name.of_cnstr_name cnstr)
+              ~key:(Value_name.of_cnstr_name cnstr_name)
               ~data:
-                (Local (Name_entry.val_declared (Type.Concrete.cast Intrinsics.Bool.typ))))
+                (Local
+                   (Name_entry.val_declared
+                      ~extern_name
+                      (Type.Concrete.cast Intrinsics.Bool.typ))))
       }
   }
 ;;
-
-(* TODO: remove if unused *)
-(*let merge_shadow t1 t2 =
-  let shadow ~key:_ _ x = x in
-  { names = Map.merge_skewed t1.names t2.names ~combine:shadow
-  ; types = Map.merge_skewed t1.types t2.types ~combine:shadow
-  ; modules = Map.merge_skewed t1.modules t2.modules ~combine:shadow
-  }
-;;*)
 
 let merge_no_shadow t1 t2 =
   let err to_ustring ~key:name = name_error_msg "Name clash" (to_ustring name) in

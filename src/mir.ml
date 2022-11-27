@@ -219,11 +219,15 @@ end = struct
 
   let find { names; name_bindings; _ } name =
     match Map.find names (Value_name.Qualified.to_ustring name) with
-    | Some _ as name -> name
+    | Some _ as name ->
+      name
     | None ->
       (match Name_bindings.find_entry name_bindings name with
       | exception Name_bindings.Name_error _ -> None
       | entry ->
+        (* TODO: Creating new unique names here means uses of imported names are
+           different in different files, which is weird. Maybe [Name_bindings] should be
+           responsible for assigning unique names for names in its own file? *)
         Name_bindings.Name_entry.extern_name entry
         |> Option.map ~f:(Unique_name.create << Extern_name.to_ustring))
   ;;
@@ -493,11 +497,13 @@ end
 
 module Expr = struct
   module Break_label : sig
-    type t [@@deriving sexp]
+    type t [@@deriving compare, equal, hash, sexp]
+
+    include Hashable.S with type t := t
 
     val make_creator_for_whole_expression : unit -> (unit -> t) Staged.t
   end = struct
-    type t = int [@@deriving sexp]
+    include Int
 
     let make_creator_for_whole_expression () =
       let counter = ref (-1) in
@@ -1112,13 +1118,13 @@ let of_typed_module =
   in
   let generate_variant_constructor_values ~ctx ~stmts decl =
     match Context.find_cnstr_info_from_decl ctx decl with
-    | None -> stmts
+    | None -> ctx, stmts
     | Some cnstr_info ->
-      Cnstr_info.fold cnstr_info ~init:stmts ~f:(fun stmts cnstr tag args ->
+      Cnstr_info.fold cnstr_info ~init:(ctx, stmts) ~f:(fun (ctx, stmts) cnstr tag args ->
         match cnstr with
-        | Tuple -> stmts
+        | Tuple -> ctx, stmts
         | Named cnstr_name ->
-          let _ctx, name =
+          let outer_ctx, name =
             Context.add_value_name ctx (Value_name.of_cnstr_name cnstr_name)
           in
           let stmt : Stmt.t =
@@ -1139,7 +1145,7 @@ let of_typed_module =
                       { tag; fields = List.map arg_names ~f:(fun name -> Expr.Name name) }
                 })
           in
-          stmt :: stmts)
+          outer_ctx, stmt :: stmts)
   in
   let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
@@ -1150,9 +1156,7 @@ let of_typed_module =
       | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
       (* TODO: Should probably preserve extern declarations *)
       | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
-        (* FIXME: Need to generate variant constructor values/functions *)
-        let stmts = generate_variant_constructor_values ~ctx ~stmts decl in
-        ctx, stmts
+        generate_variant_constructor_values ~ctx ~stmts decl
       | Common_def
           (Val _ | Extern _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
         -> ctx, stmts)

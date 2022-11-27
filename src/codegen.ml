@@ -40,6 +40,7 @@ end = struct
           "Tried to add duplicate LLVM value definition" (name : Unique_name.t) (t : t)]
   ;;
 
+
   let find ({ local; existing } as t) ~(kind : [ `Function | `Unknown ]) name =
     match Hashtbl.find local name with
     | Some value -> value
@@ -153,86 +154,120 @@ let get_block_tag t value =
   Llvm.build_gep value [| Llvm.const_int (block_index_type t.context) 0 |] "tag" t.builder
 ;;
 
-let rec codegen_expr t expr =
-  match (expr : Mir.Expr.t) with
-  | Primitive lit -> codegen_literal t lit
-  | Name name -> Value_table.find t.values ~kind:`Unknown name
-  | Let (name, expr, body) ->
-    (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
+let find_value t ~kind name =
+  (* TODO: It would be nice to have something less hacky/special-cased for intrinsics,
+     and just deal with them like any other module.*)
+  let intrinsic_value =
+    match Unique_name.base_name name |> Ustring.to_string with
+    | "%false" -> Some 0
+    | "%true" -> Some 1
+    | _ -> None
+  in
+  match intrinsic_value with
+  | None -> Value_table.find t.values ~kind name
+  | Some i ->
+    let type_ = Llvm.i64_type t.context in
+    constant_block t ~tag:Tag.int ~len:1 (Llvm.const_int type_ i)
+;;
+
+let codegen_expr t expr =
+  let break_labels = Mir.Expr.Break_label.Table.create () in
+  let rec codegen_expr t expr =
+    match (expr : Mir.Expr.t) with
+    | Primitive lit -> codegen_literal t lit
+    | Name name -> find_value t ~kind:`Unknown name
+    | Let (name, expr, body) ->
+      (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
        and maybe allow recursive lets too. (?) *)
-    Value_table.add t.values name (codegen_expr t expr);
-    codegen_expr t body
-  | Fun_call (fun_name, args) ->
-    let fun_ = Value_table.find t.values ~kind:`Function fun_name in
-    let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
-    Llvm.build_call fun_ args fun_call_name t.builder
-  | Make_block { tag; fields } ->
-    if List.is_empty fields
-    then codegen_constant_tag t tag
-    else (
-      let fields = List.map fields ~f:(codegen_expr t) in
-      box t ~tag ~fields)
-  | Get_block_field (i, expr) ->
-    Llvm.const_gep
-      (codegen_expr t expr)
-      [| Llvm.const_int (Llvm.i16_type t.context) (Mir.Block_index.to_int i + 1) |]
-  | If { cond; then_; else_ } ->
-    let cond = codegen_cond t cond in
-    let start_block = Llvm.insertion_block t.builder in
-    let current_fun = Llvm.block_parent start_block in
-    let make_child_block ~label expr =
-      let child_block = Llvm.append_block t.context label current_fun in
-      Llvm.position_at_end child_block t.builder;
-      let child_value = codegen_expr t expr in
-      (* Codegen in the child can create new basic blocks, so we have to update *)
-      let child_block = Llvm.insertion_block t.builder in
-      child_value, child_block
+      Value_table.add t.values name (codegen_expr t expr);
+      codegen_expr t body
+    | Fun_call (fun_name, args) ->
+      let fun_ = find_value t ~kind:`Function fun_name in
+      let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
+      Llvm.build_call fun_ args fun_call_name t.builder
+    | Make_block { tag; fields } ->
+      if List.is_empty fields
+      then codegen_constant_tag t tag
+      else (
+        let fields = List.map fields ~f:(codegen_expr t) in
+        box t ~tag ~fields)
+    | Get_block_field (i, expr) ->
+      Llvm.const_gep
+        (codegen_expr t expr)
+        [| Llvm.const_int (Llvm.i16_type t.context) (Mir.Block_index.to_int i + 1) |]
+    | If { cond; then_; else_ } ->
+      let cond = codegen_cond t cond in
+      let start_block = Llvm.insertion_block t.builder in
+      let current_fun = Llvm.block_parent start_block in
+      let make_child_block ~label expr =
+        let child_block = Llvm.append_block t.context label current_fun in
+        Llvm.position_at_end child_block t.builder;
+        let child_value = codegen_expr t expr in
+        (* Codegen in the child can create new basic blocks, so we have to update *)
+        let child_block = Llvm.insertion_block t.builder in
+        child_value, child_block
+      in
+      let ((_, then_block) as then_incoming) = make_child_block ~label:"then" then_ in
+      let ((_, else_block) as else_incoming) = make_child_block ~label:"else" else_ in
+      let merge_block = Llvm.append_block t.context "if_merge" current_fun in
+      Llvm.position_at_end merge_block t.builder;
+      let phi = Llvm.build_phi [ then_incoming; else_incoming ] "if_phi" t.builder in
+      (* Return to the start block to add the condition *)
+      Llvm.position_at_end start_block t.builder;
+      ignore (Llvm.build_cond_br cond then_block else_block t.builder : Llvm.llvalue);
+      (* Add unconditional jumps from the child blocks to the merge block *)
+      Llvm.position_at_end then_block t.builder;
+      ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
+      Llvm.position_at_end else_block t.builder;
+      ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
+      (* Finish *)
+      Llvm.position_at_end merge_block t.builder;
+      phi
+    | Catch { label; body; with_ } ->
+      (* FIXME: copied from make_child_block *)
+      let dest_block =
+        let start_block = Llvm.insertion_block t.builder in
+        let current_fun = Llvm.block_parent start_block in
+        let dest_block = Llvm.append_block t.context "" current_fun in
+        Llvm.position_at_end dest_block t.builder;
+        ignore (codegen_expr t with_ : Llvm.llvalue);
+        (* Codegen in the destination can create new basic blocks, so we have to update *)
+        let dest_block = Llvm.insertion_block t.builder in
+        dest_block
+      in
+      Hashtbl.add_exn break_labels ~key:label ~data:dest_block;
+      codegen_expr t body
+    | Break label ->
+      let dest_block = Hashtbl.find_exn break_labels label in
+      Llvm.build_br dest_block t.builder
+  and codegen_cond t cond =
+    let make_equals value value' =
+      (* FIXME: This isn't going to work through pointers, yeah? Need to dereference/gep *)
+      Llvm.build_icmp Eq value value' "equals" t.builder
     in
-    let ((_, then_block) as then_incoming) = make_child_block ~label:"then" then_ in
-    let ((_, else_block) as else_incoming) = make_child_block ~label:"else" else_ in
-    let merge_block = Llvm.append_block t.context "if_merge" current_fun in
-    Llvm.position_at_end merge_block t.builder;
-    let phi = Llvm.build_phi [ then_incoming; else_incoming ] "if_phi" t.builder in
-    (* Return to the start block to add the condition *)
-    Llvm.position_at_end start_block t.builder;
-    ignore (Llvm.build_cond_br cond then_block else_block t.builder : Llvm.llvalue);
-    (* Add unconditional jumps from the child blocks to the merge block *)
-    Llvm.position_at_end then_block t.builder;
-    ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
-    Llvm.position_at_end else_block t.builder;
-    ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
-    (* Finish *)
-    Llvm.position_at_end merge_block t.builder;
-    phi
-  | Catch _ | Break _ -> failwith "TODO: codgen catch/break"
-
-and codegen_cond t cond =
-  let make_equals value value' =
-    (* FIXME: This isn't going to work through pointers, yeah? Need to dereference/gep *)
-    Llvm.build_icmp Eq value value' "equals" t.builder
-  in
-  match cond with
-  | Equals (expr, lit) ->
-    (* FIXME: need to handle strings, chars, ints, floats, separately *)
-    make_equals (codegen_expr t expr) (codegen_literal t lit)
-  | Constant_tag_equals (expr, tag) ->
-    make_equals (codegen_expr t expr) (codegen_constant_tag t tag)
-  | Non_constant_tag_equals (expr, tag) ->
-    make_equals (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
-  | And _ -> failwith "TODO: And conditions"
-
-and box ?(tag = Mir.Cnstr.Tag.default) t ~fields =
-  (* TODO: Heap allocation. Also, GC. (Actually, for now, let's just try to plug in a
+    match cond with
+    | Equals (expr, lit) ->
+      (* FIXME: need to handle strings, chars, ints, floats, separately *)
+      make_equals (codegen_expr t expr) (codegen_literal t lit)
+    | Constant_tag_equals (expr, tag) ->
+      make_equals (codegen_expr t expr) (codegen_constant_tag t tag)
+    | Non_constant_tag_equals (expr, tag) ->
+      make_equals (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
+    | And _ -> failwith "TODO: And conditions"
+  and box ?(tag = Mir.Cnstr.Tag.default) t ~fields =
+    (* TODO: Heap allocation. Also, GC. (Actually, for now, let's just try to plug in a
      conservative GC e.g. Boehm) *)
-  let block_header =
-    Llvm.const_named_struct
-      (block_header_type t)
-      [| codegen_non_constant_tag t tag
-       ; Llvm.const_int (block_index_type t.context) (List.length fields)
-      |]
+    let block_header =
+      Llvm.const_named_struct
+        (block_header_type t)
+        [| codegen_non_constant_tag t tag
+         ; Llvm.const_int (block_index_type t.context) (List.length fields)
+        |]
+    in
+    let fields = Llvm.const_struct t.context (Array.of_list fields) in
+    Llvm.const_struct t.context [| block_header; fields |]
   in
-  let fields = Llvm.const_struct t.context (Array.of_list fields) in
-  Llvm.const_struct t.context [| block_header; fields |]
+  codegen_expr t expr
 ;;
 
 let codegen_stmt t stmt =

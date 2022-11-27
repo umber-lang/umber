@@ -20,8 +20,8 @@ let names = {|
 ((current_path "Std(d)")
  (toplevel
   ((names
-    ((True (Local ((typ (Scheme (Type_app Bool ()))))))
-     (False (Local ((typ (Scheme (Type_app Bool ()))))))))
+    ((True (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %true))))
+     (False (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %false))))))
    (types
     ((Int ((Local (() Abstract))))
      (Bool ((Local (() (Variants ((False ()) (True ())))))))

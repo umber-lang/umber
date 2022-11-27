@@ -287,7 +287,7 @@ end = struct
 end
 
 module Unique_name : sig
-  type t [@@deriving sexp_of]
+  type t [@@deriving sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t

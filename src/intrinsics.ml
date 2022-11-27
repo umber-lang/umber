@@ -18,7 +18,7 @@ end
 module type Variants = sig
   include Type
 
-  val cnstrs : Cnstr_name.t list
+  val cnstrs : (Cnstr_name.t * Extern_name.t) list
   val decl : Type.Decl.t
 end
 
@@ -28,8 +28,14 @@ module Make_variants (T : sig
 end) : Variants = struct
   let name = Type_name.of_string_unchecked T.name
   let typ = Type.Expr.Type_app (([], name), [])
-  let cnstrs = List.map T.cnstrs ~f:Cnstr_name.of_string_unchecked
-  let decl = [], Type.Decl.Variants (List.map cnstrs ~f:(fun name -> name, []))
+
+  let cnstrs =
+    List.map T.cnstrs ~f:(fun cnstr_name ->
+      ( Cnstr_name.of_string_unchecked cnstr_name
+      , Extern_name.of_string_exn [%string "%%{String.uncapitalize cnstr_name}"] ))
+  ;;
+
+  let decl = [], Type.Decl.Variants (List.map cnstrs ~f:(fun (name, _) -> name, []))
 end
 
 module type Abstract = Type
@@ -48,8 +54,11 @@ module Bool = struct
     let cnstrs = [ "False"; "True" ]
   end)
 
-  let false_ = [], List.hd_exn cnstrs
-  let true_ = [], List.nth_exn cnstrs 1
+  let false_, true_ =
+    match cnstrs with
+    | [ (false_, _); (true_, _) ] -> ([], false_), ([], true_)
+    | _ -> assert false
+  ;;
 end
 
 module Int = Make_abstract (struct
