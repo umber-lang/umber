@@ -575,6 +575,13 @@ module Expr = struct
         ; with_ : t
         }
     | Break of Break_label.t
+    (* FIXME: Can convert [If] to this *)
+    (* | Cond_assign of
+        { vars : Unique_name.t list
+        ; conds : (cond * t list) list
+        ; then_ : t
+        ; else_ : t
+        } *)
 
   and cond =
     (* TODO: In practice, the expressions in conditions have to be simple names. Maybe we
