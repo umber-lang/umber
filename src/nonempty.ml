@@ -137,6 +137,15 @@ let foldi t ~init ~f =
 
 let fold_until t = List.fold_until (to_list t)
 
+let fold_map_until (hd :: tl) ~init ~f : _ Fold_action.t =
+  match (f init hd : _ Fold_action.t) with
+  | Stop final -> Stop (final, [])
+  | Continue (acc, hd) ->
+    (match List.fold_map_until tl ~init:acc ~f with
+     | Stop (final, tl) -> Stop (final, hd :: tl)
+     | Continue (acc, tl) -> Continue (acc, hd :: tl))
+;;
+
 module Fold2_result = struct
   type nonrec ('a, 'b) t =
     | Left_trailing of 'a t
@@ -158,6 +167,12 @@ let fold2 xs ys ~init ~f =
 let fold2_exn xs ys ~init ~f = List.fold2_exn (to_list xs) (to_list ys) ~init ~f
 let iteri t ~f = foldi t ~init:() ~f:(fun i () x -> f i x)
 let iter2 xs ys ~f = fold2 xs ys ~init:() ~f:(fun () x y -> f x y) |> snd
+
+let split_last xs =
+  let (last :: rest) = rev xs in
+  List.rev rest, last
+;;
+
 let ( @ ) = append
 let is_empty _ = false
 let min_elt xs ~compare = List.min_elt (to_list xs) ~compare |> Option.value_exn

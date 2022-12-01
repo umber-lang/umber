@@ -1,6 +1,8 @@
 open Import
 open Names
 
+let ignore_value (_ : Llvm.llvalue) = ()
+
 let data_layout_string =
   (* See https://llvm.org/docs/LangRef.html#data-layout *)
   "i32:64-i64:64-p:64:64-f64:64"
@@ -193,7 +195,6 @@ let ptr_to_int t value =
 ;;
 
 let codegen_expr t expr =
-  let break_labels = Mir.Expr.Break_label.Table.create () in
   let rec codegen_expr t expr =
     match (expr : Mir.Expr.t) with
     | Primitive lit -> codegen_literal t lit
@@ -237,85 +238,102 @@ let codegen_expr t expr =
       Llvm.const_gep
         (codegen_expr t expr)
         [| Llvm.const_int (Llvm.i16_type t.context) (Mir.Block_index.to_int i + 1) |]
-    | If { cond; then_; else_ } ->
+    | Cond_assign { vars; conds; body; if_none_matched } ->
+      (* Problem: How do we assign multiple values conditionally? Phi nodes only
+         accept one value. We can't use multiple phi blocks because you lose the
+         predecessor information after the first one.
+         Some possible approaches:
+         1. Duplicate the conditions and re-check them to do each phi. This obviously
+            sucks.
+         2. Put the variables in a vector or array in the phi. Unclear what LLVM will do
+            with this (stack allocation?) and whether that's better or worse than other
+            options.
+         3. Use `select` instead of `phi`. This means we always do all of the GEPs, etc.
+            for each match arm. Maybe this is fine since they will always be simple/not
+            side-effecting, so it might not cause (much) duplicated work.
+            
+        For now I've gone with (2). *)
       let start_block = Llvm.insertion_block t.builder in
       let current_fun = Llvm.block_parent start_block in
-      let make_child_block ~label expr =
-        let child_block = Llvm.append_block t.context label current_fun in
-        Llvm.position_at_end child_block t.builder;
-        let child_value = codegen_expr t expr in
-        (* Codegen in the child can create new basic blocks, so we have to update *)
-        let child_block_end = Llvm.insertion_block t.builder in
-        child_block, child_value, child_block_end
-      in
-      let then_block_start, then_value, then_block_end =
-        make_child_block ~label:"then" then_
-      in
-      let else_block_start, else_value, else_block_end =
-        make_child_block ~label:"else" else_
-      in
-      let merge_block = Llvm.append_block t.context "if_merge" current_fun in
-      Llvm.position_at_end merge_block t.builder;
-      let phi =
-        Llvm.build_phi
-          [ then_value, then_block_end; else_value, else_block_end ]
-          "if_phi"
+      let num_vars = List.length vars in
+      (* Set up a phi block to receive the variable bindings as a vector. *)
+      let phi_block = Llvm.append_block t.context "cond_merge" current_fun in
+      Llvm.position_at_end phi_block t.builder;
+      let phi_value =
+        Llvm.build_empty_phi
+          (Llvm.vector_type (block_pointer_type t) num_vars)
+          "cond_bindings"
           t.builder
       in
-      (* Return to the start block to add the condition *)
-      Llvm.position_at_end start_block t.builder;
-      ignore
-        (Llvm.build_cond_br
-           (codegen_cond t cond)
-           then_block_start
-           else_block_start
-           t.builder
-          : Llvm.llvalue);
-      (* Add unconditional jumps from the child blocks to the merge block *)
-      Llvm.position_at_end then_block_end t.builder;
-      ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
-      Llvm.position_at_end else_block_end t.builder;
-      ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
-      (* Finish *)
-      Llvm.position_at_end merge_block t.builder;
-      phi
-    | Catch { label; body; with_ } ->
-      (* FIXME: Catch/break are way too complicated and don't work well with SSA. How is
-         the multiple assignment even going to work? I think we'd have to reverse-engineer
-         which variables are bound and convert them to phis. Let's just change the MIR.
-         New_idea: Cond_assign *)
-      let start_block = Llvm.insertion_block t.builder in
-      let current_fun = Llvm.block_parent start_block in
-      let dest_block = Llvm.append_block t.context "catch_dest" current_fun in
-      Hashtbl.add_exn break_labels ~key:label ~data:dest_block;
+      (* Extract all the variables out of the vector in the phi. *)
+      List.iteri vars ~f:(fun i var ->
+        ignore_value
+          (Llvm.build_extractelement
+             phi_value
+             (Llvm.const_int (Llvm.i64_type t.context) i)
+             (Unique_name.to_string var)
+             t.builder));
       let body_value = codegen_expr t body in
-      let body_block_end = Llvm.insertion_block t.builder in
-      Llvm.position_at_end dest_block t.builder;
-      let dest_value = codegen_expr t with_ in
-      let dest_block_end = Llvm.insertion_block t.builder in
-      (* FIXME: copy-pasted from if statements (making a phi) *)
-      let merge_block = Llvm.append_block t.context "catch_merge" current_fun in
-      Llvm.position_at_end merge_block t.builder;
-      let phi =
-        Llvm.build_phi
-          [ dest_value, dest_block_end; body_value, body_block_end ]
-          "catch_phi"
-          t.builder
+      let make_binding_block_and_br_to_phi bindings =
+        let binding_block = Llvm.append_block t.context "cond_binding" current_fun in
+        Llvm.position_at_end binding_block t.builder;
+        let binding_values =
+          List.map2_exn vars bindings ~f:(fun name expr ->
+            let value = codegen_expr t expr in
+            Llvm.set_value_name (Unique_name.to_string name) value;
+            value)
+        in
+        ignore_value (Llvm.build_br phi_block t.builder);
+        let binding_block_end = Llvm.insertion_block t.builder in
+        let binding_vector = Llvm.const_vector (List.to_array binding_values) in
+        Llvm.add_incoming (binding_vector, binding_block_end) phi_value;
+        binding_block
       in
-      (* Add unconditional jumps from the child blocks to the merge block *)
-      Llvm.position_at_end dest_block_end t.builder;
-      ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
-      Llvm.position_at_end body_block_end t.builder;
-      ignore (Llvm.build_br merge_block t.builder : Llvm.llvalue);
-      (* Finish *)
-      Llvm.position_at_end merge_block t.builder;
-      phi
-    | Break label ->
-      let dest_block = Hashtbl.find_exn break_labels label in
-      let br = Llvm.build_br dest_block t.builder in
-      (* FIXME: I just added this, does it make sense? *)
-      (* Llvm.position_at_end dest_block t.builder; *)
-      br
+      let conds =
+        (* Set up condition and binding blocks. Have the bindings go to the phi block. *)
+        Nonempty.map conds ~f:(fun (cond, bindings) ->
+          let cond_block = Llvm.append_block t.context "cond" current_fun in
+          Llvm.position_at_end cond_block t.builder;
+          let cond_value = codegen_cond t cond in
+          let cond_block_end = Llvm.insertion_block t.builder in
+          let binding_block = make_binding_block_and_br_to_phi bindings in
+          cond_value, cond_block, cond_block_end, binding_block)
+      in
+      (* Have each condition block branch and break to either its binding block or the
+         next condition block. The last condition block goes to the [if_none_matched]
+         case, which either goes to another arbitrary expression, or runs the body with a
+         final set of bindings. *)
+      let rec associate_conds = function
+        | [] -> ()
+        | [ (last_cond_value, _, last_cond_block_end, last_binding_block) ] ->
+          let if_none_matched_block =
+            match if_none_matched with
+            | Otherwise otherwise_expr ->
+              let otherwise_block =
+                Llvm.append_block t.context "cond_otherwise" current_fun
+              in
+              Llvm.position_at_end otherwise_block t.builder;
+              ignore_value (codegen_expr t otherwise_expr);
+              otherwise_block
+            | Use_bindings bindings -> make_binding_block_and_br_to_phi bindings
+          in
+          Llvm.position_at_end last_cond_block_end t.builder;
+          ignore_value
+            (Llvm.build_cond_br
+               last_cond_value
+               last_binding_block
+               if_none_matched_block
+               t.builder)
+        | (cond_value, _, current_cond_block_end, binding_block)
+          :: (_, next_cond_block_start, _, _)
+          :: _ as rest ->
+          Llvm.position_at_end current_cond_block_end t.builder;
+          ignore_value
+            (Llvm.build_cond_br cond_value binding_block next_cond_block_start t.builder);
+          associate_conds rest
+      in
+      associate_conds (Nonempty.to_list conds);
+      body_value
   and codegen_cond t cond =
     let make_equals value value' =
       (* FIXME: This isn't going to work through pointers, yeah? Need to dereference/gep *)
@@ -351,10 +369,9 @@ let codegen_expr t expr =
         "box"
         t.builder
     in
-    ignore
-      (Llvm.build_store (codegen_non_constant_tag t tag) heap_pointer_16 t.builder
-        : Llvm.llvalue);
-    ignore
+    ignore_value
+      (Llvm.build_store (codegen_non_constant_tag t tag) heap_pointer_16 t.builder);
+    ignore_value
       (let heap_pointer =
          Llvm.build_gep
            heap_pointer_16
@@ -362,10 +379,9 @@ let codegen_expr t expr =
            "box"
            t.builder
        in
-       Llvm.build_store (codegen_block_len t block_field_num) heap_pointer t.builder
-        : Llvm.llvalue);
+       Llvm.build_store (codegen_block_len t block_field_num) heap_pointer t.builder);
     List.iteri fields ~f:(fun i field_value ->
-      ignore
+      ignore_value
         (let heap_pointer =
            Llvm.build_bitcast
              heap_pointer
@@ -380,8 +396,7 @@ let codegen_expr t expr =
              "box"
              t.builder
          in
-         Llvm.build_store field_value heap_pointer t.builder
-          : Llvm.llvalue));
+         Llvm.build_store field_value heap_pointer t.builder));
     Llvm.build_bitcast heap_pointer (block_pointer_type t) "box" t.builder
   in
   codegen_expr t expr
@@ -412,7 +427,7 @@ let codegen_stmt t stmt =
     let entry_block = Llvm.entry_block fun_ in
     Llvm.position_at_end entry_block t.builder;
     let return_value = codegen_expr t body in
-    ignore (Llvm.build_ret return_value t.builder : Llvm.llvalue);
+    ignore_value (Llvm.build_ret return_value t.builder);
     (* TODO: see if we can use [verify_function] instead, so we don't abort on failure. *)
     (* FIXME: re-enable *)
     (* Llvm_analysis.assert_valid_function fun_; *)
@@ -492,7 +507,7 @@ let print t ~to_:file = Llvm.print_module file t.module_
 
 let of_mir_exn ~context ~source_filename ~values mir =
   let t = create ~context ~source_filename ~values in
-  List.iter mir ~f:(ignore << codegen_stmt t);
+  List.iter mir ~f:(ignore_value << codegen_stmt t);
   match Llvm_analysis.verify_module t.module_ with
   | None -> t
   | Some error ->

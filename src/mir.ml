@@ -312,6 +312,7 @@ module Simple_pattern : sig
 
   val flatten_typed_pattern : Typed.Pattern.t -> t Nonempty.t
   val flatten_typed_pattern_no_unions : Typed.Pattern.t -> label:string -> t
+  val names : t -> Value_name.Set.t
 
   module Coverage : sig
     type simple_pattern = t
@@ -334,6 +335,17 @@ end = struct
     | As of t * Value_name.t
     | Cnstr_appl of Cnstr.t * t list
   [@@deriving sexp, variants]
+
+  let names =
+    let rec loop acc t =
+      match t with
+      | Constant _ | Catch_all None -> acc
+      | Catch_all (Some name) -> Set.add acc name
+      | As (t, name) -> loop (Set.add acc name) t
+      | Cnstr_appl (_, ts) -> List.fold ts ~init:acc ~f:loop
+    in
+    fun t -> loop Value_name.Set.empty t
+  ;;
 
   (* TODO: remove *)
   (*let tuple_cnstr_name arity = Cnstr_name.of_string_unchecked (sprintf "Tuple/%d" arity)
@@ -504,23 +516,6 @@ end = struct
 end
 
 module Expr = struct
-  module Break_label : sig
-    type t [@@deriving compare, equal, hash, sexp]
-
-    include Hashable.S with type t := t
-
-    val make_creator_for_whole_expression : unit -> (unit -> t) Staged.t
-  end = struct
-    include Int
-
-    let make_creator_for_whole_expression () =
-      let counter = ref (-1) in
-      stage (fun () ->
-        incr counter;
-        !counter)
-    ;;
-  end
-
   (* TODO: can put tags in the pointer to the block e.g. constructor tag,
      see https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/haskell-execution/pointer-tagging
      GHC uses 3 bits (on 64-bit architectures) to store up to 7 constructors (0-6). 
@@ -553,35 +548,12 @@ module Expr = struct
         ; fields : t list [@sexp.omit_nil]
         }
     | Get_block_field of Block_index.t * t
-    | If of
-        { cond : cond
-        ; then_ : t
-        ; else_ : t
-        }
-    (* TODO: enforce that all switch cases have the same type + support switch on blocks
-       - actually I'm not sure if this makes sense - variants will have different
-         Value_kinds e.g. Int64 vs Block *)
-    (*| Switch of
-        { expr : t
-        ; cases : (Literal.t Nonempty.t * t) Nonempty.t
-        ; default : t option
-        }*)
-    (* TODO: Apparently catch/exit can pass bindings around? Is it basically a function
-       call at that point? Note: we could just have bindings that go through the exit 
-       - do llvm bindings work like this? *)
-    | Catch of
-        { label : Break_label.t
+    | Cond_assign of
+        { vars : Unique_name.t list [@sexp.omit_nil]
+        ; conds : (cond * (t list[@sexp.omit_nil])) Nonempty.t
         ; body : t
-        ; with_ : t
+        ; if_none_matched : cond_if_none_matched
         }
-    | Break of Break_label.t
-    (* FIXME: Can convert [If] to this *)
-    (* | Cond_assign of
-        { vars : Unique_name.t list
-        ; conds : (cond * t list) list
-        ; then_ : t
-        ; else_ : t
-        } *)
 
   and cond =
     (* TODO: In practice, the expressions in conditions have to be simple names. Maybe we
@@ -590,6 +562,10 @@ module Expr = struct
     | Constant_tag_equals of t * Cnstr.Tag.t
     | Non_constant_tag_equals of t * Cnstr.Tag.t
     | And of cond * cond
+
+  and cond_if_none_matched =
+    | Otherwise of t
+    | Use_bindings of t list
   [@@deriving sexp_of]
 
   module Fun_def = struct
@@ -605,10 +581,11 @@ module Expr = struct
   (* TODO: consider merging making bindings with making conditions. If we extended
      [Coverage.t] to include some notion of what conditions have been tested as well, it
      could help us avoid unnecessary checks. *)
-  (* TODO: I think this should probably just collect the bindings into a list and give
-     them to you - I think most of the uses do this anyway. We could also try to do
-     clever stuff like noticing if a pattern binds only the empty name and no "real"
-     names, and then returning no bindings. *)
+
+  (** [fold_pattern_bindings] folds over the variable bindings formed by a pattern
+      associated with an expression. The expression must be given as a name previously
+      bound in [ctx] since nested bindings duplicate references to it, and if we allowed
+      any expresion, it could duplicate arbitrary amounts of work. *)
   let fold_pattern_bindings =
     let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
       match (pat : Simple_pattern.t) with
@@ -624,26 +601,28 @@ module Expr = struct
         let acc = add_let acc name mir_expr in
         loop ~ctx ~add_let ~add_name acc pattern (Name name) type_
       | Cnstr_appl (cnstr, args) ->
-        let ctx, name, acc =
-          match mir_expr with
-          | Name name -> ctx, name, acc
-          | _ ->
-            (* When adding an empty name, this should always create a new entry in the
-               context, so we bypass `add_name`. *)
-            let ctx, name = Context.add_value_name ctx Constant_names.empty in
-            let acc = add_let acc name mir_expr in
-            ctx, name, acc
-        in
         let cnstr_info = Context.find_cnstr_info ctx type_ in
         List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
           let arg_index = Block_index.of_int i in
           let arg_type = Cnstr_info.arg_type cnstr_info cnstr arg_index in
-          let arg_expr = Get_block_field (arg_index, Name name) in
+          let arg_expr = Get_block_field (arg_index, mir_expr) in
           loop ~ctx ~add_let ~add_name acc arg arg_expr arg_type)
       | Constant _ -> ctx, acc
     in
-    fun ?(add_name = Context.add_value_name) ~ctx ~init ~add_let pat mir_expr type_ ->
-      loop ~ctx ~add_let ~add_name init pat mir_expr type_
+    fun ?(add_name = Context.add_value_name) ~ctx ~init:acc ~add_let pat expr_name type_ ->
+      loop ~ctx ~add_let ~add_name acc pat (Name expr_name) type_
+  ;;
+
+  let convert_expr_to_name ~ctx ~default ~add_let mir_expr =
+    let ctx, value, expr_name =
+      match mir_expr with
+      | Name expr_name -> ctx, default, expr_name
+      | _ ->
+        let ctx_for_body, expr_name = Context.add_value_name ctx Constant_names.empty in
+        let acc = add_let expr_name mir_expr in
+        ctx_for_body, acc, expr_name
+    in
+    ctx, value, expr_name
   ;;
 
   let rec condition_of_pattern ~ctx ~input_expr ~input_type pattern =
@@ -778,10 +757,17 @@ module Expr = struct
         process_expr acc ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
       in
       let add_name ctx name = ctx, Context.find_value_name ctx ([], name) in
+      let ctx_for_body, acc, expr_name =
+        convert_expr_to_name
+          ~ctx:ctx_for_body
+          ~default:acc
+          ~add_let:(add_let acc)
+          mir_expr
+      in
       fold_pattern_bindings
         ~ctx:ctx_for_body
         pat'
-        mir_expr
+        expr_name
         typ
         ~init:acc
         ~add_let
@@ -795,7 +781,6 @@ module Expr = struct
     outer_expr
     outer_type
     =
-    let create_break_label = unstage (Break_label.make_creator_for_whole_expression ()) in
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match (expr : Type.Scheme.t Typed.Expr.t), (expr_type : Type.Scheme.t) with
       | Literal lit, _ -> Primitive lit
@@ -811,7 +796,7 @@ module Expr = struct
           in
           match fun_ with
           | Name fun_name -> Fun_call (fun_name, args)
-          | Let _ | Fun_call _ | Get_block_field _ | If _ | Catch _ | Break _ ->
+          | Let _ | Fun_call _ | Get_block_field _ | Cond_assign _ ->
             let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
             Let (fun_name, fun_, Fun_call (fun_name, args))
           | Primitive _ | Make_block _ ->
@@ -893,9 +878,8 @@ module Expr = struct
              | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
                let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
                let add_let acc name mir_expr = (name, mir_expr) :: acc in
-               let mir_expr = Name arg_name in
                let ctx, bindings =
-                 fold_pattern_bindings ~ctx arg mir_expr arg_type ~init:bindings ~add_let
+                 fold_pattern_bindings ~ctx arg arg_name arg_type ~init:bindings ~add_let
                in
                (ctx, bindings), arg_name)
       in
@@ -958,7 +942,7 @@ module Expr = struct
           ~input_type
           ~output_expr
           ~output_type
-          ?fallback
+          ~fallback
           patterns
       and loop ~coverage = function
         | [] ->
@@ -981,50 +965,92 @@ module Expr = struct
       ~input_type
       ~output_expr
       ~output_type
-      ?fallback
+      ~fallback
       patterns
       =
-      let label = create_break_label () in
-      let rec loop Nonempty.(pattern :: patterns) =
-        let add_let bindings name expr = (name, expr) :: bindings in
-        let ctx', bindings =
-          fold_pattern_bindings ~ctx pattern input_expr input_type ~init:[] ~add_let
-        in
-        (* TODO: this should skip underscore bindings (bindings for no actual variables) *)
-        let output_expr = add_let_bindings ~bindings ~body:(Break label) in
-        let output_expr' =
-          match condition_of_pattern ~ctx ~input_expr ~input_type pattern with
-          | None ->
-            (* TODO: warn about unused patterns (the other arms) *)
-            output_expr
-          | Some cond ->
-            (match Nonempty.of_list patterns, fallback with
-             | Some patterns, _ ->
-               let _ctx, else_ = loop patterns in
-               If { cond; then_ = output_expr; else_ }
-             | None, Some fallback ->
-               let else_ = fallback () in
-               If { cond; then_ = output_expr; else_ }
-             | None, None ->
-               (* This is the last case, so just elide the condition *)
-               output_expr)
-        in
-        ctx', output_expr'
+      let ctx, vars =
+        List.fold_map
+          (Simple_pattern.names (Nonempty.hd patterns) |> Set.to_list)
+          ~init:ctx
+          ~f:Context.add_value_name
       in
-      (* NOTE: All patterns in a union must bind the same names with the same types, so we
-         can use any one of the [Context.t]s to create the output expression as they will
-         all be equivalent. *)
-      let ctx, body = loop patterns in
-      (* TODO: if there is only one pattern, we could skip the catch/break.
-         (pass in a function to create the output_expr) *)
-      Catch { label; body; with_ = of_typed_expr ~ctx output_expr output_type }
+      let ctx, wrapping_binding, input_expr_name =
+        convert_expr_to_name
+          ~ctx
+          ~default:None
+          ~add_let:(fun name expr -> Some (name, expr))
+          input_expr
+      in
+      let body = of_typed_expr ~ctx output_expr output_type in
+      let fold_result =
+        Nonempty.fold_map_until ~init:() patterns ~f:(fun () pattern ->
+          (* TODO: this should skip underscore bindings (bindings for no actual variables) *)
+          let cond = condition_of_pattern ~ctx ~input_expr ~input_type pattern in
+          let (_ : Context.t), bindings =
+            (* Names are pre-added to the context above so they get the same unique names
+               in different patterns. *)
+            let add_name ctx name = ctx, Context.find_value_name ctx ([], name) in
+            let add_let bindings name expr = (name, expr) :: bindings in
+            fold_pattern_bindings
+              ~ctx
+              pattern
+              input_expr_name
+              input_type
+              ~init:[]
+              ~add_let
+              ~add_name
+          in
+          let bindings =
+            (* Bindings must be sorted by their names to match up with [vars] above. This
+               relies on the [Value_name.t]s and [Unique_name.t]s having the same ordering
+               due to the former being a prefix of the latter. *)
+            List.sort bindings ~compare:[%compare: Unique_name.t * _] |> List.map ~f:snd
+          in
+          match cond with
+          | None ->
+            (* TODO: warn about unused patterns (the rest of the patterns and following
+               arms) *)
+            Stop bindings
+          | Some cond -> Continue ((), (cond, bindings)))
+      in
+      let add_last_unconditional_bindings ~conds ~last_bindings =
+        match Nonempty.of_list conds with
+        | Some conds ->
+          Cond_assign { vars; conds; body; if_none_matched = Use_bindings last_bindings }
+        | None ->
+          (* FIXME: bug *)
+          (* If there are no other conditions, the result doesn't need [Cond_assign] and
+             can be a regular unconditional expression. *)
+          List.fold2_exn vars last_bindings ~init:body ~f:(fun acc name expr ->
+            Let (name, expr, acc))
+      in
+      let result_expr =
+        match fold_result, fallback with
+        | Continue ((), conds), Some fallback ->
+          (* Didn't hit an unconditional pattern; fallback to later match arms. *)
+          Cond_assign { vars; conds; body; if_none_matched = Otherwise (fallback ()) }
+        | Continue ((), conds), None ->
+          (* Didn't hit an unconditional pattern, but this is the last match arm. Due to
+           separate checks in [Simple_pattern.Coverage] we know the pattern is exhaustive,
+           so we can elide the last condition. *)
+          (* FIXME: elide the last condition *)
+          let conds, ((_ : cond), last_bindings) = Nonempty.split_last conds in
+          add_last_unconditional_bindings ~conds ~last_bindings
+        | Stop (last_bindings, conds), _ ->
+          (* Found an unconditional pattern. *)
+          (* TODO: Warn if [fallback] is [Some], since we ignoring following match arms. *)
+          add_last_unconditional_bindings ~conds ~last_bindings
+      in
+      match wrapping_binding with
+      | None -> result_expr
+      | Some (name, expr) -> Let (name, expr, result_expr)
     in
     of_typed_expr ~just_bound:outer_just_bound ~ctx:outer_ctx outer_expr outer_type
   ;;
 
   let rec map_names expr ~f =
     match expr with
-    | Primitive _ | Break _ -> expr
+    | Primitive _ -> expr
     | Name name -> Name (f name)
     | Let (name, expr, body) ->
       let name = f name in
@@ -1039,15 +1065,17 @@ module Expr = struct
       let fields = List.map fields ~f:(map_names ~f) in
       Make_block { tag; fields }
     | Get_block_field (i, expr) -> Get_block_field (i, map_names expr ~f)
-    | If { cond; then_; else_ } ->
-      let cond = map_cond_names cond ~f in
-      let then_ = map_names then_ ~f in
-      let else_ = map_names else_ ~f in
-      If { cond; then_; else_ }
-    | Catch { label; body; with_ } ->
+    | Cond_assign { vars; conds; body; if_none_matched } ->
+      let vars = List.map vars ~f in
+      let conds =
+        Nonempty.map conds ~f:(fun (cond, bindings) ->
+          let cond = map_cond_names cond ~f in
+          let bindings = List.map bindings ~f:(map_names ~f) in
+          cond, bindings)
+      in
       let body = map_names body ~f in
-      let with_ = map_names with_ ~f in
-      Catch { label; body; with_ }
+      let if_none_matched = map_if_none_matched_names if_none_matched ~f in
+      Cond_assign { vars; conds; body; if_none_matched }
 
   and map_cond_names cond ~f =
     match cond with
@@ -1059,6 +1087,11 @@ module Expr = struct
       let cond = map_cond_names cond ~f in
       let cond' = map_cond_names cond' ~f in
       And (cond, cond')
+
+  and map_if_none_matched_names if_none_matched ~f =
+    match if_none_matched with
+    | Otherwise expr -> Otherwise (map_names expr ~f)
+    | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map_names ~f))
   ;;
 end
 

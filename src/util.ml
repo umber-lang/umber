@@ -57,6 +57,12 @@ module List : sig
     -> init:'acc
     -> f:('acc -> 'a -> ('acc, 'final) Fold_action.t)
     -> ('acc, 'final) Fold_action.t
+
+  val fold_map_until
+    :  'a t
+    -> init:'acc
+    -> f:('acc -> 'a -> ('acc * 'b, 'final) Fold_action.t)
+    -> ('acc * 'b t, 'final * 'b t) Fold_action.t
 end = struct
   include List
 
@@ -83,6 +89,17 @@ end = struct
     | x :: xs ->
       let%bind.Fold_action init = f init x in
       fold_until xs ~init ~f
+  ;;
+
+  let fold_map_until list ~init ~f : _ Fold_action.t =
+    match
+      fold_until list ~init:(init, []) ~f:(fun (acc, xs) x ->
+        match (f acc x : _ Fold_action.t) with
+        | Continue (acc, x) -> Continue (acc, x :: xs)
+        | Stop final -> Stop (final, xs))
+    with
+    | Continue (acc, xs) -> Continue (acc, List.rev xs)
+    | Stop (final, xs) -> Stop (final, List.rev xs)
   ;;
 end
 
