@@ -43,11 +43,16 @@ and ('pat, 'expr) def =
 
 (* TODO: probably move this somewhere else, like Parsing *)
 let with_filename (_, sigs, defs) filename =
+  let basename = Filename.basename filename in
   let module_name =
-    Filename.basename filename
-    |> Filename.split_extension
-    |> fst
-    |> Module_name.of_string_lenient_exn
+    try Filename.split_extension basename |> fst |> Module_name.of_string_lenient_exn with
+    | exn ->
+      (* TODO: This is a bit silly/hacky. Maybe we should have an interpreter that can
+         compile things on the fly instead. *)
+      (* Handle stuff like /dev/fd/N for debugging *)
+      if String.equal (Filename.dirname filename) "/dev/fd"
+      then Module_name.of_string_lenient_exn [%string "Devfd%{basename}"]
+      else raise exn
   in
   module_name, sigs, defs
 ;;

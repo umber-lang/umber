@@ -78,13 +78,7 @@ module Identified_ustring (V : Name_validator) : Name = struct
 end
 
 module Lower_name = Identified_ustring (struct
-  let coerce lexbuf =
-    match Lex_helpers.lex_lower_name lexbuf with
-    | Some name -> Ok name
-    | None ->
-      let input = Sedlexing.Utf8.lexeme lexbuf in
-      error_s [%message "Invalid lower name" input]
-  ;;
+  let coerce = Lex_helpers.lex_lower_name
 
   let coerce_lenient str =
     (* TODO: add proper unicode capitalization to lower name/upper name checking *)
@@ -93,14 +87,7 @@ module Lower_name = Identified_ustring (struct
 end)
 
 module Upper_name = Identified_ustring (struct
-  let coerce lexbuf =
-    match Lex_helpers.lex_upper_name lexbuf with
-    | Some name -> Ok name
-    | None ->
-      let input = Sedlexing.Utf8.lexeme lexbuf in
-      error_s [%message "Invalid upper name" input]
-  ;;
-
+  let coerce lexbuf = Lex_helpers.lex_upper_name lexbuf
   let coerce_lenient str = String.capitalize str |> Sedlexing.Utf8.from_string |> coerce
 end)
 

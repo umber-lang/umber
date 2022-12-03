@@ -443,8 +443,8 @@ define %umber_block* @Std.Prelude.Operators...27(%umber_block* %Std.Prelude.Oper
 entry:
   %Std.Prelude.Operators.f.281 = bitcast %umber_block* %Std.Prelude.Operators.f.28 to %umber_block* (%umber_block*)*
   %Std.Prelude.Operators.g.292 = bitcast %umber_block* %Std.Prelude.Operators.g.29 to %umber_block* (%umber_block*)*
-  %fun_call = call %umber_block* %Std.Prelude.Operators.g.292(%umber_block* %Std.Prelude.Operators.x.30)
-  %fun_call3 = call %umber_block* %Std.Prelude.Operators.f.281(%umber_block* %fun_call)
+  %fun_call = tail call %umber_block* %Std.Prelude.Operators.g.292(%umber_block* %Std.Prelude.Operators.x.30)
+  %fun_call3 = tail call %umber_block* %Std.Prelude.Operators.f.281(%umber_block* %fun_call)
   ret %umber_block* %fun_call3
 }
 
@@ -520,7 +520,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
 define %umber_block* @"Std.Prelude.Operators.|>.40"(%umber_block* %Std.Prelude.Operators.x.41, %umber_block* %Std.Prelude.Operators.f.42) {
 entry:
   %Std.Prelude.Operators.f.421 = bitcast %umber_block* %Std.Prelude.Operators.f.42 to %umber_block* (%umber_block*)*
-  %fun_call = call %umber_block* %Std.Prelude.Operators.f.421(%umber_block* %Std.Prelude.Operators.x.41)
+  %fun_call = tail call %umber_block* %Std.Prelude.Operators.f.421(%umber_block* %Std.Prelude.Operators.x.41)
   ret %umber_block* %fun_call
 }
 

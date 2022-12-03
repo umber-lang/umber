@@ -21,7 +21,7 @@ let should_make_mir test =
 let no_llvm_tests = [ "AsPattern" (* closures *) ]
 
 let should_make_llvm test =
-  false && should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
+  should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
 ;;
 
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =

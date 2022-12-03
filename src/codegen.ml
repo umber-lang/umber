@@ -62,11 +62,15 @@ end
 
 type t =
   { context : Llvm.llcontext
-  ; builder : Llvm.llbuilder
   ; module_ : Llvm.llmodule
+  ; builder : Llvm.llbuilder
   ; values : Value_table.t
   ; literal_cache : Llvm.llvalue Literal.Table.t
+  ; main_function_builder : Llvm.llbuilder Lazy.t
   }
+
+let to_string t = Llvm.string_of_llmodule t.module_
+let print t ~to_:file = Llvm.print_module file t.module_
 
 module Tag = struct
   (* let no_scan = 0x8000 *)
@@ -207,7 +211,7 @@ let codegen_expr t expr =
     | Name name -> find_value t ~kind:`Unknown name
     | Let (name, expr, body) ->
       (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
-       and maybe allow recursive lets too. (?) *)
+         and maybe allow recursive lets too. (?) *)
       Value_table.add t.values name (codegen_expr t expr);
       codegen_expr t body
     | Fun_call (fun_name, args) ->
@@ -233,13 +237,15 @@ let codegen_expr t expr =
                 (value_kind : Llvm_sexp.Value_kind.t)]
       in
       let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
-      Llvm.build_call fun_ args "fun_call" t.builder
+      let call = Llvm.build_call fun_ args "fun_call" t.builder in
+      Llvm.set_tail_call true call;
+      call
     | Make_block { tag; fields } ->
-      if List.is_empty fields
-      then codegen_constant_tag t tag
-      else (
-        let fields = List.map fields ~f:(codegen_expr t) in
-        box t ~tag ~fields)
+      (match Nonempty.of_list fields with
+       | None -> codegen_constant_tag t tag
+       | Some fields ->
+         let fields = Nonempty.map fields ~f:(codegen_expr t) in
+         box t ~tag ~fields)
     | Get_block_field (i, expr) ->
       Llvm.const_gep
         (codegen_expr t expr)
@@ -371,26 +377,27 @@ let codegen_expr t expr =
       in
       associate_conds conds
   and codegen_cond t cond =
-    let make_equals value value' =
-      (* FIXME: This isn't going to work through pointers, yeah? Need to dereference/gep *)
+    let make_icmp value value' =
       Llvm.build_icmp Eq (ptr_to_int t value) (ptr_to_int t value') "equals" t.builder
     in
     match cond with
-    | Equals (expr, lit) ->
+    | Equals (expr, literal) ->
       (* FIXME: need to handle strings, chars, ints, floats, separately *)
-      make_equals (codegen_expr t expr) (codegen_literal t lit)
+      let expr_value = codegen_expr t expr in
+      let literal_value = codegen_literal t literal in
+      (match literal with
+       | Int _ | Char _ -> make_icmp expr_value literal_value
+       | Float _ -> Llvm.build_fcmp Oeq expr_value literal_value "equals" t.builder
+       | String _ -> failwith "TODO: string equality in patterns")
     | Constant_tag_equals (expr, tag) ->
-      make_equals (codegen_expr t expr) (codegen_constant_tag t tag)
+      make_icmp (codegen_expr t expr) (codegen_constant_tag t tag)
     | Non_constant_tag_equals (expr, tag) ->
-      make_equals (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
+      make_icmp (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
     | And _ -> failwith "TODO: And conditions"
   and box ?(tag = Mir.Cnstr.Tag.default) t ~fields =
     (* TODO: Use GC instead of leaking memory. For now, let's just try to plug in a
        conservative GC e.g. Boehm. *)
-    (* FIXME: Abstract over allocating a struct and filling in a bunch of fields.
-       We should also probably just generate one function that does this so the generated
-       IR isn't completely unreadable. *)
-    let block_field_num = List.length fields in
+    let block_field_num = Nonempty.length fields in
     let heap_pointer =
       Llvm.build_array_malloc
         (Llvm.i64_type t.context)
@@ -415,7 +422,7 @@ let codegen_expr t expr =
            t.builder
        in
        Llvm.build_store (codegen_block_len t block_field_num) heap_pointer t.builder);
-    List.iteri fields ~f:(fun i field_value ->
+    Nonempty.iteri fields ~f:(fun i field_value ->
       ignore_value
         (let heap_pointer =
            Llvm.build_bitcast
@@ -440,12 +447,23 @@ let codegen_expr t expr =
 let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
-    let value =
-      Llvm.define_global (Unique_name.to_string name) (codegen_expr t expr) t.module_
+    (* FIXME: Can't put code at toplevel, maybe jam it in a main function? It seems like
+       initializers can only be const expressions. The other option would be splitting
+       things by whether they are const or not. *)
+    let global_value =
+      Llvm.declare_global (block_pointer_type t) (Unique_name.to_string name) t.module_
     in
-    Llvm.set_global_constant true value;
-    Value_table.add t.values name value;
-    value
+    let main_function_builder = force t.main_function_builder in
+    Llvm.position_at_end (Llvm.insertion_block main_function_builder) t.builder;
+    let expr_value = codegen_expr t expr in
+    Llvm.position_at_end (Llvm.insertion_block t.builder) main_function_builder;
+    if Llvm.is_constant expr_value
+    then (
+      Llvm.set_global_constant true global_value;
+      Llvm.set_initializer expr_value global_value)
+    else ignore_value (Llvm.build_store expr_value global_value main_function_builder);
+    Value_table.add t.values name global_value;
+    global_value
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
     then raise_s [%message "TODO: closures" (closed_over : Unique_name.Set.t)];
@@ -468,58 +486,6 @@ let codegen_stmt t stmt =
     fun_
 ;;
 
-(* FIXME: remove *)
-(* TODO: Do this as less of a hack. We should be able to treat the prelude basically like
-   importing any other file. *)
-(* NOTE: This function only works for the subset of the prelude we need. *)
-(* let llvm_type_of_type_scheme t scheme =
-  match (scheme : Type.Scheme.t) with
-  | Type_app _ | Var _ | Tuple _ -> block_pointer_type t
-  | Function (arg_types, _) ->
-    let type_ = block_pointer_type t in
-    Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length arg_types))
-  | Partial_function _ -> .
-;;
-
-let add_prelude t =
-  Name_bindings.fold_local_names
-    (force Name_bindings.std_prelude)
-    ~init:t
-    ~f:(fun t name name_entry ->
-    let name = Value_name.Qualified.to_ustring name in
-    let extern_name =
-      match Name_bindings.Name_entry.extern_name name_entry with
-      | Some extern_name -> Extern_name.to_ustring extern_name
-      | None -> name
-    in
-    let name = Unique_name.create name in
-    match Name_bindings.Name_entry.scheme name_entry with
-    | None ->
-      compiler_bug
-        [%message
-          "Missing type scheme on Prelude name entry"
-            (name_entry : Name_bindings.Name_entry.t)]
-    | Some scheme ->
-      let is_function =
-        match scheme with
-        | Function _ -> true
-        | _ -> false
-      in
-      let type_ = llvm_type_of_type_scheme t scheme in
-      let value =
-        if is_function
-        then Llvm.declare_function (Ustring.to_string extern_name) type_ t.module_
-        else (
-          let global =
-            Llvm.declare_global type_ (Ustring.to_string extern_name) t.module_
-          in
-          Llvm.set_global_constant true global;
-          global)
-      in
-      Value_table.add t.values name value;
-      t)
-;; *)
-
 let create ~context ~source_filename ~values =
   let module_ =
     (* TODO: need to manually free modules and possibly other things: see e.g.
@@ -527,24 +493,38 @@ let create ~context ~source_filename ~values =
     Llvm.create_module context source_filename
   in
   Llvm.set_data_layout data_layout_string module_;
+  let main_function_builder =
+    lazy
+      (let main_function_builder = Llvm.builder context in
+       let main_function =
+         Llvm.define_function
+           "main"
+           (Llvm.function_type (Llvm.void_type context) [||])
+           module_
+       in
+       Llvm.position_at_end (Llvm.entry_block main_function) main_function_builder;
+       main_function_builder)
+  in
   { context
   ; builder = Llvm.builder context
   ; module_
   ; values
   ; literal_cache = Literal.Table.create ()
+  ; main_function_builder
   }
 ;;
-
-let to_string t = Llvm.string_of_llmodule t.module_
-let print t ~to_:file = Llvm.print_module file t.module_
 
 let of_mir_exn ~context ~source_filename ~values mir =
   let t = create ~context ~source_filename ~values in
   List.iter mir ~f:(ignore_value << codegen_stmt t);
+  if Lazy.is_val t.main_function_builder
+  then ignore_value (Llvm.build_ret_void (force t.main_function_builder));
   match Llvm_analysis.verify_module t.module_ with
   | None -> t
   | Some error ->
-    compiler_bug [%message "Llvm_analysis found invalid module" (error : string)]
+    compiler_bug
+      [%message
+        "Llvm_analysis found invalid module" (error : string) ~module_:(to_string t)]
 ;;
 
 let of_mir ~context ~source_filename ~values mir =
