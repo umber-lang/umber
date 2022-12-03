@@ -1106,6 +1106,8 @@ module Expr = struct
 end
 
 module Stmt = struct
+  (* TODO: Consider passing through information about whether the values/functions are
+     exposed to other files so we can decide on proper LLVM linkage for them. *)
   type t =
     | Value_def of Unique_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t

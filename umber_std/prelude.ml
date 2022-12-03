@@ -417,7 +417,12 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 
 @Std.Prelude.List.Nil.23 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
-@"Std.Prelude.Operators.::.31" = constant %umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons.24
+@"Std.Prelude.Operators.::.31" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons.24 to %umber_block*)
+
+define void @main() {
+entry:
+  ret void
+}
 
 define %umber_block* @Std.Prelude.List.Cons.24(%umber_block* %arg0.26, %umber_block* %arg1.25) {
 entry:

@@ -18,7 +18,7 @@ let should_make_mir test =
 ;;
 
 (* TODO: expand this to more files *)
-let no_llvm_tests = [ "AsPattern" (* closures *) ]
+let no_llvm_tests = [ "AsPattern"; "TypeChecking" (* closures *) ]
 
 let should_make_llvm test =
   should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
