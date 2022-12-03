@@ -11,9 +11,9 @@
     (Let ModuleSig.Range.lo.1 (Get_block_field 0 (Name *lambda_arg.0))
      (Let ModuleSig.Range.hi.1 (Get_block_field 1 (Name *lambda_arg.0))
       (Fun_call Std.Prelude.Operators.&&.0
-       ((Fun_call Std.Prelude.Operators.<=.0
+       ((Fun_call Std.Prelude.Operators.<=%lte.0
          ((Name ModuleSig.Range.lo.1) (Name ModuleSig.Range.x.0)))
-        (Fun_call Std.Prelude.Operators.<=.0
+        (Fun_call Std.Prelude.Operators.<=%lte.0
          ((Name ModuleSig.Range.x.0) (Name ModuleSig.Range.hi.1))))))))))
  (Value_def ModuleSig.my_range.0
   (Fun_call ModuleSig.Range.between.0

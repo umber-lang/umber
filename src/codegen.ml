@@ -117,12 +117,18 @@ let codegen_constant_tag t tag =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
   let int63_value = Mir.Cnstr.Tag.to_int tag |> Int64.of_int in
   let int64_value = Int64.shift_left int63_value 1 |> Int64.( + ) Int64.one in
-  (* FIXME: What is this bool? *)
-  Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value true
+  let is_signed = false in
+  let int_value = Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed in
+  Llvm.const_inttoptr int_value (block_pointer_type t)
+;;
+
+let int_non_constant_tag t tag =
+  Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr.Tag.to_int tag)
 ;;
 
 let codegen_non_constant_tag t tag =
-  Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr.Tag.to_int tag)
+  let int_value = int_non_constant_tag t tag in
+  Llvm.const_inttoptr int_value (block_pointer_type t)
 ;;
 
 let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
@@ -130,7 +136,7 @@ let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
 let const_block_header t ~tag ~len =
   Llvm.const_named_struct
     (block_header_type t)
-    [| codegen_non_constant_tag t tag; codegen_block_len t len |]
+    [| int_non_constant_tag t tag; codegen_block_len t len |]
 ;;
 
 let constant_block t ~tag ~len ~name ~str constant_value =
@@ -257,23 +263,30 @@ let codegen_expr t expr =
       let current_fun = Llvm.block_parent start_block in
       let num_vars = List.length vars in
       (* Set up a phi block to receive the variable bindings as a vector. *)
-      let phi_block = Llvm.append_block t.context "cond_merge" current_fun in
+      let phi_block = Llvm.append_block t.context "cond_binding_merge" current_fun in
       Llvm.position_at_end phi_block t.builder;
       let phi_value =
-        Llvm.build_empty_phi
-          (Llvm.vector_type (block_pointer_type t) num_vars)
-          "cond_bindings"
-          t.builder
+        if num_vars = 0
+        then None
+        else (
+          let phi_value =
+            Llvm.build_empty_phi
+              (Llvm.vector_type (block_pointer_type t) num_vars)
+              "cond_bindings"
+              t.builder
+          in
+          (* Extract all the variables out of the vector in the phi. *)
+          List.iteri vars ~f:(fun i var ->
+            ignore_value
+              (Llvm.build_extractelement
+                 phi_value
+                 (Llvm.const_int (Llvm.i64_type t.context) i)
+                 (Unique_name.to_string var)
+                 t.builder));
+          Some phi_value)
       in
-      (* Extract all the variables out of the vector in the phi. *)
-      List.iteri vars ~f:(fun i var ->
-        ignore_value
-          (Llvm.build_extractelement
-             phi_value
-             (Llvm.const_int (Llvm.i64_type t.context) i)
-             (Unique_name.to_string var)
-             t.builder));
       let body_value = codegen_expr t body in
+      let body_block_end = Llvm.insertion_block t.builder in
       let make_binding_block_and_br_to_phi bindings =
         let binding_block = Llvm.append_block t.context "cond_binding" current_fun in
         Llvm.position_at_end binding_block t.builder;
@@ -285,8 +298,9 @@ let codegen_expr t expr =
         in
         ignore_value (Llvm.build_br phi_block t.builder);
         let binding_block_end = Llvm.insertion_block t.builder in
-        let binding_vector = Llvm.const_vector (List.to_array binding_values) in
-        Llvm.add_incoming (binding_vector, binding_block_end) phi_value;
+        Option.iter phi_value ~f:(fun phi_value ->
+          let binding_vector = Llvm.const_vector (List.to_array binding_values) in
+          Llvm.add_incoming (binding_vector, binding_block_end) phi_value);
         binding_block
       in
       let conds =
@@ -299,23 +313,44 @@ let codegen_expr t expr =
           let binding_block = make_binding_block_and_br_to_phi bindings in
           cond_value, cond_block, cond_block_end, binding_block)
       in
+      (* Start at the first cond. *)
+      Llvm.position_at_end start_block t.builder;
+      ignore_value
+        (let _, first_cond_block, _, _ = Nonempty.hd conds in
+         Llvm.build_br first_cond_block t.builder);
       (* Have each condition block branch and break to either its binding block or the
          next condition block. The last condition block goes to the [if_none_matched]
          case, which either goes to another arbitrary expression, or runs the body with a
          final set of bindings. *)
-      let rec associate_conds = function
-        | [] -> ()
+      let rec associate_conds : _ Nonempty.t -> _ = function
         | [ (last_cond_value, _, last_cond_block_end, last_binding_block) ] ->
-          let if_none_matched_block =
+          let if_none_matched_block, final_value, final_block =
             match if_none_matched with
             | Otherwise otherwise_expr ->
               let otherwise_block =
                 Llvm.append_block t.context "cond_otherwise" current_fun
               in
               Llvm.position_at_end otherwise_block t.builder;
-              ignore_value (codegen_expr t otherwise_expr);
-              otherwise_block
-            | Use_bindings bindings -> make_binding_block_and_br_to_phi bindings
+              let otherwise_value = codegen_expr t otherwise_expr in
+              let otherwise_block_end = Llvm.insertion_block t.builder in
+              let otherwise_phi_block =
+                Llvm.append_block t.context "cond_otherwise_merge" current_fun
+              in
+              Llvm.position_at_end body_block_end t.builder;
+              ignore_value (Llvm.build_br otherwise_phi_block t.builder);
+              Llvm.position_at_end otherwise_block_end t.builder;
+              ignore_value (Llvm.build_br otherwise_phi_block t.builder);
+              Llvm.position_at_end otherwise_phi_block t.builder;
+              let otherwise_phi_value =
+                Llvm.build_phi
+                  [ body_value, body_block_end; otherwise_value, otherwise_block_end ]
+                  "cond_otherwise_merge"
+                  t.builder
+              in
+              otherwise_block, otherwise_phi_value, otherwise_phi_block
+            | Use_bindings bindings ->
+              let actual_last_binding_block = make_binding_block_and_br_to_phi bindings in
+              actual_last_binding_block, body_value, body_block_end
           in
           Llvm.position_at_end last_cond_block_end t.builder;
           ignore_value
@@ -323,17 +358,18 @@ let codegen_expr t expr =
                last_cond_value
                last_binding_block
                if_none_matched_block
-               t.builder)
+               t.builder);
+          Llvm.position_at_end final_block t.builder;
+          final_value
         | (cond_value, _, current_cond_block_end, binding_block)
-          :: (_, next_cond_block_start, _, _)
-          :: _ as rest ->
+          :: ((_, next_cond_block_start, _, _) as next_cond_and_binding)
+          :: rest ->
           Llvm.position_at_end current_cond_block_end t.builder;
           ignore_value
             (Llvm.build_cond_br cond_value binding_block next_cond_block_start t.builder);
-          associate_conds rest
+          associate_conds (next_cond_and_binding :: rest)
       in
-      associate_conds (Nonempty.to_list conds);
-      body_value
+      associate_conds conds
   and codegen_cond t cond =
     let make_equals value value' =
       (* FIXME: This isn't going to work through pointers, yeah? Need to dereference/gep *)
@@ -369,8 +405,7 @@ let codegen_expr t expr =
         "box"
         t.builder
     in
-    ignore_value
-      (Llvm.build_store (codegen_non_constant_tag t tag) heap_pointer_16 t.builder);
+    ignore_value (Llvm.build_store (int_non_constant_tag t tag) heap_pointer_16 t.builder);
     ignore_value
       (let heap_pointer =
          Llvm.build_gep
@@ -428,9 +463,7 @@ let codegen_stmt t stmt =
     Llvm.position_at_end entry_block t.builder;
     let return_value = codegen_expr t body in
     ignore_value (Llvm.build_ret return_value t.builder);
-    (* TODO: see if we can use [verify_function] instead, so we don't abort on failure. *)
-    (* FIXME: re-enable *)
-    (* Llvm_analysis.assert_valid_function fun_; *)
+    Llvm_analysis.assert_valid_function fun_;
     Value_table.add t.values fun_name fun_;
     fun_
 ;;
@@ -511,9 +544,6 @@ let of_mir_exn ~context ~source_filename ~values mir =
   match Llvm_analysis.verify_module t.module_ with
   | None -> t
   | Some error ->
-    (* FIXME: remove writing to files *)
-    Out_channel.write_all "/tmp/llvm_error.txt" ~data:error;
-    Out_channel.write_all "/tmp/llvm_module.llvm" ~data:(to_string t);
     compiler_bug [%message "Llvm_analysis found invalid module" (error : string)]
 ;;
 

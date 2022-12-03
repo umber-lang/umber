@@ -6,30 +6,24 @@
   ((fun_name AsPattern.iter_pairs.0) (closed_over ())
    (args (AsPattern.f.0 AsPattern.lst.0))
    (body
-    (Catch (label 0)
-     (body
-      (If (cond (Constant_tag_equals (Name AsPattern.lst.0) 0))
-       (then_ (Break 0))
-       (else_
-        (If
-         (cond
-          (And (Non_constant_tag_equals (Name AsPattern.lst.0) 0)
-           (Constant_tag_equals (Get_block_field 1 (Name AsPattern.lst.0)) 0)))
-         (then_
-          (Let .0 (Get_block_field 1 (Name AsPattern.lst.0)) (Break 0)))
-         (else_
-          (Catch (label 1)
-           (body
-            (Let AsPattern.a.0 (Get_block_field 0 (Name AsPattern.lst.0))
-             (Let .1 (Get_block_field 1 (Name AsPattern.lst.0))
-              (Let AsPattern.b.0 (Get_block_field 0 (Name .1))
-               (Let AsPattern.rest.0 (Get_block_field 1 (Name .1)) (Break 1))))))
-           (with_
-            (Fun_call "Std.Prelude.Operators.;.0"
-             ((Fun_call AsPattern.f.0
-               ((Name AsPattern.a.0) (Name AsPattern.b.0)))
-              (Fun_call AsPattern.iter_pairs.0
-               ((Name AsPattern.f.0)
-                (Fun_call Std.Prelude.Operators.::.0
-                 ((Name AsPattern.b.0) (Name AsPattern.rest.0))))))))))))))
-     (with_ (Make_block (tag 0))))))))
+    (Cond_assign
+     (conds
+      (((Constant_tag_equals (Name AsPattern.lst.0) 0) ())
+       ((And (Non_constant_tag_equals (Name AsPattern.lst.0) 0)
+         (Constant_tag_equals (Get_block_field 1 (Name AsPattern.lst.0)) 0))
+        ())))
+     (body (Make_block (tag 0)))
+     (if_none_matched
+      (Otherwise
+       (Let AsPattern.rest.0
+        (Get_block_field 1 (Get_block_field 1 (Name AsPattern.lst.0)))
+        (Let AsPattern.b.0
+         (Get_block_field 0 (Get_block_field 1 (Name AsPattern.lst.0)))
+         (Let AsPattern.a.0 (Get_block_field 0 (Name AsPattern.lst.0))
+          (Fun_call "Std.Prelude.Operators.;.0"
+           ((Fun_call AsPattern.f.0
+             ((Name AsPattern.a.0) (Name AsPattern.b.0)))
+            (Fun_call AsPattern.iter_pairs.0
+             ((Name AsPattern.f.0)
+              (Fun_call Std.Prelude.Operators.::.0
+               ((Name AsPattern.b.0) (Name AsPattern.rest.0)))))))))))))))))

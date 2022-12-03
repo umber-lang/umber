@@ -48,42 +48,44 @@ let run_tests () =
     let print_llvm_to = Out_channel.create (concat_current "llvm" out_filename) in
     let in_file = concat_current "examples" filename in
     (match Parsing.parse_file ~print_tokens_to ~full_lex:true in_file with
-    | Ok ast ->
-      if should_type_check bare_filename
-      then (
-        match
-          Ast.Typed.Module.of_untyped
-            ~names:(Name_bindings.of_prelude_sexp Umber_std.Prelude.names)
-            ~types:(Type_bindings.create ())
-            ast
-        with
-        | Ok (names, ast) ->
-          Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Typed.Module.t)];
-          if should_make_mir bare_filename
-          then (
-            match Mir.of_typed_module ~names ast with
-            | Ok mir ->
-              let mir = Mir.renumber_ids mir in
-              Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
-              if should_make_llvm bare_filename
-              then (
-                let context = Llvm.create_context () in
-                let values = Codegen.Value_table.parse context Umber_std.Prelude.llvm in
-                match Codegen.of_mir ~context ~source_filename:filename ~values mir with
-                | Ok llvm ->
-                  Out_channel.output_string print_llvm_to (Codegen.to_string llvm)
-                | Error error ->
-                  print_compilation_error ~out:print_llvm_to ~filename error)
-            | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
-        | Error error -> print_compilation_error ~out:print_ast_to ~filename error)
-      else Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Untyped.Module.t)]
-    | Error error -> print_compilation_error ~out:print_ast_to ~filename error);
+     | Ok ast ->
+       if should_type_check bare_filename
+       then (
+         match
+           Ast.Typed.Module.of_untyped
+             ~names:(Name_bindings.of_prelude_sexp Umber_std.Prelude.names)
+             ~types:(Type_bindings.create ())
+             ast
+         with
+         | Ok (names, ast) ->
+           Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Typed.Module.t)];
+           if should_make_mir bare_filename
+           then (
+             match Mir.of_typed_module ~names ast with
+             | Ok mir ->
+               let mir = Mir.renumber_ids mir in
+               Parsing.fprint_s ~out:print_mir_to [%sexp (mir : Mir.t)];
+               if should_make_llvm bare_filename
+               then (
+                 let context = Llvm.create_context () in
+                 let values = Codegen.Value_table.parse context Umber_std.Prelude.llvm in
+                 match Codegen.of_mir ~context ~source_filename:filename ~values mir with
+                 | Ok llvm ->
+                   Out_channel.output_string print_llvm_to (Codegen.to_string llvm)
+                 | Error error ->
+                   print_compilation_error ~out:print_llvm_to ~filename error)
+             | Error error -> print_compilation_error ~out:print_mir_to ~filename error)
+         | Error error -> print_compilation_error ~out:print_ast_to ~filename error)
+       else Parsing.fprint_s ~out:print_ast_to [%sexp (ast : Ast.Untyped.Module.t)]
+     | Error error -> print_compilation_error ~out:print_ast_to ~filename error);
     Out_channel.close print_tokens_to;
     Out_channel.close print_ast_to;
     Out_channel.close print_mir_to;
     Out_channel.close print_llvm_to
   in
-  Array.iter (Util.sorted_files_in_local_dir "examples") ~f:test
+  Array.iter (Util.sorted_files_in_local_dir "examples") ~f:(fun file ->
+    try test file with
+    | exn -> Exn.reraise exn [%string "Error compiling file %{file}"])
 ;;
 
 let () = run_tests ()

@@ -16,8 +16,7 @@ open! Core
 $*)
 
 (*$ let () = compile_and_print ~name:"names" ~is_sexp:true Names *)
-let names =
-  {|
+let names = {|
 ((current_path "Std(d)")
  (toplevel
   ((names
@@ -405,11 +404,130 @@ let names =
                           (type_source Let_inferred))))))
                      (types ()) (modules ()))))))))))))))))))))))
 |}
-  |> Sexp.of_string
-;;
-
+|> Sexp.of_string
 (*$*)
 
 (*$ let () = compile_and_print ~name:"llvm" ~is_sexp:false Llvm *)
-let llvm = "placeholder"
+let llvm = {|
+; ModuleID = 'Std/Prelude.um'
+source_filename = "Std/Prelude.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@Std.Prelude.List.Nil.23 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@"Std.Prelude.Operators.::.31" = constant %umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons.24
+
+define %umber_block* @Std.Prelude.List.Cons.24(%umber_block* %arg0.26, %umber_block* %arg1.25) {
+entry:
+  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
+  %box = bitcast i8* %malloccall to i64*
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i64 1
+  store i16 2, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  store %umber_block* %arg0.26, %umber_block** %box4, align 8
+  %box5 = bitcast i64* %box to %umber_block**
+  %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 2
+  store %umber_block* %arg1.25, %umber_block** %box6, align 8
+  %box7 = bitcast i64* %box to %umber_block*
+  ret %umber_block* %box7
+}
+
+declare noalias i8* @malloc(i32)
+
+define %umber_block* @Std.Prelude.Operators...27(%umber_block* %Std.Prelude.Operators.f.28, %umber_block* %Std.Prelude.Operators.g.29, %umber_block* %Std.Prelude.Operators.x.30) {
+entry:
+  %Std.Prelude.Operators.f.281 = bitcast %umber_block* %Std.Prelude.Operators.f.28 to %umber_block* (%umber_block*)*
+  %Std.Prelude.Operators.g.292 = bitcast %umber_block* %Std.Prelude.Operators.g.29 to %umber_block* (%umber_block*)*
+  %fun_call = call %umber_block* %Std.Prelude.Operators.g.292(%umber_block* %Std.Prelude.Operators.x.30)
+  %fun_call3 = call %umber_block* %Std.Prelude.Operators.f.281(%umber_block* %fun_call)
+  ret %umber_block* %fun_call3
+}
+
+define %umber_block* @Std.Prelude.Operators.not.32(%umber_block* %.33) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %.331 = ptrtoint %umber_block* %.33 to i64
+  %equals = icmp eq i64 %.331, 3
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge2 = phi %umber_block* [ inttoptr (i64 1 to %umber_block*), %cond_binding_merge ], [ inttoptr (i64 3 to %umber_block*), %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge2
+}
+
+define %umber_block* @"Std.Prelude.Operators.&&.34"(%umber_block* %Std.Prelude.Operators.a.35, %umber_block* %Std.Prelude.Operators.b.36) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %Std.Prelude.Operators.a.351 = ptrtoint %umber_block* %Std.Prelude.Operators.a.35 to i64
+  %equals = icmp eq i64 %Std.Prelude.Operators.a.351, 3
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge2 = phi %umber_block* [ %Std.Prelude.Operators.b.36, %cond_binding_merge ], [ inttoptr (i64 1 to %umber_block*), %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge2
+}
+
+define %umber_block* @"Std.Prelude.Operators.||.37"(%umber_block* %Std.Prelude.Operators.a.38, %umber_block* %Std.Prelude.Operators.b.39) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %Std.Prelude.Operators.a.381 = ptrtoint %umber_block* %Std.Prelude.Operators.a.38 to i64
+  %equals = icmp eq i64 %Std.Prelude.Operators.a.381, 3
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge2 = phi %umber_block* [ inttoptr (i64 3 to %umber_block*), %cond_binding_merge ], [ %Std.Prelude.Operators.b.39, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge2
+}
+
+define %umber_block* @"Std.Prelude.Operators.|>.40"(%umber_block* %Std.Prelude.Operators.x.41, %umber_block* %Std.Prelude.Operators.f.42) {
+entry:
+  %Std.Prelude.Operators.f.421 = bitcast %umber_block* %Std.Prelude.Operators.f.42 to %umber_block* (%umber_block*)*
+  %fun_call = call %umber_block* %Std.Prelude.Operators.f.421(%umber_block* %Std.Prelude.Operators.x.41)
+  ret %umber_block* %fun_call
+}
+
+define %umber_block* @"Std.Prelude.Operators.;.43"(%umber_block* %"*lambda_arg.44", %umber_block* %Std.Prelude.Operators.x.45) {
+entry:
+  ret %umber_block* %Std.Prelude.Operators.x.45
+}
+
+|}
 (*$*)

@@ -4,6 +4,7 @@ open Names
 type ('pat, 'expr) t = Module_name.t * sig_ Node.t list * ('pat, 'expr) def Node.t list
 
 and common =
+  (* TODO: Consider making [Val] sig-only. *)
   | Val of Value_name.t * Fixity.t option * Type.Scheme.Bounded.t
   | Extern of Value_name.t * Fixity.t option * Type.Scheme.t * Extern_name.t
   | Type_decl of Type_name.t * Type.Decl.t

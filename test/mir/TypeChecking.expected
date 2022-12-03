@@ -26,13 +26,10 @@
   ((fun_name *fun.0)
    (closed_over (TypeChecking.else_.0 TypeChecking.then_.0)) (args (.2))
    (body
-    (Catch (label 0)
-     (body
-      (If (cond (Constant_tag_equals (Name .2) 1)) (then_ (Break 0))
-       (else_
-        (Catch (label 1) (body (Break 1))
-         (with_ (Fun_call TypeChecking.else_.0 ((Make_block (tag 0)))))))))
-     (with_ (Fun_call TypeChecking.then_.0 ((Make_block (tag 0)))))))))
+    (Cond_assign (conds (((Constant_tag_equals (Name .2) 1) ())))
+     (body (Fun_call TypeChecking.then_.0 ((Make_block (tag 0)))))
+     (if_none_matched
+      (Otherwise (Fun_call TypeChecking.else_.0 ((Make_block (tag 0))))))))))
  (Fun_def
   ((fun_name TypeChecking.if_.0) (closed_over ())
    (args (TypeChecking.then_.0 TypeChecking.else_.0)) (body (Name *fun.0))))
@@ -40,11 +37,8 @@
   ((fun_name TypeChecking.if'.0) (closed_over ())
    (args (TypeChecking.then_.1 TypeChecking.else_.1 TypeChecking.cond.0))
    (body
-    (Catch (label 0)
-     (body
-      (If (cond (Constant_tag_equals (Name TypeChecking.cond.0) 1))
-       (then_ (Break 0))
-       (else_
-        (Catch (label 1) (body (Break 1))
-         (with_ (Fun_call TypeChecking.else_.1 ((Make_block (tag 0)))))))))
-     (with_ (Fun_call TypeChecking.then_.1 ((Make_block (tag 0))))))))))
+    (Cond_assign
+     (conds (((Constant_tag_equals (Name TypeChecking.cond.0) 1) ())))
+     (body (Fun_call TypeChecking.then_.1 ((Make_block (tag 0)))))
+     (if_none_matched
+      (Otherwise (Fun_call TypeChecking.else_.1 ((Make_block (tag 0)))))))))))

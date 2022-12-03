@@ -7,5 +7,5 @@
  (Fun_def
   ((fun_name Functions.sqr.0) (closed_over ()) (args (Functions.x.1))
    (body
-    (Fun_call Std.Prelude.Operators.*.0
+    (Fun_call Std.Prelude.Operators.*%int_mul.0
      ((Name Functions.x.1) (Name Functions.x.1)))))))

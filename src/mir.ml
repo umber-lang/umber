@@ -209,12 +209,12 @@ end = struct
      responsible for assigning unique names for names in its own file? *)
   let add ?extern_name t name =
     let name = Value_name.Qualified.to_ustring name in
-    let name =
+    let name' =
       match extern_name with
       | None -> name
       | Some extern_name -> Ustring.( ^ ) name (Extern_name.to_ustring extern_name)
     in
-    let name' = Unique_name.create name in
+    let name' = Unique_name.create name' in
     { t with names = Map.set t.names ~key:name ~data:name' }, name'
   ;;
 
@@ -238,6 +238,7 @@ end = struct
          |> Option.map ~f:(Unique_name.create << Extern_name.to_ustring))
   ;;
 
+  (* FIXME: Is it intentional that this doesn't called [t.find_observer]? Seems wrong *)
   let find_value_name' t name =
     match name with
     | [], name when Constant_names.mem name -> find t ([], name)
@@ -583,9 +584,7 @@ module Expr = struct
      could help us avoid unnecessary checks. *)
 
   (** [fold_pattern_bindings] folds over the variable bindings formed by a pattern
-      associated with an expression. The expression must be given as a name previously
-      bound in [ctx] since nested bindings duplicate references to it, and if we allowed
-      any expresion, it could duplicate arbitrary amounts of work. *)
+      associated with an expression. *)
   let fold_pattern_bindings =
     let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
       match (pat : Simple_pattern.t) with
@@ -613,16 +612,19 @@ module Expr = struct
       loop ~ctx ~add_let ~add_name acc pat (Name expr_name) type_
   ;;
 
-  let convert_expr_to_name ~ctx ~default ~add_let mir_expr =
-    let ctx, value, expr_name =
-      match mir_expr with
-      | Name expr_name -> ctx, default, expr_name
-      | _ ->
-        let ctx_for_body, expr_name = Context.add_value_name ctx Constant_names.empty in
-        let acc = add_let expr_name mir_expr in
-        ctx_for_body, acc, expr_name
-    in
-    ctx, value, expr_name
+  let convert_expr_to_name
+    ?(binding_name = Constant_names.empty)
+    ~ctx
+    ~default
+    ~add_let
+    mir_expr
+    =
+    match mir_expr with
+    | Name expr_name -> ctx, default, expr_name
+    | _ ->
+      let ctx_for_body, expr_name = Context.add_value_name ctx binding_name in
+      let acc = add_let expr_name mir_expr in
+      ctx_for_body, acc, expr_name
   ;;
 
   let rec condition_of_pattern ~ctx ~input_expr ~input_type pattern =
@@ -757,11 +759,18 @@ module Expr = struct
         process_expr acc ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
       in
       let add_name ctx name = ctx, Context.find_value_name ctx ([], name) in
+      let binding_name =
+        match pat' with
+        | Catch_all (Some name) | As (_, name) -> name
+        | Catch_all None -> Value_name.of_string_unchecked "_"
+        | Constant _ | Cnstr_appl _ -> Constant_names.empty
+      in
       let ctx_for_body, acc, expr_name =
         convert_expr_to_name
           ~ctx:ctx_for_body
           ~default:acc
           ~add_let:(add_let acc)
+          ~binding_name
           mir_expr
       in
       fold_pattern_bindings
@@ -983,6 +992,9 @@ module Expr = struct
       in
       let body = of_typed_expr ~ctx output_expr output_type in
       let fold_result =
+        (* TODO: Consider writing this is a regular recursive function. It might actually
+           be easier to understand that way, and this version duplicates work by always
+           generating the condition for the last pattern and throwing it away. *)
         Nonempty.fold_map_until ~init:() patterns ~f:(fun () pattern ->
           (* TODO: this should skip underscore bindings (bindings for no actual variables) *)
           let cond = condition_of_pattern ~ctx ~input_expr ~input_type pattern in
@@ -1018,7 +1030,6 @@ module Expr = struct
         | Some conds ->
           Cond_assign { vars; conds; body; if_none_matched = Use_bindings last_bindings }
         | None ->
-          (* FIXME: bug *)
           (* If there are no other conditions, the result doesn't need [Cond_assign] and
              can be a regular unconditional expression. *)
           List.fold2_exn vars last_bindings ~init:body ~f:(fun acc name expr ->
@@ -1031,9 +1042,8 @@ module Expr = struct
           Cond_assign { vars; conds; body; if_none_matched = Otherwise (fallback ()) }
         | Continue ((), conds), None ->
           (* Didn't hit an unconditional pattern, but this is the last match arm. Due to
-           separate checks in [Simple_pattern.Coverage] we know the pattern is exhaustive,
-           so we can elide the last condition. *)
-          (* FIXME: elide the last condition *)
+             separate checks in [Simple_pattern.Coverage] we know the pattern is
+             exhaustive, so we can elide the last condition. *)
           let conds, ((_ : cond), last_bindings) = Nonempty.split_last conds in
           add_last_unconditional_bindings ~conds ~last_bindings
         | Stop (last_bindings, conds), _ ->

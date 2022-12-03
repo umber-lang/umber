@@ -44,9 +44,10 @@ module Pattern = struct
              Type_bindings.unify ~names ~types arg_type arg_type';
              pat_names, arg :: args)
          with
-        | Ok (pat_names, args) -> pat_names, (Cnstr_appl (cnstr, List.rev args), body_type)
-        | Unequal_lengths ->
-          type_error_msg "Wrong number of arguments in constructor application")
+         | Ok (pat_names, args) ->
+           pat_names, (Cnstr_appl (cnstr, List.rev args), body_type)
+         | Unequal_lengths ->
+           type_error_msg "Wrong number of arguments in constructor application")
       | Tuple fields ->
         let pat_names, fields, field_types =
           List.fold_right
@@ -315,53 +316,54 @@ module Expr = struct
     | `Retry expr -> map ~f ~f_type expr
     | `Defer expr ->
       (match expr with
-      | Let { rec_; bindings; body } ->
-        let bindings =
-          Nonempty.map bindings ~f:(fun ((pat, typ), expr) ->
-            (pat, f_type typ), map ~f ~f_type expr)
-        in
-        let body = map ~f ~f_type body in
-        Let { rec_; bindings; body }
-      | (Literal _ | Name (_, _)) as expr -> expr
-      | Fun_call (fun_, args) ->
-        let fun_ = map ~f ~f_type fun_ in
-        let args =
-          Nonempty.map args ~f:(fun (arg, arg_type) ->
-            map ~f ~f_type arg, f_type arg_type)
-        in
-        Fun_call (fun_, args)
-      | Lambda (args, body) -> Lambda (args, map ~f ~f_type body)
-      | Match (expr, expr_type, branches) ->
-        let expr = map ~f ~f_type expr in
-        Match
-          ( expr
-          , f_type expr_type
-          , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map ~f ~f_type)) )
-      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~f_type))
-      | Record_literal fields ->
-        Record_literal
-          (List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_type))))
-      | Record_update (expr, fields) ->
-        let expr = map ~f ~f_type expr in
-        Record_update
-          (expr, List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_type))))
-      | Record_field_access (record, field) ->
-        Record_field_access (map ~f ~f_type record, field))
+       | Let { rec_; bindings; body } ->
+         let bindings =
+           Nonempty.map bindings ~f:(fun ((pat, typ), expr) ->
+             (pat, f_type typ), map ~f ~f_type expr)
+         in
+         let body = map ~f ~f_type body in
+         Let { rec_; bindings; body }
+       | (Literal _ | Name (_, _)) as expr -> expr
+       | Fun_call (fun_, args) ->
+         let fun_ = map ~f ~f_type fun_ in
+         let args =
+           Nonempty.map args ~f:(fun (arg, arg_type) ->
+             map ~f ~f_type arg, f_type arg_type)
+         in
+         Fun_call (fun_, args)
+       | Lambda (args, body) -> Lambda (args, map ~f ~f_type body)
+       | Match (expr, expr_type, branches) ->
+         let expr = map ~f ~f_type expr in
+         Match
+           ( expr
+           , f_type expr_type
+           , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map ~f ~f_type)) )
+       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~f_type))
+       | Record_literal fields ->
+         Record_literal
+           (List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_type))))
+       | Record_update (expr, fields) ->
+         let expr = map ~f ~f_type expr in
+         Record_update
+           (expr, List.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_type))))
+       | Record_field_access (record, field) ->
+         Record_field_access (map ~f ~f_type record, field))
   ;;
 
   let rec generalize_let_bindings ~names ~types =
     map
       ~f_type:(fun (typ, _) -> Type_bindings.generalize types typ)
-      ~f:(function
-        | Let { rec_; bindings; body } ->
-          let bindings =
-            Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
-              let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
-              (pat, scheme), generalize_let_bindings ~names ~types expr)
-          in
-          let body = generalize_let_bindings ~names ~types body in
-          `Halt (Let { rec_; bindings; body })
-        | expr -> `Defer expr)
+      ~f:
+        (function
+         | Let { rec_; bindings; body } ->
+           let bindings =
+             Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
+               let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
+               (pat, scheme), generalize_let_bindings ~names ~types expr)
+           in
+           let body = generalize_let_bindings ~names ~types body in
+           `Halt (Let { rec_; bindings; body })
+         | expr -> `Defer expr)
   ;;
 end
 
@@ -386,10 +388,10 @@ module Module = struct
       | None ->
         fun names def ->
           (match def.Node.node with
-          | Common_def common -> f_common names common
-          | Module (module_name, sigs, defs) ->
-            gather_names ~names module_name sigs defs ~f_common ?f_def
-          | Let _ | Trait _ | Impl _ -> names)
+           | Common_def common -> f_common names common
+           | Module (module_name, sigs, defs) ->
+             gather_names ~names module_name sigs defs ~f_common ?f_def
+           | Let _ | Trait _ | Impl _ -> names)
     in
     Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
       List.fold defs ~init:names ~f)
@@ -434,22 +436,22 @@ module Module = struct
         match sig_.Node.node with
         | Common_sig common ->
           (match common with
-          | Type_decl (type_name, _) ->
-            let data = { sig_ with node = Common_def common } in
-            (* TODO: won't these [Map.add_exn]s raise from duplicate vals in the sig? 
+           | Type_decl (type_name, _) ->
+             let data = { sig_ with node = Common_def common } in
+             (* TODO: won't these [Map.add_exn]s raise from duplicate vals in the sig? 
                We should be raising a proper compile error instead *)
-            Nested_map.map
-              sig_map
-              ~f:(Sig_data.map_type_decls ~f:(Map.add_exn ~key:type_name ~data))
-          | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-          | Val (value_name, Some fixity, _) | Extern (value_name, Some fixity, _, _) ->
-            Nested_map.map
-              sig_map
-              ~f:(Sig_data.map_fixities ~f:(Map.add_exn ~key:value_name ~data:fixity))
-          | Val (_, None, _)
-          | Extern (_, None, _, _)
-          (* TODO: handle imports bringing in type declarations to copy over (?) *)
-          | Import _ | Import_with _ | Import_without _ -> sig_map)
+             Nested_map.map
+               sig_map
+               ~f:(Sig_data.map_type_decls ~f:(Map.add_exn ~key:type_name ~data))
+           | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
+           | Val (value_name, Some fixity, _) | Extern (value_name, Some fixity, _, _) ->
+             Nested_map.map
+               sig_map
+               ~f:(Sig_data.map_fixities ~f:(Map.add_exn ~key:value_name ~data:fixity))
+           | Val (_, None, _)
+           | Extern (_, None, _, _)
+           (* TODO: handle imports bringing in type declarations to copy over (?) *)
+           | Import _ | Import_with _ | Import_without _ -> sig_map)
         | Module_sig (module_name, sigs) ->
           Nested_map.with_module sig_map module_name ~f:(fun sig_map ->
             gather_decls ~sig_map:(Option.value sig_map ~default:empty_sig_map) sigs))
@@ -464,39 +466,39 @@ module Module = struct
                match def with
                | Common_def common ->
                  (match common with
-                 | Type_decl (type_name, _) ->
-                   ( Nested_map.map
-                       sig_map
-                       ~f:(Sig_data.map_type_decls ~f:(Fn.flip Map.remove type_name))
-                   , def )
-                 | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-                 | Val (value_name, None, typ) ->
-                   (* Merge the fixity from the sig *)
-                   let fixity =
-                     Map.find (Nested_map.current sig_map).fixities value_name
-                   in
-                   sig_map, Common_def (Val (value_name, fixity, typ))
-                 | Extern (value_name, None, typ, extern_name) ->
-                   (* Merge the fixity from the sig *)
-                   let fixity =
-                     Map.find (Nested_map.current sig_map).fixities value_name
-                   in
-                   sig_map, Common_def (Extern (value_name, fixity, typ, extern_name))
-                 | Val (_, Some _, _)
-                 | Extern (_, Some _, _, _)
-                 | Import _ | Import_with _ | Import_without _ -> sig_map, def)
+                  | Type_decl (type_name, _) ->
+                    ( Nested_map.map
+                        sig_map
+                        ~f:(Sig_data.map_type_decls ~f:(Fn.flip Map.remove type_name))
+                    , def )
+                  | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
+                  | Val (value_name, None, typ) ->
+                    (* Merge the fixity from the sig *)
+                    let fixity =
+                      Map.find (Nested_map.current sig_map).fixities value_name
+                    in
+                    sig_map, Common_def (Val (value_name, fixity, typ))
+                  | Extern (value_name, None, typ, extern_name) ->
+                    (* Merge the fixity from the sig *)
+                    let fixity =
+                      Map.find (Nested_map.current sig_map).fixities value_name
+                    in
+                    sig_map, Common_def (Extern (value_name, fixity, typ, extern_name))
+                  | Val (_, Some _, _)
+                  | Extern (_, Some _, _, _)
+                  | Import _ | Import_with _ | Import_without _ -> sig_map, def)
                | Module (module_name, sigs, defs) ->
                  (match Nested_map.find_module sig_map module_name with
-                 | Some child_map ->
-                   if List.is_empty sigs
-                   then
-                     ( Nested_map.remove_module sig_map module_name
-                     , Module (module_name, [], copy_to_defs ~sig_map:child_map defs) )
-                   else
-                     (* Don't copy inherited sigs from the parent over (at least for now)
+                  | Some child_map ->
+                    if List.is_empty sigs
+                    then
+                      ( Nested_map.remove_module sig_map module_name
+                      , Module (module_name, [], copy_to_defs ~sig_map:child_map defs) )
+                    else
+                      (* Don't copy inherited sigs from the parent over (at least for now)
                       because it's complicated *)
-                     sig_map, def
-                 | None -> sig_map, def)
+                      sig_map, def
+                  | None -> sig_map, def)
                | Trait _ -> failwith "TODO: copy trait_sigs to defs, without overriding"
                | Let _ | Impl _ -> sig_map, def))
       in
@@ -567,16 +569,18 @@ module Module = struct
       | Type.Expr.Type_app (name, args) ->
         let decl = Name_bindings.find_type_decl names name in
         (match decl with
-        | _, Alias alias ->
-          (match Hashtbl.add aliases_seen ~key:decl ~data:name with
-          | `Ok -> loop ~names aliases_seen alias
-          | `Duplicate ->
-            Compilation_error.raise
-              Type_error
-              ~msg:
-                [%message
-                  "Cyclic type alias" (name : Type_name.Qualified.t) (decl : Type.Decl.t)])
-        | _ -> ());
+         | _, Alias alias ->
+           (match Hashtbl.add aliases_seen ~key:decl ~data:name with
+            | `Ok -> loop ~names aliases_seen alias
+            | `Duplicate ->
+              Compilation_error.raise
+                Type_error
+                ~msg:
+                  [%message
+                    "Cyclic type alias"
+                      (name : Type_name.Qualified.t)
+                      (decl : Type.Decl.t)])
+         | _ -> ());
         List.iter args ~f:(loop ~names aliases_seen)
       | Function (args, body) ->
         Nonempty.iter args ~f:(loop ~names aliases_seen);
@@ -790,6 +794,7 @@ module Module = struct
       let names = gather_imports_and_type_decls ~names module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
+      (* TODO: should check every [Val] has a corresponding [Let]. *)
       Sig_def_diff.create ~names module_name |> Sig_def_diff.raise_if_nonempty;
       Ok (names, (module_name, sigs, defs))
     with

@@ -14,18 +14,6 @@
    (bindings
     (((Catch_all (dec_code_exclam))
       ((Literal (String !)) (Type_app String ()))))))
-  (Common_def
-   (Val ++ ()
-    (()
-     (Function ((Type_app String ()) (Type_app String ()))
-      (Type_app String ())))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ())
-      ((Fun_call (Name ++)
-        (((Literal (String "hello\n")) (Type_app String ()))
-         ((Literal (String "\bworld!")) (Type_app String ()))))
-       (Type_app String ()))))))
   (Let (rec_ false)
    (bindings
     (((Tuple ((Catch_all (a)) (Catch_all (b))))
