@@ -60,6 +60,10 @@ module Stmt : sig
   type t =
     | Value_def of Unique_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
+    | Extern_decl of
+        { extern_name : Extern_name.t
+        ; arity : int
+        }
   [@@deriving sexp_of, variants]
 end
 

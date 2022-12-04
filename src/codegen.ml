@@ -492,6 +492,16 @@ let codegen_stmt t stmt =
     Llvm_analysis.assert_valid_function fun_;
     Value_table.add t.values fun_name fun_;
     fun_
+  | Extern_decl { extern_name; arity } ->
+    let type_ = block_pointer_type t in
+    let name = Extern_name.to_ustring extern_name |> Ustring.to_string in
+    if arity = 0
+    then Llvm.declare_global type_ name t.module_
+    else
+      Llvm.declare_function
+        name
+        (Llvm.function_type type_ (Array.create type_ ~len:arity))
+        t.module_
 ;;
 
 let create ~context ~source_filename ~values =

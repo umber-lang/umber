@@ -453,6 +453,14 @@ entry:
   ret %umber_block* %fun_call3
 }
 
+declare %umber_block* @"%int_pow"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%int_mul"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%int_add"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%int_sub"(%umber_block*, %umber_block*)
+
 define tailcc %umber_block* @Std.Prelude.Operators.not.32(%umber_block* %.33) {
 entry:
   br label %cond
@@ -475,6 +483,18 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   %cond_otherwise_merge2 = phi %umber_block* [ inttoptr (i64 1 to %umber_block*), %cond_binding_merge ], [ inttoptr (i64 3 to %umber_block*), %cond_otherwise ]
   ret %umber_block* %cond_otherwise_merge2
 }
+
+declare %umber_block* @"%eq"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%neq"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%lt"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%lte"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%gt"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%gte"(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @"Std.Prelude.Operators.&&.34"(%umber_block* %Std.Prelude.Operators.a.35, %umber_block* %Std.Prelude.Operators.b.36) {
 entry:
@@ -533,6 +553,10 @@ define tailcc %umber_block* @"Std.Prelude.Operators.;.43"(%umber_block* %"*lambd
 entry:
   ret %umber_block* %Std.Prelude.Operators.x.45
 }
+
+declare %umber_block* @"%int_sqrt"(%umber_block*)
+
+declare %umber_block* @"%print_endline"(%umber_block*)
 
 |}
 (*$*)

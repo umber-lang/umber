@@ -1,1 +1,1 @@
-()
+((Extern_decl (extern_name %int_add) (arity 2)))

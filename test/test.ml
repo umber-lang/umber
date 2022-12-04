@@ -18,10 +18,10 @@ let should_make_mir test =
 ;;
 
 (* TODO: expand this to more files *)
-let no_llvm_tests = [ "AsPattern"; "TypeChecking" (* closures *) ]
+let no_llvm_tests = [ "AsPattern"; "Closures"; "TypeChecking" (* closures *) ]
 
 let should_make_llvm test =
-  should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
+  false && should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
 ;;
 
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =

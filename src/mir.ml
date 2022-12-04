@@ -1108,8 +1108,11 @@ module Stmt = struct
   type t =
     | Value_def of Unique_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
-  (* TODO: Should extend [Extern_decl] to support non-extern imported values. *)
-  (* | Extern_decl of { extern_name : Extern_name.t  ; arity : int }  *)
+    (* TODO: Should extend [Extern_decl] to support non-extern imported values. *)
+    | Extern_decl of
+        { extern_name : Extern_name.t
+        ; arity : int
+        }
   [@@deriving sexp_of, variants]
 
   let map_names stmt ~f =
@@ -1124,10 +1127,23 @@ module Stmt = struct
       let args = Nonempty.map args ~f in
       let body = Expr.map_names body ~f in
       Fun_def { fun_name; closed_over; args; body }
+    | Extern_decl _ as t -> t
   ;;
 end
 
 type t = Stmt.t list [@@deriving sexp_of]
+
+(* This doesn't handle abstract types in defs or polymorphic types particularly smartly,
+   but is only needed for extern types, so this should be fine. *)
+let rec arity_of_type ~names : Type.Scheme.t -> int = function
+  | Var _ | Tuple _ -> 0
+  | Type_app (type_name, _) ->
+    (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
+     | Abstract | Variants _ | Record _ -> 0
+     | Alias type_ -> arity_of_type ~names type_)
+  | Function (args, _) -> Nonempty.length args
+  | Partial_function _ -> .
+;;
 
 let of_typed_module =
   let handle_let_bindings
@@ -1189,25 +1205,28 @@ let of_typed_module =
           in
           outer_ctx, stmt :: stmts)
   in
-  let rec loop ~ctx ~stmts (defs : Typed.Module.def Node.t list) =
+  let rec loop ~ctx ~names ~stmts (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.node with
       | Let { rec_; bindings } -> handle_let_bindings ~ctx ~stmts ~rec_ bindings
       | Module (module_name, _sigs, defs) ->
-        Context.with_module ctx module_name ~f:(fun ctx -> loop ~ctx ~stmts defs)
+        Context.with_module ctx module_name ~f:(fun ctx -> loop ~ctx ~names ~stmts defs)
       | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
       (* TODO: Should probably preserve extern declarations *)
       | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
         generate_variant_constructor_values ~ctx ~stmts decl
-        (* | Common_def (Extern (name, fixity, type_, extern_name)) -> *)
       | Common_def
-          (Extern _ | Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
-        -> ctx, stmts)
+          (Extern ((_ : Value_name.t), (_ : Fixity.t option), type_, extern_name)) ->
+        ctx, Extern_decl { extern_name; arity = arity_of_type ~names type_ } :: stmts
+      | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _) ->
+        ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     try
       let names = Name_bindings.into_module names module_name ~place:`Def in
-      let _ctx, stmts = loop ~ctx:(Context.of_name_bindings names) ~stmts:[] defs in
+      let _ctx, stmts =
+        loop ~ctx:(Context.of_name_bindings names) ~names ~stmts:[] defs
+      in
       Ok (List.rev stmts)
     with
     | Compilation_error.Compilation_error error -> Error error
