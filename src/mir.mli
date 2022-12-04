@@ -24,12 +24,12 @@ module Expr : sig
     | Fun_call of Unique_name.t * t Nonempty.t
     | Make_block of
         { tag : Cnstr_tag.t
-        ; fields : t list [@sexp.omit_nil]
+        ; fields : t list
         }
     | Get_block_field of Block_index.t * t
     | Cond_assign of
-        { vars : Unique_name.t list [@sexp.omit_nil]
-        ; conds : (cond * (t list[@sexp.omit_nil])) Nonempty.t
+        { vars : Unique_name.t list
+        ; conds : (cond * t list) Nonempty.t
         ; body : t
         ; if_none_matched : cond_if_none_matched
         }
