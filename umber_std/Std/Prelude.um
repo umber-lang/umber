@@ -1,7 +1,4 @@
-# Temporary mock-up for testing purposes
 module :
-  # Types like Bool, Int, etc. are automatically pre-loaded
-
   module List :
     type List a = Nil | Cons a (List a)
   import List with Nil, Cons

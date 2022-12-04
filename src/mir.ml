@@ -183,7 +183,6 @@ module Context : sig
 
   val with_find_observer : t -> f:(find_observer -> find_observer) -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
-  val name_bindings : t -> Name_bindings.t
   val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
   val find_cnstr_info_from_decl : t -> Type.Decl.decl -> Cnstr_info.t option
 end = struct
@@ -193,8 +192,6 @@ end = struct
     ; find_observer : Value_name.Qualified.t -> Unique_name.t -> unit [@sexp.opaque]
     }
   [@@deriving sexp_of]
-
-  let name_bindings t = t.name_bindings
 
   let with_module t module_name ~f =
     let name_bindings =
@@ -1111,12 +1108,9 @@ module Stmt = struct
   type t =
     | Value_def of Unique_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
+  (* TODO: Should extend [Extern_decl] to support non-extern imported values. *)
+  (* | Extern_decl of { extern_name : Extern_name.t  ; arity : int }  *)
   [@@deriving sexp_of, variants]
-
-  let name = function
-    | Value_def (name, _) -> name
-    | Fun_def { fun_name; _ } -> fun_name
-  ;;
 
   let map_names stmt ~f =
     match stmt with
@@ -1134,18 +1128,6 @@ module Stmt = struct
 end
 
 type t = Stmt.t list [@@deriving sexp_of]
-
-(* TODO: Consider adding some kind of fold over types that follows aliases. *)
-let rec type_get_function ~names typ =
-  match (typ : Type.Scheme.t) with
-  | Function (arg_types, body_type) -> Some (arg_types, body_type)
-  | Var _ | Tuple _ -> None
-  | Type_app (type_name, _args) ->
-    (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
-     | Alias alias -> type_get_function ~names alias
-     | Variants _ | Record _ | Abstract -> None)
-  | Partial_function _ -> .
-;;
 
 let of_typed_module =
   let handle_let_bindings
@@ -1217,8 +1199,9 @@ let of_typed_module =
       (* TODO: Should probably preserve extern declarations *)
       | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
         generate_variant_constructor_values ~ctx ~stmts decl
+        (* | Common_def (Extern (name, fixity, type_, extern_name)) -> *)
       | Common_def
-          (Val _ | Extern _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
+          (Extern _ | Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
         -> ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
@@ -1247,16 +1230,3 @@ let renumber_ids stmts =
       | Some id_table ->
         Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
 ;;
-
-(* Goals should be:
-   - Remove unnecessary type information (definitions, etc.)
-   - Flatten out function definitions/calls (?)
-     - idk if OCaml lambda form does this
-       - Actually it did seem to have lists of argument types for functions
-     - What's the cost of currying?
-     - Surely we don't want all our functions in LLVM to be single-argument?
-   - Move all function definitions to toplevel, with unique names
-     (Other values can stay inside functions (?))
-     (Dynamically created functions may have to represented as closures e.g. like in OCaml
-     partial application even if they don't bind any variables)
-   *)

@@ -1,12 +1,14 @@
 open Import
 open Names
 
-let ignore_value (_ : Llvm.llvalue) = ()
+let tailcc = 18
 
 let data_layout_string =
   (* See https://llvm.org/docs/LangRef.html#data-layout *)
   "i32:64-i64:64-p:64:64-f64:64"
 ;;
+
+let ignore_value (_ : Llvm.llvalue) = ()
 
 module Value_table : sig
   type t [@@deriving sexp_of]
@@ -14,7 +16,13 @@ module Value_table : sig
   val create : unit -> t
   val parse : Llvm.llcontext -> string -> t
   val add : t -> Unique_name.t -> Llvm.llvalue -> unit
-  val find : t -> kind:[ `Function | `Unknown ] -> Unique_name.t -> Llvm.llvalue
+
+  val find
+    :  t
+    -> kind:[ `Function | `Unknown ]
+    -> module_:Llvm.llmodule
+    -> Unique_name.t
+    -> Llvm.llvalue
 end = struct
   type t =
     { local : Llvm_sexp.llvalue Unique_name.Table.t
@@ -40,7 +48,7 @@ end = struct
           "Tried to add duplicate LLVM value definition" (name : Unique_name.t) (t : t)]
   ;;
 
-  let find ({ local; existing } as t) ~(kind : [ `Function | `Unknown ]) name =
+  let find ({ local; existing } as t) ~(kind : [ `Function | `Unknown ]) ~module_ name =
     match Hashtbl.find local name with
     | Some value -> value
     | None ->
@@ -48,9 +56,8 @@ end = struct
         let name_str = Unique_name.to_string name in
         let%bind.Option existing = existing in
         match Llvm.lookup_function name_str existing, kind with
-        | (Some _ as value), _ ->
-          (* FIXME: Do we need to emit a declaration when we hit this case or the below one? *)
-          value
+        | Some value, _ ->
+          Some (Llvm.declare_function name_str (Llvm.type_of value) module_)
         | None, `Function -> None
         | None, _ -> Llvm.lookup_global name_str existing
       in
@@ -197,7 +204,7 @@ let find_value t ~kind name =
   in
   match intrinsic_value with
   | Some tag -> codegen_constant_tag t tag
-  | None -> Value_table.find t.values ~kind name
+  | None -> Value_table.find t.values ~kind ~module_:t.module_ name
 ;;
 
 let ptr_to_int t value =
@@ -472,6 +479,7 @@ let codegen_stmt t stmt =
       Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
     in
     let fun_ = Llvm.define_function (Unique_name.to_string fun_name) fun_type t.module_ in
+    Llvm.set_function_call_conv tailcc fun_;
     let fun_params = Llvm.params fun_ in
     Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
