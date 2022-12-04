@@ -16,9 +16,10 @@ module Cnstr = struct
 
   include T
   include Comparable.Make (T)
+end
 
-  module Tag : sig
-    (** Constructor tags are represented as follows:
+module Cnstr_tag : sig
+  (** Constructor tags are represented as follows:
       - For constant constructors (i.e. constructors with no arguments), the tag is given
         inline as a 64-bit integer where the least significant bit is always set to 1.
         This is identical to the OCaml representation.
@@ -26,24 +27,23 @@ module Cnstr = struct
         block header as the first 16 bits. In that case, as with any block, the pointer to
         the block will have its least signficiant bit set to 0. *)
 
-    (* TODO: what about putting constructor tags in the pointer sometimes? On 64-bit
+  (* TODO: what about putting constructor tags in the pointer sometimes? On 64-bit
        platforms we should have 3 free bits. This could be especially helpful for
        implementing unboxed options or similar types. *)
 
-    type t [@@deriving compare, equal, hash, sexp]
+  type t [@@deriving compare, equal, hash, sexp]
 
-    include Comparable.S with type t := t
+  include Comparable.S with type t := t
 
-    val of_int : int -> t
-    val to_int : t -> int
-    val default : t
-  end = struct
-    include Int
+  val of_int : int -> t
+  val to_int : t -> int
+  val default : t
+end = struct
+  include Int
 
-    let of_int t = t
-    let to_int t = t
-    let default = 0
-  end
+  let of_int t = t
+  let to_int t = t
+  let default = 0
 end
 
 module Block_index : sig
@@ -92,14 +92,14 @@ module Cnstr_info : sig
   (* TODO: Consider exposing a function to zip with the list of args. I think the
      callsites generally do that, which leads to looking up each constructor separately. *)
 
-  val tag : t -> Cnstr.t -> Cnstr.Tag.t
+  val tag : t -> Cnstr.t -> Cnstr_tag.t
   val arg_type : t -> Cnstr.t -> Block_index.t -> Type.Scheme.t
   val cnstrs : t -> Cnstr.t list
 
   val fold
     :  t
     -> init:'acc
-    -> f:('acc -> Cnstr.t -> Cnstr.Tag.t -> Type.Scheme.t list -> 'acc)
+    -> f:('acc -> Cnstr.t -> Cnstr_tag.t -> Type.Scheme.t list -> 'acc)
     -> 'acc
 
   val of_variants : (Cnstr_name.t * Type.Scheme.t list) list -> t
@@ -130,11 +130,11 @@ end = struct
     | Variants { constant_cnstrs; non_constant_cnstrs } ->
       let acc =
         List.foldi constant_cnstrs ~init:acc ~f:(fun i acc cnstr_name ->
-          f acc (Cnstr.Named cnstr_name) (Cnstr.Tag.of_int i) [])
+          f acc (Cnstr.Named cnstr_name) (Cnstr_tag.of_int i) [])
       in
       List.foldi non_constant_cnstrs ~init:acc ~f:(fun i acc (cnstr_name, args) ->
-        f acc (Named cnstr_name) (Cnstr.Tag.of_int i) args)
-    | Tuple args -> f acc Tuple Cnstr.Tag.default args
+        f acc (Named cnstr_name) (Cnstr_tag.of_int i) args)
+    | Tuple args -> f acc Tuple Cnstr_tag.default args
   ;;
 
   let cnstrs t = List.rev (fold t ~init:[] ~f:(fun acc cnstr _tag _args -> cnstr :: acc))
@@ -145,20 +145,20 @@ end = struct
       (match
          List.findi constant_cnstrs ~f:(fun (_ : int) -> Cnstr_name.( = ) cnstr_name)
        with
-       | Some (i, (_ : Cnstr_name.t)) -> Cnstr.Tag.of_int i, []
+       | Some (i, (_ : Cnstr_name.t)) -> Cnstr_tag.of_int i, []
        | None ->
          (match
             List.findi non_constant_cnstrs ~f:(fun _ ->
               Cnstr_name.( = ) cnstr_name << fst)
           with
-          | Some (i, (_, args)) -> Cnstr.Tag.of_int i, args
+          | Some (i, (_, args)) -> Cnstr_tag.of_int i, args
           | None ->
             compiler_bug
               [%message
                 "Constructor name lookup failed"
                   (cnstr_name : Cnstr_name.t)
                   ~cnstr_info:(t : t)]))
-    | Tuple args, Tuple -> Cnstr.Tag.default, args
+    | Tuple args, Tuple -> Cnstr_tag.default, args
     | Variants _, Tuple | Tuple _, Named _ ->
       compiler_bug
         [%message "Incompatible cnstr info" (cnstr : Cnstr.t) ~cnstr_info:(t : t)]
@@ -542,7 +542,7 @@ module Expr = struct
     | Let of Unique_name.t * t * t
     | Fun_call of Unique_name.t * t Nonempty.t
     | Make_block of
-        { tag : Cnstr.Tag.t
+        { tag : Cnstr_tag.t
         ; fields : t list [@sexp.omit_nil]
         }
     | Get_block_field of Block_index.t * t
@@ -557,8 +557,8 @@ module Expr = struct
     (* TODO: In practice, the expressions in conditions have to be simple names. Maybe we
        should enforce that in the type here. *)
     | Equals of t * Literal.t
-    | Constant_tag_equals of t * Cnstr.Tag.t
-    | Non_constant_tag_equals of t * Cnstr.Tag.t
+    | Constant_tag_equals of t * Cnstr_tag.t
+    | Non_constant_tag_equals of t * Cnstr_tag.t
     | And of cond * cond
 
   and cond_if_none_matched =
@@ -855,7 +855,7 @@ module Expr = struct
         let body = of_typed_expr ~ctx body body_type in
         add_let_bindings ~bindings ~body
       | Tuple fields, Tuple field_types ->
-        make_block ~ctx ~tag:Cnstr.Tag.default ~fields ~field_types
+        make_block ~ctx ~tag:Cnstr_tag.default ~fields ~field_types
       | Record_literal _, _ | Record_update _, _ | Record_field_access _, _ ->
         failwith "TODO: records in MIR exprs"
       | ( Lambda _, (Var _ | Type_app _ | Tuple _)

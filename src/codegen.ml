@@ -81,10 +81,10 @@ let print t ~to_:file = Llvm.print_module file t.module_
 
 module Tag = struct
   (* let no_scan = 0x8000 *)
-  let int = Mir.Cnstr.Tag.of_int 0x8001
-  let char = Mir.Cnstr.Tag.of_int 0x8002
-  let float = Mir.Cnstr.Tag.of_int 0x8003
-  let string = Mir.Cnstr.Tag.of_int 0x8004
+  let int = Mir.Cnstr_tag.of_int 0x8001
+  let char = Mir.Cnstr_tag.of_int 0x8002
+  let float = Mir.Cnstr_tag.of_int 0x8003
+  let string = Mir.Cnstr_tag.of_int 0x8004
 end
 
 let block_tag_type = Llvm.i16_type
@@ -126,7 +126,7 @@ let block_pointer_type = Llvm.pointer_type << block_type
 
 let codegen_constant_tag t tag =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
-  let int63_value = Mir.Cnstr.Tag.to_int tag |> Int64.of_int in
+  let int63_value = Mir.Cnstr_tag.to_int tag |> Int64.of_int in
   let int64_value = Int64.shift_left int63_value 1 |> Int64.( + ) Int64.one in
   let is_signed = false in
   let int_value = Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed in
@@ -134,7 +134,7 @@ let codegen_constant_tag t tag =
 ;;
 
 let int_non_constant_tag t tag =
-  Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr.Tag.to_int tag)
+  Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr_tag.to_int tag)
 ;;
 
 let codegen_non_constant_tag t tag =
@@ -198,8 +198,8 @@ let find_value t ~kind name =
      and just deal with them like any other module. *)
   let intrinsic_value =
     match Unique_name.base_name name |> Ustring.to_string |> String.lsplit2 ~on:'%' with
-    | Some (_, "false") -> Some (Mir.Cnstr.Tag.of_int 0)
-    | Some (_, "true") -> Some (Mir.Cnstr.Tag.of_int 1)
+    | Some (_, "false") -> Some (Mir.Cnstr_tag.of_int 0)
+    | Some (_, "true") -> Some (Mir.Cnstr_tag.of_int 1)
     | None | Some _ -> None
   in
   match intrinsic_value with
@@ -403,7 +403,7 @@ and codegen_cond t cond =
     make_icmp (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
   | And _ -> failwith "TODO: And conditions"
 
-and box ?(tag = Mir.Cnstr.Tag.default) t ~fields =
+and box ?(tag = Mir.Cnstr_tag.default) t ~fields =
   (* TODO: Use GC instead of leaking memory. For now, let's just try to plug in a
        conservative GC e.g. Boehm. *)
   let block_field_num = Nonempty.length fields in

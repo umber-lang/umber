@@ -1,14 +1,12 @@
 open! Import
 open Names
 
-module Cnstr : sig
-  module Tag : sig
-    type t
+module Cnstr_tag : sig
+  type t
 
-    val of_int : int -> t
-    val to_int : t -> int
-    val default : t
-  end
+  val of_int : int -> t
+  val to_int : t -> int
+  val default : t
 end
 
 module Block_index : sig
@@ -16,7 +14,7 @@ module Block_index : sig
 
   val of_int : int -> t
   val to_int : t -> int
-end 
+end
 
 module Expr : sig
   type t =
@@ -25,7 +23,7 @@ module Expr : sig
     | Let of Unique_name.t * t * t
     | Fun_call of Unique_name.t * t Nonempty.t
     | Make_block of
-        { tag : Cnstr.Tag.t
+        { tag : Cnstr_tag.t
         ; fields : t list [@sexp.omit_nil]
         }
     | Get_block_field of Block_index.t * t
@@ -38,8 +36,8 @@ module Expr : sig
 
   and cond =
     | Equals of t * Literal.t
-    | Constant_tag_equals of t * Cnstr.Tag.t
-    | Non_constant_tag_equals of t * Cnstr.Tag.t
+    | Constant_tag_equals of t * Cnstr_tag.t
+    | Non_constant_tag_equals of t * Cnstr_tag.t
     | And of cond * cond
 
   and cond_if_none_matched =
