@@ -43,11 +43,11 @@ You can see code examples used for testing under `test/examples`. Currently only
 ### (Very) Rough Roadmap
 - [x] Lexing
 - [x] Parsing
-- [ ] (in progress) Name resolution
-- [ ] (in progress) Basic type inference and checking
+- [x] Name resolution
+- [x] Basic type inference and checking
 - [ ] Record types
 - [ ] Traits
 - [ ] Effects
-- [ ] Basic code generation
+- [ ] (In progress) Code generation to LLVM
 - [ ] Garbage collection
 - [ ] Self-hosting
