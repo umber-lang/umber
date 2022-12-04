@@ -12,7 +12,7 @@ entry:
   ret void
 }
 
-define %umber_block* @Option.Some.0(%umber_block* %arg0.0) {
+define tailcc %umber_block* @Option.Some.0(%umber_block* %arg0.0) {
 entry:
   %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 2))
   %box = bitcast i8* %malloccall to i64*

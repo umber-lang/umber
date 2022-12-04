@@ -1,2 +1,8 @@
 ; ModuleID = 'Empty.um'
 source_filename = "Empty.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+define void @main() {
+entry:
+  ret void
+}
