@@ -8,11 +8,10 @@
      (if_none_matched
       (Otherwise
        (Let Classics.n.0 (Name .0)
-        (Fun_call Std.Prelude.Operators.*%int_mul.0
+        (Fun_call %int_mul
          ((Name Classics.n.0)
           (Fun_call Classics.fact.0
-           ((Fun_call Std.Prelude.Operators.-%int_sub.0
-             ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
+           ((Fun_call %int_sub ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
  (Fun_def
   ((fun_name Classics.fib.0) (closed_over ()) (args (Classics.n.1))
    (body
@@ -24,10 +23,8 @@
      (if_none_matched
       (Otherwise
        (Let Classics.n.2 (Name Classics.n.1)
-        (Fun_call Std.Prelude.Operators.+%int_add.0
+        (Fun_call %int_add
          ((Fun_call Classics.fib.0
-           ((Fun_call Std.Prelude.Operators.-%int_sub.0
-             ((Name Classics.n.2) (Primitive (Int 1))))))
+           ((Fun_call %int_sub ((Name Classics.n.2) (Primitive (Int 1))))))
           (Fun_call Classics.fib.0
-           ((Fun_call Std.Prelude.Operators.-%int_sub.0
-             ((Name Classics.n.2) (Primitive (Int 2))))))))))))))))
+           ((Fun_call %int_sub ((Name Classics.n.2) (Primitive (Int 2))))))))))))))))

@@ -13,7 +13,7 @@
         (Let MutualRecursion.tree.0
          (Get_block_field 0 (Name MutualRecursion.forest.0))
          (Fun_call MutualRecursion.loop.0
-          ((Fun_call Std.Prelude.Operators.+%int_add.0
+          ((Fun_call %int_add
             ((Name MutualRecursion.acc.0)
              (Fun_call MutualRecursion.sum_tree.0
               ((Name MutualRecursion.tree.0)))))
@@ -34,7 +34,7 @@
       (Otherwise
        (Let MutualRecursion.forest.2 (Get_block_field 1 (Name .0))
         (Let MutualRecursion.x.0 (Get_block_field 0 (Name .0))
-         (Fun_call Std.Prelude.Operators.+%int_add.0
+         (Fun_call %int_add
           ((Name MutualRecursion.x.0)
            (Fun_call MutualRecursion.sum_forest.0
             ((Name MutualRecursion.forest.2)))))))))))))
@@ -51,32 +51,30 @@
    (args (MutualRecursion.x.1))
    (body
     (Let match.0
-     (Fun_call Std.Prelude.Operators.==%eq.0
-      ((Name MutualRecursion.x.1) (Primitive (Int 0))))
+     (Fun_call %eq ((Name MutualRecursion.x.1) (Primitive (Int 0))))
      (Cond_assign (conds (((Constant_tag_equals (Name match.0) 1) ())))
-      (body (Name True%true.0))
+      (body (Name %true))
       (if_none_matched
        (Otherwise
         (Fun_call MutualRecursion.odd.0
-         ((Fun_call Std.Prelude.Operators.-%int_sub.0
+         ((Fun_call %int_sub
            ((Name MutualRecursion.x.1) (Primitive (Int 1)))))))))))))
  (Fun_def
   ((fun_name MutualRecursion.odd.0) (closed_over ())
    (args (MutualRecursion.x.2))
    (body
     (Let match.1
-     (Fun_call Std.Prelude.Operators.==%eq.0
-      ((Name MutualRecursion.x.2) (Primitive (Int 0))))
+     (Fun_call %eq ((Name MutualRecursion.x.2) (Primitive (Int 0))))
      (Cond_assign (conds (((Constant_tag_equals (Name match.1) 1) ())))
-      (body (Name False%false.0))
+      (body (Name %false))
       (if_none_matched
        (Otherwise
         (Fun_call MutualRecursion.even.0
-         ((Fun_call Std.Prelude.Operators.-%int_sub.0
+         ((Fun_call %int_sub
            ((Name MutualRecursion.x.2) (Primitive (Int 1)))))))))))))
  (Value_def MutualRecursion.number.0
   (Let MutualRecursion.number.1 (Primitive (Int 5))
    (Let MutualRecursion.number.2
-    (Fun_call Std.Prelude.Operators.+%int_add.0
+    (Fun_call %int_add
      ((Name MutualRecursion.number.1) (Name MutualRecursion.number.1)))
     (Name MutualRecursion.number.2)))))
