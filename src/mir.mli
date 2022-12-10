@@ -19,16 +19,16 @@ end
 module Expr : sig
   type t =
     | Primitive of Literal.t
-    | Name of Unique_name.t
-    | Let of Unique_name.t * t * t
-    | Fun_call of Unique_name.t * t Nonempty.t
+    | Name of Mir_name.t
+    | Let of Mir_name.t * t * t
+    | Fun_call of Mir_name.t * t Nonempty.t
     | Make_block of
         { tag : Cnstr_tag.t
         ; fields : t list
         }
     | Get_block_field of Block_index.t * t
     | Cond_assign of
-        { vars : Unique_name.t list
+        { vars : Mir_name.t list
         ; conds : (cond * t list) Nonempty.t
         ; body : t
         ; if_none_matched : cond_if_none_matched
@@ -47,9 +47,9 @@ module Expr : sig
 
   module Fun_def : sig
     type nonrec t =
-      { fun_name : Unique_name.t
-      ; closed_over : Unique_name.Set.t
-      ; args : Unique_name.t Nonempty.t
+      { fun_name : Mir_name.t
+      ; closed_over : Mir_name.Set.t
+      ; args : Mir_name.t Nonempty.t
       ; body : t
       }
     [@@deriving sexp_of]
@@ -58,7 +58,7 @@ end
 
 module Stmt : sig
   type t =
-    | Value_def of Unique_name.t * Expr.t
+    | Value_def of Mir_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
     | Extern_decl of
         { extern_name : Extern_name.t

@@ -273,30 +273,69 @@ end = struct
   ;;
 end
 
-module Unique_name : sig
-  type t [@@deriving sexp]
+module Mir_name : sig
+  type t [@@deriving compare, equal, hash, sexp]
 
+  include Stringable.S with type t := t
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 
   val create : Ustring.t -> t
-  val base_name : t -> Ustring.t
+  val of_extern_name : Extern_name.t -> t
+  val extern_name : t -> Extern_name.t option
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
-  val map_id : t -> f:(int -> int) -> t
+  val map_parts : t -> f:(Ustring.t -> int -> int) -> t
 end = struct
-  module Id = Unique_id.Int ()
+  module Unique_name = struct
+    module Id = Unique_id.Int ()
+
+    module T = struct
+      module U = struct
+        type t = Ustring.t * Id.t [@@deriving compare, equal, hash]
+
+        let to_string (ustr, id) = [%string "%{ustr#Ustring}.%{id#Id}"]
+        let to_ustring (ustr, id) = Ustring.(ustr ^ of_string_exn [%string ".%{id#Id}"])
+
+        let of_string str =
+          let name, id = String.rsplit2_exn str ~on:'.' in
+          Ustring.of_string_exn name, Id.of_string id
+        ;;
+      end
+
+      include U
+      include Sexpable.Of_stringable (U)
+    end
+
+    include T
+    include Comparable.Make (T)
+    include Hashable.Make (T)
+
+    let create ustr = ustr, Id.create ()
+
+    let map_parts (ustr, id) ~f =
+      let id = f ustr (Id.to_int_exn id) |> Id.of_int_exn in
+      ustr, id
+    ;;
+  end
 
   module T = struct
     module U = struct
-      type t = Ustring.t * Id.t [@@deriving compare, hash]
+      type t =
+        | Internal of Unique_name.t
+        | External of Extern_name.t
+      [@@deriving compare, equal, hash]
 
-      let to_string (ustr, id) = [%string "%{ustr#Ustring}.%{id#Id}"]
-      let to_ustring (ustr, id) = Ustring.(ustr ^ of_string_exn [%string ".%{id#Id}"])
+      let to_ustring = function
+        | Internal name -> Unique_name.to_ustring name
+        | External name -> Extern_name.to_ustring name
+      ;;
+
+      let to_string t = to_ustring t |> Ustring.to_string
 
       let of_string str =
-        let name, id = String.rsplit2_exn str ~on:'.' in
-        Ustring.of_string_exn name, Id.of_string id
+        try Internal (Unique_name.of_string str) with
+        | _ -> External (Extern_name.of_string_exn str)
       ;;
     end
 
@@ -308,7 +347,16 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let create ustr = ustr, Id.create ()
-  let base_name = fst
-  let map_id t ~f = Tuple2.map_snd t ~f:(Id.of_int_exn << f << Id.to_int_exn)
+  let create ustr = Internal (Unique_name.create ustr)
+  let of_extern_name name = External name
+
+  let extern_name = function
+  | Internal _ -> None
+  | External name -> Some name
+
+  let map_parts t ~f =
+    match t with
+    | Internal name -> Internal (Unique_name.map_parts name ~f)
+    | External _ as t -> t
+  ;;
 end

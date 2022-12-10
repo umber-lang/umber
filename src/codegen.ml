@@ -15,25 +15,26 @@ module Value_table : sig
 
   val create : unit -> t
   val parse : Llvm.llcontext -> string -> t
-  val add : t -> Unique_name.t -> Llvm.llvalue -> unit
+  val add : t -> Mir_name.t -> Llvm.llvalue -> unit
 
   val find
     :  t
     -> kind:[ `Function | `Unknown ]
     -> module_:Llvm.llmodule
-    -> Unique_name.t
+    -> Mir_name.t
     -> Llvm.llvalue
 end = struct
+  (* TODO: Get rid of `existing` and have MIR declare uses of things from other modules. *)
   type t =
-    { local : Llvm_sexp.llvalue Unique_name.Table.t
+    { local : Llvm_sexp.llvalue Mir_name.Table.t
     ; existing : Llvm_sexp.llmodule option
     }
   [@@deriving sexp_of]
 
-  let create () = { local = Unique_name.Table.create (); existing = None }
+  let create () = { local = Mir_name.Table.create (); existing = None }
 
   let parse context ll_string =
-    { local = Unique_name.Table.create ()
+    { local = Mir_name.Table.create ()
     ; existing =
         Some (Llvm_irreader.parse_ir context (Llvm.MemoryBuffer.of_string ll_string))
     }
@@ -45,7 +46,7 @@ end = struct
     | `Duplicate ->
       compiler_bug
         [%message
-          "Tried to add duplicate LLVM value definition" (name : Unique_name.t) (t : t)]
+          "Tried to add duplicate LLVM value definition" (name : Mir_name.t) (t : t)]
   ;;
 
   let find ({ local; existing } as t) ~(kind : [ `Function | `Unknown ]) ~module_ name =
@@ -53,7 +54,7 @@ end = struct
     | Some value -> value
     | None ->
       let result =
-        let name_str = Unique_name.to_string name in
+        let name_str = Mir_name.to_string name in
         let%bind.Option existing = existing in
         match Llvm.lookup_function name_str existing, kind with
         | Some value, _ ->
@@ -63,7 +64,7 @@ end = struct
       in
       Option.value_or_thunk result ~default:(fun () ->
         compiler_bug
-          [%message "Failed to find LLVM value for name" (name : Unique_name.t) (t : t)])
+          [%message "Failed to find LLVM value for name" (name : Mir_name.t) (t : t)])
   ;;
 end
 
@@ -194,12 +195,14 @@ let get_block_tag t value =
 ;;
 
 let find_value t ~kind name =
-  (* TODO: It would be nice to have something less hacky/special-cased for intrinsics,
-     and just deal with them like any other module. *)
+  (* TODO: Have the MIR declare uses of intrinsics like anything else from other modules. *)
   let intrinsic_value =
-    match Unique_name.base_name name |> Ustring.to_string |> String.lsplit2 ~on:'%' with
-    | Some (_, "false") -> Some (Mir.Cnstr_tag.of_int 0)
-    | Some (_, "true") -> Some (Mir.Cnstr_tag.of_int 1)
+    match
+      Mir_name.extern_name name
+      |> Option.map ~f:(Extern_name.to_ustring >> Ustring.to_string)
+    with
+    | Some "%false" -> Some (Mir.Cnstr_tag.of_int 0)
+    | Some "%true" -> Some (Mir.Cnstr_tag.of_int 1)
     | None | Some _ -> None
   in
   match intrinsic_value with
@@ -234,13 +237,13 @@ let rec codegen_expr t expr =
                arg_type
                (Array.create arg_type ~len:(Nonempty.length args)))
         in
-        let fun_name = Unique_name.to_string fun_name in
+        let fun_name = Mir_name.to_string fun_name in
         Llvm.build_bitcast fun_value fun_pointer_type fun_name t.builder
       | value_kind ->
         compiler_bug
           [%message
             "Unexpected LLVM value kind for function"
-              (fun_name : Unique_name.t)
+              (fun_name : Mir_name.t)
               (value_kind : Llvm_sexp.Value_kind.t)]
     in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
@@ -294,7 +297,7 @@ let rec codegen_expr t expr =
             (Llvm.build_extractelement
                phi_value
                (Llvm.const_int (Llvm.i64_type t.context) i)
-               (Unique_name.to_string var)
+               (Mir_name.to_string var)
                t.builder));
         Some phi_value)
     in
@@ -306,7 +309,7 @@ let rec codegen_expr t expr =
       let binding_values =
         List.map2_exn vars bindings ~f:(fun name expr ->
           let value = codegen_expr t expr in
-          Llvm.set_value_name (Unique_name.to_string name) value;
+          Llvm.set_value_name (Mir_name.to_string name) value;
           value)
       in
       ignore_value (Llvm.build_br phi_block t.builder);
@@ -458,7 +461,7 @@ let codegen_stmt t stmt =
        initializers can only be const expressions. The other option would be splitting
        things by whether they are const or not. *)
     let global_value =
-      Llvm.declare_global (block_pointer_type t) (Unique_name.to_string name) t.module_
+      Llvm.declare_global (block_pointer_type t) (Mir_name.to_string name) t.module_
     in
     (* TODO: Having this be lazy is quite pointless if we always force it. *)
     Llvm.position_at_end (Llvm.insertion_block t.main_function_builder) t.builder;
@@ -473,17 +476,17 @@ let codegen_stmt t stmt =
     global_value
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
-    then raise_s [%message "TODO: closures" (closed_over : Unique_name.Set.t)];
+    then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
     let type_ = block_pointer_type t in
     let fun_type =
       Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
     in
-    let fun_ = Llvm.define_function (Unique_name.to_string fun_name) fun_type t.module_ in
+    let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
     Llvm.set_function_call_conv tailcc fun_;
     let fun_params = Llvm.params fun_ in
     Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
-      Llvm.set_value_name (Unique_name.to_string arg_name) arg_value;
+      Llvm.set_value_name (Mir_name.to_string arg_name) arg_value;
       Value_table.add t.values arg_name arg_value);
     let entry_block = Llvm.entry_block fun_ in
     Llvm.position_at_end entry_block t.builder;
