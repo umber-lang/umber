@@ -249,6 +249,8 @@ type_expr:
   | t = type_non_fun { t }
   | t = type_fun { t }
 
+(* TODO: Consider having trait bounds use brackets [] instead of parens (). I think it
+   looks a little clearer and would also be easier to parse. *)
 %inline trait_bound:
   | bounds = parens(block_items(pair(UPPER_NAME, type_params_nonempty)));
     FAT_ARROW

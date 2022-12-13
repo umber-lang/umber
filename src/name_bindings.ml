@@ -282,16 +282,10 @@ let core =
       { empty_bindings with
         types =
           List.fold
+            Intrinsics.all
             ~init:empty_bindings.types
-            ~f:(fun types (name, decl) ->
-              Map.set types ~key:name ~data:(Some (Local decl)))
-            Intrinsics.
-              [ Bool.name, Bool.decl
-              ; Int.name, Int.decl
-              ; Float.name, Float.decl
-              ; Char.name, Char.decl
-              ; String.name, String.decl
-              ]
+            ~f:(fun types (module Intrinsic) ->
+            Map.set types ~key:Intrinsic.name ~data:(Some (Local Intrinsic.decl)))
       ; names =
           List.fold
             Intrinsics.Bool.cnstrs

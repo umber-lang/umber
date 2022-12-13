@@ -56,14 +56,19 @@ module Expr : sig
   end
 end
 
+module Extern_decl : sig
+  type t =
+    { name : Mir_name.t
+    ; arity : int
+    }
+  [@@deriving sexp]
+end
+
 module Stmt : sig
   type t =
     | Value_def of Mir_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
-    | Extern_decl of
-        { extern_name : Extern_name.t
-        ; arity : int
-        }
+    | Extern_decl of Extern_decl.t
   [@@deriving sexp_of, variants]
 end
 

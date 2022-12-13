@@ -102,6 +102,7 @@ module Module_path : sig
   val of_ustrings_unchecked : Ustring.t list -> t
   val of_ustrings_exn : Ustring.t list -> t
   val to_ustring : t -> Ustring.t
+  val is_prefix : prefix:t -> t -> bool
 end = struct
   (* TODO: Maybe the sexp of this type should use the nice ustring representation, rather
      than just being a sexp list. *)
@@ -123,6 +124,16 @@ end = struct
       Ustring.iter (Module_name.to_ustring s) ~f:(Queue.enqueue q));
     ignore (Queue.dequeue q : Uchar.t option);
     Queue.to_array q |> Ustring.of_array_unchecked
+  ;;
+
+  let rec is_prefix ~prefix:t t' =
+    match t, t' with
+    | [], ([] | _ :: _) -> true
+    | _ :: _, [] -> false
+    | module_name :: rest, module_name' :: rest' ->
+      if Module_name.equal module_name module_name'
+      then is_prefix ~prefix:rest rest'
+      else false
   ;;
 end
 
@@ -351,8 +362,9 @@ end = struct
   let of_extern_name name = External name
 
   let extern_name = function
-  | Internal _ -> None
-  | External name -> Some name
+    | Internal _ -> None
+    | External name -> Some name
+  ;;
 
   let map_parts t ~f =
     match t with

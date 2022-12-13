@@ -84,8 +84,8 @@ end = struct
     { targets = Set.add targets target
     ; max_stage =
         (match max_stage with
-        | Some max_stage -> Some (Stage.max max_stage (Target.stage target))
-        | None -> Some (Target.stage target))
+         | Some max_stage -> Some (Stage.max max_stage (Target.stage target))
+         | None -> Some (Target.stage target))
     }
   ;;
 

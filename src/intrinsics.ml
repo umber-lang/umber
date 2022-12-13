@@ -76,3 +76,7 @@ end)
 module String = Make_abstract (struct
   let name = "String"
 end)
+
+let all : (module Type) list =
+  [ (module Bool); (module Int); (module Float); (module Char); (module String) ]
+;;

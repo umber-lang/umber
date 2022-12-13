@@ -171,13 +171,40 @@ end = struct
   ;;
 end
 
+module Extern_decl = struct
+  type t =
+    { name : Mir_name.t
+    ; arity : int
+    }
+  [@@deriving sexp]
+end
+
+(* TODO: This doesn't handle polymorphic types particularly smartly. Should think about
+   whether that matters. *)
+let rec arity_of_type ~names : Type.Scheme.t -> int = function
+  | Var _ | Tuple _ -> 0
+  | Type_app (type_name, _) ->
+    (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
+     | Abstract | Variants _ | Record _ -> 0
+     | Alias type_ -> arity_of_type ~names type_)
+  | Function (args, _) -> Nonempty.length args
+  | Partial_function _ -> .
+;;
+
 module Context : sig
   type t [@@deriving sexp_of]
 
   val of_name_bindings : Name_bindings.t -> t
   val add_value_name : t -> Value_name.t -> t * Mir_name.t
-  val find_value_name : t -> Value_name.Qualified.t -> Mir_name.t
-  val find_value_name' : t -> Value_name.Qualified.t -> Mir_name.t option
+
+  val find_value_name
+    :  t
+    -> Value_name.Qualified.t
+    -> add_extern_decl:(Extern_decl.t -> unit)
+    -> Mir_name.t
+
+  val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
+  val peek_value_name : t -> Value_name.Qualified.t -> Mir_name.t option
 
   type find_observer := Value_name.Qualified.t -> Mir_name.t -> unit
 
@@ -186,8 +213,13 @@ module Context : sig
   val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
   val find_cnstr_info_from_decl : t -> Type.Decl.decl -> Cnstr_info.t option
 end = struct
+  type extern_info =
+    | Local
+    | External of { arity : int }
+  [@@deriving sexp_of]
+
   type t =
-    { names : Mir_name.t Ustring.Map.t
+    { names : (Mir_name.t * extern_info) Value_name.Qualified.Map.t
     ; name_bindings : Name_bindings.t [@sexp.opaque]
     ; find_observer : Value_name.Qualified.t -> Mir_name.t -> unit [@sexp.opaque]
     }
@@ -204,60 +236,86 @@ end = struct
   (* TODO: Creating new unique names here means uses of imported names are
      different in different files, which is weird. Maybe [Name_bindings] should be
      responsible for assigning unique names for names in its own file? *)
-  let add ?extern_name t name =
-    let name = Value_name.Qualified.to_ustring name in
-    let name' =
+  let add t name ~extern_name ~extern_info =
+    let mir_name =
       match extern_name with
-      | None -> Mir_name.create name
+      | None -> Mir_name.create (Value_name.Qualified.to_ustring name)
       | Some extern_name -> Mir_name.of_extern_name extern_name
     in
-    { t with names = Map.set t.names ~key:name ~data:name' }, name'
+    { t with names = Map.set t.names ~key:name ~data:(mir_name, extern_info) }, mir_name
   ;;
 
   let add_value_name t name =
     if Constant_names.mem name
-    then add t ([], name)
+    then add t ([], name) ~extern_name:None ~extern_info:Local
     else (
       let path = Name_bindings.(current_path t.name_bindings |> Path.to_module_path) in
-      add t (path, name))
+      add t (path, name) ~extern_name:None ~extern_info:Local)
   ;;
 
-  let find { names; name_bindings; _ } name =
-    match Map.find names (Value_name.Qualified.to_ustring name) with
+  let find { names; _ } name =
+    match Map.find names name with
     | Some _ as name -> name
-    | None ->
-      (* FIXME: What does this case do? I don't think it makes sense. *)
-      (match Name_bindings.find_entry name_bindings name with
+    | None -> None
+  ;;
+
+  (* FIXME: What does this case do? I don't think it makes sense. *)
+  (* (match Name_bindings.find_entry name_bindings name with
        | exception Name_bindings.Name_error _ -> None
        | entry ->
          Name_bindings.Name_entry.extern_name entry
-         |> Option.map ~f:(Mir_name.create << Extern_name.to_ustring))
-  ;;
+         |> Option.map ~f:Mir_name.of_extern_name) *)
 
-  (* FIXME: Is it intentional that this doesn't called [t.find_observer]? Seems wrong *)
-  let find_value_name' t name =
+  let peek_value_name_internal t name =
     match name with
     | [], name when Constant_names.mem name -> find t ([], name)
     | _ ->
       let name =
         try Name_bindings.absolutify_value_name t.name_bindings name with
-        | Name_bindings.Name_error _ ->
+        | Name_bindings.Name_error error ->
+          (* FIXME: Cleanup *)
+          if String.is_substring (Ustring.to_string error) ~substring:"List.Cons"
+          then
+            raise_s
+              [%message
+                "name error absolutifying value name"
+                  (error : Ustring.t)
+                  (t.name_bindings : Name_bindings.t)];
           Name_bindings.(current_path t.name_bindings |> Path.to_module_path), snd name
       in
       find t name
   ;;
 
-  let find_value_name t name =
-    match find_value_name' t name with
-    | Some name' ->
+  let find_value_name_internal t name =
+    match peek_value_name_internal t name with
+    | Some ((name', _) as entry) ->
       t.find_observer name name';
-      name'
+      entry
     | None ->
       compiler_bug
         [%message
           "Name missing from context"
             (name : Value_name.Qualified.t)
-            (t.names : Mir_name.t Ustring.Map.t)]
+            (t.names : (Mir_name.t * extern_info) Value_name.Qualified.Map.t)]
+  ;;
+
+  let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
+
+  let find_value_name t name ~add_extern_decl =
+    let name, extern_info = find_value_name_internal t name in
+    (match extern_info with
+     | Local -> ()
+     | External { arity } -> add_extern_decl { Extern_decl.name; arity });
+    name
+  ;;
+
+  let find_value_name_assert_local t name =
+    let name, extern_info = find_value_name_internal t ([], name) in
+    (match extern_info with
+     | Local -> ()
+     | External _ ->
+       compiler_bug [%message "Unexpected non-local value" (extern_info : extern_info)]);
+    name
   ;;
 
   let with_find_observer t ~f = { t with find_observer = f t.find_observer }
@@ -266,10 +324,36 @@ end = struct
     (* FIXME: We add all these names, but then still allow looking them up from the name
        bindings later. I don't think this makes sense. *)
     let t =
-      { names = Ustring.Map.empty; name_bindings; find_observer = (fun _ _ -> ()) }
+      { names = Value_name.Qualified.Map.empty
+      ; name_bindings
+      ; find_observer = (fun _ _ -> ())
+      }
     in
-    Name_bindings.fold_local_names name_bindings ~init:t ~f:(fun t name entry ->
-      fst (add t name ?extern_name:(Name_bindings.Name_entry.extern_name entry)))
+    let current_path =
+      Name_bindings.current_path name_bindings |> Name_bindings.Path.to_module_path
+    in
+    Name_bindings.fold_local_names
+      name_bindings
+      ~init:t
+      ~f:(fun t ((path, _) as name) entry ->
+      let extern_name = Name_bindings.Name_entry.extern_name entry in
+      let extern_info =
+        if Option.is_none extern_name && Module_path.is_prefix ~prefix:current_path path
+        then Local
+        else (
+          let scheme =
+            Option.value_or_thunk
+              (Name_bindings.Name_entry.scheme entry)
+              ~default:(fun () ->
+              compiler_bug
+                [%message
+                  "Didn't find type scheme for external name entry"
+                    (name : Value_name.Qualified.t)
+                    (entry : Name_bindings.Name_entry.t)])
+          in
+          External { arity = arity_of_type ~names:name_bindings scheme })
+      in
+      fst (add t name ~extern_name ~extern_info))
   ;;
 
   let cnstr_info_lookup_failed type_ =
@@ -754,7 +838,7 @@ module Expr = struct
       let acc, mir_expr =
         process_expr acc ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
       in
-      let add_name ctx name = ctx, Context.find_value_name ctx ([], name) in
+      let add_name ctx name = ctx, Context.find_value_name_assert_local ctx name in
       let binding_name =
         match pat' with
         | Catch_all (Some name) | As (_, name) -> name
@@ -783,13 +867,14 @@ module Expr = struct
     ~just_bound:outer_just_bound
     ~ctx:outer_ctx
     ~add_fun_def
+    ~add_extern_decl
     outer_expr
     outer_type
     =
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match (expr : Type.Scheme.t Typed.Expr.t), (expr_type : Type.Scheme.t) with
       | Literal lit, _ -> Primitive lit
-      | Name name, _ -> Name (Context.find_value_name ctx name)
+      | Name name, _ -> Name (Context.find_value_name ctx name ~add_extern_decl)
       | Fun_call (fun_, args_and_types), body_type ->
         let fun_call () =
           let arg_types = Nonempty.map ~f:snd args_and_types in
@@ -898,7 +983,7 @@ module Expr = struct
       let ctx =
         let from_which_context name mir_name =
           let in_context ctx =
-            Context.find_value_name' ctx name
+            Context.peek_value_name ctx name
             |> Option.value_map ~default:false ~f:(Mir_name.equal mir_name)
           in
           if in_context outer_ctx
@@ -997,7 +1082,7 @@ module Expr = struct
           let (_ : Context.t), bindings =
             (* Names are pre-added to the context above so they get the same unique names
                in different patterns. *)
-            let add_name ctx name = ctx, Context.find_value_name ctx ([], name) in
+            let add_name ctx name = ctx, Context.find_value_name_assert_local ctx name in
             let add_let bindings name expr = (name, expr) :: bindings in
             fold_pattern_bindings
               ~ctx
@@ -1107,11 +1192,7 @@ module Stmt = struct
   type t =
     | Value_def of Mir_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
-    (* TODO: Should extend [Extern_decl] to support non-extern imported values. *)
-    | Extern_decl of
-        { extern_name : Extern_name.t
-        ; arity : int
-        }
+    | Extern_decl of Extern_decl.t
   [@@deriving sexp_of, variants]
 
   let map_names stmt ~f =
@@ -1132,29 +1213,26 @@ end
 
 type t = Stmt.t list [@@deriving sexp_of]
 
-(* This doesn't handle abstract types in defs or polymorphic types particularly smartly,
-   but is only needed for extern types, so this should be fine. *)
-let rec arity_of_type ~names : Type.Scheme.t -> int = function
-  | Var _ | Tuple _ -> 0
-  | Type_app (type_name, _) ->
-    (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
-     | Abstract | Variants _ | Record _ -> 0
-     | Alias type_ -> arity_of_type ~names type_)
-  | Function (args, _) -> Nonempty.length args
-  | Partial_function _ -> .
-;;
-
 let of_typed_module =
   let handle_let_bindings
     ~ctx
     ~stmts
     ~rec_
+    ~extern_decls
     (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t Nonempty.t)
     =
     let process_expr stmts ~just_bound ~ctx expr typ =
       let stmts = ref stmts in
       let add_fun_def fun_def = stmts := Stmt.Fun_def fun_def :: !stmts in
-      let expr = Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def expr typ in
+      let add_extern_decl (extern_decl : Extern_decl.t) =
+        if not (Hash_set.mem extern_decls extern_decl.name)
+        then (
+          Hash_set.add extern_decls extern_decl.name;
+          stmts := Stmt.Extern_decl extern_decl :: !stmts)
+      in
+      let expr =
+        Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def ~add_extern_decl expr typ
+      in
       !stmts, expr
     in
     let add_let stmts name mir_expr =
@@ -1204,32 +1282,37 @@ let of_typed_module =
           in
           outer_ctx, stmt :: stmts)
   in
-  let rec loop ~ctx ~names ~stmts (defs : Typed.Module.def Node.t list) =
+  let rec loop ~ctx ~names ~stmts ~extern_decls (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.node with
-      | Let { rec_; bindings } -> handle_let_bindings ~ctx ~stmts ~rec_ bindings
+      | Let { rec_; bindings } ->
+        handle_let_bindings ~ctx ~stmts ~rec_ ~extern_decls bindings
       | Module (module_name, _sigs, defs) ->
-        Context.with_module ctx module_name ~f:(fun ctx -> loop ~ctx ~names ~stmts defs)
+        Context.with_module ctx module_name ~f:(fun ctx ->
+          loop ~ctx ~names ~stmts ~extern_decls defs)
       | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
       (* TODO: Should probably preserve extern declarations *)
       | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
         generate_variant_constructor_values ~ctx ~stmts decl
       | Common_def
           (Extern ((_ : Value_name.t), (_ : Fixity.t option), type_, extern_name)) ->
-        ctx, Extern_decl { extern_name; arity = arity_of_type ~names type_ } :: stmts
+        ( ctx
+        , Extern_decl
+            { name = Mir_name.of_extern_name extern_name
+            ; arity = arity_of_type ~names type_
+            }
+          :: stmts )
       | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _) ->
         ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
-    try
-      let names = Name_bindings.into_module names module_name ~place:`Def in
-      let _ctx, stmts =
-        loop ~ctx:(Context.of_name_bindings names) ~names ~stmts:[] defs
-      in
-      Ok (List.rev stmts)
-    with
-    | Compilation_error.Compilation_error error -> Error error
-    | Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
+    let names = Name_bindings.into_module names module_name ~place:`Def in
+    let ctx = Context.of_name_bindings names in
+    let extern_decls = Mir_name.Hash_set.create () in
+    match loop ~ctx ~names ~stmts:[] ~extern_decls defs with
+    | (_ : Context.t), stmts -> Ok (List.rev stmts)
+    | exception Compilation_error.Compilation_error error -> Error error
+    | exception Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
 ;;
 
 let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
