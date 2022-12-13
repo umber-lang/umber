@@ -4,6 +4,8 @@
    (body
     (Make_block (tag 0)
      (fields ((Name ModuleSig.Range.lo.0) (Name ModuleSig.Range.hi.0)))))))
+ (Extern_decl ((name Std.Prelude.Operators.&&.194) (arity 2)))
+ (Extern_decl ((name %lte) (arity 2)))
  (Fun_def
   ((fun_name ModuleSig.Range.in.0) (closed_over ())
    (args (ModuleSig.Range.x.0 *lambda_arg.0))

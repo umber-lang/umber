@@ -1,4 +1,6 @@
-((Value_def MutualRecursion.f.0 (Name Std.Prelude.List.Nil.0))
+((Extern_decl ((name Std.Prelude.List.Nil.215) (arity 0)))
+ (Value_def MutualRecursion.f.0 (Name Std.Prelude.List.Nil.0))
+ (Extern_decl ((name %int_add) (arity 2)))
  (Fun_def
   ((fun_name MutualRecursion.loop.0) (closed_over ())
    (args (MutualRecursion.acc.0 MutualRecursion.forest.0))
@@ -46,6 +48,8 @@
  (Fun_def
   ((fun_name MutualRecursion.Node.0) (closed_over ()) (args (arg0.1 arg1.1))
    (body (Make_block (tag 0) (fields ((Name arg0.1) (Name arg1.1)))))))
+ (Extern_decl ((name %eq) (arity 2))) (Extern_decl ((name %true) (arity 0)))
+ (Extern_decl ((name %int_sub) (arity 2)))
  (Fun_def
   ((fun_name MutualRecursion.even.0) (closed_over ())
    (args (MutualRecursion.x.1))
@@ -59,6 +63,7 @@
         (Fun_call MutualRecursion.odd.0
          ((Fun_call %int_sub
            ((Name MutualRecursion.x.1) (Primitive (Int 1)))))))))))))
+ (Extern_decl ((name %false) (arity 0)))
  (Fun_def
   ((fun_name MutualRecursion.odd.0) (closed_over ())
    (args (MutualRecursion.x.2))

@@ -1,4 +1,6 @@
-((Value_def Basics.false.0 (Name %false))
+((Extern_decl ((name %false) (arity 0)))
+ (Value_def Basics.false.0 (Name %false))
+ (Extern_decl ((name %true) (arity 0)))
  (Value_def Basics.true.0 (Name %true))
  (Value_def Basics._.0
   (Cond_assign (conds (((Constant_tag_equals (Name Basics.false.0) 1) ())))
