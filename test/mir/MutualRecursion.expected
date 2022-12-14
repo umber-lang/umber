@@ -1,4 +1,4 @@
-((Extern_decl ((name Std.Prelude.List.Nil.215) (arity 0)))
+((Extern_decl ((name Std.Prelude.List.Nil.0) (arity 0)))
  (Value_def MutualRecursion.f.0 (Name Std.Prelude.List.Nil.0))
  (Extern_decl ((name %int_add) (arity 2)))
  (Fun_def

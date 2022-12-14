@@ -1207,7 +1207,9 @@ module Stmt = struct
       let args = Nonempty.map args ~f in
       let body = Expr.map_names body ~f in
       Fun_def { fun_name; closed_over; args; body }
-    | Extern_decl _ as t -> t
+    | Extern_decl { name; arity } ->
+      let name = f name in
+      Extern_decl { name; arity }
   ;;
 end
 

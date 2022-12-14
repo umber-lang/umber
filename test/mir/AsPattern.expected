@@ -2,8 +2,8 @@
   (Make_block (tag 0) (fields ((Primitive (Int 1)) (Primitive (Int 2))))))
  (Value_def AsPattern.one.0 (Get_block_field 0 (Name AsPattern.pair.0)))
  (Value_def AsPattern.two.0 (Get_block_field 1 (Name AsPattern.pair.0)))
- (Extern_decl ((name "Std.Prelude.Operators.;.3") (arity 2)))
- (Extern_decl ((name Std.Prelude.Operators.::.5) (arity 2)))
+ (Extern_decl ((name "Std.Prelude.Operators.;.0") (arity 2)))
+ (Extern_decl ((name Std.Prelude.Operators.::.0) (arity 2)))
  (Fun_def
   ((fun_name AsPattern.iter_pairs.0) (closed_over ())
    (args (AsPattern.f.0 AsPattern.lst.0))

@@ -229,7 +229,7 @@ let rec codegen_expr t expr =
       let fun_value = find_value t ~kind:`Function fun_name in
       match Llvm.classify_value fun_value with
       | Function -> fun_value
-      | Argument ->
+      | _ ->
         let arg_type = block_pointer_type t in
         let fun_pointer_type =
           Llvm.pointer_type
@@ -239,12 +239,6 @@ let rec codegen_expr t expr =
         in
         let fun_name = Mir_name.to_string fun_name in
         Llvm.build_bitcast fun_value fun_pointer_type fun_name t.builder
-      | value_kind ->
-        compiler_bug
-          [%message
-            "Unexpected LLVM value kind for function"
-              (fun_name : Mir_name.t)
-              (value_kind : Llvm_sexp.Value_kind.t)]
     in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     let call = Llvm.build_call fun_ args "fun_call" t.builder in
