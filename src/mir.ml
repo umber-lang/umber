@@ -894,6 +894,8 @@ module Expr = struct
         in
         (match fun_ with
          | Name (_, name) ->
+           (* TODO: I think there's no need for this special-casing actually: we can just
+              use the constructor functions directly. *)
            (* Special-case constructor applications *)
            (match Value_name.to_cnstr_name name with
             | Ok cnstr_name ->
