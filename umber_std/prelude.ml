@@ -444,8 +444,6 @@ entry:
   ret %umber_block* %box7
 }
 
-declare noalias i8* @malloc(i32)
-
 define tailcc %umber_block* @Std.Prelude.Operators...13(%umber_block* %Std.Prelude.Operators.f.14, %umber_block* %Std.Prelude.Operators.g.15, %umber_block* %Std.Prelude.Operators.x.16) {
 entry:
   %Std.Prelude.Operators.f.141 = bitcast %umber_block* %Std.Prelude.Operators.f.14 to %umber_block* (%umber_block*)*
@@ -559,6 +557,8 @@ entry:
 declare %umber_block* @"%int_sqrt"(%umber_block*)
 
 declare %umber_block* @"%print_endline"(%umber_block*)
+
+declare noalias i8* @malloc(i32)
 
 |}
 (*$*)

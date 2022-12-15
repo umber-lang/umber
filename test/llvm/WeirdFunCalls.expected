@@ -6,11 +6,11 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 
 @.0 = external global %umber_block*
-@string.465106951 = constant %umber_block { %umber_header { i16 -32764, i16 5 }, [5 x i8] c"plain" }
-@string.812905539 = constant %umber_block { %umber_header { i16 -32764, i16 8 }, [8 x i8] c"fun call" }
 @.1 = external global %umber_block*
 @"%true" = external global %umber_block*
 @WeirdFunCalls.if_.0 = external global %umber_block*
+@string.465106951 = constant %umber_block { %umber_header { i16 -32764, i16 5 }, [5 x i8] c"plain" }
+@string.812905539 = constant %umber_block { %umber_header { i16 -32764, i16 8 }, [8 x i8] c"fun call" }
 @string.1035704714 = constant %umber_block { %umber_header { i16 -32764, i16 2 }, [2 x i8] c"if" }
 
 define void @main() {

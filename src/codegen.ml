@@ -224,8 +224,6 @@ let rec codegen_expr t expr =
      | GlobalVariable -> Llvm.build_load value (Llvm.value_name value) t.builder
      | _ -> value)
   | Let (name, expr, body) ->
-    (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
-         and maybe allow recursive lets too. (?) *)
     Value_table.add t.values name (codegen_expr t expr);
     codegen_expr t body
   | Fun_call (fun_name, args) ->
@@ -454,47 +452,21 @@ and box ?(tag = Mir.Cnstr_tag.default) t ~fields =
   Llvm.build_bitcast heap_pointer (block_pointer_type t) "box" t.builder
 ;;
 
-let codegen_stmt t stmt =
+let preprocess_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
-  | Value_def (name, expr) ->
-    (* FIXME: Can't put code at toplevel, maybe jam it in a main function? It seems like
-       initializers can only be const expressions. The other option would be splitting
-       things by whether they are const or not. *)
-    let global_value =
-      Llvm.declare_global (block_pointer_type t) (Mir_name.to_string name) t.module_
-    in
-    (* TODO: Having this be lazy is quite pointless if we always force it. *)
-    Llvm.position_at_end (Llvm.insertion_block t.main_function_builder) t.builder;
-    let expr_value = codegen_expr t expr in
-    Llvm.position_at_end (Llvm.insertion_block t.builder) t.main_function_builder;
-    if Llvm.is_constant expr_value
-    then (
-      Llvm.set_global_constant true global_value;
-      Llvm.set_initializer expr_value global_value)
-    else ignore_value (Llvm.build_store expr_value global_value t.main_function_builder);
-    Value_table.add t.values name global_value;
-    global_value
-  | Fun_def { fun_name; closed_over; args; body } ->
-    if not (Set.is_empty closed_over)
-    then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
+  | Value_def (name, _) ->
+    Value_table.add
+      t.values
+      name
+      (Llvm.declare_global (block_pointer_type t) (Mir_name.to_string name) t.module_)
+  | Fun_def { fun_name; args; closed_over = _; body = _ } ->
     let type_ = block_pointer_type t in
     let fun_type =
       Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
     in
     let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
     Llvm.set_function_call_conv tailcc fun_;
-    let fun_params = Llvm.params fun_ in
-    Nonempty.iteri args ~f:(fun i arg_name ->
-      let arg_value = fun_params.(i) in
-      Llvm.set_value_name (Mir_name.to_string arg_name) arg_value;
-      Value_table.add t.values arg_name arg_value);
-    let entry_block = Llvm.entry_block fun_ in
-    Llvm.position_at_end entry_block t.builder;
-    let return_value = codegen_expr t body in
-    ignore_value (Llvm.build_ret return_value t.builder);
-    Llvm_analysis.assert_valid_function fun_;
-    Value_table.add t.values fun_name fun_;
-    fun_
+    Value_table.add t.values fun_name fun_
   | Extern_decl { name; arity } ->
     let type_ = block_pointer_type t in
     let name_str = Mir_name.to_string name in
@@ -507,8 +479,36 @@ let codegen_stmt t stmt =
           (Llvm.function_type type_ (Array.create type_ ~len:arity))
           t.module_
     in
-    Value_table.add t.values name value;
-    value
+    Value_table.add t.values name value
+;;
+
+let codegen_stmt t stmt =
+  match (stmt : Mir.Stmt.t) with
+  | Value_def (name, expr) ->
+    let global_value = Value_table.find t.values name ~kind:`Unknown ~module_:t.module_ in
+    Llvm.position_at_end (Llvm.insertion_block t.main_function_builder) t.builder;
+    let expr_value = codegen_expr t expr in
+    Llvm.position_at_end (Llvm.insertion_block t.builder) t.main_function_builder;
+    if Llvm.is_constant expr_value
+    then (
+      Llvm.set_global_constant true global_value;
+      Llvm.set_initializer expr_value global_value)
+    else ignore_value (Llvm.build_store expr_value global_value t.main_function_builder)
+  | Fun_def { fun_name; closed_over; args; body } ->
+    if not (Set.is_empty closed_over)
+    then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
+    let fun_ = Value_table.find t.values fun_name ~kind:`Function ~module_:t.module_ in
+    let fun_params = Llvm.params fun_ in
+    Nonempty.iteri args ~f:(fun i arg_name ->
+      let arg_value = fun_params.(i) in
+      Llvm.set_value_name (Mir_name.to_string arg_name) arg_value;
+      Value_table.add t.values arg_name arg_value);
+    let entry_block = Llvm.entry_block fun_ in
+    Llvm.position_at_end entry_block t.builder;
+    let return_value = codegen_expr t body in
+    ignore_value (Llvm.build_ret return_value t.builder);
+    Llvm_analysis.assert_valid_function fun_
+  | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
 ;;
 
 let create ~context ~source_filename ~values =
@@ -534,7 +534,8 @@ let create ~context ~source_filename ~values =
 
 let of_mir_exn ~context ~source_filename ~values mir =
   let t = create ~context ~source_filename ~values in
-  List.iter mir ~f:(ignore_value << codegen_stmt t);
+  List.iter mir ~f:(preprocess_stmt t);
+  List.iter mir ~f:(codegen_stmt t);
   ignore_value (Llvm.build_ret_void t.main_function_builder);
   match Llvm_analysis.verify_module t.module_ with
   | None -> t

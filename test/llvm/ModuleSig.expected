@@ -1,0 +1,55 @@
+; ModuleID = 'ModuleSig.um'
+source_filename = "ModuleSig.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@ModuleSig.my_range.0 = external global %umber_block*
+@int.1 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 1 }
+@int.10 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 10 }
+@ModuleSig.is_10_in_range.0 = external global %umber_block*
+
+define void @main() {
+entry:
+  %fun_call = tail call %umber_block* @ModuleSig.Range.between.0(%umber_block* @int.1, %umber_block* @int.10)
+  store %umber_block* %fun_call, %umber_block** @ModuleSig.my_range.0, align 8
+  %ModuleSig.my_range.0 = load %umber_block*, %umber_block** @ModuleSig.my_range.0, align 8
+  %fun_call1 = tail call %umber_block* @ModuleSig.Range.in.0(%umber_block* @int.10, %umber_block* %ModuleSig.my_range.0)
+  store %umber_block* %fun_call1, %umber_block** @ModuleSig.is_10_in_range.0, align 8
+  ret void
+}
+
+define tailcc %umber_block* @ModuleSig.Range.between.0(%umber_block* %ModuleSig.Range.lo.0, %umber_block* %ModuleSig.Range.hi.0) {
+entry:
+  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
+  %box = bitcast i8* %malloccall to i64*
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i64 1
+  store i16 2, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  store %umber_block* %ModuleSig.Range.lo.0, %umber_block** %box4, align 8
+  %box5 = bitcast i64* %box to %umber_block**
+  %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 2
+  store %umber_block* %ModuleSig.Range.hi.0, %umber_block** %box6, align 8
+  %box7 = bitcast i64* %box to %umber_block*
+  ret %umber_block* %box7
+}
+
+declare noalias i8* @malloc(i32)
+
+declare %umber_block* @"Std.Prelude.Operators.&&.0"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%lte"(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @ModuleSig.Range.in.0(%umber_block* %ModuleSig.Range.x.0, %umber_block* %"*lambda_arg.0") {
+entry:
+  %block_field = getelementptr %umber_block, %umber_block* %"*lambda_arg.0", i16 1
+  %block_field1 = getelementptr %umber_block, %umber_block* %"*lambda_arg.0", i16 2
+  %fun_call = tail call %umber_block* @"%lte"(%umber_block* %block_field, %umber_block* %ModuleSig.Range.x.0)
+  %fun_call2 = tail call %umber_block* @"%lte"(%umber_block* %ModuleSig.Range.x.0, %umber_block* %block_field1)
+  %fun_call3 = tail call %umber_block* @"Std.Prelude.Operators.&&.0"(%umber_block* %fun_call, %umber_block* %fun_call2)
+  ret %umber_block* %fun_call3
+}
