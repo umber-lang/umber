@@ -6,8 +6,8 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 
 @Functions.zero.0 = constant %umber_block* @float.0.
-@float.0. = constant %umber_block { %umber_header { i16 -32765, i16 1 }, double 0.000000e+00 }
 @Functions.still_zero_wow.0 = external global %umber_block*
+@float.0. = constant %umber_block { %umber_header { i16 -32765, i16 1 }, double 0.000000e+00 }
 
 define void @main() {
 entry:

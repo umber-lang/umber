@@ -6,9 +6,9 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 
 @ModuleSig.my_range.0 = external global %umber_block*
+@ModuleSig.is_10_in_range.0 = external global %umber_block*
 @int.1 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 1 }
 @int.10 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 10 }
-@ModuleSig.is_10_in_range.0 = external global %umber_block*
 
 define void @main() {
 entry:
@@ -38,8 +38,6 @@ entry:
   ret %umber_block* %box7
 }
 
-declare noalias i8* @malloc(i32)
-
 declare %umber_block* @"Std.Prelude.Operators.&&.0"(%umber_block*, %umber_block*)
 
 declare %umber_block* @"%lte"(%umber_block*, %umber_block*)
@@ -53,3 +51,5 @@ entry:
   %fun_call3 = tail call %umber_block* @"Std.Prelude.Operators.&&.0"(%umber_block* %fun_call, %umber_block* %fun_call2)
   ret %umber_block* %fun_call3
 }
+
+declare noalias i8* @malloc(i32)
