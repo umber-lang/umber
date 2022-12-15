@@ -30,7 +30,10 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  br i1 icmp eq (i64 ptrtoint (%umber_block** @Basics.false.0 to i64), i64 3), label %cond_binding, label %cond_otherwise
+  %Basics.false.0 = load %umber_block*, %umber_block** @Basics.false.0, align 8
+  %Basics.false.01 = ptrtoint %umber_block* %Basics.false.0 to i64
+  %equals = icmp eq i64 %Basics.false.01, 3
+  br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
@@ -39,25 +42,25 @@ cond_otherwise:                                   ; preds = %cond
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge1 = phi %umber_block* [ @float.1., %cond_binding_merge ], [ @float.2.5, %cond_otherwise ]
-  store %umber_block* %cond_otherwise_merge1, %umber_block** @Basics._.0, align 8
+  %cond_otherwise_merge2 = phi %umber_block* [ @float.1., %cond_binding_merge ], [ @float.2.5, %cond_otherwise ]
+  store %umber_block* %cond_otherwise_merge2, %umber_block** @Basics._.0, align 8
   %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 4))
   %box = bitcast i8* %malloccall to i64*
-  %box2 = bitcast i64* %box to i16*
-  store i16 0, i16* %box2, align 2
-  %box3 = getelementptr i16, i16* %box2, i64 1
-  store i16 3, i16* %box3, align 2
-  %box4 = bitcast i64* %box to %umber_block**
-  %box5 = getelementptr %umber_block*, %umber_block** %box4, i64 1
-  store %umber_block* @int.1, %umber_block** %box5, align 8
-  %box6 = bitcast i64* %box to %umber_block**
-  %box7 = getelementptr %umber_block*, %umber_block** %box6, i64 2
-  store %umber_block* @int.2, %umber_block** %box7, align 8
-  %box8 = bitcast i64* %box to %umber_block**
-  %box9 = getelementptr %umber_block*, %umber_block** %box8, i64 3
-  store %umber_block* @int.3, %umber_block** %box9, align 8
-  %box10 = bitcast i64* %box to %umber_block*
-  store %umber_block* %box10, %umber_block** @Basics.xyz.0, align 8
+  %box3 = bitcast i64* %box to i16*
+  store i16 0, i16* %box3, align 2
+  %box4 = getelementptr i16, i16* %box3, i64 1
+  store i16 3, i16* %box4, align 2
+  %box5 = bitcast i64* %box to %umber_block**
+  %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 1
+  store %umber_block* @int.1, %umber_block** %box6, align 8
+  %box7 = bitcast i64* %box to %umber_block**
+  %box8 = getelementptr %umber_block*, %umber_block** %box7, i64 2
+  store %umber_block* @int.2, %umber_block** %box8, align 8
+  %box9 = bitcast i64* %box to %umber_block**
+  %box10 = getelementptr %umber_block*, %umber_block** %box9, i64 3
+  store %umber_block* @int.3, %umber_block** %box10, align 8
+  %box11 = bitcast i64* %box to %umber_block*
+  store %umber_block* %box11, %umber_block** @Basics.xyz.0, align 8
   ret void
 }
 

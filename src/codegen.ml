@@ -218,7 +218,11 @@ let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
   | Name name ->
-    Llvm.const_bitcast (find_value t ~kind:`Unknown name) (block_pointer_type t)
+    let value = find_value t ~kind:`Unknown name in
+    (match Llvm.classify_value value with
+     | Function -> Llvm.const_bitcast value (block_pointer_type t)
+     | GlobalVariable -> Llvm.build_load value (Llvm.value_name value) t.builder
+     | _ -> value)
   | Let (name, expr, body) ->
     (* FIXME: I think mir needs to make it clear whether at least a fun_def is recursive,
          and maybe allow recursive lets too. (?) *)
@@ -251,9 +255,11 @@ let rec codegen_expr t expr =
        let fields = Nonempty.map fields ~f:(codegen_expr t) in
        box t ~tag ~fields)
   | Get_block_field (i, expr) ->
-    Llvm.const_gep
+    Llvm.build_gep
       (codegen_expr t expr)
       [| Llvm.const_int (Llvm.i16_type t.context) (Mir.Block_index.to_int i + 1) |]
+      "block_field"
+      t.builder
   | Cond_assign { vars; conds; body; if_none_matched } ->
     (* Problem: How do we assign multiple values conditionally? Phi nodes only
          accept one value. We can't use multiple phi blocks because you lose the
@@ -491,14 +497,18 @@ let codegen_stmt t stmt =
     fun_
   | Extern_decl { name; arity } ->
     let type_ = block_pointer_type t in
-    let name = Mir_name.to_string name in
-    if arity = 0
-    then Llvm.declare_global type_ name t.module_
-    else
-      Llvm.declare_function
-        name
-        (Llvm.function_type type_ (Array.create type_ ~len:arity))
-        t.module_
+    let name_str = Mir_name.to_string name in
+    let value =
+      if arity = 0
+      then Llvm.declare_global type_ name_str t.module_
+      else
+        Llvm.declare_function
+          name_str
+          (Llvm.function_type type_ (Array.create type_ ~len:arity))
+          t.module_
+    in
+    Value_table.add t.values name value;
+    value
 ;;
 
 let create ~context ~source_filename ~values =

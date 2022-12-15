@@ -16,8 +16,8 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @.0 = external global %umber_block*
 @string.0 = constant %umber_block { %umber_header { i16 -32764, i16 0 }, [0 x i8] zeroinitializer }
 @char.b = constant %umber_block { %umber_header { i16 -32766, i16 1 }, i32 98 }
-@Text.a.0 = constant %umber_block* getelementptr (%umber_block, %umber_block* bitcast (%umber_block** @.0 to %umber_block*), i16 1)
-@Text.b.0 = constant %umber_block* getelementptr (%umber_block, %umber_block* bitcast (%umber_block** @.0 to %umber_block*), i16 2)
+@Text.a.0 = external global %umber_block*
+@Text.b.0 = external global %umber_block*
 @Text._UNICODE_WORKS_TOO.0 = constant %umber_block* @string.986077178
 @string.986077178 = constant %umber_block { %umber_header { i16 -32764, i16 15 }, [15 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA" }
 
@@ -37,6 +37,12 @@ entry:
   store %umber_block* @char.b, %umber_block** %box6, align 8
   %box7 = bitcast i64* %box to %umber_block*
   store %umber_block* %box7, %umber_block** @.0, align 8
+  %.0 = load %umber_block*, %umber_block** @.0, align 8
+  %block_field = getelementptr %umber_block, %umber_block* %.0, i16 1
+  store %umber_block* %block_field, %umber_block** @Text.a.0, align 8
+  %.08 = load %umber_block*, %umber_block** @.0, align 8
+  %block_field9 = getelementptr %umber_block, %umber_block* %.08, i16 2
+  store %umber_block* %block_field9, %umber_block** @Text.b.0, align 8
   ret void
 }
 

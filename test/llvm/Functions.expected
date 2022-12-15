@@ -11,7 +11,8 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 define void @main() {
 entry:
-  %fun_call = tail call %umber_block* @Functions.id.0(%umber_block* bitcast (%umber_block** @Functions.zero.0 to %umber_block*))
+  %Functions.zero.0 = load %umber_block*, %umber_block** @Functions.zero.0, align 8
+  %fun_call = tail call %umber_block* @Functions.id.0(%umber_block* %Functions.zero.0)
   store %umber_block* %fun_call, %umber_block** @Functions.still_zero_wow.0, align 8
   ret void
 }
