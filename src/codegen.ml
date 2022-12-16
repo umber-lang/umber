@@ -125,22 +125,20 @@ let block_type t =
    looks like the OCaml bindings only support up to version 13, though. *)
 let block_pointer_type = Llvm.pointer_type << block_type
 
-let codegen_constant_tag t tag =
+let int_constant_tag t tag =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
   let int63_value = Mir.Cnstr_tag.to_int tag |> Int64.of_int in
   let int64_value = Int64.shift_left int63_value 1 |> Int64.( + ) Int64.one in
   let is_signed = false in
-  let int_value = Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed in
-  Llvm.const_inttoptr int_value (block_pointer_type t)
+  Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed
+;;
+
+let codegen_constant_tag t tag =
+  Llvm.const_inttoptr (int_constant_tag t tag) (block_pointer_type t)
 ;;
 
 let int_non_constant_tag t tag =
   Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr_tag.to_int tag)
-;;
-
-let codegen_non_constant_tag t tag =
-  let int_value = int_non_constant_tag t tag in
-  Llvm.const_inttoptr int_value (block_pointer_type t)
 ;;
 
 let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
@@ -172,9 +170,9 @@ let codegen_literal t literal =
       let str = Float.to_string x in
       constant_block t ~tag:Tag.float ~len:1 ~name:"float" ~str (Llvm.const_float type_ x)
     | Char c ->
+      let type_ = Llvm.i64_type t.context in
       let str = Uchar.to_string c in
       let c = Uchar.to_int c in
-      let type_ = Llvm.i32_type t.context in
       constant_block t ~tag:Tag.char ~len:1 ~name:"char" ~str (Llvm.const_int type_ c)
     | String s ->
       (* FIXME: Strings will need handling of the final word, similar to how OCaml does it *)
@@ -386,22 +384,28 @@ let rec codegen_expr t expr =
     associate_conds conds
 
 and codegen_cond t cond =
-  let make_icmp value value' =
-    Llvm.build_icmp Eq (ptr_to_int t value) (ptr_to_int t value') "equals" t.builder
-  in
+  let make_icmp value value' = Llvm.build_icmp Eq value value' "equals" t.builder in
   match cond with
   | Equals (expr, literal) ->
-    (* FIXME: need to handle strings, chars, ints, floats, separately *)
     let expr_value = codegen_expr t expr in
     let literal_value = codegen_literal t literal in
+    let indexes = [| Llvm.const_int (Llvm.i64_type t.context) 1 |] in
+    let build_gep value = Llvm.build_gep value indexes "equals_expr" t.builder in
+    let const_gep value = Llvm.const_gep value indexes in
     (match literal with
-     | Int _ | Char _ -> make_icmp expr_value literal_value
-     | Float _ -> Llvm.build_fcmp Oeq expr_value literal_value "equals" t.builder
+     | Int _ | Char _ -> make_icmp (build_gep expr_value) (const_gep literal_value)
+     | Float _ ->
+       Llvm.build_fcmp
+         Oeq
+         (build_gep expr_value)
+         (const_gep literal_value)
+         "equals"
+         t.builder
      | String _ -> failwith "TODO: string equality in patterns")
   | Constant_tag_equals (expr, tag) ->
-    make_icmp (codegen_expr t expr) (codegen_constant_tag t tag)
+    make_icmp (ptr_to_int t (codegen_expr t expr)) (int_constant_tag t tag)
   | Non_constant_tag_equals (expr, tag) ->
-    make_icmp (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
+    make_icmp (get_block_tag t (codegen_expr t expr)) (int_non_constant_tag t tag)
   | And _ -> failwith "TODO: And conditions"
 
 and box ?(tag = Mir.Cnstr_tag.default) t ~fields =
