@@ -648,7 +648,7 @@ module Expr = struct
   module Fun_def = struct
     type nonrec t =
       { fun_name : Mir_name.t
-      ; closed_over : Mir_name.Set.t
+      ; closed_over : Mir_name.Set.t [@sexp.omit_nil]
       ; args : Mir_name.t Nonempty.t
       ; body : t
       }
@@ -702,7 +702,7 @@ module Expr = struct
     else (
       let ctx_for_body, expr_name = Context.add_value_name ctx binding_name in
       let acc = add_let expr_name mir_expr in
-      ctx_for_body, acc, (Name expr_name))
+      ctx_for_body, acc, Name expr_name)
   ;;
 
   let rec condition_of_pattern ~ctx ~input_expr ~input_type pattern =

@@ -94,9 +94,9 @@ end
 
 (* TODO: probably just make 'path the variable so we don't have to put unit for module paths *)
 module Or_imported = struct
-  type ('entry, 'name) t =
+  type ('entry, 'path) t =
     | Local of 'entry
-    | Imported of (Module_path.t * 'name)
+    | Imported of 'path
   [@@deriving sexp, variants]
 end
 
@@ -163,9 +163,9 @@ and defs = sigs bindings
 
 (* TODO: may want to add a separate field for imports *)
 and 'a bindings =
-  { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
-  ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
-  ; modules : ('a option * 'a bindings, unit) Or_imported.t Module_name.Map.t
+  { names : (Name_entry.t, Value_name.Qualified.t) Or_imported.t Value_name.Map.t
+  ; types : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option Type_name.Map.t
+  ; modules : ('a option * 'a bindings, Module_path.t) Or_imported.t Module_name.Map.t
   }
 [@@deriving sexp]
 
@@ -211,7 +211,7 @@ let without_std t =
 type f_bindings = { f : 'a. 'a bindings -> 'a bindings }
 
 let update_current t ~f =
-  let updating_import_err t (imported_module, ()) =
+  let updating_import_err t imported_module =
     compiler_bug
       [%message "Updating imported module" (imported_module : Module_path.t) (t : t)]
   in
@@ -320,7 +320,7 @@ let resolve_path =
       (match%bind Map.find sigs.modules module_name with
        | Local (None, sigs) -> loop_sigs t rest sigs
        | Local (Some _, _) -> .
-       | Imported (path, ()) -> resolve_path t path ~defs_only:false)
+       | Imported path -> resolve_path t path ~defs_only:false)
   and loop_defs t current_path path defs =
     match path with
     | [] -> Some (Defs defs)
@@ -338,14 +338,14 @@ let resolve_path =
          (match go_into, sigs with
           | `Sig, Some sigs -> loop_sigs t rest sigs
           | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
-       | Imported (path, ()) -> resolve_path t path ~defs_only:false)
+       | Imported path -> resolve_path t path ~defs_only:false)
   and loop_defs_only t path defs =
     match path with
     | [] -> Some (Defs defs)
     | module_name :: rest ->
       (match%bind Map.find defs.modules module_name with
        | Local (_, defs) -> loop_defs_only t rest defs
-       | Imported (path, ()) -> resolve_path t path ~defs_only:true)
+       | Imported path -> resolve_path t path ~defs_only:true)
   and resolve_path t path ~defs_only =
     if defs_only
     then loop_defs_only t path t.toplevel
@@ -450,7 +450,7 @@ let find_type_decl' ?at_path ?defs_only t name =
           let%bind decl = Map.find sigs.types name in
           Some (path, decl)
         | Local (Some _, _) -> .
-        | Imported (import_path, ()) -> Some (path, Some (Imported (import_path, name))))
+        | Imported import_path -> Some (path, Some (Imported (import_path, name))))
     | Defs defs ->
       f defs ~check_submodule:(function
         | Local (None, defs) ->
@@ -459,7 +459,7 @@ let find_type_decl' ?at_path ?defs_only t name =
         | Local (Some sigs, _defs) ->
           let%bind decl = Map.find sigs.types name in
           Some (path, decl)
-        | Imported (import_path, ()) -> Some (path, Some (Imported (import_path, name)))))
+        | Imported import_path -> Some (path, Some (Imported (import_path, name)))))
 ;;
 
 (* TODO: Ideally we should have consistent behavior between all the absolutify functions,
@@ -514,7 +514,7 @@ let import_filtered t path ~f =
         Map.filter_mapi bindings.modules ~f:(fun ~key:module_name ~data:_ ->
           Option.some_if
             (f (Module_name.unidentify module_name))
-            (Or_imported.Imported (path @ [ module_name ], ())))
+            (Or_imported.Imported (path @ [ module_name ])))
     }
   in
   let bindings_to_import =
@@ -756,7 +756,7 @@ let resolve_decl_or_import ?at_path t decl_or_import =
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import : (Type.Decl.t, Type_name.t) Or_imported.t option)
+          (decl_or_import : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option)
           (without_std t : t)])
 ;;
 
@@ -781,7 +781,7 @@ let find_sigs_and_defs t path module_name =
                   (t : t)]
           | Defs bindings ->
             (match%bind Map.find bindings.modules module_name with
-             | Imported (path, ()) ->
+             | Imported path ->
                let%bind path, module_name = List.split_last path in
                Some (loop t path module_name)
              | Local sigs_and_defs -> Some sigs_and_defs))
@@ -829,12 +829,12 @@ module Sigs_or_defs = struct
     match bindings with
     | Sigs bindings ->
       (match%bind Map.find bindings.modules module_name with
-       | Imported (path, ()) -> resolve_path t path ~defs_only:false
+       | Imported path -> resolve_path t path ~defs_only:false
        | Local (None, sigs) -> Some (Sigs sigs)
        | Local (Some _, _) -> .)
     | Defs bindings ->
       (match%bind Map.find bindings.modules module_name with
-       | Imported (path, ()) -> resolve_path t path ~defs_only:false
+       | Imported path -> resolve_path t path ~defs_only:false
        | Local (Some sigs, _) -> Some (Sigs sigs)
        | Local (None, defs) -> Some (Defs defs))
   ;;
