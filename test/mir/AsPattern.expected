@@ -5,8 +5,7 @@
  (Extern_decl ((name "Std.Prelude.Operators.;.0") (arity 2)))
  (Extern_decl ((name Std.Prelude.Operators.::.0) (arity 2)))
  (Fun_def
-  ((fun_name AsPattern.iter_pairs.0) (closed_over ())
-   (args (AsPattern.f.0 AsPattern.lst.0))
+  ((fun_name AsPattern.iter_pairs.0) (args (AsPattern.f.0 AsPattern.lst.0))
    (body
     (Cond_assign
      (conds

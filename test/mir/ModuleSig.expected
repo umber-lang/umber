@@ -1,5 +1,5 @@
 ((Fun_def
-  ((fun_name ModuleSig.Range.between.0) (closed_over ())
+  ((fun_name ModuleSig.Range.between.0)
    (args (ModuleSig.Range.lo.0 ModuleSig.Range.hi.0))
    (body
     (Make_block (tag 0)
@@ -7,8 +7,7 @@
  (Extern_decl ((name Std.Prelude.Operators.&&.0) (arity 2)))
  (Extern_decl ((name %lte) (arity 2)))
  (Fun_def
-  ((fun_name ModuleSig.Range.in.0) (closed_over ())
-   (args (ModuleSig.Range.x.0 *lambda_arg.0))
+  ((fun_name ModuleSig.Range.in.0) (args (ModuleSig.Range.x.0 *lambda_arg.0))
    (body
     (Let ModuleSig.Range.lo.1 (Get_block_field 0 (Name *lambda_arg.0))
      (Let ModuleSig.Range.hi.1 (Get_block_field 1 (Name *lambda_arg.0))

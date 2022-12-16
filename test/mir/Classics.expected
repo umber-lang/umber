@@ -1,7 +1,7 @@
 ((Extern_decl ((name %int_mul) (arity 2)))
  (Extern_decl ((name %int_sub) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fact.0) (closed_over ()) (args (.0))
+  ((fun_name Classics.fact.0) (args (.0))
    (body
     (Cond_assign
      (conds
@@ -16,7 +16,7 @@
            ((Fun_call %int_sub ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
  (Extern_decl ((name %int_add) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fib.0) (closed_over ()) (args (Classics.n.1))
+  ((fun_name Classics.fib.0) (args (Classics.n.1))
    (body
     (Cond_assign
      (conds

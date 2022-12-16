@@ -14,6 +14,6 @@
           ((Name Closures.current.0) (Name Closures.count_by.0))))))
       (if_none_matched (Otherwise (Name Closures.current.0))))))))
  (Fun_def
-  ((fun_name Closures.count_up.0) (closed_over ())
+  ((fun_name Closures.count_up.0)
    (args (Closures.start_at.0 Closures.count_by.0 Closures.end_after.0))
    (body (Fun_call Closures.loop.0 ((Name Closures.start_at.0)))))))

@@ -1,16 +1,15 @@
 ((Fun_def
-  ((fun_name TypeChecking.id.0) (closed_over ()) (args (TypeChecking.x.0))
+  ((fun_name TypeChecking.id.0) (args (TypeChecking.x.0))
    (body (Name TypeChecking.x.0))))
  (Fun_def
-  ((fun_name TypeChecking.id_for_ints.0) (closed_over ())
-   (args (TypeChecking.x.1)) (body (Name TypeChecking.x.1))))
+  ((fun_name TypeChecking.id_for_ints.0) (args (TypeChecking.x.1))
+   (body (Name TypeChecking.x.1))))
  (Fun_def
-  ((fun_name TypeChecking.id_for_floats.0) (closed_over ())
-   (args (TypeChecking.x.2)) (body (Name TypeChecking.x.2))))
+  ((fun_name TypeChecking.id_for_floats.0) (args (TypeChecking.x.2))
+   (body (Name TypeChecking.x.2))))
  (Value_def TypeChecking.id_for_chars.0 (Name TypeChecking.id.0))
  (Fun_def
-  ((fun_name TypeChecking.id_for_bools.0) (closed_over ())
-   (args (TypeChecking.x.3))
+  ((fun_name TypeChecking.id_for_bools.0) (args (TypeChecking.x.3))
    (body (Fun_call TypeChecking.id.0 ((Name TypeChecking.x.3))))))
  (Value_def .0
   (Make_block (tag 0)
@@ -18,8 +17,7 @@
  (Value_def TypeChecking.id_alias.0 (Get_block_field 0 (Name .0)))
  (Value_def TypeChecking.five.0 (Get_block_field 1 (Name .0)))
  (Fun_def
-  ((fun_name TypeChecking.|>.0) (closed_over ())
-   (args (TypeChecking.x.4 TypeChecking.f.0))
+  ((fun_name TypeChecking.|>.0) (args (TypeChecking.x.4 TypeChecking.f.0))
    (body (Fun_call TypeChecking.f.0 ((Name TypeChecking.x.4))))))
  (Fun_def
   ((fun_name *fun.0)
@@ -30,10 +28,10 @@
      (if_none_matched
       (Otherwise (Fun_call TypeChecking.else_.0 ((Make_block (tag 0))))))))))
  (Fun_def
-  ((fun_name TypeChecking.if_.0) (closed_over ())
+  ((fun_name TypeChecking.if_.0)
    (args (TypeChecking.then_.0 TypeChecking.else_.0)) (body (Name *fun.0))))
  (Fun_def
-  ((fun_name TypeChecking.if'.0) (closed_over ())
+  ((fun_name TypeChecking.if'.0)
    (args (TypeChecking.then_.1 TypeChecking.else_.1 TypeChecking.cond.0))
    (body
     (Cond_assign
