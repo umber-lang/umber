@@ -14,34 +14,15 @@ module Value_table : sig
   type t [@@deriving sexp_of]
 
   val create : unit -> t
-  val parse : Llvm.llcontext -> string -> t
   val add : t -> Mir_name.t -> Llvm.llvalue -> unit
-
-  val find
-    :  t
-    -> kind:[ `Function | `Unknown ]
-    -> module_:Llvm.llmodule
-    -> Mir_name.t
-    -> Llvm.llvalue
+  val find : t -> Mir_name.t -> Llvm.llvalue
 end = struct
-  (* TODO: Get rid of `existing` and have MIR declare uses of things from other modules. *)
-  type t =
-    { local : Llvm_sexp.llvalue Mir_name.Table.t
-    ; existing : Llvm_sexp.llmodule option
-    }
-  [@@deriving sexp_of]
+  type t = Llvm_sexp.llvalue Mir_name.Table.t [@@deriving sexp_of]
 
-  let create () = { local = Mir_name.Table.create (); existing = None }
+  let create () = Mir_name.Table.create ()
 
-  let parse context ll_string =
-    { local = Mir_name.Table.create ()
-    ; existing =
-        Some (Llvm_irreader.parse_ir context (Llvm.MemoryBuffer.of_string ll_string))
-    }
-  ;;
-
-  let add ({ local; existing = _ } as t) name value =
-    match Hashtbl.add local ~key:name ~data:value with
+  let add t name value =
+    match Hashtbl.add t ~key:name ~data:value with
     | `Ok -> ()
     | `Duplicate ->
       compiler_bug
@@ -49,22 +30,12 @@ end = struct
           "Tried to add duplicate LLVM value definition" (name : Mir_name.t) (t : t)]
   ;;
 
-  let find ({ local; existing } as t) ~(kind : [ `Function | `Unknown ]) ~module_ name =
-    match Hashtbl.find local name with
+  let find t name =
+    match Hashtbl.find t name with
     | Some value -> value
     | None ->
-      let result =
-        let name_str = Mir_name.to_string name in
-        let%bind.Option existing = existing in
-        match Llvm.lookup_function name_str existing, kind with
-        | Some value, _ ->
-          Some (Llvm.declare_function name_str (Llvm.type_of value) module_)
-        | None, `Function -> None
-        | None, _ -> Llvm.lookup_global name_str existing
-      in
-      Option.value_or_thunk result ~default:(fun () ->
-        compiler_bug
-          [%message "Failed to find LLVM value for name" (name : Mir_name.t) (t : t)])
+      compiler_bug
+        [%message "Failed to find LLVM value for name" (name : Mir_name.t) (t : t)]
   ;;
 end
 
@@ -192,22 +163,6 @@ let get_block_tag t value =
   Llvm.build_gep value [| Llvm.const_int (block_index_type t.context) 0 |] "tag" t.builder
 ;;
 
-let find_value t ~kind name =
-  (* TODO: Have the MIR declare uses of intrinsics like anything else from other modules. *)
-  let intrinsic_value =
-    match
-      Mir_name.extern_name name
-      |> Option.map ~f:(Extern_name.to_ustring >> Ustring.to_string)
-    with
-    | Some "%false" -> Some (Mir.Cnstr_tag.of_int 0)
-    | Some "%true" -> Some (Mir.Cnstr_tag.of_int 1)
-    | None | Some _ -> None
-  in
-  match intrinsic_value with
-  | Some tag -> codegen_constant_tag t tag
-  | None -> Value_table.find t.values ~kind ~module_:t.module_ name
-;;
-
 let ptr_to_int t value =
   Llvm.build_ptrtoint value (Llvm.i64_type t.context) (Llvm.value_name value) t.builder
 ;;
@@ -216,7 +171,7 @@ let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
   | Name name ->
-    let value = find_value t ~kind:`Unknown name in
+    let value = Value_table.find t.values name in
     (match Llvm.classify_value value with
      | Function -> Llvm.const_bitcast value (block_pointer_type t)
      | GlobalVariable -> Llvm.build_load value (Llvm.value_name value) t.builder
@@ -226,7 +181,7 @@ let rec codegen_expr t expr =
     codegen_expr t body
   | Fun_call (fun_name, args) ->
     let fun_ =
-      let fun_value = find_value t ~kind:`Function fun_name in
+      let fun_value = Value_table.find t.values fun_name in
       match Llvm.classify_value fun_value with
       | Function -> fun_value
       | _ ->
@@ -489,7 +444,7 @@ let preprocess_stmt t stmt =
 let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
-    let global_value = Value_table.find t.values name ~kind:`Unknown ~module_:t.module_ in
+    let global_value = Value_table.find t.values name in
     Llvm.position_at_end (Llvm.insertion_block t.main_function_builder) t.builder;
     let expr_value = codegen_expr t expr in
     Llvm.position_at_end (Llvm.insertion_block t.builder) t.main_function_builder;
@@ -501,7 +456,7 @@ let codegen_stmt t stmt =
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
     then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
-    let fun_ = Value_table.find t.values fun_name ~kind:`Function ~module_:t.module_ in
+    let fun_ = Value_table.find t.values fun_name in
     let fun_params = Llvm.params fun_ in
     Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
@@ -515,7 +470,8 @@ let codegen_stmt t stmt =
   | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
 ;;
 
-let create ~context ~source_filename ~values =
+let create ~source_filename =
+  let context = Llvm.create_context () in
   let module_ =
     (* TODO: need to manually free modules and possibly other things: see e.g.
        `dispose_module` *)
@@ -530,14 +486,14 @@ let create ~context ~source_filename ~values =
   { context
   ; builder = Llvm.builder context
   ; module_
-  ; values
+  ; values = Value_table.create ()
   ; literal_cache = Literal.Table.create ()
   ; main_function_builder
   }
 ;;
 
-let of_mir_exn ~context ~source_filename ~values mir =
-  let t = create ~context ~source_filename ~values in
+let of_mir_exn ~source_filename mir =
+  let t = create ~source_filename in
   List.iter mir ~f:(preprocess_stmt t);
   List.iter mir ~f:(codegen_stmt t);
   ignore_value (Llvm.build_ret_void t.main_function_builder);
@@ -549,10 +505,10 @@ let of_mir_exn ~context ~source_filename ~values mir =
         "Llvm_analysis found invalid module" (error : string) ~module_:(to_string t)]
 ;;
 
-let of_mir ~context ~source_filename ~values mir =
+let of_mir ~source_filename mir =
   Compilation_error.try_with
     ~filename:source_filename
     Codegen_error
     ~msg:[%message "LLVM codegen failed"]
-    (fun () -> of_mir_exn ~context ~source_filename ~values mir)
+    (fun () -> of_mir_exn ~source_filename mir)
 ;;

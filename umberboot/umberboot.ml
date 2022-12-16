@@ -130,16 +130,10 @@ let compile_and_print_internal ~filename ~output ~no_std ~parent =
         let mir = or_raise (Mir.of_typed_module ~names ast) in
         if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
         if Output.requires output Generating_llvm
-        then (
-          let context = Llvm.create_context () in
-          let values =
-            if no_std
-            then Codegen.Value_table.create ()
-            else Codegen.Value_table.parse context Umber_std.Prelude.llvm
-          in
-          Codegen.of_mir_exn ~context ~source_filename:filename ~values mir
+        then
+          Codegen.of_mir_exn ~source_filename:filename mir
           |> Codegen.to_string
-          |> print_endline))))
+          |> print_endline)))
   else if Output.targets output Tokens
   then
     Parsing.lex_file filename ~print_tokens_to:stdout
