@@ -48,7 +48,7 @@
  (Fun_def
   ((fun_name MutualRecursion.Node.0) (closed_over ()) (args (arg0.1 arg1.1))
    (body (Make_block (tag 0) (fields ((Name arg0.1) (Name arg1.1)))))))
- (Extern_decl ((name %eq) (arity 2))) (Extern_decl ((name %true) (arity 0)))
+ (Extern_decl ((name %eq) (arity 2)))
  (Extern_decl ((name %int_sub) (arity 2)))
  (Fun_def
   ((fun_name MutualRecursion.even.0) (closed_over ())
@@ -57,13 +57,12 @@
     (Let match.0
      (Fun_call %eq ((Name MutualRecursion.x.1) (Primitive (Int 0))))
      (Cond_assign (conds (((Constant_tag_equals (Name match.0) 1) ())))
-      (body (Name %true))
+      (body (Make_block (tag 1)))
       (if_none_matched
        (Otherwise
         (Fun_call MutualRecursion.odd.0
          ((Fun_call %int_sub
            ((Name MutualRecursion.x.1) (Primitive (Int 1)))))))))))))
- (Extern_decl ((name %false) (arity 0)))
  (Fun_def
   ((fun_name MutualRecursion.odd.0) (closed_over ())
    (args (MutualRecursion.x.2))
@@ -71,7 +70,7 @@
     (Let match.1
      (Fun_call %eq ((Name MutualRecursion.x.2) (Primitive (Int 0))))
      (Cond_assign (conds (((Constant_tag_equals (Name match.1) 1) ())))
-      (body (Name %false))
+      (body (Make_block (tag 0)))
       (if_none_matched
        (Otherwise
         (Fun_call MutualRecursion.even.0

@@ -17,10 +17,9 @@
     (Fun_call "Std.Prelude.Operators.;.0"
      ((Fun_call %print_endline ((Name WeirdFunCalls.msg.0)))
       (Fun_call %print_endline ((Name WeirdFunCalls.msg.0))))))))
- (Extern_decl ((name %true) (arity 0)))
  (Value_def WeirdFunCalls.if_.0
   (Let *fun.2
-   (Cond_assign (conds (((Constant_tag_equals (Name %true) 1) ())))
+   (Cond_assign (conds (((Constant_tag_equals (Make_block (tag 1)) 1) ())))
     (body (Name WeirdFunCalls.print_twice.0))
     (if_none_matched (Otherwise (Name %print_endline))))
    (Fun_call *fun.2 ((Primitive (String if)))))))

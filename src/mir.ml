@@ -197,12 +197,15 @@ module Context : sig
   val of_name_bindings : Name_bindings.t -> t
   val add_value_name : t -> Value_name.t -> t * Mir_name.t
 
-  val find_value_name
-    :  t
-    -> Value_name.Qualified.t
-    -> add_extern_decl:(Extern_decl.t -> unit)
-    -> Mir_name.t
+  module Extern_info : sig
+    type t =
+      | Local
+      | External of { arity : int }
+      | Bool_intrinsic of { tag : Cnstr_tag.t }
+    [@@deriving sexp_of]
+  end
 
+  val find_value_name : t -> Value_name.Qualified.t -> Mir_name.t * Extern_info.t
   val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
   val peek_value_name : t -> Value_name.Qualified.t -> Mir_name.t option
 
@@ -213,13 +216,16 @@ module Context : sig
   val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
   val find_cnstr_info_from_decl : t -> Type.Decl.decl -> Cnstr_info.t option
 end = struct
-  type extern_info =
-    | Local
-    | External of { arity : int }
-  [@@deriving sexp_of]
+  module Extern_info = struct
+    type t =
+      | Local
+      | External of { arity : int }
+      | Bool_intrinsic of { tag : Cnstr_tag.t }
+    [@@deriving sexp_of]
+  end
 
   type t =
-    { names : (Mir_name.t * extern_info) Value_name.Qualified.Map.t
+    { names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t
     ; name_bindings : Name_bindings.t [@sexp.opaque]
     ; find_observer : Value_name.Qualified.t -> Mir_name.t -> unit [@sexp.opaque]
     }
@@ -253,18 +259,7 @@ end = struct
       add t (path, name) ~extern_name:None ~extern_info:Local)
   ;;
 
-  let find { names; _ } name =
-    match Map.find names name with
-    | Some _ as name -> name
-    | None -> None
-  ;;
-
-  (* FIXME: What does this case do? I don't think it makes sense. *)
-  (* (match Name_bindings.find_entry name_bindings name with
-       | exception Name_bindings.Name_error _ -> None
-       | entry ->
-         Name_bindings.Name_entry.extern_name entry
-         |> Option.map ~f:Mir_name.of_extern_name) *)
+  let find { names; _ } name = Map.find names name
 
   let peek_value_name_internal t name =
     match name with
@@ -286,7 +281,7 @@ end = struct
       find t name
   ;;
 
-  let find_value_name_internal t name =
+  let find_value_name t name =
     match peek_value_name_internal t name with
     | Some ((name', _) as entry) ->
       t.find_observer name name';
@@ -296,25 +291,17 @@ end = struct
         [%message
           "Name missing from context"
             (name : Value_name.Qualified.t)
-            (t.names : (Mir_name.t * extern_info) Value_name.Qualified.Map.t)]
+            (t.names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t)]
   ;;
 
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
 
-  let find_value_name t name ~add_extern_decl =
-    let name, extern_info = find_value_name_internal t name in
-    (match extern_info with
-     | Local -> ()
-     | External { arity } -> add_extern_decl { Extern_decl.name; arity });
-    name
-  ;;
-
   let find_value_name_assert_local t name =
-    let name, extern_info = find_value_name_internal t ([], name) in
+    let name, extern_info = find_value_name t ([], name) in
     (match extern_info with
-     | Local -> ()
+     | Local | Bool_intrinsic _ -> ()
      | External _ ->
-       compiler_bug [%message "Unexpected non-local value" (extern_info : extern_info)]);
+       compiler_bug [%message "Unexpected non-local value" (extern_info : Extern_info.t)]);
     name
   ;;
 
@@ -337,21 +324,30 @@ end = struct
       ~init:t
       ~f:(fun t ((path, _) as name) entry ->
       let extern_name = Name_bindings.Name_entry.extern_name entry in
-      let extern_info =
-        if Option.is_none extern_name && Module_path.is_prefix ~prefix:current_path path
-        then Local
-        else (
-          let scheme =
-            Option.value_or_thunk
-              (Name_bindings.Name_entry.scheme entry)
-              ~default:(fun () ->
-              compiler_bug
-                [%message
-                  "Didn't find type scheme for external name entry"
-                    (name : Value_name.Qualified.t)
-                    (entry : Name_bindings.Name_entry.t)])
-          in
-          External { arity = arity_of_type ~names:name_bindings scheme })
+      let fallback_to_external () : Extern_info.t =
+        let scheme =
+          Option.value_or_thunk
+            (Name_bindings.Name_entry.scheme entry)
+            ~default:(fun () ->
+            compiler_bug
+              [%message
+                "Didn't find type scheme for external name entry"
+                  (name : Value_name.Qualified.t)
+                  (entry : Name_bindings.Name_entry.t)])
+        in
+        External { arity = arity_of_type ~names:name_bindings scheme }
+      in
+      let extern_info : Extern_info.t =
+        match extern_name with
+        | None ->
+          if Module_path.is_prefix ~prefix:current_path path
+          then Local
+          else fallback_to_external ()
+        | Some extern_name ->
+          (match Extern_name.to_ustring extern_name |> Ustring.to_string with
+           | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
+           | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
+           | _ -> fallback_to_external ())
       in
       fst (add t name ~extern_name ~extern_info))
   ;;
@@ -659,12 +655,20 @@ module Expr = struct
     [@@deriving sexp_of]
   end
 
+  let is_atomic : t -> bool = function
+    | Primitive _ | Name _ | Make_block { tag = _; fields = [] } | Get_block_field _ ->
+      true
+    | Fun_call _ | Let _ | Make_block { tag = _; fields = _ :: _ } | Cond_assign _ ->
+      false
+  ;;
+
   (* TODO: consider merging making bindings with making conditions. If we extended
      [Coverage.t] to include some notion of what conditions have been tested as well, it
      could help us avoid unnecessary checks. *)
 
   (** [fold_pattern_bindings] folds over the variable bindings formed by a pattern
-      associated with an expression. *)
+      associated with an expression. The expression passed in should be atomic as it will
+      be duplicated when generating bindings. *)
   let fold_pattern_bindings =
     let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
       match (pat : Simple_pattern.t) with
@@ -688,23 +692,17 @@ module Expr = struct
           loop ~ctx ~add_let ~add_name acc arg arg_expr arg_type)
       | Constant _ -> ctx, acc
     in
-    fun ?(add_name = Context.add_value_name) ~ctx ~init:acc ~add_let pat expr_name type_ ->
-      loop ~ctx ~add_let ~add_name acc pat (Name expr_name) type_
+    fun ?(add_name = Context.add_value_name) ~ctx ~init:acc ~add_let pat mir_expr type_ ->
+      loop ~ctx ~add_let ~add_name acc pat mir_expr type_
   ;;
 
-  let convert_expr_to_name
-    ?(binding_name = Constant_names.empty)
-    ~ctx
-    ~default
-    ~add_let
-    mir_expr
-    =
-    match mir_expr with
-    | Name expr_name -> ctx, default, expr_name
-    | _ ->
+  let make_atomic ~ctx ~default ~add_let ~binding_name mir_expr =
+    if is_atomic mir_expr
+    then ctx, default, mir_expr
+    else (
       let ctx_for_body, expr_name = Context.add_value_name ctx binding_name in
       let acc = add_let expr_name mir_expr in
-      ctx_for_body, acc, expr_name
+      ctx_for_body, acc, (Name expr_name))
   ;;
 
   let rec condition_of_pattern ~ctx ~input_expr ~input_type pattern =
@@ -845,8 +843,8 @@ module Expr = struct
         | Catch_all None -> Value_name.of_string_unchecked "_"
         | Constant _ | Cnstr_appl _ -> Constant_names.empty
       in
-      let ctx_for_body, acc, expr_name =
-        convert_expr_to_name
+      let ctx_for_body, acc, mir_expr =
+        make_atomic
           ~ctx:ctx_for_body
           ~default:acc
           ~add_let:(add_let acc)
@@ -856,7 +854,7 @@ module Expr = struct
       fold_pattern_bindings
         ~ctx:ctx_for_body
         pat'
-        expr_name
+        mir_expr
         typ
         ~init:acc
         ~add_let
@@ -874,7 +872,14 @@ module Expr = struct
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match (expr : Type.Scheme.t Typed.Expr.t), (expr_type : Type.Scheme.t) with
       | Literal lit, _ -> Primitive lit
-      | Name name, _ -> Name (Context.find_value_name ctx name ~add_extern_decl)
+      | Name name, _ ->
+        let name, extern_info = Context.find_value_name ctx name in
+        (match extern_info with
+         | Local -> Name name
+         | External { arity } ->
+           add_extern_decl { Extern_decl.name; arity };
+           Name name
+         | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
       | Fun_call (fun_, args_and_types), body_type ->
         let fun_call () =
           let arg_types = Nonempty.map ~f:snd args_and_types in
@@ -912,17 +917,17 @@ module Expr = struct
         Name (add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound)
       | Match (expr, input_type, arms), output_type ->
         let input_expr = of_typed_expr ~ctx expr input_type in
-        (match expr with
-         | Name _ ->
-           (* Skip binding [match_expr_name] when matching on a single variable *)
-           handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
-         | _ ->
-           let ctx, match_expr_name = Context.add_value_name ctx Constant_names.match_ in
-           let body =
-             let input_expr = Name match_expr_name in
-             handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
-           in
-           Let (match_expr_name, input_expr, body))
+        if is_atomic input_expr
+        then
+          (* Skip binding [match_expr_name] when matching on an atomic expression. *)
+          handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
+        else (
+          let ctx, match_expr_name = Context.add_value_name ctx Constant_names.match_ in
+          let body =
+            let input_expr = Name match_expr_name in
+            handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
+          in
+          Let (match_expr_name, input_expr, body))
       | Let { rec_; bindings; body }, body_type ->
         (* TODO: let statements in expressions should be able to be made into global
            statements (e.g. to define static functions/values) - not all lets should be
@@ -971,7 +976,13 @@ module Expr = struct
                let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
                let add_let acc name mir_expr = (name, mir_expr) :: acc in
                let ctx, bindings =
-                 fold_pattern_bindings ~ctx arg arg_name arg_type ~init:bindings ~add_let
+                 fold_pattern_bindings
+                   ~ctx
+                   arg
+                   (Name arg_name)
+                   arg_type
+                   ~init:bindings
+                   ~add_let
                in
                (ctx, bindings), arg_name)
       in
@@ -1066,11 +1077,12 @@ module Expr = struct
           ~init:ctx
           ~f:Context.add_value_name
       in
-      let ctx, wrapping_binding, input_expr_name =
-        convert_expr_to_name
+      let ctx, wrapping_binding, input_expr =
+        make_atomic
           ~ctx
           ~default:None
           ~add_let:(fun name expr -> Some (name, expr))
+          ~binding_name:Constant_names.empty
           input_expr
       in
       let body = of_typed_expr ~ctx output_expr output_type in
@@ -1089,7 +1101,7 @@ module Expr = struct
             fold_pattern_bindings
               ~ctx
               pattern
-              input_expr_name
+              input_expr
               input_type
               ~init:[]
               ~add_let

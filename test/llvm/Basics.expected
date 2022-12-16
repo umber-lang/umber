@@ -5,9 +5,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 
-@"%false" = external global %umber_block*
 @Basics.false.0 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
-@"%true" = external global %umber_block*
 @Basics.true.0 = constant %umber_block* inttoptr (i64 3 to %umber_block*)
 @Basics._.0 = external global %umber_block*
 @Basics.Red.0 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
