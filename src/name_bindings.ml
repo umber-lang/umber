@@ -161,7 +161,6 @@ type t =
 and sigs = Nothing.t bindings
 and defs = sigs bindings
 
-(* TODO: may want to add a separate field for imports *)
 and 'a bindings =
   { names : (Name_entry.t, Value_name.Qualified.t) Or_imported.t Value_name.Map.t
   ; types : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option Type_name.Map.t
