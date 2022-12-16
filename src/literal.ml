@@ -1,15 +1,21 @@
 open Import
 
-type t =
-  | Int of int
-  | Float of float
-  | Char of Uchar.t
-  | String of Ustring.t
-[@@deriving sexp, variants]
+module T = struct
+  type t =
+    | Int of int
+    | Float of float
+    | Char of Uchar.t
+    | String of Ustring.t
+  [@@deriving compare, equal, hash, sexp, variants]
+end
+
+include T
+include Comparable.Make (T)
+include Hashable.Make (T)
 
 let typ = function
-  | Int _ -> Core.Int.typ
-  | Float _ -> Core.Float.typ
-  | Char _ -> Core.Char.typ
-  | String _ -> Core.String.typ
+  | Int _ -> Intrinsics.Int.typ
+  | Float _ -> Intrinsics.Float.typ
+  | Char _ -> Intrinsics.Char.typ
+  | String _ -> Intrinsics.String.typ
 ;;

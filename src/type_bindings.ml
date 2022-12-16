@@ -16,10 +16,14 @@ type t = { vars : Type.t Type.Var_id.Table.t } [@@deriving sexp]
 let create () = { vars = Type.Var_id.Table.create () }
 
 let rec occurs_in id : Type.t -> bool = function
-  | Var id2 -> Type.Var_id.(id = id2)
+  | Var id' -> Type.Var_id.(id = id')
   | Type_app (_, fields) | Tuple fields -> List.exists fields ~f:(occurs_in id)
   | Function (args, body) -> Nonempty.exists args ~f:(occurs_in id) || occurs_in id body
+  | Partial_function (args, id') ->
+    Nonempty.exists args ~f:(occurs_in id) || Type.Var_id.(id = id')
 ;;
+
+let fun_arg_number_mismatch = type_error "Function argument number mismatch"
 
 let rec unify ~names ~types t1 t2 =
   let is_bound = Hashtbl.mem types.vars in
@@ -64,28 +68,75 @@ let rec unify ~names ~types t1 t2 =
         if not (phys_equal decl1 decl2) then type_error "Type application mismatch" t1 t2;
         iter2 args1 args2 ~f:(unify ~names ~types)))
   | Function (args1, res1), Function (args2, res2) ->
-    (match Nonempty.iter2_strict args1 args2 ~f:(unify ~names ~types) with
-    | Ok () -> ()
-    | Unequal_lengths -> type_error "Function argument number mismatch" t1 t2);
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Same_length -> ()
+    | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch t1 t2);
     unify ~names ~types res1 res2
+  | Partial_function (args1, id1), Partial_function (args2, id2) ->
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Left_trailing args1_trailing ->
+      unify ~names ~types (Partial_function (args1_trailing, id1)) (Var id2)
+    | Right_trailing args2_trailing ->
+      unify ~names ~types (Var id1) (Partial_function (args2_trailing, id2))
+    | Same_length -> unify ~names ~types (Var id1) (Var id2))
+  | Partial_function (args1, id), Function (args2, res) ->
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Left_trailing _ -> fun_arg_number_mismatch t1 t2
+    | Right_trailing args2_trailing ->
+      let id' = Type.Var_id.create () in
+      unify ~names ~types (Var id') res;
+      unify ~names ~types (Var id) (Partial_function (args2_trailing, id'))
+    | Same_length -> unify ~names ~types (Var id) res)
+  | Function (args2, res), Partial_function (args1, id) ->
+    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    | Left_trailing args1_trailing ->
+      let id' = Type.Var_id.create () in
+      unify ~names ~types res (Var id');
+      unify ~names ~types (Partial_function (args1_trailing, id')) (Var id)
+    | Right_trailing _ -> fun_arg_number_mismatch t1 t2
+    | Same_length -> unify ~names ~types res (Var id))
   | Tuple xs, Tuple ys -> iter2 ~f:(unify ~names ~types) xs ys
-  | _ ->
-    (* TODO: need nominal typing for records/type applications:
-       to infer the type of records, unify the structural record type with the nominal type *)
-    type_error "Fell through cases" t1 t2
+  | Type_app _, (Tuple _ | Function _ | Partial_function _)
+  | Tuple _, (Type_app _ | Function _ | Partial_function _)
+  | Function _, (Type_app _ | Tuple _)
+  | Partial_function _, (Type_app _ | Tuple _) -> type_error "Types do not match" t1 t2
 ;;
 
-let substitute types typ =
-  Type.Expr.map typ ~f:(function
-    | Var id as typ ->
+let rec substitute types typ =
+  Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~f:(fun typ ->
+    match typ with
+    | Var id ->
       (match Hashtbl.find types.vars id with
-      (* TODO: can I get rid of `Retry and just use recursion here? *)
-      | Some type_sub -> `Retry type_sub
-      | None -> `Halt typ)
-    | typ -> `Defer typ)
+      | Some type_sub -> Retry type_sub
+      | None -> Halt typ)
+    | Partial_function (args, id) -> combine_partial_functions types typ args id
+    | _ -> Defer typ)
+
+and combine_partial_functions types typ args id =
+  match Hashtbl.find types.vars id with
+  | None -> Defer typ
+  | Some type_sub ->
+    let args = Nonempty.map args ~f:(substitute types) in
+    (match substitute types type_sub with
+    | Partial_function (args', id') ->
+      let args' = Nonempty.map args' ~f:(substitute types) in
+      let args_combined = Nonempty.(args @ args') in
+      let typ = Type.Expr.Partial_function (args_combined, id') in
+      combine_partial_functions types typ args_combined id'
+    | (Var _ | Type_app _ | Tuple _ | Function _) as type_sub ->
+      Halt (Function (args, type_sub)))
 ;;
 
 let generalize types typ =
   let env = Type.Param.Env_of_vars.create () in
-  Type.Expr.map_vars (substitute types typ) ~f:(Type.Param.Env_of_vars.find_or_add env)
+  Type.Expr.map
+    (substitute types typ)
+    ~var:(Type.Param.Env_of_vars.find_or_add env)
+    ~pf:(never_happens [%here])
+    ~f:(function
+      | Partial_function (args, id) -> Defer (Function (args, Var id))
+      | typ -> Defer typ)
 ;;
+
+(* FIXME: add unit test for cyclic type variables. Also consider if we want to implement
+   path compression. *)

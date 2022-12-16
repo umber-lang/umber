@@ -1,0 +1,49 @@
+# Brainfuck interpreter
+# Spec: https://github.com/brain-lang/brainfuck/blob/master/brainfuck.md
+
+module :
+  # TODO: How should the IO effects work? Reading/writing to files/stdin/stdout?
+    Blocking vs non-blocking?
+  val eval : Bytes -> <Io, Fail > ()
+
+# TODO: How should mut/Heap effects work?
+module Memory =
+  type Memory = { 
+    tape : Bytes,
+    pointer : mut Int,
+  }
+
+  let tape_size = 10000
+
+  let create () = { tape = Buffer.create ~capacity:tape_size (); pointer = 0 }
+
+let eval program =
+  Heap.wrap \() ->
+    let memory = Memory.create ()
+    let loop_starts = Vec.create () 
+    eval' ~program ~program_index:0 ~memory ~loop_starts
+
+val eval' : program:Bytes, program_index:Int, memory:mut'h Memory -> <Io, Heap h> ()
+let eval' ~program ~program_index ~memory ~loop_starts =
+  match Bytes.get program program_index
+  | Some char ->
+    match char
+    | '>' -> memory.pointer += 1
+    | '<' -> memory.pointer -= 1
+    | '+' -> memory.tape@[memory.pointer] += 1  # Not sure if I really want to have @[] 
+    | '-' -> memory.tape@[memory.pointer] -= 1
+    | '.' -> print memory.tape@[memory.pointer]
+    | ',' -> memory.tape@[memory.pointer] := Io.get_char ()
+    | '[' ->
+      if memory.tape@[memory.pointer] = 0 then skip_loop ~program_index
+      else Vec.push loop_starts program_index
+    | ']' ->
+      if memory.tape@[memory.pointer] != 0 then eval' ~program ~program_index:(Vec.pop loop_starts) ~memory 
+    | _ -> ()
+  | None -> 
+
+let skip_loop ~program_index
+
+# NOTE:
+  `val (+=) (infix 0) : (Num a) => mut'h a -> a -> <Heap h> a`
+  `val (:=) (infix 0) : mut'h a -> a -> <Heap h> a`

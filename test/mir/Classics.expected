@@ -1,43 +1,33 @@
-((Fun_def
-  ((fun_name Classics.fact.0)
-   (closed_over
-    (Classics.fact.0 Std.Prelude.Operators.*.0 Std.Prelude.Operators.-.0))
-   (args ((.0 Int64))) (returns Int64)
-   (body
-    (Catch (label 0)
-     (body
-      (If (cond (Equals (Name .0) (Int 0))) (then_ (Break 0))
-       (else_
-        (If (cond (Equals (Name .0) (Int 1))) (then_ (Break 0))
-         (else_
-          (Catch (label 1) (body (Let Classics.n.0 (Name .0) (Break 1)))
-           (with_
-            (Fun_call Std.Prelude.Operators.*.0
-             ((Name Classics.n.0)
-              (Fun_call Classics.fact.0
-               ((Fun_call Std.Prelude.Operators.-.0
-                 ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
-     (with_ (Primitive (Int 1)))))))
+((Extern_decl ((name %int_mul) (arity 2)))
+ (Extern_decl ((name %int_sub) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fib.0)
-   (closed_over
-    (Classics.fib.0 Std.Prelude.Operators.+.0 Std.Prelude.Operators.-.0))
-   (args ((Classics.n.1 Int64))) (returns Int64)
+  ((fun_name Classics.fact.0) (args (.0))
    (body
-    (Catch (label 0)
-     (body
-      (If (cond (Equals (Name Classics.n.1) (Int 0))) (then_ (Break 0))
-       (else_
-        (If (cond (Equals (Name Classics.n.1) (Int 1))) (then_ (Break 0))
-         (else_
-          (Catch (label 1)
-           (body (Let Classics.n.2 (Name Classics.n.1) (Break 1)))
-           (with_
-            (Fun_call Std.Prelude.Operators.+.0
-             ((Fun_call Classics.fib.0
-               ((Fun_call Std.Prelude.Operators.-.0
-                 ((Name Classics.n.2) (Primitive (Int 1))))))
-              (Fun_call Classics.fib.0
-               ((Fun_call Std.Prelude.Operators.-.0
-                 ((Name Classics.n.2) (Primitive (Int 2)))))))))))))))
-     (with_ (Primitive (Int 1))))))))
+    (Cond_assign
+     (conds
+      (((Equals (Name .0) (Int 0)) ()) ((Equals (Name .0) (Int 1)) ())))
+     (body (Primitive (Int 1)))
+     (if_none_matched
+      (Otherwise
+       (Let Classics.n.0 (Name .0)
+        (Fun_call %int_mul
+         ((Name Classics.n.0)
+          (Fun_call Classics.fact.0
+           ((Fun_call %int_sub ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
+ (Extern_decl ((name %int_add) (arity 2)))
+ (Fun_def
+  ((fun_name Classics.fib.0) (args (Classics.n.1))
+   (body
+    (Cond_assign
+     (conds
+      (((Equals (Name Classics.n.1) (Int 0)) ())
+       ((Equals (Name Classics.n.1) (Int 1)) ())))
+     (body (Primitive (Int 1)))
+     (if_none_matched
+      (Otherwise
+       (Let Classics.n.2 (Name Classics.n.1)
+        (Fun_call %int_add
+         ((Fun_call Classics.fib.0
+           ((Fun_call %int_sub ((Name Classics.n.2) (Primitive (Int 1))))))
+          (Fun_call Classics.fib.0
+           ((Fun_call %int_sub ((Name Classics.n.2) (Primitive (Int 2))))))))))))))))

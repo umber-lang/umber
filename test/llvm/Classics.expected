@@ -1,0 +1,91 @@
+; ModuleID = 'Classics.um'
+source_filename = "Classics.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@int.1 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 1 }
+@int.0 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 0 }
+@int.2 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 2 }
+
+define void @main() {
+entry:
+  ret void
+}
+
+declare %umber_block* @"%int_mul"(%umber_block*, %umber_block*)
+
+declare %umber_block* @"%int_sub"(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @Classics.fact.0(%umber_block* %.0) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding4, %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %equals_expr = getelementptr %umber_block, %umber_block* %.0, i64 1
+  %equals = icmp eq %umber_block* %equals_expr, getelementptr inbounds (%umber_block, %umber_block* @int.0, i64 1)
+  br i1 %equals, label %cond_binding, label %cond1
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond1:                                            ; preds = %cond
+  %equals_expr2 = getelementptr %umber_block, %umber_block* %.0, i64 1
+  %equals3 = icmp eq %umber_block* %equals_expr2, getelementptr inbounds (%umber_block, %umber_block* @int.1, i64 1)
+  br i1 %equals3, label %cond_binding4, label %cond_otherwise
+
+cond_binding4:                                    ; preds = %cond1
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond1
+  %fun_call = tail call %umber_block* @"%int_sub"(%umber_block* %.0, %umber_block* @int.1)
+  %fun_call5 = tail call %umber_block* @Classics.fact.0(%umber_block* %fun_call)
+  %fun_call6 = tail call %umber_block* @"%int_mul"(%umber_block* %.0, %umber_block* %fun_call5)
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge7 = phi %umber_block* [ @int.1, %cond_binding_merge ], [ %fun_call6, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge7
+}
+
+declare %umber_block* @"%int_add"(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @Classics.fib.0(%umber_block* %Classics.n.1) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding4, %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %equals_expr = getelementptr %umber_block, %umber_block* %Classics.n.1, i64 1
+  %equals = icmp eq %umber_block* %equals_expr, getelementptr inbounds (%umber_block, %umber_block* @int.0, i64 1)
+  br i1 %equals, label %cond_binding, label %cond1
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond1:                                            ; preds = %cond
+  %equals_expr2 = getelementptr %umber_block, %umber_block* %Classics.n.1, i64 1
+  %equals3 = icmp eq %umber_block* %equals_expr2, getelementptr inbounds (%umber_block, %umber_block* @int.1, i64 1)
+  br i1 %equals3, label %cond_binding4, label %cond_otherwise
+
+cond_binding4:                                    ; preds = %cond1
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond1
+  %fun_call = tail call %umber_block* @"%int_sub"(%umber_block* %Classics.n.1, %umber_block* @int.1)
+  %fun_call5 = tail call %umber_block* @Classics.fib.0(%umber_block* %fun_call)
+  %fun_call6 = tail call %umber_block* @"%int_sub"(%umber_block* %Classics.n.1, %umber_block* @int.2)
+  %fun_call7 = tail call %umber_block* @Classics.fib.0(%umber_block* %fun_call6)
+  %fun_call8 = tail call %umber_block* @"%int_add"(%umber_block* %fun_call5, %umber_block* %fun_call7)
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge9 = phi %umber_block* [ @int.1, %cond_binding_merge ], [ %fun_call8, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge9
+}

@@ -63,15 +63,21 @@ let to_regrouped_bindings t =
              let binding, path' = Hashtbl.find_exn t.binding_table id in
              if not (Name_bindings.Path.equal path path')
              then (
-               let msg =
-                 "Mutually recursive functions are not allowed across module boundaries"
+               let modules =
+                 List.sort
+                   ~compare:[%compare: Module_path.t]
+                   [ Name_bindings.Path.to_module_path path
+                   ; Name_bindings.Path.to_module_path path'
+                   ]
                in
-               let module1 = Name_bindings.Path.to_module_path path in
-               let module2 = Name_bindings.Path.to_module_path path' in
                Compilation_error.raise
                  Type_error
-                 ~msg:[%message msg (module1 : Module_path.t) (module2 : Module_path.t)]);
+                 ~msg:
+                   [%message
+                     "Mutually recursive functions are not allowed across module \
+                      boundaries"
+                       (modules : Module_path.t list)]);
              binding)
          in
-         binding :: bindings, path)
+         Nonempty.(binding :: bindings), path)
 ;;

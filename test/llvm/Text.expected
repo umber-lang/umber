@@ -1,0 +1,49 @@
+; ModuleID = 'Text.um'
+source_filename = "Text.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@Text.c.0 = constant %umber_block* @char.a
+@Text.hello.0 = constant %umber_block* @string.774705101
+@Text.spacing.0 = constant %umber_block* @string.398489461
+@Text.dec_code_exclam.0 = constant %umber_block* @string.229771883
+@.0 = external global %umber_block*
+@Text.a.0 = external global %umber_block*
+@Text.b.0 = external global %umber_block*
+@Text._UNICODE_WORKS_TOO.0 = constant %umber_block* @string.986077178
+@char.a = constant %umber_block { %umber_header { i16 -32766, i16 1 }, i64 97 }
+@string.774705101 = constant %umber_block { %umber_header { i16 -32764, i16 12 }, [12 x i8] c"hello world!" }
+@string.398489461 = constant %umber_block { %umber_header { i16 -32764, i16 16 }, [16 x i8] c"line 1\0D\0A\09 line 2" }
+@string.229771883 = constant %umber_block { %umber_header { i16 -32764, i16 1 }, [1 x i8] c"!" }
+@string.0 = constant %umber_block { %umber_header { i16 -32764, i16 0 }, [0 x i8] zeroinitializer }
+@char.b = constant %umber_block { %umber_header { i16 -32766, i16 1 }, i64 98 }
+@string.986077178 = constant %umber_block { %umber_header { i16 -32764, i16 15 }, [15 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA" }
+
+define void @main() {
+entry:
+  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
+  %box = bitcast i8* %malloccall to i64*
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i64 1
+  store i16 2, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  store %umber_block* @char.a, %umber_block** %box4, align 8
+  %box5 = bitcast i64* %box to %umber_block**
+  %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 2
+  store %umber_block* @char.b, %umber_block** %box6, align 8
+  %box7 = bitcast i64* %box to %umber_block*
+  store %umber_block* %box7, %umber_block** @.0, align 8
+  %.0 = load %umber_block*, %umber_block** @.0, align 8
+  %block_field = getelementptr %umber_block, %umber_block* %.0, i16 1
+  store %umber_block* %block_field, %umber_block** @Text.a.0, align 8
+  %.08 = load %umber_block*, %umber_block** @.0, align 8
+  %block_field9 = getelementptr %umber_block, %umber_block* %.08, i16 2
+  store %umber_block* %block_field9, %umber_block** @Text.b.0, align 8
+  ret void
+}
+
+declare noalias i8* @malloc(i32)

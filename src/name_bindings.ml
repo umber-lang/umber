@@ -27,17 +27,18 @@ module Name_entry = struct
     type t =
       | Type of Type.t
       | Scheme of Type.Scheme.t
-    [@@deriving sexp]
+    [@@deriving equal, sexp]
   end
 
+  (* TODO: Consider having this type be responsible for assigning/tracking unique names,
+     rather than doing it in the MIR. *)
   type t =
     { typ : Type_or_scheme.t
-    ; type_source : Type_source.t
-         [@default Type_source.Val_declared] [@sexp_drop_default.equal]
+    ; type_source : Type_source.t [@default Val_declared] [@sexp_drop_default.equal]
     ; fixity : Fixity.t option [@sexp.option]
     ; extern_name : Extern_name.t option [@sexp.option]
     }
-  [@@deriving fields, sexp]
+  [@@deriving equal, fields, sexp]
 
   let typ entry =
     match entry.typ with
@@ -61,7 +62,7 @@ module Name_entry = struct
 
   let placeholder =
     { type_source = Placeholder
-    ; typ = Scheme (Var Type_param_name.default)
+    ; typ = Scheme (Var Type.Param.dummy)
     ; fixity = None
     ; extern_name = None
     }
@@ -93,9 +94,9 @@ end
 
 (* TODO: probably just make 'path the variable so we don't have to put unit for module paths *)
 module Or_imported = struct
-  type ('entry, 'name) t =
+  type ('entry, 'path) t =
     | Local of 'entry
-    | Imported of (Module_path.t * 'name)
+    | Imported of 'path
   [@@deriving sexp, variants]
 end
 
@@ -111,8 +112,8 @@ module Path = struct
           if Buffer.length buf > 0 then Buffer.add_char buf '.';
           Ustring.add_to_buffer buf (Module_name.to_ustring module_name);
           (match place with
-          | `Sig -> Buffer.add_string buf "(s)"
-          | `Def -> Buffer.add_string buf "(d)");
+           | `Sig -> Buffer.add_string buf "(s)"
+           | `Def -> Buffer.add_string buf "(d)");
           loop buf rest
       in
       fun t ->
@@ -124,7 +125,8 @@ module Path = struct
       let open Option.Let_syntax in
       let rec lex_nonempty acc lexbuf =
         let%bind module_name =
-          Lex_helpers.lex_upper_name lexbuf >>| Module_name.of_ustring_unchecked
+          Result.ok (Lex_helpers.lex_upper_name lexbuf)
+          >>| Module_name.of_ustring_unchecked
         in
         let%bind place = Lex_helpers.lex_place lexbuf in
         let acc = (module_name, place) :: acc in
@@ -137,8 +139,8 @@ module Path = struct
       | "" -> []
       | str ->
         (match lex_nonempty [] (Sedlexing.Utf8.from_string str) with
-        | Some path -> List.rev path
-        | None -> failwith "Name_bindings.Path.of_string: parse failed")
+         | Some path -> List.rev path
+         | None -> failwith "Name_bindings.Path.of_string: parse failed")
     ;;
   end
 
@@ -157,14 +159,12 @@ type t =
   }
 
 and sigs = Nothing.t bindings
-
 and defs = sigs bindings
 
-(* TODO: may want to add a separate field for imports *)
 and 'a bindings =
-  { names : (Name_entry.t, Value_name.t) Or_imported.t Value_name.Map.t
-  ; types : (Type.Decl.t, Type_name.t) Or_imported.t option Type_name.Map.t
-  ; modules : ('a option * 'a bindings, unit) Or_imported.t Module_name.Map.t
+  { names : (Name_entry.t, Value_name.Qualified.t) Or_imported.t Value_name.Map.t
+  ; types : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option Type_name.Map.t
+  ; modules : ('a option * 'a bindings, Module_path.t) Or_imported.t Module_name.Map.t
   }
 [@@deriving sexp]
 
@@ -201,14 +201,16 @@ let empty = { current_path = []; toplevel = empty_bindings }
 let without_std t =
   { t with
     toplevel =
-      { t.toplevel with modules = Map.remove t.toplevel.modules Core.std_module_name }
+      { t.toplevel with
+        modules = Map.remove t.toplevel.modules Intrinsics.std_module_name
+      }
   }
 ;;
 
 type f_bindings = { f : 'a. 'a bindings -> 'a bindings }
 
 let update_current t ~f =
-  let updating_import_err t (imported_module, ()) =
+  let updating_import_err t imported_module =
     compiler_bug
       [%message "Updating imported module" (imported_module : Module_path.t) (t : t)]
   in
@@ -235,10 +237,10 @@ let update_current t ~f =
           Map.update defs.modules module_name ~f:(function
             | Some (Local (sigs, defs)) ->
               (match place with
-              | `Sig ->
-                let sigs = Option.value sigs ~default:empty_bindings in
-                Local (Some (loop_sigs t sigs rest ~f), defs)
-              | `Def -> Local (sigs, loop_defs t defs rest ~f))
+               | `Sig ->
+                 let sigs = Option.value sigs ~default:empty_bindings in
+                 Local (Some (loop_sigs t sigs rest ~f), defs)
+               | `Def -> Local (sigs, loop_defs t defs rest ~f))
             | Some (Imported imported_module) -> updating_import_err t imported_module
             | None -> name_error_path (Path.to_module_path t.current_path))
       }
@@ -279,34 +281,26 @@ let core =
       { empty_bindings with
         types =
           List.fold
+            Intrinsics.all
             ~init:empty_bindings.types
-            ~f:(fun types (name, decl) ->
-              Map.set types ~key:name ~data:(Some (Local decl)))
-            Core.
-              [ Bool.name, Bool.decl
-              ; Int.name, Int.decl
-              ; Float.name, Float.decl
-              ; Char.name, Char.decl
-              ; String.name, String.decl
-              ]
+            ~f:(fun types (module Intrinsic) ->
+            Map.set types ~key:Intrinsic.name ~data:(Some (Local Intrinsic.decl)))
       ; names =
-          List.fold Core.Bool.cnstrs ~init:empty_bindings.names ~f:(fun names cnstr ->
+          List.fold
+            Intrinsics.Bool.cnstrs
+            ~init:empty_bindings.names
+            ~f:(fun names (cnstr_name, extern_name) ->
             Map.set
               names
-              ~key:(Value_name.of_cnstr_name cnstr)
-              ~data:(Local (Name_entry.val_declared (Type.Concrete.cast Core.Bool.typ))))
+              ~key:(Value_name.of_cnstr_name cnstr_name)
+              ~data:
+                (Local
+                   (Name_entry.val_declared
+                      ~extern_name
+                      (Type.Concrete.cast Intrinsics.Bool.typ))))
       }
   }
 ;;
-
-(* TODO: remove if unused *)
-(*let merge_shadow t1 t2 =
-  let shadow ~key:_ _ x = x in
-  { names = Map.merge_skewed t1.names t2.names ~combine:shadow
-  ; types = Map.merge_skewed t1.types t2.types ~combine:shadow
-  ; modules = Map.merge_skewed t1.modules t2.modules ~combine:shadow
-  }
-;;*)
 
 let merge_no_shadow t1 t2 =
   let err to_ustring ~key:name = name_error_msg "Name clash" (to_ustring name) in
@@ -323,34 +317,34 @@ let resolve_path =
     | [] -> Some (Sigs sigs)
     | module_name :: rest ->
       (match%bind Map.find sigs.modules module_name with
-      | Local (None, sigs) -> loop_sigs t rest sigs
-      | Local (Some _, _) -> .
-      | Imported (path, ()) -> resolve_path t path ~defs_only:false)
+       | Local (None, sigs) -> loop_sigs t rest sigs
+       | Local (Some _, _) -> .
+       | Imported path -> resolve_path t path ~defs_only:false)
   and loop_defs t current_path path defs =
     match path with
     | [] -> Some (Defs defs)
     | module_name :: rest ->
       (match%bind Map.find defs.modules module_name with
-      | Local (sigs, defs) ->
-        let current_path, go_into =
-          match current_path with
-          | Some [] | None -> None, `Sig
-          | Some ((module_name', place) :: rest') ->
-            if Module_name.(module_name = module_name')
-            then Some rest', place
-            else None, `Sig
-        in
-        (match go_into, sigs with
-        | `Sig, Some sigs -> loop_sigs t rest sigs
-        | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
-      | Imported (path, ()) -> resolve_path t path ~defs_only:false)
+       | Local (sigs, defs) ->
+         let current_path, go_into =
+           match current_path with
+           | Some [] | None -> None, `Sig
+           | Some ((module_name', place) :: rest') ->
+             if Module_name.(module_name = module_name')
+             then Some rest', place
+             else None, `Sig
+         in
+         (match go_into, sigs with
+          | `Sig, Some sigs -> loop_sigs t rest sigs
+          | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
+       | Imported path -> resolve_path t path ~defs_only:false)
   and loop_defs_only t path defs =
     match path with
     | [] -> Some (Defs defs)
     | module_name :: rest ->
       (match%bind Map.find defs.modules module_name with
-      | Local (_, defs) -> loop_defs_only t rest defs
-      | Imported (path, ()) -> resolve_path t path ~defs_only:true)
+       | Local (_, defs) -> loop_defs_only t rest defs
+       | Imported path -> resolve_path t path ~defs_only:true)
   and resolve_path t path ~defs_only =
     if defs_only
     then loop_defs_only t path t.toplevel
@@ -387,8 +381,8 @@ let find =
         else check_parent t at_path input ~f ~to_ustring
       in
       (match bindings_at_current with
-      | Sigs sigs -> f sigs
-      | Defs defs -> f defs)
+       | Sigs sigs -> f sigs
+       | Defs defs -> f defs)
     | None ->
       option_or_default (f at_path name bindings_at_current) ~f:(fun () ->
         check_parent t at_path input ~f ~to_ustring)
@@ -455,7 +449,7 @@ let find_type_decl' ?at_path ?defs_only t name =
           let%bind decl = Map.find sigs.types name in
           Some (path, decl)
         | Local (Some _, _) -> .
-        | Imported (import_path, ()) -> Some (path, Some (Imported (import_path, name))))
+        | Imported import_path -> Some (path, Some (Imported (import_path, name))))
     | Defs defs ->
       f defs ~check_submodule:(function
         | Local (None, defs) ->
@@ -464,7 +458,7 @@ let find_type_decl' ?at_path ?defs_only t name =
         | Local (Some sigs, _defs) ->
           let%bind decl = Map.find sigs.types name in
           Some (path, decl)
-        | Imported (import_path, ()) -> Some (path, Some (Imported (import_path, name)))))
+        | Imported import_path -> Some (path, Some (Imported (import_path, name)))))
 ;;
 
 (* TODO: Ideally we should have consistent behavior between all the absolutify functions,
@@ -519,7 +513,7 @@ let import_filtered t path ~f =
         Map.filter_mapi bindings.modules ~f:(fun ~key:module_name ~data:_ ->
           Option.some_if
             (f (Module_name.unidentify module_name))
-            (Or_imported.Imported (path @ [ module_name ], ())))
+            (Or_imported.Imported (path @ [ module_name ])))
     }
   in
   let bindings_to_import =
@@ -539,23 +533,22 @@ let import_with t path = function
 ;;
 
 let import_without t path hiding =
-  import_filtered t path ~f:(not << List.mem hiding ~equal:Unidentified_name.equal)
+  import_filtered t path ~f:(not << Nonempty.mem hiding ~equal:Unidentified_name.equal)
 ;;
 
 let map_type_expr_names type_expr ~f =
-  Type.Expr.map type_expr ~f:(function
-    | Type_app (name, args) -> `Defer (Type.Expr.Type_app (f name, args))
-    | typ -> `Defer typ)
+  Type.Expr.map type_expr ~var:Fn.id ~pf:Fn.id ~f:(function
+    | Type_app (name, args) -> Defer (Type.Expr.Type_app (f name, args))
+    | typ -> Defer typ)
 ;;
 
 let absolutify_type_expr t =
   map_type_expr_names ~f:(fun name -> absolutify_type_name t name)
 ;;
 
-let std_prelude =
-  lazy
-    (let t = into_parent (t_of_sexp (Sexp.of_string Prelude.names_sexp)) in
-     import_all t Core.prelude_module_path)
+let of_prelude_sexp sexp =
+  let t = into_parent (t_of_sexp sexp) in
+  import_all t Intrinsics.prelude_module_path
 ;;
 
 let add_val_or_extern
@@ -624,24 +617,25 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
           ~err_msg:"Duplicate type declarations"
     ; names =
         (match decl with
-        | params, Variants cnstrs ->
-          (* Add constructors as functions to the namespace *)
-          let result_type =
-            let path = Path.to_module_path current_path in
-            Type.Expr.Type_app ((path, type_name), List.map params ~f:Type.Expr.var)
-          in
-          List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
-            let entry =
-              Name_entry.val_declared
-                (match Nonempty.of_list args with
-                | Some args -> Function (args, result_type)
-                | None -> result_type)
-            in
-            Map.add names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry)
-            |> or_name_clash
-                 "Variant constructor name clashes with another value"
-                 (Cnstr_name.to_ustring cnstr_name))
-        | _ -> bindings.names)
+         | params, Variants cnstrs ->
+           (* Add constructors as functions to the namespace *)
+           let result_type : Type.Scheme.t =
+             let path = Path.to_module_path current_path in
+             let params = List.map params ~f:Type.Expr.var in
+             Type_app ((path, type_name), params)
+           in
+           List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
+             let entry =
+               Name_entry.val_declared
+                 (match Nonempty.of_list args with
+                  | Some args -> Function (args, result_type)
+                  | None -> result_type)
+             in
+             Map.add names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry)
+             |> or_name_clash
+                  "Variant constructor name clashes with another value"
+                  (Cnstr_name.to_ustring cnstr_name))
+         | _ -> bindings.names)
     }
   in
   update_current t ~f:{ f }
@@ -761,7 +755,7 @@ let resolve_decl_or_import ?at_path t decl_or_import =
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import : (Type.Decl.t, Type_name.t) Or_imported.t option)
+          (decl_or_import : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option)
           (without_std t : t)])
 ;;
 
@@ -775,20 +769,21 @@ let find_sigs_and_defs t path module_name =
     find
       t
       (path, module_name)
-      ~f:(fun _ module_name -> function
-        | Sigs _ ->
-          compiler_bug
-            [%message
-              "Name_bindings.find_sigs_and_defs found only sigs"
-                (path : Module_path.t)
-                (module_name : Module_name.t)
-                (t : t)]
-        | Defs bindings ->
-          (match%bind Map.find bindings.modules module_name with
-          | Imported (path, ()) ->
-            let%bind path, module_name = list_split_last path in
-            Some (loop t path module_name)
-          | Local sigs_and_defs -> Some sigs_and_defs))
+      ~f:
+        (fun _ module_name -> function
+          | Sigs _ ->
+            compiler_bug
+              [%message
+                "Name_bindings.find_sigs_and_defs found only sigs"
+                  (path : Module_path.t)
+                  (module_name : Module_name.t)
+                  (t : t)]
+          | Defs bindings ->
+            (match%bind Map.find bindings.modules module_name with
+             | Imported path ->
+               let%bind path, module_name = List.split_last path in
+               Some (loop t path module_name)
+             | Local sigs_and_defs -> Some sigs_and_defs))
       ~to_ustring:(fun (path, module_name) ->
         Module_path.to_ustring (path @ [ module_name ]))
   in
@@ -833,13 +828,13 @@ module Sigs_or_defs = struct
     match bindings with
     | Sigs bindings ->
       (match%bind Map.find bindings.modules module_name with
-      | Imported (path, ()) -> resolve_path t path ~defs_only:false
-      | Local (None, sigs) -> Some (Sigs sigs)
-      | Local (Some _, _) -> .)
+       | Imported path -> resolve_path t path ~defs_only:false
+       | Local (None, sigs) -> Some (Sigs sigs)
+       | Local (Some _, _) -> .)
     | Defs bindings ->
       (match%bind Map.find bindings.modules module_name with
-      | Imported (path, ()) -> resolve_path t path ~defs_only:false
-      | Local (Some sigs, _) -> Some (Sigs sigs)
-      | Local (None, defs) -> Some (Defs defs))
+       | Imported path -> resolve_path t path ~defs_only:false
+       | Local (Some sigs, _) -> Some (Sigs sigs)
+       | Local (None, defs) -> Some (Defs defs))
   ;;
 end

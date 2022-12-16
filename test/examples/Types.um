@@ -29,7 +29,7 @@ type Option a =
   | None
 
 # TODO: labelled arguments
-val value : Option a -> a -> a
+val value : Option a, a -> a
 let value opt default = match opt
   | Some x -> x
   | None -> default

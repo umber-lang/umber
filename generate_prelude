@@ -1,7 +1,0 @@
-to=src/prelude.ml
-tmp="$to".tmp
-./dune_prelude > "$tmp"
-echo "let names_sexp = {|" > "$to"
-cat "$tmp" >> "$to"
-echo "|}" >> "$to"
-rm "$tmp"

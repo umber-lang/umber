@@ -28,13 +28,16 @@ let is_empty { name_diff; type_diff; module_diff } =
   && Sequence.is_empty module_diff
 ;;
 
+let try_unify ~names ~types type1 type2 =
+  match Type_bindings.unify ~names ~types type1 type2 with
+  | () -> true
+  | exception Type_bindings.Type_error _ -> false
+;;
+
 let compatible_type_schemes ~names scheme1 scheme2 =
+  (* TODO: do some kind of fold2 thing *)
   let type1, type2 = Type.Scheme.instantiate scheme1, Type.Scheme.instantiate scheme2 in
-  try
-    Type_bindings.unify ~names ~types:(Type_bindings.create ()) type1 type2;
-    true
-  with
-  | Type_bindings.Type_error _ -> false
+  try_unify ~names ~types:(Type_bindings.create ()) type1 type2
 ;;
 
 let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
@@ -45,62 +48,68 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
           "Type binding not generalized when diffing sigs/defs"
             (entry : Name_bindings.Name_entry.t)])
   in
+  let compatible_fixities =
+    Comparable.lift [%equal: Fixity.t option] ~f:Name_bindings.Name_entry.fixity
+  in
+  let compatible_extern_names sig_entry def_entry =
+    match
+      ( Name_bindings.Name_entry.extern_name sig_entry
+      , Name_bindings.Name_entry.extern_name def_entry )
+    with
+    | None, (None | Some _) -> true
+    | Some _, None -> false
+    | Some sig_extern_name, Some def_extern_name ->
+      Extern_name.equal sig_extern_name def_extern_name
+  in
   let sig_scheme, def_scheme = get_scheme sig_entry, get_scheme def_entry in
   compatible_type_schemes ~names sig_scheme def_scheme
-  && Option.equal
-       Fixity.equal
-       (Name_bindings.Name_entry.fixity sig_entry)
-       (Name_bindings.Name_entry.fixity def_entry)
-  &&
-  match
-    ( Name_bindings.Name_entry.extern_name sig_entry
-    , Name_bindings.Name_entry.extern_name def_entry )
-  with
-  | None, (None | Some _) -> true
-  | Some _, None -> false
-  | Some sig_extern_name, Some def_extern_name ->
-    Extern_name.equal sig_extern_name def_extern_name
+  && compatible_fixities sig_entry def_entry
+  && compatible_extern_names sig_entry def_entry
 ;;
 
 (* TODO: test/look at this for correctness, there are probably bugs here *)
 let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, def_type) =
-  let for_all_zipped xs ys ~f =
-    match List.zip xs ys with
-    | Ok xys -> List.for_all xys ~f
+  let for_all2 xs ys ~f =
+    match List.for_all2 xs ys ~f with
+    | Ok b -> b
     | Unequal_lengths -> false
   in
   let unify_schemes ~names ~types params scheme1 scheme2 =
     let expr1 = Type.Scheme.instantiate ~params scheme1 in
     let expr2 = Type.Scheme.instantiate ~params scheme2 in
-    Type_bindings.unify ~names ~types expr1 expr2;
-    true
+    try_unify ~names ~types expr1 expr2
   in
   let types = Type_bindings.create () in
+  (* FIXME: I think this has a bug where it will say these are not compatible:
+     ```
+       module :
+         val id : b -> b
+       val id : a -> a
+       let id x = x
+     ``` 
+     Since it uses the same env for each, the names have to match up, which seems wrong.
+     Should write a test to demonstrate this, then fix it. *)
   let param_env = Type.Param.Env_to_vars.create () in
-  try
-    for_all_zipped sig_params def_params ~f:(fun (sig_param, def_param) ->
-      let sig_param_type = Type.Param.Env_to_vars.find_or_add param_env sig_param in
-      let def_param_type = Type.Param.Env_to_vars.find_or_add param_env def_param in
-      Type_bindings.unify ~names ~types (Var sig_param_type) (Var def_param_type);
-      true)
-    &&
-    match (sig_type : _ Type.Decl.decl), (def_type : _ Type.Decl.decl) with
-    | Abstract, _ -> true
-    | Alias scheme1, Alias scheme2 ->
-      unify_schemes ~names ~types param_env scheme1 scheme2
-    | Variants cnstrs1, Variants cnstrs2 ->
-      for_all_zipped cnstrs1 cnstrs2 ~f:(fun ((cnstr1, args1), (cnstr2, args2)) ->
-        Cnstr_name.equal cnstr1 cnstr2
-        && for_all_zipped args1 args2 ~f:(fun (arg1, arg2) ->
-             unify_schemes ~names ~types param_env arg1 arg2))
-    | Record _, Record _ -> failwith "TODO: record types in compatibiltiy checks"
-    | Record _, (Abstract | Alias _ | Variants _)
-    | Variants _, (Abstract | Alias _ | Record _)
-    | Alias _, (Abstract | Variants _ | Record _) -> false
-  with
-  | Type_bindings.Type_error _ -> false
+  for_all2 sig_params def_params ~f:(fun sig_param def_param ->
+    let sig_param_type = Type.Param.Env_to_vars.find_or_add param_env sig_param in
+    let def_param_type = Type.Param.Env_to_vars.find_or_add param_env def_param in
+    try_unify ~names ~types (Var sig_param_type) (Var def_param_type))
+  &&
+  match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
+  | Abstract, _ -> true
+  | Alias scheme1, Alias scheme2 -> unify_schemes ~names ~types param_env scheme1 scheme2
+  | Variants cnstrs1, Variants cnstrs2 ->
+    for_all2 cnstrs1 cnstrs2 ~f:(fun (cnstr1, args1) (cnstr2, args2) ->
+      Cnstr_name.equal cnstr1 cnstr2
+      && for_all2 args1 args2 ~f:(unify_schemes ~names ~types param_env))
+  | Record _, Record _ -> failwith "TODO: record types in compatibiltiy checks"
+  | Record _, (Abstract | Alias _ | Variants _)
+  | Variants _, (Abstract | Alias _ | Record _)
+  | Alias _, (Abstract | Variants _ | Record _) -> false
 ;;
 
+(* TODO: Maybe we should get rid of [filter] and just have constructor names show up in
+   defs? *)
 let do_simple_diff
   ?(filter : 'name -> bool = fun _ -> true)
   (names : Name_bindings.t)
@@ -110,17 +119,17 @@ let do_simple_diff
   ~(find : Name_bindings.t -> Sigs_or_defs.t -> 'name -> 'data)
   : ('name * 'data diff) Sequence.t
   =
-  let different = Set.symmetric_diff name_set1 name_set2 in
-  let same = Set.inter name_set1 name_set2 |> Set.to_sequence in
-  Sequence.append
-    (Sequence.filter_map different ~f:(function
-      | First name -> if filter name then Some (name, Missing_from_def) else None
-      | Second _ -> None))
-    (Sequence.filter_map (Sequence.filter ~f:filter same) ~f:(fun name ->
-       let data1, data2 = find names bindings1 name, find names bindings2 name in
-       if compatible ~names ~sig_:data1 ~def:data2
-       then None
-       else Some (name, Incompatible (data1, data2))))
+  Sequence.filter_map (Set.merge_to_sequence name_set1 name_set2) ~f:(function
+    | Right _ -> (* Ok to just appear in defs *) None
+    | Left name -> if filter name then Some (name, Missing_from_def) else None
+    | Both (name, _) ->
+      if not (filter name)
+      then None
+      else (
+        let data1, data2 = find names bindings1 name, find names bindings2 name in
+        if compatible ~names ~sig_:data1 ~def:data2
+        then None
+        else Some (name, Incompatible (data1, data2))))
 ;;
 
 let create ~names module_name =

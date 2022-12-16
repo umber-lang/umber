@@ -1,214 +1,514 @@
-(* Generating LLVM IR for the AST *)
-
 open Import
-open Llvm
+open Names
 
-let fun_call_name = "fun_call"
+let tailcc = 18
+
+let data_layout_string =
+  (* See https://llvm.org/docs/LangRef.html#data-layout *)
+  "i32:64-i64:64-p:64:64-f64:64"
+;;
+
+let ignore_value (_ : Llvm.llvalue) = ()
+
+module Value_table : sig
+  type t [@@deriving sexp_of]
+
+  val create : unit -> t
+  val add : t -> Mir_name.t -> Llvm.llvalue -> unit
+  val find : t -> Mir_name.t -> Llvm.llvalue
+end = struct
+  type t = Llvm_sexp.llvalue Mir_name.Table.t [@@deriving sexp_of]
+
+  let create () = Mir_name.Table.create ()
+
+  let add t name value =
+    match Hashtbl.add t ~key:name ~data:value with
+    | `Ok -> ()
+    | `Duplicate ->
+      compiler_bug
+        [%message
+          "Tried to add duplicate LLVM value definition" (name : Mir_name.t) (t : t)]
+  ;;
+
+  let find t name =
+    match Hashtbl.find t name with
+    | Some value -> value
+    | None ->
+      compiler_bug
+        [%message "Failed to find LLVM value for name" (name : Mir_name.t) (t : t)]
+  ;;
+end
 
 type t =
-  { context : llcontext
-  ; builder : llbuilder
-  ; module_ : llmodule
-  ; values : llvalue Mir.Unique_name.Table.t
+  { context : Llvm.llcontext
+  ; module_ : Llvm.llmodule
+  ; builder : Llvm.llbuilder
+  ; values : Value_table.t
+  ; literal_cache : Llvm.llvalue Literal.Table.t
+  ; main_function_builder : Llvm.llbuilder
   }
 
-let create ~source_filename =
-  let context = create_context () in
-  { context
-  ; builder = builder context
-  ; module_ = create_module context source_filename
-  ; values = Mir.Unique_name.Table.create ()
-  }
+let to_string t = Llvm.string_of_llmodule t.module_
+let print t ~to_:file = Llvm.print_module file t.module_
+
+module Tag = struct
+  (* let no_scan = 0x8000 *)
+  let int = Mir.Cnstr_tag.of_int 0x8001
+  let char = Mir.Cnstr_tag.of_int 0x8002
+  let float = Mir.Cnstr_tag.of_int 0x8003
+  let string = Mir.Cnstr_tag.of_int 0x8004
+end
+
+let block_tag_type = Llvm.i16_type
+let block_index_type = Llvm.i16_type
+
+let with_type_memo t ~name ~f =
+  Option.value_or_thunk (Llvm.type_by_name t.module_ name) ~default:f
 ;;
 
-let block_index_type context = i16_type context
-
-let block_header_type context =
-  let typ = named_struct_type context "header" in
-  struct_set_body
-    typ
-    [| i16_type context (* tag *)
-     ; block_index_type context (* # of pointers *)
-     ; block_index_type context (* # of immediates *)
-    |]
-    false;
-  typ
+let block_header_type t =
+  let name = "umber_header" in
+  with_type_memo t ~name ~f:(fun () ->
+    let typ = Llvm.named_struct_type t.context name in
+    Llvm.struct_set_body
+      typ
+      [| block_tag_type t.context (* tag *)
+       ; block_index_type t.context (* length *)
+       ; Llvm.i32_type t.context (* padding *)
+      |]
+      false;
+    typ)
 ;;
 
-let block_type context =
-  let block_type = named_struct_type context "block" in
-  struct_set_body
-    block_type
-    [| block_header_type context
-     ; array_type (pointer_type block_type) 0
-     ; array_type (i64_type context) 0
-    |]
-    false;
-  block_type
+let block_type t =
+  let name = "umber_block" in
+  with_type_memo t ~name ~f:(fun () ->
+    let block_type = Llvm.named_struct_type t.context name in
+    Llvm.struct_set_body
+      block_type
+      [| block_header_type t; Llvm.array_type (Llvm.i64_type t.context) 0 |]
+      false;
+    block_type)
 ;;
 
-let block_pointer_type context = pointer_type (block_type context)
+(* TODO: If we use LLVM 15 it just has opaque pointers enabled by default, then we don't
+   have to worry about pointer types. See https://llvm.org/docs/OpaquePointers.html. It
+   looks like the OCaml bindings only support up to version 13, though. *)
+let block_pointer_type = Llvm.pointer_type << block_type
 
-let type_value_kind t : Mir.Value_kind.t -> lltype = function
-  | `Int64 -> i64_type t.context
-  | `Float64 -> double_type t.context
-  | `Char -> i32_type t.context
-  | `Block -> block_pointer_type t.context
-;;
-
-let codegen_literal t lit =
-  let with_type make_type const x =
-    let typ = make_type t.context in
-    const typ x
-  in
-  match (lit : Literal.t) with
-  (* TODO: Int should really be an Int64.t *)
-  | Int i -> with_type i64_type const_int i
-  | Float x -> with_type double_type const_float x
-  | Char c -> with_type i32_type const_int (Uchar.to_int c)
-  | String s ->
-    let s = Ustring.to_string s in
-    const_string t.context s
+let int_constant_tag t tag =
+  (* Put the int63 into an int64 and make the bottom bit 1. *)
+  let int63_value = Mir.Cnstr_tag.to_int tag |> Int64.of_int in
+  let int64_value = Int64.shift_left int63_value 1 |> Int64.( + ) Int64.one in
+  let is_signed = false in
+  Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed
 ;;
 
 let codegen_constant_tag t tag =
-  const_int (integer_type t.context 63) (Mir.Cnstr.Tag.to_int tag)
+  Llvm.const_inttoptr (int_constant_tag t tag) (block_pointer_type t)
 ;;
 
-let codegen_non_constant_tag t tag =
-  const_int (i16_type t.context) (Mir.Cnstr.Tag.to_int tag)
+let int_non_constant_tag t tag =
+  Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr_tag.to_int tag)
+;;
+
+let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
+
+let const_block_header t ~tag ~len =
+  Llvm.const_named_struct
+    (block_header_type t)
+    [| int_non_constant_tag t tag; codegen_block_len t len |]
+;;
+
+let constant_block t ~tag ~len ~name ~str constant_value =
+  let block_header = const_block_header t ~tag ~len in
+  let value = Llvm.const_named_struct (block_type t) [| block_header; constant_value |] in
+  let global_name = [%string "%{name}.%{str}"] in
+  let global = Llvm.define_global global_name value t.module_ in
+  Llvm.set_global_constant true global;
+  global
+;;
+
+let codegen_literal t literal =
+  Hashtbl.find_or_add t.literal_cache literal ~default:(fun () ->
+    match literal with
+    | Int i ->
+      let type_ = Llvm.i64_type t.context in
+      let str = Int.to_string i in
+      constant_block t ~tag:Tag.int ~len:1 ~name:"int" ~str (Llvm.const_int type_ i)
+    | Float x ->
+      let type_ = Llvm.double_type t.context in
+      let str = Float.to_string x in
+      constant_block t ~tag:Tag.float ~len:1 ~name:"float" ~str (Llvm.const_float type_ x)
+    | Char c ->
+      let type_ = Llvm.i64_type t.context in
+      let str = Uchar.to_string c in
+      let c = Uchar.to_int c in
+      constant_block t ~tag:Tag.char ~len:1 ~name:"char" ~str (Llvm.const_int type_ c)
+    | String s ->
+      (* FIXME: Strings will need handling of the final word, similar to how OCaml does it *)
+      let s = Ustring.to_string s in
+      let len = String.length s in
+      let str = String.hash s |> Int.to_string in
+      constant_block
+        t
+        ~tag:Tag.string
+        ~len
+        ~name:"string"
+        ~str
+        (Llvm.const_string t.context s))
 ;;
 
 let get_block_tag t value =
-  build_gep value [| const_int (block_index_type t.context) 0 |] "tag" t.builder
+  Llvm.build_gep value [| Llvm.const_int (block_index_type t.context) 0 |] "tag" t.builder
 ;;
 
-(* TODO: monomorphize polymorphic functions by Value_kind - should be done in mir, I think *)
+let ptr_to_int t value =
+  Llvm.build_ptrtoint value (Llvm.i64_type t.context) (Llvm.value_name value) t.builder
+;;
+
 let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit -> codegen_literal t lit
-  | Name name -> Hashtbl.find_exn t.values name
+  | Name name ->
+    let value = Value_table.find t.values name in
+    (match Llvm.classify_value value with
+     | Function -> Llvm.const_bitcast value (block_pointer_type t)
+     | GlobalVariable -> Llvm.build_load value (Llvm.value_name value) t.builder
+     | _ -> value)
   | Let (name, expr, body) ->
-    Hashtbl.add_exn t.values ~key:name ~data:(codegen_expr t expr);
+    Value_table.add t.values name (codegen_expr t expr);
     codegen_expr t body
   | Fun_call (fun_name, args) ->
     let fun_ =
-      Option.value_exn (lookup_function (Mir.Unique_name.to_string fun_name) t.module_)
+      let fun_value = Value_table.find t.values fun_name in
+      match Llvm.classify_value fun_value with
+      | Function -> fun_value
+      | _ ->
+        let arg_type = block_pointer_type t in
+        let fun_pointer_type =
+          Llvm.pointer_type
+            (Llvm.function_type
+               arg_type
+               (Array.create arg_type ~len:(Nonempty.length args)))
+        in
+        let fun_name = Mir_name.to_string fun_name in
+        Llvm.build_bitcast fun_value fun_pointer_type fun_name t.builder
     in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
-    build_call fun_ args fun_call_name t.builder
-  | Make_block { tag; pointers; immediates } ->
-    if List.is_empty pointers && List.is_empty immediates
-    then codegen_constant_tag t tag
-    else (
-      let pointers = List.map pointers ~f:(codegen_expr t) in
-      let immediates = List.map immediates ~f:(codegen_expr t) in
-      box t ~tag ~pointers ~immediates)
+    let call = Llvm.build_call fun_ args "fun_call" t.builder in
+    Llvm.set_tail_call true call;
+    call
+  | Make_block { tag; fields } ->
+    (match Nonempty.of_list fields with
+     | None -> codegen_constant_tag t tag
+     | Some fields ->
+       let fields = Nonempty.map fields ~f:(codegen_expr t) in
+       box t ~tag ~fields)
   | Get_block_field (i, expr) ->
-    const_gep
+    Llvm.build_gep
       (codegen_expr t expr)
-      [| const_int (i16_type t.context) (Mir.Block_index.to_int i + 1) |]
-  | If { cond; then_; else_ } ->
-    let cond = codegen_cond t cond in
-    let start_block = insertion_block t.builder in
-    let current_fun = block_parent start_block in
-    let make_child_block ~label expr =
-      let child_block = append_block t.context label current_fun in
-      position_at_end child_block t.builder;
-      let child_value = codegen_expr t expr in
-      (* Codegen in the child can create new basic blocks, so we have to update *)
-      let child_block = insertion_block t.builder in
-      child_value, child_block
+      [| Llvm.const_int (Llvm.i16_type t.context) (Mir.Block_index.to_int i + 1) |]
+      "block_field"
+      t.builder
+  | Cond_assign { vars; conds; body; if_none_matched } ->
+    (* Problem: How do we assign multiple values conditionally? Phi nodes only
+         accept one value. We can't use multiple phi blocks because you lose the
+         predecessor information after the first one.
+         Some possible approaches:
+         1. Duplicate the conditions and re-check them to do each phi. This obviously
+            sucks.
+         2. Put the variables in a vector or array in the phi. Unclear what LLVM will do
+            with this (stack allocation?) and whether that's better or worse than other
+            options.
+         3. Use `select` instead of `phi`. This means we always do all of the GEPs, etc.
+            for each match arm. Maybe this is fine since they will always be simple/not
+            side-effecting, so it might not cause (much) duplicated work.
+            
+        For now I've gone with (2). *)
+    let start_block = Llvm.insertion_block t.builder in
+    let current_fun = Llvm.block_parent start_block in
+    let num_vars = List.length vars in
+    (* Set up a phi block to receive the variable bindings as a vector. *)
+    let phi_block = Llvm.append_block t.context "cond_binding_merge" current_fun in
+    Llvm.position_at_end phi_block t.builder;
+    let phi_value =
+      if num_vars = 0
+      then None
+      else (
+        let phi_value =
+          Llvm.build_empty_phi
+            (Llvm.vector_type (block_pointer_type t) num_vars)
+            "cond_bindings"
+            t.builder
+        in
+        (* Extract all the variables out of the vector in the phi. *)
+        List.iteri vars ~f:(fun i var ->
+          ignore_value
+            (Llvm.build_extractelement
+               phi_value
+               (Llvm.const_int (Llvm.i64_type t.context) i)
+               (Mir_name.to_string var)
+               t.builder));
+        Some phi_value)
     in
-    let ((_, then_block) as then_incoming) = make_child_block ~label:"then" then_ in
-    let ((_, else_block) as else_incoming) = make_child_block ~label:"else" else_ in
-    let merge_block = append_block t.context "if_merge" current_fun in
-    position_at_end merge_block t.builder;
-    let phi = build_phi [ then_incoming; else_incoming ] "if_phi" t.builder in
-    (* Return to the start block to add the condition *)
-    position_at_end start_block t.builder;
-    ignore (build_cond_br cond then_block else_block t.builder : llvalue);
-    (* Add unconditional jumps from the child blocks to the merge block *)
-    position_at_end then_block t.builder;
-    ignore (build_br merge_block t.builder : llvalue);
-    position_at_end else_block t.builder;
-    ignore (build_br merge_block t.builder : llvalue);
-    (* Finish *)
-    position_at_end merge_block t.builder;
-    phi
-  | Catch _ | Break _ -> failwith "TODO: codgen catch/break"
+    let body_value = codegen_expr t body in
+    let body_block_end = Llvm.insertion_block t.builder in
+    let make_binding_block_and_br_to_phi bindings =
+      let binding_block = Llvm.append_block t.context "cond_binding" current_fun in
+      Llvm.position_at_end binding_block t.builder;
+      let binding_values =
+        List.map2_exn vars bindings ~f:(fun name expr ->
+          let value = codegen_expr t expr in
+          Llvm.set_value_name (Mir_name.to_string name) value;
+          value)
+      in
+      ignore_value (Llvm.build_br phi_block t.builder);
+      let binding_block_end = Llvm.insertion_block t.builder in
+      Option.iter phi_value ~f:(fun phi_value ->
+        let binding_vector = Llvm.const_vector (List.to_array binding_values) in
+        Llvm.add_incoming (binding_vector, binding_block_end) phi_value);
+      binding_block
+    in
+    let conds =
+      (* Set up condition and binding blocks. Have the bindings go to the phi block. *)
+      Nonempty.map conds ~f:(fun (cond, bindings) ->
+        let cond_block = Llvm.append_block t.context "cond" current_fun in
+        Llvm.position_at_end cond_block t.builder;
+        let cond_value = codegen_cond t cond in
+        let cond_block_end = Llvm.insertion_block t.builder in
+        let binding_block = make_binding_block_and_br_to_phi bindings in
+        cond_value, cond_block, cond_block_end, binding_block)
+    in
+    (* Start at the first cond. *)
+    Llvm.position_at_end start_block t.builder;
+    ignore_value
+      (let _, first_cond_block, _, _ = Nonempty.hd conds in
+       Llvm.build_br first_cond_block t.builder);
+    (* Have each condition block branch and break to either its binding block or the
+         next condition block. The last condition block goes to the [if_none_matched]
+         case, which either goes to another arbitrary expression, or runs the body with a
+         final set of bindings. *)
+    let rec associate_conds : _ Nonempty.t -> _ = function
+      | [ (last_cond_value, _, last_cond_block_end, last_binding_block) ] ->
+        let if_none_matched_block, final_value, final_block =
+          match if_none_matched with
+          | Otherwise otherwise_expr ->
+            let otherwise_block =
+              Llvm.append_block t.context "cond_otherwise" current_fun
+            in
+            Llvm.position_at_end otherwise_block t.builder;
+            let otherwise_value = codegen_expr t otherwise_expr in
+            let otherwise_block_end = Llvm.insertion_block t.builder in
+            let otherwise_phi_block =
+              Llvm.append_block t.context "cond_otherwise_merge" current_fun
+            in
+            Llvm.position_at_end body_block_end t.builder;
+            ignore_value (Llvm.build_br otherwise_phi_block t.builder);
+            Llvm.position_at_end otherwise_block_end t.builder;
+            ignore_value (Llvm.build_br otherwise_phi_block t.builder);
+            Llvm.position_at_end otherwise_phi_block t.builder;
+            let otherwise_phi_value =
+              Llvm.build_phi
+                [ body_value, body_block_end; otherwise_value, otherwise_block_end ]
+                "cond_otherwise_merge"
+                t.builder
+            in
+            otherwise_block, otherwise_phi_value, otherwise_phi_block
+          | Use_bindings bindings ->
+            let actual_last_binding_block = make_binding_block_and_br_to_phi bindings in
+            actual_last_binding_block, body_value, body_block_end
+        in
+        Llvm.position_at_end last_cond_block_end t.builder;
+        ignore_value
+          (Llvm.build_cond_br
+             last_cond_value
+             last_binding_block
+             if_none_matched_block
+             t.builder);
+        Llvm.position_at_end final_block t.builder;
+        final_value
+      | (cond_value, _, current_cond_block_end, binding_block)
+        :: ((_, next_cond_block_start, _, _) as next_cond_and_binding)
+        :: rest ->
+        Llvm.position_at_end current_cond_block_end t.builder;
+        ignore_value
+          (Llvm.build_cond_br cond_value binding_block next_cond_block_start t.builder);
+        associate_conds (next_cond_and_binding :: rest)
+    in
+    associate_conds conds
 
 and codegen_cond t cond =
-  let make_equals value value' =
-    (* FIXME: This isn't going to work through pointers, yeah? Need to dereference/gep *)
-    build_icmp Eq value value' "equals" t.builder
-  in
+  let make_icmp value value' = Llvm.build_icmp Eq value value' "equals" t.builder in
   match cond with
-  | Equals (expr, lit) ->
-    (* FIXME: need to handle strings, chars, ints, floats, separately *)
-    make_equals (codegen_expr t expr) (codegen_literal t lit)
+  | Equals (expr, literal) ->
+    let expr_value = codegen_expr t expr in
+    let literal_value = codegen_literal t literal in
+    let indexes = [| Llvm.const_int (Llvm.i64_type t.context) 1 |] in
+    let build_gep value = Llvm.build_gep value indexes "equals_expr" t.builder in
+    let const_gep value = Llvm.const_gep value indexes in
+    (match literal with
+     | Int _ | Char _ -> make_icmp (build_gep expr_value) (const_gep literal_value)
+     | Float _ ->
+       Llvm.build_fcmp
+         Oeq
+         (build_gep expr_value)
+         (const_gep literal_value)
+         "equals"
+         t.builder
+     | String _ -> failwith "TODO: string equality in patterns")
   | Constant_tag_equals (expr, tag) ->
-    make_equals (codegen_expr t expr) (codegen_constant_tag t tag)
+    make_icmp (ptr_to_int t (codegen_expr t expr)) (int_constant_tag t tag)
   | Non_constant_tag_equals (expr, tag) ->
-    make_equals (get_block_tag t (codegen_expr t expr)) (codegen_non_constant_tag t tag)
+    make_icmp (get_block_tag t (codegen_expr t expr)) (int_non_constant_tag t tag)
   | And _ -> failwith "TODO: And conditions"
 
-and box ?(tag = Mir.Cnstr.Tag.default) t ~pointers ~immediates =
-  (* TODO: Heap allocation. Also, GC. (Actually, for now, let's just try to plug in a
-     conservative GC e.g. Boehm) *)
-  let block_header =
-    const_named_struct
-      (block_header_type t.context)
-      [| codegen_non_constant_tag t tag
-       ; const_int (block_index_type t.context) (List.length pointers)
-       ; const_int (block_index_type t.context) (List.length immediates)
-      |]
+and box ?(tag = Mir.Cnstr_tag.default) t ~fields =
+  (* TODO: Use GC instead of leaking memory. For now, let's just try to plug in a
+       conservative GC e.g. Boehm. *)
+  let block_field_num = Nonempty.length fields in
+  let heap_pointer =
+    Llvm.build_array_malloc
+      (Llvm.i64_type t.context)
+      (Llvm.const_int (Llvm.i32_type t.context) (block_field_num + 1))
+      "box"
+      t.builder
   in
-  let pointers = const_struct t.context (Array.of_list pointers) in
-  let immediates = const_struct t.context (Array.of_list immediates) in
-  const_struct t.context [| block_header; pointers; immediates |]
+  let heap_pointer_16 =
+    Llvm.build_bitcast
+      heap_pointer
+      (Llvm.pointer_type (Llvm.i16_type t.context))
+      "box"
+      t.builder
+  in
+  ignore_value (Llvm.build_store (int_non_constant_tag t tag) heap_pointer_16 t.builder);
+  ignore_value
+    (let heap_pointer =
+       Llvm.build_gep
+         heap_pointer_16
+         [| Llvm.const_int (Llvm.i64_type t.context) 1 |]
+         "box"
+         t.builder
+     in
+     Llvm.build_store (codegen_block_len t block_field_num) heap_pointer t.builder);
+  Nonempty.iteri fields ~f:(fun i field_value ->
+    ignore_value
+      (let heap_pointer =
+         Llvm.build_bitcast
+           heap_pointer
+           (Llvm.pointer_type (block_pointer_type t))
+           "box"
+           t.builder
+       in
+       let heap_pointer =
+         Llvm.build_gep
+           heap_pointer
+           [| Llvm.const_int (Llvm.i64_type t.context) (i + 1) |]
+           "box"
+           t.builder
+       in
+       Llvm.build_store field_value heap_pointer t.builder));
+  Llvm.build_bitcast heap_pointer (block_pointer_type t) "box" t.builder
+;;
+
+let preprocess_stmt t stmt =
+  match (stmt : Mir.Stmt.t) with
+  | Value_def (name, _) ->
+    Value_table.add
+      t.values
+      name
+      (Llvm.declare_global (block_pointer_type t) (Mir_name.to_string name) t.module_)
+  | Fun_def { fun_name; args; closed_over = _; body = _ } ->
+    let type_ = block_pointer_type t in
+    let fun_type =
+      Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
+    in
+    let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
+    Llvm.set_function_call_conv tailcc fun_;
+    Value_table.add t.values fun_name fun_
+  | Extern_decl { name; arity } ->
+    let type_ = block_pointer_type t in
+    let name_str = Mir_name.to_string name in
+    let value =
+      if arity = 0
+      then Llvm.declare_global type_ name_str t.module_
+      else
+        Llvm.declare_function
+          name_str
+          (Llvm.function_type type_ (Array.create type_ ~len:arity))
+          t.module_
+    in
+    Value_table.add t.values name value
 ;;
 
 let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
-    let value =
-      define_global (Mir.Unique_name.to_string name) (codegen_expr t expr) t.module_
-    in
-    set_global_constant true value;
-    Hashtbl.add_exn t.values ~key:name ~data:value;
-    value
-  | Fun_def { fun_name; closed_over; args; returns; body } ->
+    let global_value = Value_table.find t.values name in
+    Llvm.position_at_end (Llvm.insertion_block t.main_function_builder) t.builder;
+    let expr_value = codegen_expr t expr in
+    Llvm.position_at_end (Llvm.insertion_block t.builder) t.main_function_builder;
+    if Llvm.is_constant expr_value
+    then (
+      Llvm.set_global_constant true global_value;
+      Llvm.set_initializer expr_value global_value)
+    else ignore_value (Llvm.build_store expr_value global_value t.main_function_builder)
+  | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
-    then raise_s [%message "TODO: closures" (closed_over : Mir.Unique_name.Set.t)];
-    let arg_names, arg_kinds = Nonempty.unzip args in
-    let fun_type =
-      function_type
-        (type_value_kind t returns)
-        (Array.of_list_map ~f:(type_value_kind t) (Nonempty.to_list arg_kinds))
-    in
-    let fun_ = define_function (Mir.Unique_name.to_string fun_name) fun_type t.module_ in
-    let fun_params = params fun_ in
-    Nonempty.iteri arg_names ~f:(fun i arg_name ->
+    then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
+    let fun_ = Value_table.find t.values fun_name in
+    let fun_params = Llvm.params fun_ in
+    Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
-      set_value_name (Mir.Unique_name.to_string arg_name) arg_value;
-      Hashtbl.add_exn t.values ~key:arg_name ~data:arg_value);
-    let entry_block = append_block t.context "entry" fun_ in
-    position_at_end entry_block t.builder;
+      Llvm.set_value_name (Mir_name.to_string arg_name) arg_value;
+      Value_table.add t.values arg_name arg_value);
+    let entry_block = Llvm.entry_block fun_ in
+    Llvm.position_at_end entry_block t.builder;
     let return_value = codegen_expr t body in
-    ignore (build_ret return_value t.builder : llvalue);
-    (* FIXME: probably re-enable *)
-    (*Llvm_analysis.assert_valid_function fun_;*)
-    Hashtbl.add_exn t.values ~key:fun_name ~data:fun_;
-    fun_
+    ignore_value (Llvm.build_ret return_value t.builder);
+    Llvm_analysis.assert_valid_function fun_
+  | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
+;;
+
+let create ~source_filename =
+  let context = Llvm.create_context () in
+  let module_ =
+    (* TODO: need to manually free modules and possibly other things: see e.g.
+       `dispose_module` *)
+    Llvm.create_module context source_filename
+  in
+  Llvm.set_data_layout data_layout_string module_;
+  let main_function_builder = Llvm.builder context in
+  let main_function =
+    Llvm.define_function "main" (Llvm.function_type (Llvm.void_type context) [||]) module_
+  in
+  Llvm.position_at_end (Llvm.entry_block main_function) main_function_builder;
+  { context
+  ; builder = Llvm.builder context
+  ; module_
+  ; values = Value_table.create ()
+  ; literal_cache = Literal.Table.create ()
+  ; main_function_builder
+  }
+;;
+
+let of_mir_exn ~source_filename mir =
+  let t = create ~source_filename in
+  List.iter mir ~f:(preprocess_stmt t);
+  List.iter mir ~f:(codegen_stmt t);
+  ignore_value (Llvm.build_ret_void t.main_function_builder);
+  match Llvm_analysis.verify_module t.module_ with
+  | None -> t
+  | Some error ->
+    compiler_bug
+      [%message
+        "Llvm_analysis found invalid module" (error : string) ~module_:(to_string t)]
 ;;
 
 let of_mir ~source_filename mir =
-  let t = create ~source_filename in
-  List.iter mir ~f:(ignore << codegen_stmt t);
-  Llvm_analysis.assert_valid_module t.module_;
-  t
+  Compilation_error.try_with
+    ~filename:source_filename
+    Codegen_error
+    ~msg:[%message "LLVM codegen failed"]
+    (fun () -> of_mir_exn ~source_filename mir)
 ;;
-
-let to_string t = string_of_llmodule t.module_
-let print t ~to_:file = print_module file t.module_

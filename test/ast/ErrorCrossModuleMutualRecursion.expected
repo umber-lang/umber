@@ -2,6 +2,7 @@
  ((kind Type_error)
   (msg
    ("Mutually recursive functions are not allowed across module boundaries"
-    (module1 (ErrorCrossModuleMutualRecursion Child))
-    (module2 (ErrorCrossModuleMutualRecursion))))
+    (modules
+     ((ErrorCrossModuleMutualRecursion)
+      (ErrorCrossModuleMutualRecursion Child)))))
   (filename ErrorCrossModuleMutualRecursion.um)))

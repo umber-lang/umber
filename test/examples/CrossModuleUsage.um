@@ -1,7 +1,10 @@
 let source = "everything depends on me"
 
 module A =
-  let a = b  # TODO: this should probably error out at the mir stage
+  # FIXME: LEXER BUG: This doesn't lex right if you remove the second # below
+  # Comment continued on next line:
+  # test
+  let a = b
   let b = a
 
   let print = Std.Prelude.print

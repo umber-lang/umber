@@ -1,12 +1,13 @@
 open Import
 open Names
 
-(* TODO: add location references to the file/place each token came from *)
+(* TODO: Make this a CST, with it precisely representing the syntax written.
+   This should involving adding spans (Node-ifying the tree). *)
 
 module Pattern = struct
   include Pattern
 
-  type nonrec t = Type.Expr.Bounded.t t [@@deriving sexp]
+  type nonrec t = Type.Scheme.Bounded.t t [@@deriving sexp]
 end
 
 module Expr = struct
@@ -22,10 +23,10 @@ module Expr = struct
     | Let of (Pattern.t, t) Let_binding.t
     | Tuple of t list
     | Seq_literal of t list
-    | Record_literal of (Value_name.t * t option) list
-    | Record_update of t * (Value_name.t * t option) list
+    | Record_literal of (Value_name.t * t option) Nonempty.t
+    | Record_update of t * (Value_name.t * t option) Nonempty.t
     | Record_field_access of t * Value_name.t
-    | Type_annotation of t * Type.Expr.Bounded.t
+    | Type_annotation of t * Type.Scheme.Bounded.t
   [@@deriving sexp, variants]
 
   (** Get all the external names referenced by an expression. Names local to the
@@ -75,7 +76,7 @@ module Expr = struct
       | Record_field_access (expr, _) | Type_annotation (expr, _) ->
         loop ~names used locals expr
     and loop_record_fields ~names used locals =
-      List.fold ~init:used ~f:(fun used -> function
+      Nonempty.fold ~init:used ~f:(fun used -> function
         | _, Some expr -> loop ~names used locals expr
         | _, None -> used)
     in

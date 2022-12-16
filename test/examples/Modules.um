@@ -5,8 +5,8 @@ module A :
 
   module B :
     module C :
-      trait D :
-        val d : Nat
+      trait D d :
+        val d : d -> Nat
 
     module D :
       val wow : a -> a

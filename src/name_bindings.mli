@@ -11,7 +11,7 @@ module Name_entry : sig
     [@@deriving equal, sexp]
   end
 
-  type t [@@deriving sexp]
+  type t [@@deriving equal, sexp]
 
   val typ : t -> Type.t
   val scheme : t -> Type.Scheme.t option
@@ -23,7 +23,7 @@ module Name_entry : sig
 end
 
 module Path : sig
-  type t [@@deriving sexp]
+  type t [@@deriving compare, equal, hash, sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
@@ -41,7 +41,7 @@ val name_error_msg : string -> Ustring.t -> 'a
 (* Handling of default values *)
 val empty : t
 val core : t
-val std_prelude : t Lazy.t
+val of_prelude_sexp : Sexp.t -> t
 val without_std : t -> t
 
 (* Querying/updating names *)
@@ -101,13 +101,13 @@ val with_path : t -> Path.t -> f:(t -> t * 'a) -> t * 'a
 val import : t -> Module_name.t -> t
 val import_with : t -> Module_path.t -> Unidentified_name.t list -> t
 val import_all : t -> Module_path.t -> t
-val import_without : t -> Module_path.t -> Unidentified_name.t list -> t
+val import_without : t -> Module_path.t -> Unidentified_name.t Nonempty.t -> t
 
 val add_val
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Type.Expr.Bounded.t
+  -> Type.Scheme.Bounded.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
@@ -115,7 +115,7 @@ val add_extern
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Type.Expr.Bounded.t
+  -> Type.Scheme.Bounded.t
   -> Extern_name.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t
@@ -135,6 +135,8 @@ module Sigs_or_defs : sig
   val find_module : name_bindings -> t -> Module_name.t -> t option
 end
 
+(* TODO: Maybe this should have a return type more like [Sigs.t option * Defs.t]. This
+   would be clearer to use.*)
 val find_sigs_and_defs
   :  t
   -> Module_path.t

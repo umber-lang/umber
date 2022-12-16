@@ -2,7 +2,7 @@
 
 (executables
  (names test gen_dune)
- (libraries core_kernel umber)
+ (libraries core core_unix.sys_unix umber)
  (preprocess
   (pps ppx_jane)))
 
@@ -22,7 +22,7 @@
     (with-accepted-exit-codes
      (or 0 1)
      (system "mkdir ast tokens mir llvm")))
-   (run %{dep:test.exe}) ; does this do anything different to just ./test.exe ? (adds it as a dependency)
+   (run %{dep:test.exe})
    (system "echo \"Tests run at $(date)\" > %{target}"))))
 
 (include dune.inc)

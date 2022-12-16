@@ -1,0 +1,4 @@
+let count_up start_at count_by end_after =
+  let loop current =
+    if current < end_after then loop (current + count_by) else current
+  loop start_at

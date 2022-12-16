@@ -1,81 +1,74 @@
 (LetPattern ()
- ((Let
-   (((Catch_all (catch_all)) ((Name (() False)) (Type_app (() Bool) ())))))
+ ((Let (rec_ false)
+   (bindings (((Catch_all (catch_all)) ((Name False) (Type_app Bool ()))))))
   (Common_def
    (Type_decl Thing
     (()
-     (Variants
-      ((Thing1 ((Type_app (() Int) ()))) (Thing2 ((Type_app (() Int) ()))))))))
-  (Let
-   (((Union (Cnstr_appl (() Thing1) ((Catch_all (one))))
-      (Cnstr_appl (() Thing2) ((Catch_all (one)))))
-     ((Fun_call (Name (() Thing1)) (Literal (Int 1)) (Type_app (() Int) ()))
-      (Type_app ((LetPattern) Thing) ())))))
-  (Let
-   (((Catch_all (make_thing))
-     ((Lambda (Catch_all (""))
-       (Match (Name (() "")) (Type_app (() Int) ())
-        (((Constant (Int 1))
-          (Fun_call (Name (() Thing1)) (Literal (Int 1))
-           (Type_app (() Int) ())))
-         ((Constant (Int 2))
-          (Fun_call (Name (() Thing2)) (Literal (Int 2))
-           (Type_app (() Int) ())))
-         ((Catch_all (n))
-          (Fun_call (Name (() Thing1)) (Name (() n)) (Type_app (() Int) ()))))))
-      (Function (Type_app (() Int) ()) (Type_app ((LetPattern) Thing) ()))))))
-  (Let
-   (((Union (Cnstr_appl (() Thing1) ((Catch_all (n))))
-      (Cnstr_appl (() Thing2) ((Catch_all (n)))))
-     ((Fun_call (Name (() make_thing)) (Literal (Int 7))
-       (Type_app (() Int) ()))
-      (Type_app ((LetPattern) Thing) ())))))
+     (Variants ((Thing1 ((Type_app Int ()))) (Thing2 ((Type_app Int ()))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Union (Cnstr_appl Thing1 ((Catch_all (one))))
+       (Cnstr_appl Thing2 ((Catch_all (one)))))
+      ((Fun_call (Name Thing1) (((Literal (Int 1)) (Type_app Int ()))))
+       (Type_app LetPattern.Thing ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all (make_thing))
+      ((Lambda ((Catch_all ("")))
+        (Match (Name "") (Type_app Int ())
+         (((Constant (Int 1))
+           (Fun_call (Name Thing1) (((Literal (Int 1)) (Type_app Int ())))))
+          ((Constant (Int 2))
+           (Fun_call (Name Thing2) (((Literal (Int 2)) (Type_app Int ())))))
+          ((Catch_all (n))
+           (Fun_call (Name Thing1) (((Name n) (Type_app Int ()))))))))
+       (Function ((Type_app Int ())) (Type_app LetPattern.Thing ())))))))
+  (Let (rec_ false)
+   (bindings
+    (((Union (Cnstr_appl Thing1 ((Catch_all (n))))
+       (Cnstr_appl Thing2 ((Catch_all (n)))))
+      ((Fun_call (Name make_thing) (((Literal (Int 7)) (Type_app Int ()))))
+       (Type_app LetPattern.Thing ()))))))
   (Common_def
    (Type_decl Triple
     ((a b c) (Variants ((Triple ((Var a) (Var b) (Var c))))))))
-  (Let
-   (((Catch_all ())
-     ((Fun_call
-       (Fun_call
-        (Fun_call (Name (() Triple)) (Literal (String s))
-         (Type_app (() String) ()))
-        (Literal (Int 1)) (Type_app (() Int) ()))
-       (Literal (Int 2)) (Type_app (() Int) ()))
-      (Type_app ((LetPattern) Triple)
-       ((Type_app (() String) ()) (Type_app (() Int) ())
-        (Type_app (() Int) ())))))))
-  (Let
-   (((Catch_all ())
-     ((Tuple ((Literal (String s')) (Literal (Int -1)) (Literal (Int -2))))
-      (Tuple
-       ((Type_app (() String) ()) (Type_app (() Int) ())
-        (Type_app (() Int) ())))))))
-  (Let
-   (((Union
-      (Cnstr_appl (() Triple)
-       ((Catch_all (x)) (Constant (Int 5)) (Catch_all (y))))
-      (Cnstr_appl (() Triple)
-       ((Catch_all (x)) (Catch_all (y)) (Constant (Int 5)))))
-     ((Fun_call
-       (Fun_call
-        (Fun_call (Name (() Triple)) (Literal (String "Weird stuff"))
-         (Type_app (() String) ()))
-        (Literal (Int 5)) (Type_app (() Int) ()))
-       (Literal (Int 7)) (Type_app (() Int) ()))
-      (Type_app ((LetPattern) Triple)
-       ((Type_app (() String) ()) (Type_app (() Int) ())
-        (Type_app (() Int) ())))))))
-  (Let
-   (((Union (Tuple ((Catch_all (u)) (Constant (Int -5)) (Catch_all (v))))
-      (Tuple ((Catch_all (u)) (Catch_all (v)) (Constant (Int -20)))))
-     ((Tuple
-       ((Literal (String "Weird tuples")) (Literal (Int 0))
-        (Literal (Int 1))))
-      (Tuple
-       ((Type_app (() String) ()) (Type_app (() Int) ())
-        (Type_app (() Int) ())))))))
-  (Let
-   (((Catch_all (a))
-     ((Name (() ANewThing)) (Type_app ((LetPattern) NewThing) ())))))
-  (Common_def (Val a () (() (Type_app (() NewThing) ()))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ())
+      ((Fun_call (Name Triple)
+        (((Literal (String s)) (Type_app String ()))
+         ((Literal (Int 1)) (Type_app Int ()))
+         ((Literal (Int 2)) (Type_app Int ()))))
+       (Type_app LetPattern.Triple
+        ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ())
+      ((Tuple ((Literal (String s')) (Literal (Int -1)) (Literal (Int -2))))
+       (Tuple ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Union
+       (Cnstr_appl Triple
+        ((Catch_all (x)) (Constant (Int 5)) (Catch_all (y))))
+       (Cnstr_appl Triple
+        ((Catch_all (x)) (Catch_all (y)) (Constant (Int 5)))))
+      ((Fun_call (Name Triple)
+        (((Literal (String "Weird stuff")) (Type_app String ()))
+         ((Literal (Int 5)) (Type_app Int ()))
+         ((Literal (Int 7)) (Type_app Int ()))))
+       (Type_app LetPattern.Triple
+        ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Union (Tuple ((Catch_all (u)) (Constant (Int -5)) (Catch_all (v))))
+       (Tuple ((Catch_all (u)) (Catch_all (v)) (Constant (Int -20)))))
+      ((Tuple
+        ((Literal (String "Weird tuples")) (Literal (Int 0))
+         (Literal (Int 1))))
+       (Tuple ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all (a)) ((Name ANewThing) (Type_app LetPattern.NewThing ()))))))
+  (Common_def (Val a () (() (Type_app NewThing ()))))
   (Common_def (Type_decl NewThing (() (Variants ((ANewThing ()))))))))

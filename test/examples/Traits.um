@@ -1,7 +1,7 @@
 import Date
 
 trait Eq a :
-  val (==) : a -> a -> Bool
+  val (==) : a, a -> Bool
 
 type Person = {
   name : String,
@@ -16,7 +16,7 @@ let (p : Person) = {  # TODO: try and get this to parse without parens
 impl Eq Person =
   let (==) p1 p2 = p1.name == p2.name && p1.dob == p2.dob
 
-impl (Eq a, Eq b) => Eq (a, b) = let (==) (a, b) (c, d) = a == c && d == d
+impl (Eq a, Eq b) => Eq (a, b) = let (==) (a, b) (c, d) = a == c && b == d
 
 #let _x = (  # TODO: figure out how to handle extra dedents properly
   1, 2)

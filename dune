@@ -1,5 +1,5 @@
 (executable
  (name umberboot)
- (libraries core umber)
+ (libraries umberboot)
  (preprocess
   (pps ppx_jane)))

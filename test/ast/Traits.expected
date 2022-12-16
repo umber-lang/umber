@@ -3,47 +3,45 @@
   (Common_def
    (Trait_sig Eq (a)
     ((Common_sig
-      (Val == ()
-       (() (Function (Var a) (Function (Var a) (Type_app (() Bool) ())))))))))
+      (Val == () (() (Function ((Var a) (Var a)) (Type_app Bool ()))))))))
   (Common_def
    (Type_decl Person
-    (()
-     (Record
-      ((name (Type_app (() String) ())) (dob (Type_app (() Date) ())))))))
-  (Let
-   (((Type_annotation (Catch_all (p)) (() (Type_app (() Person) ())))
-     (Record_literal
-      ((name ((Literal (String Bob))))
-       (dob
-        ((Fun_call (Name ((Date) of_string)) (Literal (String 2020-10-11))))))))))
-  (Impl () Eq (Type_app (() Person) ())
-   ((Let
-     (((Catch_all (==))
-       (Lambda (Catch_all (p1))
-        (Lambda (Catch_all (p2))
+    (() (Record ((name (Type_app String ())) (dob (Type_app Date ())))))))
+  (Let (rec_ true)
+   (bindings
+    (((Type_annotation (Catch_all (p)) (() (Type_app Person ())))
+      (Record_literal
+       ((name ((Literal (String Bob))))
+        (dob
+         ((Fun_call (Name Date.of_string) ((Literal (String 2020-10-11))))))))))))
+  (Impl () Eq ((Type_app Person ()))
+   ((Let (rec_ true)
+     (bindings
+      (((Catch_all (==))
+        (Lambda ((Catch_all (p1)) (Catch_all (p2)))
          (Op_tree
-          ((() ==)
-           (((() &&)
-             (((() ==)
-               (((Record_field_access (Name (() p1)) name))
-                ((Record_field_access (Name (() p2)) name))))
-              ((Record_field_access (Name (() p1)) dob))))
-            ((Record_field_access (Name (() p2)) dob))))))))))))
-  (Impl ((Eq (a)) (Eq (b))) Eq (Tuple ((Var a) (Var b)))
-   ((Let
-     (((Catch_all (==))
-       (Lambda (Tuple ((Catch_all (a)) (Catch_all (b))))
-        (Lambda (Tuple ((Catch_all (c)) (Catch_all (d))))
+          (==
+           ((&&
+             ((==
+               (((Record_field_access (Name p1) name))
+                ((Record_field_access (Name p2) name))))
+              ((Record_field_access (Name p1) dob))))
+            ((Record_field_access (Name p2) dob))))))))))))
+  (Impl ((Eq (a)) (Eq (b))) Eq ((Tuple ((Var a) (Var b))))
+   ((Let (rec_ true)
+     (bindings
+      (((Catch_all (==))
+        (Lambda
+         ((Tuple ((Catch_all (a)) (Catch_all (b))))
+          (Tuple ((Catch_all (c)) (Catch_all (d)))))
          (Op_tree
-          ((() ==)
-           (((() &&)
-             (((() ==) (((Name (() a))) ((Name (() c))))) ((Name (() d)))))
-            ((Name (() d)))))))))))
-    (Let (((Catch_all (_y)) (Tuple ((Literal (Int 1)) (Literal (Int 2)))))))
-    (Let
-     (((Tuple ())
-       (Fun_call (Name (() assert))
-        (Op_tree
-         ((() ==)
-          (((Tuple ((Name (() x)) (Name (() x)))))
-           ((Tuple ((Name (() y)) (Name (() y))))))))))))))))
+          (== ((&& ((== (((Name a)) ((Name c)))) ((Name b)))) ((Name d))))))))))
+    (Let (rec_ true)
+     (bindings
+      (((Catch_all (_y)) (Tuple ((Literal (Int 1)) (Literal (Int 2))))))))
+    (Let (rec_ true)
+     (bindings
+      (((Tuple ())
+        (Fun_call (Name assert)
+         ((Op_tree
+           (== (((Tuple ((Name x) (Name x)))) ((Tuple ((Name y) (Name y)))))))))))))))))

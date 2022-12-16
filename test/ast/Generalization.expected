@@ -1,0 +1,5 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("Type application mismatch" (((Type_app Bool ()) (Type_app Char ())))))
+  (filename Generalization.um)))

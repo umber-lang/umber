@@ -1,0 +1,9 @@
+# See https://www.haskell.org/ghc/blog/20100930-LetGeneralisationInGhc7.html
+
+# We don't do local let generalization (or at least not properly) at the moment.
+# This seems fine, might even be a good idea as it supposedly makes type-checking some
+# things e.g. GADTs easier. If this ever gets annoying we can implement it.
+val f : a -> ((a, Char), (a, Bool))
+let f x =
+  let g y = (x, y)
+  (g 'v', g True)

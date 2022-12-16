@@ -1,0 +1,6 @@
+("Compilation error"
+ ((kind Mir_error)
+  (msg
+   ("This kind of expression is not allowed on the right-hand side of a recursive let binding"
+    (expr (Name go_right))))
+  (filename LetBindingGroups.um)))

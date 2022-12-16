@@ -37,7 +37,7 @@ open Parser
    should lex as (LET (LOWER_NAME _) EQUALS L_PAREN ... ???) (where am I going with this?)
  *)
 
-let lexeme = lexeme >> Ustring.of_array_unsafe
+let lexeme = lexeme >> Ustring.of_array_unchecked
 let lexeme_str = lexeme >> Ustring.to_string
 
 type indent_type =
@@ -155,7 +155,7 @@ let balance_pairs lexbuf ~opening ~closing =
   let closing = Ustring.of_string_exn closing in
   let buf = Queue.create () in
   let rec loop last_lexeme depth =
-    if depth = 0 then Queue.to_array buf |> Ustring.of_array_unsafe
+    if depth = 0 then Queue.to_array buf |> Ustring.of_array_unchecked
     else (
       Ustring.iter last_lexeme ~f:(Queue.enqueue buf);
       if prefix_matches lexbuf opening then loop opening (depth + 1)
@@ -191,7 +191,7 @@ let read_string lexbuf =
     in
     match%sedlex lexbuf with
     (* TODO: add escaping + string interpolation *)
-    | '"' -> Queue.to_array buf |> Ustring.of_array_unsafe
+    | '"' -> Queue.to_array buf |> Ustring.of_array_unchecked
     | "\\" -> add (read_escape lexbuf)
     | any -> add (lexeme_char lexbuf 0)
     | _ -> syntax_error ~msg:"String literal ended unexpectedly" lexbuf

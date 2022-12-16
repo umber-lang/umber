@@ -10,6 +10,11 @@ module type General_name = sig
   val to_ustring : t -> Ustring.t
 end
 
+(* TODO: add string/ustring interning. Should be super easy to just add it to a core
+   module like [General_name] that everything else includes and make the
+   [of_string]/[of_ustring], etc. do a global hashtable lookup. We can make the names be
+   represented as integers and then interning module paths will be fast as you can just
+   hash each int in the list. *)
 module type Unidentified_name = sig
   include General_name
 
@@ -73,13 +78,7 @@ module Identified_ustring (V : Name_validator) : Name = struct
 end
 
 module Lower_name = Identified_ustring (struct
-  let coerce lexbuf =
-    match Lex_helpers.lex_lower_name lexbuf with
-    | Some name -> Ok name
-    | None ->
-      let input = Sedlexing.Utf8.lexeme lexbuf in
-      error_s [%message "Invalid lower name" input]
-  ;;
+  let coerce = Lex_helpers.lex_lower_name
 
   let coerce_lenient str =
     (* TODO: add proper unicode capitalization to lower name/upper name checking *)
@@ -88,14 +87,7 @@ module Lower_name = Identified_ustring (struct
 end)
 
 module Upper_name = Identified_ustring (struct
-  let coerce lexbuf =
-    match Lex_helpers.lex_upper_name lexbuf with
-    | Some name -> Ok name
-    | None ->
-      let input = Sedlexing.Utf8.lexeme lexbuf in
-      error_s [%message "Invalid upper name" input]
-  ;;
-
+  let coerce lexbuf = Lex_helpers.lex_upper_name lexbuf
   let coerce_lenient str = String.capitalize str |> Sedlexing.Utf8.from_string |> coerce
 end)
 
@@ -110,7 +102,10 @@ module Module_path : sig
   val of_ustrings_unchecked : Ustring.t list -> t
   val of_ustrings_exn : Ustring.t list -> t
   val to_ustring : t -> Ustring.t
+  val is_prefix : prefix:t -> t -> bool
 end = struct
+  (* TODO: Maybe the sexp of this type should use the nice ustring representation, rather
+     than just being a sexp list. *)
   module T = struct
     type t = Module_name.t list [@@deriving compare, equal, hash, sexp]
   end
@@ -128,7 +123,17 @@ end = struct
       Queue.enqueue q (Uchar.of_char '.');
       Ustring.iter (Module_name.to_ustring s) ~f:(Queue.enqueue q));
     ignore (Queue.dequeue q : Uchar.t option);
-    Queue.to_array q |> Ustring.of_array_unsafe
+    Queue.to_array q |> Ustring.of_array_unchecked
+  ;;
+
+  let rec is_prefix ~prefix:t t' =
+    match t, t' with
+    | [], ([] | _ :: _) -> true
+    | _ :: _, [] -> false
+    | module_name :: rest, module_name' :: rest' ->
+      if Module_name.equal module_name module_name'
+      then is_prefix ~prefix:rest rest'
+      else false
   ;;
 end
 
@@ -156,7 +161,47 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
     type name = t
 
     module T = struct
-      type nonrec t = Module_path.t * t [@@deriving compare, equal, hash, sexp]
+      module U = struct
+        type nonrec t = Module_path.t * t [@@deriving compare, equal, hash]
+
+        let iter_chars (path, name) ~f =
+          List.iter path ~f:(fun module_name ->
+            Ustring.iter (Module_name.to_ustring module_name) ~f;
+            f (Uchar.of_char '.'));
+          Ustring.iter (to_ustring name) ~f
+        ;;
+
+        let total_len (path, name) =
+          List.fold
+            path
+            ~init:(Ustring.length (to_ustring name))
+            ~f:(fun len module_name ->
+              (* Add 1 additional char for the '.' *)
+              len + Ustring.length (Module_name.to_ustring module_name) + 1)
+        ;;
+
+        let to_string t =
+          let buf = Buffer.create ((total_len t + 3) / 4) in
+          iter_chars t ~f:(Uchar.add_to_buffer buf);
+          Buffer.contents buf
+        ;;
+
+        let to_ustring t =
+          let q = Queue.create ~capacity:(total_len t) () in
+          iter_chars t ~f:(Queue.enqueue q);
+          Queue.to_array q |> Ustring.of_array_unchecked
+        ;;
+
+        let of_string s =
+          match String.split s ~on:'.' |> List.split_last with
+          | Some (path, name) ->
+            List.map ~f:Module_name.of_string_unchecked path, of_string_unchecked name
+          | None -> failwithf "Bad qualified name: '%s'" s ()
+        ;;
+      end
+
+      include U
+      include Sexpable.Of_stringable (U)
     end
 
     include T
@@ -172,16 +217,6 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
     let of_ustrings_exn (path, name) =
       Module_path.of_ustrings_exn path, of_ustring_exn name
     ;;
-
-    let to_ustring (path, name) =
-      let name = to_ustring name in
-      let q = Queue.create ~capacity:(Ustring.length name * 2) () in
-      List.iter path ~f:(fun s ->
-        Ustring.iter (Module_name.to_ustring s) ~f:(Queue.enqueue q);
-        Queue.enqueue q (Uchar.of_char '.'));
-      Ustring.iter name ~f:(Queue.enqueue q);
-      Queue.to_array q |> Ustring.of_array_unsafe
-    ;;
   end
 end
 
@@ -195,6 +230,7 @@ module Value_name : sig
   include Name_qualified
 
   val of_cnstr_name : Cnstr_name.t -> t
+  val to_cnstr_name : t -> Cnstr_name.t Or_error.t
   val is_cnstr_name : t -> bool
 
   module Qualified : sig
@@ -206,7 +242,8 @@ end = struct
   include Lower_name_qualified
 
   let of_cnstr_name = of_ustring_unchecked << Cnstr_name.to_ustring
-  let is_cnstr_name = Or_error.is_ok << Cnstr_name.of_ustring << to_ustring
+  let to_cnstr_name = Cnstr_name.of_ustring << to_ustring
+  let is_cnstr_name = Or_error.is_ok << to_cnstr_name
 
   module Qualified = struct
     include Qualified
@@ -247,30 +284,69 @@ end = struct
   ;;
 end
 
-module Unique_name : sig
-  type t [@@deriving sexp_of]
+module Mir_name : sig
+  type t [@@deriving compare, equal, hash, sexp]
 
+  include Stringable.S with type t := t
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 
-  val of_ustring : Ustring.t -> t
-  val base_name : t -> Ustring.t
+  val create : Ustring.t -> t
+  val of_extern_name : Extern_name.t -> t
+  val extern_name : t -> Extern_name.t option
+  val to_ustring : t -> Ustring.t
   val to_string : t -> string
-  val map_id : t -> f:(int -> int) -> t
+  val map_parts : t -> f:(Ustring.t -> int -> int) -> t
 end = struct
-  module Id = Unique_id.Int ()
+  module Unique_name = struct
+    module Id = Unique_id.Int ()
+
+    module T = struct
+      module U = struct
+        type t = Ustring.t * Id.t [@@deriving compare, equal, hash]
+
+        let to_string (ustr, id) = [%string "%{ustr#Ustring}.%{id#Id}"]
+        let to_ustring (ustr, id) = Ustring.(ustr ^ of_string_exn [%string ".%{id#Id}"])
+
+        let of_string str =
+          let name, id = String.rsplit2_exn str ~on:'.' in
+          Ustring.of_string_exn name, Id.of_string id
+        ;;
+      end
+
+      include U
+      include Sexpable.Of_stringable (U)
+    end
+
+    include T
+    include Comparable.Make (T)
+    include Hashable.Make (T)
+
+    let create ustr = ustr, Id.create ()
+
+    let map_parts (ustr, id) ~f =
+      let id = f ustr (Id.to_int_exn id) |> Id.of_int_exn in
+      ustr, id
+    ;;
+  end
 
   module T = struct
     module U = struct
-      type t = Ustring.t * Id.t [@@deriving compare, hash]
+      type t =
+        | Internal of Unique_name.t
+        | External of Extern_name.t
+      [@@deriving compare, equal, hash]
 
-      let to_string (ustr, id) =
-        String.concat [ Ustring.to_string ustr; "."; Id.to_string id ]
+      let to_ustring = function
+        | Internal name -> Unique_name.to_ustring name
+        | External name -> Extern_name.to_ustring name
       ;;
 
+      let to_string t = to_ustring t |> Ustring.to_string
+
       let of_string str =
-        let name, id = String.rsplit2_exn str ~on:'.' in
-        Ustring.of_string_exn name, Id.of_string id
+        try Internal (Unique_name.of_string str) with
+        | _ -> External (Extern_name.of_string_exn str)
       ;;
     end
 
@@ -282,7 +358,17 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let of_ustring ustr = ustr, Id.create ()
-  let base_name = fst
-  let map_id t ~f = Tuple2.map_snd t ~f:(Id.of_int_exn << f << Id.to_int_exn)
+  let create ustr = Internal (Unique_name.create ustr)
+  let of_extern_name name = External name
+
+  let extern_name = function
+    | Internal _ -> None
+    | External name -> Some name
+  ;;
+
+  let map_parts t ~f =
+    match t with
+    | Internal name -> Internal (Unique_name.map_parts name ~f)
+    | External _ as t -> t
+  ;;
 end

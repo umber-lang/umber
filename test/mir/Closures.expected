@@ -1,0 +1,19 @@
+((Extern_decl ((name %lt) (arity 2)))
+ (Extern_decl ((name %int_add) (arity 2)))
+ (Fun_def
+  ((fun_name Closures.loop.0)
+   (closed_over (Closures.count_by.0 Closures.end_after.0))
+   (args (Closures.current.0))
+   (body
+    (Let match.0
+     (Fun_call %lt ((Name Closures.current.0) (Name Closures.end_after.0)))
+     (Cond_assign (conds (((Constant_tag_equals (Name match.0) 1) ())))
+      (body
+       (Fun_call Closures.loop.0
+        ((Fun_call %int_add
+          ((Name Closures.current.0) (Name Closures.count_by.0))))))
+      (if_none_matched (Otherwise (Name Closures.current.0))))))))
+ (Fun_def
+  ((fun_name Closures.count_up.0)
+   (args (Closures.start_at.0 Closures.count_by.0 Closures.end_after.0))
+   (body (Fun_call Closures.loop.0 ((Name Closures.start_at.0)))))))

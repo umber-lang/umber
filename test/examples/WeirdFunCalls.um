@@ -1,0 +1,18 @@
+let () = print "plain"
+
+let fun_call () = \() -> print "fun call"
+
+let () = (fun_call ()) ()
+
+let print_twice msg = print msg; print msg
+
+let if_ = (if True then print_twice else print) "if"
+
+# FIXME: This doesn't work because the lexer doesn't allow line separators inside parens,
+  and that's the only current way to create let bindings.
+  Damnit whitespace sensitivity is such a nightmare to implement.
+#let () =
+  (let () = ()
+   print) ()
+
+# TODO: Add an application of a field from a record 

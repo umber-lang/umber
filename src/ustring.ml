@@ -58,7 +58,7 @@ let ( ^ ) = append
 let mem t c = Array.mem t c ~equal:Uchar.( = )
 let index t uchar = Array.findi t ~f:(fun _ c -> Uchar.(c = uchar)) |> Option.map ~f:fst
 let index_exn t uchar = index t uchar |> Option.value_exn
-let of_array_unsafe = Fn.id
+let of_array_unchecked = Fn.id
 let of_ustring = Fn.id
 let to_ustring = Fn.id
 let print ?(out = stdout) s = Out_channel.output_string out (to_string s)

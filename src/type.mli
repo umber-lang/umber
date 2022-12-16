@@ -4,12 +4,11 @@ module Var_id : module type of Unique_id.Int ()
 
 module Param : sig
   (* TODO: consider adding support for weak type variables here *)
-  (* TODO: consider hiding/breaking this type equality *)
-  (* TODO: consider making this a unique int or something so that mapping over it can be
-     done across types. *)
-  type t = Type_param_name.t [@@deriving compare, equal, hash, sexp]
+  type t = Type_param_name.t [@@deriving compare, equal, sexp_of]
 
-  include Comparable.S with type t := t
+  val dummy : t
+
+  include Comparable.S_plain with type t := t
 
   module Map : sig
     include module type of Map
@@ -17,103 +16,105 @@ module Param : sig
     val hash_fold_t : (Hash.state -> 'a -> Hash.state) -> Hash.state -> 'a t -> Hash.state
   end
 
-  include Hashable.S with type t := t
+  include Hashable.S_plain with type t := t
 
   module Env_to_vars : sig
-    type param = t
     type t
 
     val create : unit -> t
-    val find_or_add : t -> param -> Var_id.t
+    val find_or_add : t -> Type_param_name.t -> Var_id.t
   end
 
   module Env_of_vars : sig
-    type param = t
     type t
 
     val create : unit -> t
-    val find_or_add : t -> Var_id.t -> param
+    val find_or_add : t -> Var_id.t -> Type_param_name.t
   end
 end
 
 module Expr : sig
-  type 'var t =
-    | Var of 'var
-    | Type_app of Type_name.Qualified.t * 'var t list
-    | Function of 'var t Nonempty.t * 'var t
-    | Tuple of 'var t list
+  type ('v, 'pf) t =
+    | Var of 'v
+    | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
+    | Tuple of ('v, 'pf) t list
+    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) t
+    | Partial_function of ('v, 'pf) t Nonempty.t * 'pf
   [@@deriving compare, equal, hash, sexp, variants]
 
   val map
-    :  'a t
-    -> f:('a t -> [< `Halt of 'a t | `Defer of 'a t | `Retry of 'a t ])
-    -> 'a t
+    :  ?f:(('v1, 'pf1) t -> (('v1, 'pf1) t, ('v2, 'pf2) t) Map_action.t)
+    -> ('v1, 'pf1) t
+    -> var:('v1 -> 'v2)
+    -> pf:('pf1 -> 'pf2)
+    -> ('v2, 'pf2) t
 
-  val map_vars : 'a t -> f:('a -> 'b) -> 'b t
-  val fold_vars : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc) -> 'acc
-  val for_all_vars : 'a t -> f:('a -> bool) -> bool
+  val fold_until
+    :  ('v, 'pf) t
+    -> init:'acc
+    -> f:('acc -> ('v, 'pf) t -> ('acc, 'final) Fold_action.t)
+    -> ('acc, 'final) Fold_action.t
 
-  module Bounded : sig
-    type nonrec t = Trait_bound.t * Param.t t [@@deriving compare, equal, hash, sexp]
-  end
+  val fold_vars : ('v, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
+  val for_all_vars : ('v, _) t -> f:('v -> bool) -> bool
+  val exists_var : ('v, _) t -> f:('v -> bool) -> bool
 end
 
-type t = Var_id.t Expr.t [@@deriving compare, hash, equal, sexp]
+type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
 
 val fresh_var : unit -> t
 
 module Scheme : sig
-  type nonrec t = Param.t Expr.t [@@deriving compare, hash, equal, sexp]
+  type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
+
+  module Bounded : sig
+    type nonrec t = Trait_bound.t * t [@@deriving compare, equal, hash, sexp]
+  end
 
   val instantiate
     :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
     -> ?params:Param.Env_to_vars.t
     -> t
-    -> Var_id.t Expr.t
+    -> (Var_id.t, _) Expr.t
 
   val instantiate_bounded
     :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
     -> ?params:Param.Env_to_vars.t
-    -> Expr.Bounded.t
-    -> Var_id.t Expr.t
-
-  val infer_param_map : template_type:t -> instance_type:t -> t Param.Map.t
+    -> Bounded.t
+    -> (Var_id.t, _) Expr.t
 end
 
 module Concrete : sig
-  type t = Nothing.t Expr.t [@@deriving compare, equal, hash, sexp]
+  type t = (Nothing.t, Nothing.t) Expr.t [@@deriving compare, equal, hash, sexp]
 
-  val cast : t -> 'a Expr.t
+  val cast : t -> ('v, 'pf) Expr.t
+
+  (* TODO: Consider deleting this. Do we need it? *)
+  val of_polymorphic_exn : ('v, 'pf) Expr.t -> t
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 end
 
 module Decl : sig
-  type 'var decl =
+  type decl =
     | Abstract
-    | Alias of 'var Expr.t
-    | Variants of (Cnstr_name.t * 'var Expr.t list) list
+    | Alias of Scheme.t
+    | Variants of (Cnstr_name.t * Scheme.t list) list
     (* TODO: probably just make records a type expression - you can trivially get nominal
-       records with a single variant and an inline record *)
-    | Record of (Value_name.t * 'var Expr.t) list
+       records with a single variant and an inline record. One problem with this is you
+       can no longer define recursive record types, which is a bit annoying. *)
+    | Record of (Value_name.t * Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type t = Param.t list * Param.t decl [@@deriving compare, equal, hash, sexp]
+  type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]
 
   val arity : t -> int
-  val map_exprs : t -> f:(Param.t Expr.t -> Param.t Expr.t) -> t
-  val fold_exprs : t -> init:'acc -> f:('acc -> Param.t Expr.t -> 'acc) -> 'acc
-  val iter_exprs : t -> f:(Param.t Expr.t -> unit) -> unit
+  val map_exprs : t -> f:(Scheme.t -> Scheme.t) -> t
+  val fold_exprs : t -> init:'acc -> f:('acc -> Scheme.t -> 'acc) -> 'acc
+  val iter_exprs : t -> f:(Scheme.t -> unit) -> unit
   val no_free_params : t -> bool
-
-  (* TODO: Remove this. I don't think I want to use it. *)
-  module Monomorphic : sig
-    type t = Nothing.t decl [@@deriving compare, equal, hash, sexp]
-  end
-
-  val monomorphize : t -> args:Concrete.t list -> Monomorphic.t
 end

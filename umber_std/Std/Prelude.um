@@ -1,49 +1,46 @@
-# Temporary mock-up for testing purposes
 module :
-  # Types like Bool, Int, etc. are automatically pre-loaded
-
   module List :
     type List a = Nil | Cons a (List a)
   import List with Nil, Cons
 
   module Operators :
-    val (.) (infixr 9) : () => (b -> c) -> (a -> b) -> a -> c
+    val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
     # `() =>` is a hack for the parser as it confuses the `(` in `(b -> c)` as the start
       of a trait bound (it would need arbitrary lookahead or some other trickery to
       avoid doing so)
 
-    val (^) (infixr 8) : Int -> Int -> Int
-    #val (^^) (infixr 8) : Float -> Int -> Float
-    #val (**) (infixr 8) : Float -> Float -> Float
+    val (^) (infixr 8) : Int, Int -> Int
+    #val (^^) (infixr 8) : Float, Int -> Float
+    #val (**) (infixr 8) : Float, Float -> Float
 
-    val (*) (infixl 7) : Int -> Int -> Int
-    #val (/) (infixl 7) : Float -> Float -> Float
-    #val (//) (infixl 7) : Int -> Int -> Int  # Same as quot (not div)
-    #val (%) (infixl 7) : Int -> Int -> Int  # Same as rem (not mod)
+    val (*) (infixl 7) : Int, Int -> Int
+    #val (/) (infixl 7) : Float, Float -> Float
+    #val (//) (infixl 7) : Int, Int -> Int  # Same as quot (not div)
+    #val (%) (infixl 7) : Int, Int -> Int  # Same as rem (not mod)
 
-    val (+) (infixl 6) : Int -> Int -> Int
-    val (-) (infixl 6) : Int -> Int -> Int
+    val (+) (infixl 6) : Int, Int -> Int
+    val (-) (infixl 6) : Int, Int -> Int
 
-    val (::) (infixr 5) : a -> List a -> List a
+    val (::) (infixr 5) : a, List a -> List a
     
     # TODO: add trait bounds to these - this is just temporary
     val not : Bool -> Bool
-    val (==) (infix 4) : a -> a -> Bool
-    val (!=) (infix 4) : a -> a -> Bool
-    val (<) (infix 4) : a -> a -> Bool
-    val (<=) (infix 4) : a -> a -> Bool
-    val (>) (infix 4) : a -> a -> Bool
-    val (>=) (infix 4) : a -> a -> Bool
+    val (==) (infix 4) : a, a -> Bool
+    val (!=) (infix 4) : a, a -> Bool
+    val (<) (infix 4) : a, a -> Bool
+    val (<=) (infix 4) : a, a -> Bool
+    val (>) (infix 4) : a, a -> Bool
+    val (>=) (infix 4) : a, a -> Bool
 
-    val (&&) (infixl 3) : Bool -> Bool -> Bool
+    val (&&) (infixl 3) : Bool, Bool -> Bool
     
-    val (||) (infixl 2) : Bool -> Bool -> Bool
+    val (||) (infixl 2) : Bool, Bool -> Bool
 
-    #val (>>=) (infixl 1) : (Monad m) => m a -> (a -> m b) -> m b
+    #val (>>=) (infixl 1) : (Monad m) => m a, (a -> m b) -> m b
 
-    val (|>) (infixl 0) : a -> (a -> b) -> b
+    val (|>) (infixl 0) : a, (a -> b) -> b
 
-    val (;) (infixl 0) : () => () -> a -> a
+    val (;) (infixl 0) : () => (), a -> a
 
   import Operators with *
 
@@ -90,36 +87,36 @@ module Operators =
   # TODO: Consider removing these fixity declarations and copying them from the sig
     This requires a way to specify fixity in a let binding. (Also consider that there's 
     currently there's no way to put fixity declarations inside nested expressions).
-  val (.) (infixr 9) : () => (b -> c) -> (a -> b) -> a -> c
+  val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
   let (.) f g x = f (g x)
 
-  extern (^) (infixr 8) : Int -> Int -> Int = "%int_pow"
-  extern (*) (infixl 7) : Int -> Int -> Int = "%int_mul"
-  extern (+) (infixl 6) : Int -> Int -> Int = "%int_add"
-  extern (-) (infixl 6) : Int -> Int -> Int = "%int_sub"
+  extern (^) (infixr 8) : Int, Int -> Int = "%int_pow"
+  extern (*) (infixl 7) : Int, Int -> Int = "%int_mul"
+  extern (+) (infixl 6) : Int, Int -> Int = "%int_add"
+  extern (-) (infixl 6) : Int, Int -> Int = "%int_sub"
 
-  val (::) (infixr 5) : a -> List a -> List a
+  val (::) (infixr 5) : a, List a -> List a
   let (::) = List.Cons
   
   let not = match | True -> False | False -> True
 
-  extern (==) (infix 4) : a -> a -> Bool = "%eq"
-  extern (!=) (infix 4) : a -> a -> Bool = "%neq"
-  extern (<) (infix 4) : a -> a -> Bool = "%lt"
-  extern (<=) (infix 4) : a -> a -> Bool = "%lte"
-  extern (>) (infix 4) : a -> a -> Bool = "%gt"
-  extern (>=) (infix 4) : a -> a -> Bool = "%gte"
+  extern (==) (infix 4) : a, a -> Bool = "%eq"
+  extern (!=) (infix 4) : a, a -> Bool = "%neq"
+  extern (<) (infix 4) : a, a -> Bool = "%lt"
+  extern (<=) (infix 4) : a, a -> Bool = "%lte"
+  extern (>) (infix 4) : a, a -> Bool = "%gt"
+  extern (>=) (infix 4) : a, a -> Bool = "%gte"
 
-  val (&&) (infixl 3) : Bool -> Bool -> Bool
+  val (&&) (infixl 3) : Bool, Bool -> Bool
   let (&&) a b = if a then b else False
   
-  val (||) (infixl 2) : Bool -> Bool -> Bool
+  val (||) (infixl 2) : Bool, Bool -> Bool
   let (||) a b = if a then True else b
 
-  val (|>) (infixl 0) : a -> (a -> b) -> b
+  val (|>) (infixl 0) : a, (a -> b) -> b
   let (|>) x f = f x
 
-  val (;) (infixl 0) : () => () -> a -> a
+  val (;) (infixl 0) : () => (), a -> a
   let (;) () x = x
 
 import Operators with *

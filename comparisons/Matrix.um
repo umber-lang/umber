@@ -1,0 +1,45 @@
+module Vector :
+  type Vector
+
+  val create : Int, Int -> Vector
+  val scale : Vector, Int -> Vector
+  val dot : Vector, Vector -> Int
+  =
+  type Vector = (Int, Int)
+
+  let create x y = (x, y)
+  let scale k (x, y) = (k * x, k * y)
+  let dot (x1, y1) (x2, y2) = x1 * x2 + y1 * y2
+
+module Matrix :
+  type Matrix
+
+  val mul : Matrix, Matrix -> Matrix
+  =
+  # Setup:
+    [ a b ]
+    [ c d ]
+  type Matrix = {
+    a : Int,
+    b : Int,
+    c : Int,
+    d : Int,
+  }
+
+  let mul { a, b, c, d } { a = a', b = b', c = c', d = d' } =
+    # Exercise for the reader...
+
+trait Mul a b =
+  type Output
+
+  val (*.) : a, b -> Output
+
+impl (Num a) => Mul a a =
+  type Output = a
+
+  let (*.) = (*) 
+
+impl Mul Matrix Matrix =
+  type Output = Matrix
+
+  let (*.) = Matrix.mul 

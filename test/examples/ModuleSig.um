@@ -1,8 +1,8 @@
 module Range :
   type Range
 
-  val between : Int -> Int -> Range
-  val in : Int -> Range -> Bool
+  val between : Int, Int -> Range
+  val in : Int, Range -> Bool
   =
   type alias Range = (Int, Int)
 

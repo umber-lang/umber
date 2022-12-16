@@ -1,0 +1,30 @@
+; ModuleID = 'Option.um'
+source_filename = "Option.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@Option.None.0 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+
+define void @main() {
+entry:
+  ret void
+}
+
+define tailcc %umber_block* @Option.Some.0(%umber_block* %arg0.0) {
+entry:
+  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 2))
+  %box = bitcast i8* %malloccall to i64*
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i64 1
+  store i16 1, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  store %umber_block* %arg0.0, %umber_block** %box4, align 8
+  %box5 = bitcast i64* %box to %umber_block*
+  ret %umber_block* %box5
+}
+
+declare noalias i8* @malloc(i32)

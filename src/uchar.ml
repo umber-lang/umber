@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 include Uchar
 include Comparable.Make (Uchar)
 

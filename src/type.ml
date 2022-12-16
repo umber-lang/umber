@@ -6,45 +6,39 @@ module Param = struct
   (* TODO: need variance for type parameters (e.g. covariant, contravariant)
      Can probably wait a bit though -- it's needed for subtyping
      Variance can maybe be added as constraints on the type scheme *)
-  module T = struct
-    type t = Type_param_name.t [@@deriving compare, equal, hash, sexp]
-  end
 
+  module T = Type_param_name
   include T
-  include Comparable.Make (T)
+  include Comparable.Make_plain (T)
+  include Hashable.Make_plain (T)
 
   module Map = struct
     include Map
     include Map.Provide_hash (T)
   end
 
-  include Hashable.Make (T)
+  let dummy = Type_param_name.default
 
   module Env_to_vars : sig
-    type param = t
     type t
 
     val create : unit -> t
-    val find_or_add : t -> param -> Var_id.t
+    val find_or_add : t -> Type_param_name.t -> Var_id.t
   end = struct
-    type param = t
-    type nonrec t = (t, Var_id.t) Hashtbl.t
+    type nonrec t = (Type_param_name.t, Var_id.t) Hashtbl.t
 
-    let create () = Hashtbl.create (module T)
+    let create () = Type_param_name.Table.create ()
     let find_or_add = Hashtbl.find_or_add ~default:Var_id.create
   end
 
   module Env_of_vars : sig
-    type param = t
     type t
 
     val create : unit -> t
-    val find_or_add : t -> Var_id.t -> param
+    val find_or_add : t -> Var_id.t -> Type_param_name.t
   end = struct
-    type param = t
-
     type nonrec t =
-      { table : (Var_id.t, t) Hashtbl.t
+      { table : (Var_id.t, Type_param_name.t) Hashtbl.t
       ; mutable next_param : Type_param_name.t
       }
 
@@ -62,75 +56,97 @@ module Param = struct
 end
 
 module Expr = struct
-  type 'var t =
-    | Var of 'var
-    | Type_app of Type_name.Qualified.t * 'var t list
-    | Function of 'var t Nonempty.t * 'var t
-    | Tuple of 'var t list
+  type ('v, 'pf) t =
+    | Var of 'v
+    | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
+    | Tuple of ('v, 'pf) t list
+    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) t
+    | Partial_function of ('v, 'pf) t Nonempty.t * 'pf
   [@@deriving compare, equal, hash, sexp, variants]
 
-  let rec map' typ ~f ~var =
+  let rec map ?(f = Map_action.defer) typ ~var ~pf =
     match f typ with
-    | `Halt typ -> typ
-    | `Retry typ -> map' typ ~f ~var
-    | `Defer typ ->
+    | Halt typ -> typ
+    | Retry typ -> map typ ~f ~var ~pf
+    | Defer typ ->
       (match typ with
       | Var v -> Var (var v)
-      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map' ~f ~var))
-      | Tuple fields -> Tuple (List.map fields ~f:(map' ~f ~var))
+      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var ~pf))
+      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf))
       | Function (args, body) ->
-        let args = Nonempty.map args ~f:(map' ~f ~var) in
-        Function (args, map' ~f ~var body))
+        let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
+        Function (args, map ~f ~var ~pf body)
+      | Partial_function (args, v) ->
+        let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
+        Partial_function (args, pf v))
   ;;
 
-  let map = map' ~var:Fn.id
-  let map_vars typ ~f = map' typ ~f:(fun typ -> `Defer typ) ~var:f
-
-  let rec fold_vars typ ~init ~f =
-    match typ with
-    | Var var -> f init var
-    | Type_app (_, fields) | Tuple fields ->
-      List.fold fields ~init ~f:(fun init -> fold_vars ~init ~f)
-    | Function (args, body) ->
-      let init = Nonempty.fold args ~init ~f:(fun init -> fold_vars ~init ~f) in
-      fold_vars body ~f ~init
+  let rec fold_until typ ~init ~f =
+    match (f init typ : _ Fold_action.t) with
+    | Stop _ as stop -> stop
+    | Continue init as continue ->
+      (match typ with
+      | Var _ -> continue
+      | Type_app (_, fields) | Tuple fields ->
+        List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
+      | Function (args, body) ->
+        let%bind.Fold_action init =
+          Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
+        in
+        fold_until body ~init ~f
+      | Partial_function (args, _) ->
+        Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f))
   ;;
 
-  let rec for_all_vars typ ~f =
-    match typ with
-    | Var var -> f var
-    | Type_app (_, fields) | Tuple fields -> List.for_all fields ~f:(for_all_vars ~f)
-    | Function (args, body) ->
-      Nonempty.for_all args ~f:(for_all_vars ~f) && for_all_vars body ~f
+  let fold_vars typ ~init ~f =
+    fold_until typ ~init ~f:(fun acc -> function
+      | Var var -> Continue (f acc var)
+      | _ -> Continue acc)
+    |> Fold_action.id
   ;;
 
-  module Bounded = struct
-    type nonrec t = Trait_bound.t * Param.t t [@@deriving compare, equal, hash, sexp]
-  end
+  let for_all_vars typ ~f =
+    fold_until typ ~init:true ~f:(fun _ -> function
+      | Var var -> if f var then Continue true else Stop false
+      | _ -> Continue true)
+    |> Fold_action.id
+  ;;
+
+  let exists_var typ ~f =
+    fold_until typ ~init:false ~f:(fun _ -> function
+      | Var var -> if f var then Stop true else Continue false
+      | _ -> Continue false)
+    |> Fold_action.id
+  ;;
 end
 
-type t = Var_id.t Expr.t [@@deriving compare, hash, equal, sexp]
+type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
 
 let fresh_var () = Expr.Var (Var_id.create ())
 
 module Scheme = struct
   module T = struct
-    (* TODO: add trait constraints to this type here
-     Having this type not be the same as the type that plain type expressions get parsed
-     into also seems highly desirable *)
-    type nonrec t = Param.t Expr.t [@@deriving compare, hash, equal, sexp]
+    (* TODO: add trait constraints to this type here *)
+    type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
   end
 
   include T
   include Comparable.Make (T)
   include Hashable.Make (T)
 
+  module Bounded = struct
+    type nonrec t = Trait_bound.t * t [@@deriving compare, equal, hash, sexp]
+  end
+
   let instantiate ?(map_name = Fn.id) ?params typ =
     let params = option_or_default params ~f:Param.Env_to_vars.create in
-    Expr.map_vars typ ~f:(Param.Env_to_vars.find_or_add params)
-    |> Expr.map ~f:(function
-         | Type_app (name, args) -> `Defer (Expr.Type_app (map_name name, args))
-         | typ -> `Defer typ)
+    Expr.map
+      typ
+      ~var:(Param.Env_to_vars.find_or_add params)
+      ~f:(function
+        | Type_app (name, args) -> Defer (Expr.Type_app (map_name name, args))
+        | typ -> Defer typ)
+      ~pf:Nothing.unreachable_code
   ;;
 
   (* TODO: handle trait bounds *)
@@ -139,66 +155,35 @@ module Scheme = struct
     | [], typ -> instantiate ?map_name ?params typ
     | _ -> raise_s [%message "Trait bounds not yet implemented"]
   ;;
-
-  let infer_param_map =
-    let add_consistent param_map ~key:param ~data:new_ =
-      Param.Map.update param_map param ~f:(function
-        | None -> new_
-        | Some existing ->
-          if equal existing new_
-          then existing
-          else
-            compiler_bug
-              [%message "Inconsistent type instantiation" (existing : t) (new_ : t)])
-    in
-    let rec loop param_map t t' =
-      match (t : t), (t' : t) with
-      | Var param, _ -> add_consistent param_map ~key:param ~data:t'
-      | Type_app (type_name, args), Type_app (type_name', args') ->
-        assert_or_compiler_bug
-          (Type_name.Qualified.equal type_name type_name')
-          ~here:[%here];
-        List.fold2_exn args args' ~init:param_map ~f:loop
-      | Function (args, body), Function (args', body') ->
-        let param_map = Nonempty.fold2_exn args args' ~init:param_map ~f:loop in
-        loop param_map body body'
-      | Tuple fields, Tuple fields' ->
-        List.fold2_exn fields fields' ~init:param_map ~f:loop
-      | Type_app _, (Var _ | Function _ | Tuple _)
-      | Function _, (Var _ | Type_app _ | Tuple _)
-      | Tuple _, (Var _ | Type_app _ | Function _) ->
-        compiler_bug
-          [%message
-            "infer_param_map: incompatible template and instance types"
-              ~template:(t : t)
-              ~instance:(t : t)]
-    in
-    fun ~template_type ~instance_type -> loop Param.Map.empty template_type instance_type
-  ;;
 end
 
 module Concrete = struct
   module T = struct
-    type t = Nothing.t Expr.t [@@deriving compare, equal, hash, sexp]
+    type t = (Nothing.t, Nothing.t) Expr.t [@@deriving compare, equal, hash, sexp]
   end
 
   include T
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let cast = Expr.map_vars ~f:(function (_ : Nothing.t) -> .)
+  let cast t = Expr.map t ~var:Nothing.unreachable_code ~pf:Nothing.unreachable_code
+
+  let of_polymorphic_exn t =
+    let fail _ = compiler_bug [%message "Type.Concrete.of_polymorphic_exn: found var"] in
+    Expr.map t ~var:fail ~pf:fail
+  ;;
 end
 
 module Decl = struct
-  type 'var decl =
+  type decl =
     | Abstract
-    | Alias of 'var Expr.t
+    | Alias of Scheme.t
     (* TODO: variant constructors should probably support fixity declarations *)
-    | Variants of (Cnstr_name.t * 'var Expr.t list) list
-    | Record of (Value_name.t * 'var Expr.t) list
+    | Variants of (Cnstr_name.t * Scheme.t list) list
+    | Record of (Value_name.t * Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type t = Param.t list * Param.t decl [@@deriving compare, equal, hash, sexp]
+  type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]
 
   let arity (params, _) = List.length params
 
@@ -208,7 +193,7 @@ module Decl = struct
       | Abstract -> Abstract
       | Alias expr -> Alias (f expr)
       | Variants cnstrs -> Variants (List.map cnstrs ~f:(Tuple2.map_snd ~f:(List.map ~f)))
-      | Record fields -> Record (List.map fields ~f:(Tuple2.map_snd ~f)) )
+      | Record fields -> Record (Nonempty.map fields ~f:(Tuple2.map_snd ~f)) )
   ;;
 
   let fold_exprs (_, decl) ~init:acc ~f =
@@ -217,14 +202,14 @@ module Decl = struct
     | Alias expr -> f acc expr
     | Variants cnstrs ->
       List.fold cnstrs ~init:acc ~f:(fun acc -> snd >> List.fold ~init:acc ~f)
-    | Record fields -> List.fold fields ~init:acc ~f:(fun acc -> snd >> f acc)
+    | Record fields -> Nonempty.fold fields ~init:acc ~f:(fun acc -> snd >> f acc)
   ;;
 
   let iter_exprs decl ~f = fold_exprs decl ~init:() ~f:(fun () -> f)
 
   let no_free_params =
     let check_params params typ =
-      Expr.for_all_vars typ ~f:(List.mem params ~equal:Param.equal)
+      Expr.for_all_vars typ ~f:(List.mem params ~equal:Type_param_name.equal)
     in
     fun (params, decl) ->
       match decl with
@@ -234,23 +219,6 @@ module Decl = struct
         List.for_all cnstrs ~f:(fun (_, args) ->
           List.for_all args ~f:(check_params params))
       | Record fields ->
-        List.for_all fields ~f:(fun (_, field) -> check_params params field)
-  ;;
-
-  module Monomorphic = struct
-    type t = Nothing.t decl [@@deriving compare, equal, hash, sexp]
-  end
-
-  let monomorphize t ~(args : Concrete.t list) =
-    let param_subs = List.zip_exn (fst t) args |> Param.Map.of_alist_exn in
-    map_exprs
-      t
-      ~f:
-        (Expr.map'
-           ~f:(function
-             | Var param -> `Halt (Map.find_exn param_subs param)
-             | (Type_app _ | Function _ | Tuple _) as expr -> `Defer expr)
-           ~var:(fun _ -> compiler_bug [%message "Type.Decl.monomorphize: var"]))
-    |> snd
+        Nonempty.for_all fields ~f:(fun (_, field) -> check_params params field)
   ;;
 end

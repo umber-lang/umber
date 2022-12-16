@@ -8,7 +8,7 @@ import Number.Float without pi
 import Number with (*)
 
 module :
-  val (*) : (Num a) => a -> a -> a
+  val (*) : (Num a) => a, a -> a
 
 # TODO: should the value (*) automatically get re-exported or do you have to write this:
 # Maybe there could be a compiler directive at the top of the file to switch re-exports
