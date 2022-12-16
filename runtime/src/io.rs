@@ -1,17 +1,21 @@
 use crate::types::BlockPtr;
 
 #[no_mangle]
-pub extern "C" fn print_int(n: i64) {
-    print!("{}", n);
+pub extern "C" fn umber_print_int(x: BlockPtr) {
+    print!("{}", x.as_int());
 }
 
 #[no_mangle]
-pub extern "C" fn print_float(x: f64) {
-    print!("{}", x);
+pub extern "C" fn umber_print_float(x: BlockPtr) {
+    print!("{}", x.as_float());
 }
 
 #[no_mangle]
-pub extern "C" fn print_string(str: BlockPtr) {
-    let str = unsafe { (*str.as_ptr()).as_str() };
-    print!("{}", str);
+pub extern "C" fn umber_print_string(x: BlockPtr) {
+    print!("{}", x.as_str());
+}
+
+#[no_mangle]
+pub extern "C" fn umber_print_endline(x: BlockPtr) {
+    print!("{}\n", x.as_str());
 }
