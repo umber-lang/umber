@@ -46,7 +46,7 @@ module :
 
   val sqrt : Int -> Float
 
-  extern print : String -> () = "%print_endline"  # TODO: effects
+  extern print : String -> () = "umber_print_endline"  # TODO: effects
 
 # TODO: implement public/private distinction for modules
 
@@ -90,22 +90,22 @@ module Operators =
   val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
   let (.) f g x = f (g x)
 
-  extern (^) (infixr 8) : Int, Int -> Int = "%int_pow"
-  extern (*) (infixl 7) : Int, Int -> Int = "%int_mul"
-  extern (+) (infixl 6) : Int, Int -> Int = "%int_add"
-  extern (-) (infixl 6) : Int, Int -> Int = "%int_sub"
+  extern (^) (infixr 8) : Int, Int -> Int = "umber_int_pow"
+  extern (*) (infixl 7) : Int, Int -> Int = "umber_int_mul"
+  extern (+) (infixl 6) : Int, Int -> Int = "umber_int_add"
+  extern (-) (infixl 6) : Int, Int -> Int = "umber_int_sub"
 
   val (::) (infixr 5) : a, List a -> List a
   let (::) = List.Cons
   
   let not = match | True -> False | False -> True
 
-  extern (==) (infix 4) : a, a -> Bool = "%eq"
-  extern (!=) (infix 4) : a, a -> Bool = "%neq"
-  extern (<) (infix 4) : a, a -> Bool = "%lt"
-  extern (<=) (infix 4) : a, a -> Bool = "%lte"
-  extern (>) (infix 4) : a, a -> Bool = "%gt"
-  extern (>=) (infix 4) : a, a -> Bool = "%gte"
+  extern (==) (infix 4) : a, a -> Bool = "umber_eq"
+  extern (!=) (infix 4) : a, a -> Bool = "umber_neq"
+  extern (<) (infix 4) : a, a -> Bool = "umber_lt"
+  extern (<=) (infix 4) : a, a -> Bool = "umber_lte"
+  extern (>) (infix 4) : a, a -> Bool = "umber_gt"
+  extern (>=) (infix 4) : a, a -> Bool = "umber_gte"
 
   val (&&) (infixl 3) : Bool, Bool -> Bool
   let (&&) a b = if a then b else False
@@ -121,5 +121,5 @@ module Operators =
 
 import Operators with *
 
-extern sqrt : Int -> Float = "%int_sqrt"
-extern print : String -> () = "%print_endline"
+extern sqrt : Int -> Float = "umber_int_sqrt"
+extern print : String -> () = "umber_print_endline"

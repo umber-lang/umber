@@ -1,9 +1,8 @@
-; TODO: Might be a bit nicer to call umberboot.exe directly without cinaps and generate
-; separate files
-
 (cinaps
  (files prelude.ml)
  (libraries umberboot)
+ (runtime_deps
+  (file Std/Prelude.um))
  (preprocess
   (pps ppx_jane)))
 

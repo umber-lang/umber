@@ -6,8 +6,7 @@ let type_error_msg = Type_bindings.type_error_msg
 module Pattern = struct
   include Pattern
 
-  type 'typ pattern = [%import: 'typ Pattern.t] [@@deriving sexp]
-  type t = Nothing.t pattern [@@deriving sexp]
+  type nonrec t = Nothing.t t [@@deriving sexp]
 
   (* TODO: either split up Untyped/Typed patterns into different types or stop returning
      a pattern from these functions *)
@@ -206,7 +205,7 @@ module Expr = struct
         (* TODO: should really be referring to Bool as a primitive of some kind since
            otherwise you could shadow it. Could have it be qualified like
            `_Primitives.Bool` *)
-        let cnstr name = Pattern.Cnstr_appl (name, []) in
+        let cnstr name : Pattern.t = Cnstr_appl (name, []) in
         ( Match
             ( cond
             , (bool_type, Pattern.Names.empty)

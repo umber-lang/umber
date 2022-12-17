@@ -10,7 +10,7 @@
   llvm.irreader
   umber_std)
  (preprocess
-  (staged_pps ppx_import sedlex.ppx ppx_jane))
+  (pps sedlex.ppx ppx_jane))
  (inline_tests)
  (instrumentation
   (backend bisect_ppx)))

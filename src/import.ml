@@ -1,3 +1,4 @@
+module Umber_uchar = Uchar
 include Core
 include Util
-module Uchar = Umber__.Uchar (* Shadows Core.Uchar *)
+module Uchar = Umber_uchar

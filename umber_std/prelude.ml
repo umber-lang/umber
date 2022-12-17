@@ -65,7 +65,7 @@ let names = {|
                     ((typ
                       (Scheme (Function ((Type_app String ())) (Tuple ()))))
                      (type_source Extern_declared)
-                     (extern_name %print_endline))))))
+                     (extern_name umber_print_endline))))))
                 (types ())
                 (modules
                  ((List
@@ -238,13 +238,14 @@ let names = {|
                    ((typ
                      (Scheme
                       (Function ((Type_app Int ())) (Type_app Float ()))))
-                    (type_source Extern_declared) (extern_name %int_sqrt))))
+                    (type_source Extern_declared)
+                    (extern_name umber_int_sqrt))))
                  (print
                   (Local
                    ((typ
                      (Scheme (Function ((Type_app String ())) (Tuple ()))))
                     (type_source Extern_declared)
-                    (extern_name %print_endline))))))
+                    (extern_name umber_print_endline))))))
                (types ())
                (modules
                 ((List
@@ -285,7 +286,7 @@ let names = {|
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Left 7))
-                          (extern_name %int_mul))))
+                          (extern_name umber_int_mul))))
                        (+
                         (Local
                          ((typ
@@ -293,7 +294,7 @@ let names = {|
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Left 6))
-                          (extern_name %int_add))))
+                          (extern_name umber_int_add))))
                        (-
                         (Local
                          ((typ
@@ -301,7 +302,7 @@ let names = {|
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Left 6))
-                          (extern_name %int_sub))))
+                          (extern_name umber_int_sub))))
                        (.
                         (Local
                          ((typ
@@ -322,14 +323,14 @@ let names = {|
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
-                          (fixity (Non_assoc 4)) (extern_name %lt))))
+                          (fixity (Non_assoc 4)) (extern_name umber_lt))))
                        (>
                         (Local
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
-                          (fixity (Non_assoc 4)) (extern_name %gt))))
+                          (fixity (Non_assoc 4)) (extern_name umber_gt))))
                        (^
                         (Local
                          ((typ
@@ -337,14 +338,14 @@ let names = {|
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Right 8))
-                          (extern_name %int_pow))))
+                          (extern_name umber_int_pow))))
                        (!=
                         (Local
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
-                          (fixity (Non_assoc 4)) (extern_name %neq))))
+                          (fixity (Non_assoc 4)) (extern_name umber_neq))))
                        (&&
                         (Local
                          ((typ
@@ -366,21 +367,21 @@ let names = {|
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
-                          (fixity (Non_assoc 4)) (extern_name %lte))))
+                          (fixity (Non_assoc 4)) (extern_name umber_lte))))
                        (==
                         (Local
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
-                          (fixity (Non_assoc 4)) (extern_name %eq))))
+                          (fixity (Non_assoc 4)) (extern_name umber_eq))))
                        (>=
                         (Local
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
-                          (fixity (Non_assoc 4)) (extern_name %gte))))
+                          (fixity (Non_assoc 4)) (extern_name umber_gte))))
                        (|>
                         (Local
                          ((typ
@@ -451,13 +452,13 @@ entry:
   ret %umber_block* %fun_call3
 }
 
-declare %umber_block* @"%int_pow"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%int_mul"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%int_add"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%int_sub"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @Std.Prelude.Operators.not.18(%umber_block* %.19) {
 entry:
@@ -482,17 +483,17 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   ret %umber_block* %cond_otherwise_merge2
 }
 
-declare %umber_block* @"%eq"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_eq(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%neq"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_neq(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%lt"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_lt(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%lte"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_lte(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%gt"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_gt(%umber_block*, %umber_block*)
 
-declare %umber_block* @"%gte"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_gte(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @"Std.Prelude.Operators.&&.20"(%umber_block* %Std.Prelude.Operators.a.21, %umber_block* %Std.Prelude.Operators.b.22) {
 entry:
@@ -552,9 +553,9 @@ entry:
   ret %umber_block* %Std.Prelude.Operators.x.31
 }
 
-declare %umber_block* @"%int_sqrt"(%umber_block*)
+declare %umber_block* @umber_int_sqrt(%umber_block*)
 
-declare %umber_block* @"%print_endline"(%umber_block*)
+declare %umber_block* @umber_print_endline(%umber_block*)
 
 declare noalias i8* @malloc(i32)
 
