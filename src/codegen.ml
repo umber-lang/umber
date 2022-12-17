@@ -66,19 +66,23 @@ let with_type_memo t ~name ~f =
   Option.value_or_thunk (Llvm.type_by_name t.module_ name) ~default:f
 ;;
 
+let block_header_padding_type = Llvm.i32_type
+
 let block_header_type t =
   let name = "umber_header" in
   with_type_memo t ~name ~f:(fun () ->
     let typ = Llvm.named_struct_type t.context name in
     Llvm.struct_set_body
       typ
-      [| block_tag_type t.context (* tag *)
-       ; block_index_type t.context (* length *)
-       ; Llvm.i32_type t.context (* padding *)
+      [| block_tag_type t.context
+       ; block_index_type t.context
+       ; block_header_padding_type t.context
       |]
       false;
     typ)
 ;;
+
+let block_fields_type context = Llvm.array_type (Llvm.i64_type context) 0
 
 let block_type t =
   let name = "umber_block" in
@@ -86,7 +90,7 @@ let block_type t =
     let block_type = Llvm.named_struct_type t.context name in
     Llvm.struct_set_body
       block_type
-      [| block_header_type t; Llvm.array_type (Llvm.i64_type t.context) 0 |]
+      [| block_header_type t; block_fields_type t.context |]
       false;
     block_type)
 ;;
@@ -117,13 +121,16 @@ let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
 let const_block_header t ~tag ~len =
   Llvm.const_named_struct
     (block_header_type t)
-    [| int_non_constant_tag t tag; codegen_block_len t len |]
+    [| int_non_constant_tag t tag
+     ; codegen_block_len t len
+     ; Llvm.const_int (block_header_padding_type t.context) 0
+    |]
 ;;
 
-let constant_block t ~tag ~len ~name ~str constant_value =
+let constant_block t ~tag ~len ~type_ ~name constant_value =
   let block_header = const_block_header t ~tag ~len in
   let value = Llvm.const_named_struct (block_type t) [| block_header; constant_value |] in
-  let global_name = [%string "%{name}.%{str}"] in
+  let global_name = [%string "%{type_}.%{name}"] in
   let global = Llvm.define_global global_name value t.module_ in
   Llvm.set_global_constant true global;
   global
@@ -134,29 +141,48 @@ let codegen_literal t literal =
     match literal with
     | Int i ->
       let type_ = Llvm.i64_type t.context in
-      let str = Int.to_string i in
-      constant_block t ~tag:Tag.int ~len:1 ~name:"int" ~str (Llvm.const_int type_ i)
+      let name = Int.to_string i in
+      constant_block t ~tag:Tag.int ~len:1 ~type_:"int" ~name (Llvm.const_int type_ i)
     | Float x ->
       let type_ = Llvm.double_type t.context in
-      let str = Float.to_string x in
-      constant_block t ~tag:Tag.float ~len:1 ~name:"float" ~str (Llvm.const_float type_ x)
+      let name = Float.to_string x in
+      constant_block
+        t
+        ~tag:Tag.float
+        ~len:1
+        ~type_:"float"
+        ~name
+        (Llvm.const_float type_ x)
     | Char c ->
       let type_ = Llvm.i64_type t.context in
-      let str = Uchar.to_string c in
+      let name = Uchar.to_string c in
       let c = Uchar.to_int c in
-      constant_block t ~tag:Tag.char ~len:1 ~name:"char" ~str (Llvm.const_int type_ c)
+      constant_block t ~tag:Tag.char ~len:1 ~type_:"char" ~name (Llvm.const_int type_ c)
     | String s ->
       (* FIXME: Strings will need handling of the final word, similar to how OCaml does it *)
       let s = Ustring.to_string s in
-      let len = String.length s in
-      let str = String.hash s |> Int.to_string in
-      constant_block
-        t
-        ~tag:Tag.string
-        ~len
-        ~name:"string"
-        ~str
-        (Llvm.const_string t.context s))
+      let n_chars = String.length s in
+      let name = String.hash s |> Int.to_string in
+      let len = (n_chars / 8) + 1 in
+      let packed_char_array =
+        Array.init len ~f:(fun i ->
+          let j = i * 8 in
+          let get_char offset =
+            let c =
+              if j + offset < n_chars
+              then Int64.of_int (Char.to_int s.[j + offset])
+              else if offset = 7
+              then (* Last byte *) Int64.of_int (7 - (n_chars % 8))
+              else (* Padding null prefix of last word *) 0L
+            in
+            Int64.( lsl ) c ((7 - offset) * 8)
+          in
+          let int64_value = List.reduce_exn (List.init 8 ~f:get_char) ~f:Int64.( + ) in
+          let is_signed = false in
+          Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed)
+      in
+      let value = Llvm.const_array (Llvm.i64_type t.context) packed_char_array in
+      constant_block t ~tag:Tag.string ~len ~type_:"string" ~name value)
 ;;
 
 let get_block_tag t value =

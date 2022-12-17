@@ -14,11 +14,11 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Basics.Yellow.0 = constant %umber_block* inttoptr (i64 3 to %umber_block*)
 @Basics.Purple.0 = constant %umber_block* inttoptr (i64 5 to %umber_block*)
 @Basics.xyz.0 = external global %umber_block*
-@float.1. = constant %umber_block { %umber_header { i16 -32765, i16 1 }, double 1.000000e+00 }
-@float.2.5 = constant %umber_block { %umber_header { i16 -32765, i16 1 }, double 2.500000e+00 }
-@int.1 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 1 }
-@int.2 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 2 }
-@int.3 = constant %umber_block { %umber_header { i16 -32767, i16 1 }, i64 3 }
+@float.1. = constant %umber_block { %umber_header { i16 -32765, i16 1, i32 0 }, double 1.000000e+00 }
+@float.2.5 = constant %umber_block { %umber_header { i16 -32765, i16 1, i32 0 }, double 2.500000e+00 }
+@int.1 = constant %umber_block { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
+@int.2 = constant %umber_block { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
+@int.3 = constant %umber_block { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
 
 define void @main() {
 entry:

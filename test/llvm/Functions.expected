@@ -7,7 +7,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 @Functions.zero.0 = constant %umber_block* @float.0.
 @Functions.still_zero_wow.0 = external global %umber_block*
-@float.0. = constant %umber_block { %umber_header { i16 -32765, i16 1 }, double 0.000000e+00 }
+@float.0. = constant %umber_block { %umber_header { i16 -32765, i16 1, i32 0 }, double 0.000000e+00 }
 
 define void @main() {
 entry:
@@ -22,10 +22,10 @@ entry:
   ret %umber_block* %Functions.x.0
 }
 
-declare %umber_block* @"%int_mul"(%umber_block*, %umber_block*)
+declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @Functions.sqr.0(%umber_block* %Functions.x.1) {
 entry:
-  %fun_call = tail call %umber_block* @"%int_mul"(%umber_block* %Functions.x.1, %umber_block* %Functions.x.1)
+  %fun_call = tail call %umber_block* @umber_int_mul(%umber_block* %Functions.x.1, %umber_block* %Functions.x.1)
   ret %umber_block* %fun_call
 }

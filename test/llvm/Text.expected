@@ -13,13 +13,13 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Text.a.0 = external global %umber_block*
 @Text.b.0 = external global %umber_block*
 @Text._UNICODE_WORKS_TOO.0 = constant %umber_block* @string.986077178
-@char.a = constant %umber_block { %umber_header { i16 -32766, i16 1 }, i64 97 }
-@string.774705101 = constant %umber_block { %umber_header { i16 -32764, i16 12 }, [12 x i8] c"hello world!" }
-@string.398489461 = constant %umber_block { %umber_header { i16 -32764, i16 16 }, [16 x i8] c"line 1\0D\0A\09 line 2" }
-@string.229771883 = constant %umber_block { %umber_header { i16 -32764, i16 1 }, [1 x i8] c"!" }
-@string.0 = constant %umber_block { %umber_header { i16 -32764, i16 0 }, [0 x i8] zeroinitializer }
-@char.b = constant %umber_block { %umber_header { i16 -32766, i16 1 }, i64 98 }
-@string.986077178 = constant %umber_block { %umber_header { i16 -32764, i16 15 }, [15 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA" }
+@char.a = constant %umber_block { %umber_header { i16 -32766, i16 1, i32 0 }, i64 97 }
+@string.774705101 = constant %umber_block { %umber_header { i16 -32764, i16 2, i32 0 }, [2 x i64] [i64 7522537965568948079, i64 8245075110705233923] }
+@string.398489461 = constant %umber_block { %umber_header { i16 -32764, i16 3, i32 0 }, [3 x i64] [i64 7811896409261673738, i64 657644745675579442, i64 7] }
+@string.229771883 = constant %umber_block { %umber_header { i16 -32764, i16 1, i32 0 }, [1 x i64] [i64 2377900603251621894] }
+@string.0 = constant %umber_block { %umber_header { i16 -32764, i16 1, i32 0 }, [1 x i64] [i64 7] }
+@char.b = constant %umber_block { %umber_header { i16 -32766, i16 1, i32 0 }, i64 98 }
+@string.986077178 = constant %umber_block { %umber_header { i16 -32764, i16 2, i32 0 }, [2 x i64] [i64 -2052875192838397053, i64 -4835876847830779392] }
 
 define void @main() {
 entry:

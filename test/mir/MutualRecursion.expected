@@ -1,6 +1,6 @@
 ((Extern_decl ((name Std.Prelude.List.Nil.0) (arity 0)))
  (Value_def MutualRecursion.f.0 (Name Std.Prelude.List.Nil.0))
- (Extern_decl ((name %int_add) (arity 2)))
+ (Extern_decl ((name umber_int_add) (arity 2)))
  (Fun_def
   ((fun_name MutualRecursion.loop.0)
    (args (MutualRecursion.acc.0 MutualRecursion.forest.0))
@@ -15,7 +15,7 @@
         (Let MutualRecursion.tree.0
          (Get_block_field 0 (Name MutualRecursion.forest.0))
          (Fun_call MutualRecursion.loop.0
-          ((Fun_call %int_add
+          ((Fun_call umber_int_add
             ((Name MutualRecursion.acc.0)
              (Fun_call MutualRecursion.sum_tree.0
               ((Name MutualRecursion.tree.0)))))
@@ -36,7 +36,7 @@
       (Otherwise
        (Let MutualRecursion.forest.2 (Get_block_field 1 (Name .0))
         (Let MutualRecursion.x.0 (Get_block_field 0 (Name .0))
-         (Fun_call %int_add
+         (Fun_call umber_int_add
           ((Name MutualRecursion.x.0)
            (Fun_call MutualRecursion.sum_forest.0
             ((Name MutualRecursion.forest.2)))))))))))))
@@ -48,35 +48,35 @@
  (Fun_def
   ((fun_name MutualRecursion.Node.0) (args (arg0.1 arg1.1))
    (body (Make_block (tag 0) (fields ((Name arg0.1) (Name arg1.1)))))))
- (Extern_decl ((name %eq) (arity 2)))
- (Extern_decl ((name %int_sub) (arity 2)))
+ (Extern_decl ((name umber_eq) (arity 2)))
+ (Extern_decl ((name umber_int_sub) (arity 2)))
  (Fun_def
   ((fun_name MutualRecursion.even.0) (args (MutualRecursion.x.1))
    (body
     (Let match.0
-     (Fun_call %eq ((Name MutualRecursion.x.1) (Primitive (Int 0))))
+     (Fun_call umber_eq ((Name MutualRecursion.x.1) (Primitive (Int 0))))
      (Cond_assign (conds (((Constant_tag_equals (Name match.0) 1) ())))
       (body (Make_block (tag 1)))
       (if_none_matched
        (Otherwise
         (Fun_call MutualRecursion.odd.0
-         ((Fun_call %int_sub
+         ((Fun_call umber_int_sub
            ((Name MutualRecursion.x.1) (Primitive (Int 1)))))))))))))
  (Fun_def
   ((fun_name MutualRecursion.odd.0) (args (MutualRecursion.x.2))
    (body
     (Let match.1
-     (Fun_call %eq ((Name MutualRecursion.x.2) (Primitive (Int 0))))
+     (Fun_call umber_eq ((Name MutualRecursion.x.2) (Primitive (Int 0))))
      (Cond_assign (conds (((Constant_tag_equals (Name match.1) 1) ())))
       (body (Make_block (tag 0)))
       (if_none_matched
        (Otherwise
         (Fun_call MutualRecursion.even.0
-         ((Fun_call %int_sub
+         ((Fun_call umber_int_sub
            ((Name MutualRecursion.x.2) (Primitive (Int 1)))))))))))))
  (Value_def MutualRecursion.number.0
   (Let MutualRecursion.number.1 (Primitive (Int 5))
    (Let MutualRecursion.number.2
-    (Fun_call %int_add
+    (Fun_call umber_int_add
      ((Name MutualRecursion.number.1) (Name MutualRecursion.number.1)))
     (Name MutualRecursion.number.2)))))

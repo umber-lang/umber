@@ -1,5 +1,5 @@
-((Extern_decl ((name %int_mul) (arity 2)))
- (Extern_decl ((name %int_sub) (arity 2)))
+((Extern_decl ((name umber_int_mul) (arity 2)))
+ (Extern_decl ((name umber_int_sub) (arity 2)))
  (Fun_def
   ((fun_name Classics.fact.0) (args (.0))
    (body
@@ -10,11 +10,12 @@
      (if_none_matched
       (Otherwise
        (Let Classics.n.0 (Name .0)
-        (Fun_call %int_mul
+        (Fun_call umber_int_mul
          ((Name Classics.n.0)
           (Fun_call Classics.fact.0
-           ((Fun_call %int_sub ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
- (Extern_decl ((name %int_add) (arity 2)))
+           ((Fun_call umber_int_sub
+             ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
+ (Extern_decl ((name umber_int_add) (arity 2)))
  (Fun_def
   ((fun_name Classics.fib.0) (args (Classics.n.1))
    (body
@@ -26,8 +27,10 @@
      (if_none_matched
       (Otherwise
        (Let Classics.n.2 (Name Classics.n.1)
-        (Fun_call %int_add
+        (Fun_call umber_int_add
          ((Fun_call Classics.fib.0
-           ((Fun_call %int_sub ((Name Classics.n.2) (Primitive (Int 1))))))
+           ((Fun_call umber_int_sub
+             ((Name Classics.n.2) (Primitive (Int 1))))))
           (Fun_call Classics.fib.0
-           ((Fun_call %int_sub ((Name Classics.n.2) (Primitive (Int 2))))))))))))))))
+           ((Fun_call umber_int_sub
+             ((Name Classics.n.2) (Primitive (Int 2))))))))))))))))
