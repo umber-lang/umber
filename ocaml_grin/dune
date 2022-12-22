@@ -1,5 +1,0 @@
-(library
- (name ocaml_grin)
- (libraries base bigstring)
- (preprocess
-  (pps sedlex.ppx ppx_jane)))
