@@ -4,10 +4,11 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
+%umber_block1 = type { %umber_header, [1 x i64] }
 
-@Functions.zero.0 = constant %umber_block* @float.0.
-@Functions.still_zero_wow.0 = external global %umber_block*
-@float.0. = constant %umber_block { %umber_header { i16 -32765, i16 1, i32 0 }, double 0.000000e+00 }
+@Functions.zero.0 = constant %umber_block* bitcast (%umber_block1* @float.0. to %umber_block*)
+@Functions.still_zero_wow.0 = global %umber_block* null
+@float.0. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 0.000000e+00 }
 
 define void @main() {
 entry:

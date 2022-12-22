@@ -4,21 +4,22 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
+%umber_block1 = type { %umber_header, [1 x i64] }
 
 @Basics.false.0 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Basics.true.0 = constant %umber_block* inttoptr (i64 3 to %umber_block*)
-@Basics._.0 = external global %umber_block*
+@Basics._.0 = global %umber_block* null
 @Basics.Red.0 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Basics.Blue.0 = constant %umber_block* inttoptr (i64 3 to %umber_block*)
 @Basics.Green.0 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Basics.Yellow.0 = constant %umber_block* inttoptr (i64 3 to %umber_block*)
 @Basics.Purple.0 = constant %umber_block* inttoptr (i64 5 to %umber_block*)
-@Basics.xyz.0 = external global %umber_block*
-@float.1. = constant %umber_block { %umber_header { i16 -32765, i16 1, i32 0 }, double 1.000000e+00 }
-@float.2.5 = constant %umber_block { %umber_header { i16 -32765, i16 1, i32 0 }, double 2.500000e+00 }
-@int.1 = constant %umber_block { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
-@int.2 = constant %umber_block { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
-@int.3 = constant %umber_block { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
+@Basics.xyz.0 = global %umber_block* null
+@float.1. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 1.000000e+00 }
+@float.2.5 = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 2.500000e+00 }
+@int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
+@int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
+@int.3 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
 
 define void @main() {
 entry:
@@ -40,7 +41,7 @@ cond_otherwise:                                   ; preds = %cond
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge2 = phi %umber_block* [ @float.1., %cond_binding_merge ], [ @float.2.5, %cond_otherwise ]
+  %cond_otherwise_merge2 = phi %umber_block* [ bitcast (%umber_block1* @float.1. to %umber_block*), %cond_binding_merge ], [ bitcast (%umber_block1* @float.2.5 to %umber_block*), %cond_otherwise ]
   store %umber_block* %cond_otherwise_merge2, %umber_block** @Basics._.0, align 8
   %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 4))
   %box = bitcast i8* %malloccall to i64*
@@ -50,13 +51,13 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   store i16 3, i16* %box4, align 2
   %box5 = bitcast i64* %box to %umber_block**
   %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 1
-  store %umber_block* @int.1, %umber_block** %box6, align 8
+  store %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block** %box6, align 8
   %box7 = bitcast i64* %box to %umber_block**
   %box8 = getelementptr %umber_block*, %umber_block** %box7, i64 2
-  store %umber_block* @int.2, %umber_block** %box8, align 8
+  store %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block** %box8, align 8
   %box9 = bitcast i64* %box to %umber_block**
   %box10 = getelementptr %umber_block*, %umber_block** %box9, i64 3
-  store %umber_block* @int.3, %umber_block** %box10, align 8
+  store %umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block** %box10, align 8
   %box11 = bitcast i64* %box to %umber_block*
   store %umber_block* %box11, %umber_block** @Basics.xyz.0, align 8
   ret void

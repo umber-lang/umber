@@ -1,15 +1,16 @@
 ((Extern_decl ((name umber_int_mul) (arity 2)))
  (Extern_decl ((name umber_int_sub) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fact.0) (args (.0))
+  ((fun_name Classics.fact.0) (args (Classics..0))
    (body
     (Cond_assign
      (conds
-      (((Equals (Name .0) (Int 0)) ()) ((Equals (Name .0) (Int 1)) ())))
+      (((Equals (Name Classics..0) (Int 0)) ())
+       ((Equals (Name Classics..0) (Int 1)) ())))
      (body (Primitive (Int 1)))
      (if_none_matched
       (Otherwise
-       (Let Classics.n.0 (Name .0)
+       (Let Classics.n.0 (Name Classics..0)
         (Fun_call umber_int_mul
          ((Name Classics.n.0)
           (Fun_call Classics.fact.0

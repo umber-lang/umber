@@ -28,14 +28,17 @@
      ((Primitive (Int 0)) (Name MutualRecursion.forest.1))))))
  (Value_def MutualRecursion.sum_forest.0 (Name *fun.0))
  (Fun_def
-  ((fun_name MutualRecursion.sum_tree.0) (args (.0))
+  ((fun_name MutualRecursion.sum_tree.0) (args (MutualRecursion..0))
    (body
-    (Cond_assign (conds (((Constant_tag_equals (Name .0) 0) ())))
+    (Cond_assign
+     (conds (((Constant_tag_equals (Name MutualRecursion..0) 0) ())))
      (body (Primitive (Int 0)))
      (if_none_matched
       (Otherwise
-       (Let MutualRecursion.forest.2 (Get_block_field 1 (Name .0))
-        (Let MutualRecursion.x.0 (Get_block_field 0 (Name .0))
+       (Let MutualRecursion.forest.2
+        (Get_block_field 1 (Name MutualRecursion..0))
+        (Let MutualRecursion.x.0
+         (Get_block_field 0 (Name MutualRecursion..0))
          (Fun_call umber_int_add
           ((Name MutualRecursion.x.0)
            (Fun_call MutualRecursion.sum_forest.0

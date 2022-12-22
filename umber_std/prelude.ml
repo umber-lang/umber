@@ -460,7 +460,7 @@ declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
 
 declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @Std.Prelude.Operators.not.18(%umber_block* %.19) {
+define tailcc %umber_block* @Std.Prelude.Operators.not.18(%umber_block* %Std.Prelude.Operators..19) {
 entry:
   br label %cond
 
@@ -468,8 +468,8 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %.191 = ptrtoint %umber_block* %.19 to i64
-  %equals = icmp eq i64 %.191, 3
+  %Std.Prelude.Operators..191 = ptrtoint %umber_block* %Std.Prelude.Operators..19 to i64
+  %equals = icmp eq i64 %Std.Prelude.Operators..191, 3
   br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond

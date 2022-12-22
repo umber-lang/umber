@@ -1,12 +1,13 @@
 ((Extern_decl ((name umber_print_endline) (arity 1)))
- (Value_def .0 (Fun_call umber_print_endline ((Primitive (String plain)))))
+ (Value_def *binding.0
+  (Fun_call umber_print_endline ((Primitive (String plain)))))
  (Fun_def
   ((fun_name *fun.0) (args (*lambda_arg.0))
    (body (Fun_call umber_print_endline ((Primitive (String "fun call")))))))
  (Fun_def
   ((fun_name WeirdFunCalls.fun_call.0) (args (*lambda_arg.1))
    (body (Name *fun.0))))
- (Value_def .1
+ (Value_def *binding.1
   (Let *fun.1 (Fun_call WeirdFunCalls.fun_call.0 ((Make_block (tag 0))))
    (Fun_call *fun.1 ((Make_block (tag 0))))))
  (Extern_decl ((name "Std.Prelude.Operators.;.0") (arity 2)))

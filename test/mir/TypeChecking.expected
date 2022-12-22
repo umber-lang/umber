@@ -11,19 +11,21 @@
  (Fun_def
   ((fun_name TypeChecking.id_for_bools.0) (args (TypeChecking.x.3))
    (body (Fun_call TypeChecking.id.0 ((Name TypeChecking.x.3))))))
- (Value_def .0
+ (Value_def *binding.0
   (Make_block (tag 0)
    (fields ((Name TypeChecking.id.0) (Primitive (Int 5))))))
- (Value_def TypeChecking.id_alias.0 (Get_block_field 0 (Name .0)))
- (Value_def TypeChecking.five.0 (Get_block_field 1 (Name .0)))
+ (Value_def TypeChecking.id_alias.0 (Get_block_field 0 (Name *binding.0)))
+ (Value_def TypeChecking.five.0 (Get_block_field 1 (Name *binding.0)))
  (Fun_def
   ((fun_name TypeChecking.|>.0) (args (TypeChecking.x.4 TypeChecking.f.0))
    (body (Fun_call TypeChecking.f.0 ((Name TypeChecking.x.4))))))
  (Fun_def
   ((fun_name *fun.0)
-   (closed_over (TypeChecking.else_.0 TypeChecking.then_.0)) (args (.1))
+   (closed_over (TypeChecking.else_.0 TypeChecking.then_.0))
+   (args (TypeChecking..0))
    (body
-    (Cond_assign (conds (((Constant_tag_equals (Name .1) 1) ())))
+    (Cond_assign
+     (conds (((Constant_tag_equals (Name TypeChecking..0) 1) ())))
      (body (Fun_call TypeChecking.then_.0 ((Make_block (tag 0)))))
      (if_none_matched
       (Otherwise (Fun_call TypeChecking.else_.0 ((Make_block (tag 0))))))))))

@@ -82,15 +82,15 @@ let block_header_type t =
     typ)
 ;;
 
-let block_fields_type context = Llvm.array_type (Llvm.i64_type context) 0
+let block_fields_type context ~len = Llvm.array_type (Llvm.i64_type context) len
 
-let block_type t =
-  let name = "umber_block" in
+let block_type ?(len = 0) t =
+  let name = if len = 0 then "umber_block" else "umber_block" ^ Int.to_string len in
   with_type_memo t ~name ~f:(fun () ->
     let block_type = Llvm.named_struct_type t.context name in
     Llvm.struct_set_body
       block_type
-      [| block_header_type t; block_fields_type t.context |]
+      [| block_header_type t; block_fields_type t.context ~len |]
       false;
     block_type)
 ;;
@@ -129,11 +129,13 @@ let const_block_header t ~tag ~len =
 
 let constant_block t ~tag ~len ~type_ ~name constant_value =
   let block_header = const_block_header t ~tag ~len in
-  let value = Llvm.const_named_struct (block_type t) [| block_header; constant_value |] in
+  let value =
+    Llvm.const_named_struct (block_type t ~len) [| block_header; constant_value |]
+  in
   let global_name = [%string "%{type_}.%{name}"] in
   let global = Llvm.define_global global_name value t.module_ in
   Llvm.set_global_constant true global;
-  global
+  Llvm.const_bitcast global (block_pointer_type t)
 ;;
 
 let codegen_literal t literal =
@@ -440,10 +442,13 @@ and box ?(tag = Mir.Cnstr_tag.default) t ~fields =
 let preprocess_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, _) ->
-    Value_table.add
-      t.values
-      name
-      (Llvm.declare_global (block_pointer_type t) (Mir_name.to_string name) t.module_)
+    let global_value =
+      Llvm.define_global
+        (Mir_name.to_string name)
+        (Llvm.const_null (block_pointer_type t))
+        t.module_
+    in
+    Value_table.add t.values name global_value
   | Fun_def { fun_name; args; closed_over = _; body = _ } ->
     let type_ = block_pointer_type t in
     let fun_type =

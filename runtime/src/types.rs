@@ -39,7 +39,7 @@ impl BlockPtr {
 #[repr(C, align(8))]
 struct Block {
     tag: u16,
-    len: u32,
+    len: u16,
 }
 
 impl Block {

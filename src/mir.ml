@@ -59,7 +59,7 @@ end = struct
 end
 
 module Constant_names : sig
-  val empty : Value_name.t
+  val binding : Value_name.t
   val fun_ : Value_name.t
   val lambda_arg : Value_name.t
   val match_ : Value_name.t
@@ -68,13 +68,13 @@ module Constant_names : sig
 end = struct
   (* NOTE: none of these can be valid value names a user could enter. *)
 
-  let empty = Value_name.empty
+  let binding = Value_name.of_string_unchecked "*binding"
   let fun_ = Value_name.of_string_unchecked "*fun"
   let match_ = Value_name.of_string_unchecked "match"
   let lambda_arg = Value_name.of_string_unchecked "*lambda_arg"
 
   let constant_names_table =
-    Value_name.Hash_set.of_list [ empty; fun_; match_; lambda_arg ]
+    Value_name.Hash_set.of_list [ binding; fun_; match_; lambda_arg ]
   ;;
 
   let synthetic_arg i =
@@ -841,7 +841,7 @@ module Expr = struct
         match pat' with
         | Catch_all (Some name) | As (_, name) -> name
         | Catch_all None -> Value_name.of_string_unchecked "_"
-        | Constant _ | Cnstr_appl _ -> Constant_names.empty
+        | Constant _ | Cnstr_appl _ -> Constant_names.binding
       in
       let ctx_for_body, acc, mir_expr =
         make_atomic
@@ -1082,7 +1082,7 @@ module Expr = struct
           ~ctx
           ~default:None
           ~add_let:(fun name expr -> Some (name, expr))
-          ~binding_name:Constant_names.empty
+          ~binding_name:Constant_names.binding
           input_expr
       in
       let body = of_typed_expr ~ctx output_expr output_type in
