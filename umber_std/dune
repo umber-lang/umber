@@ -1,3 +1,6 @@
+; TODO: Consider doing this generation with a normal binary and including the files using
+; a dune "site". We will probably want to do a similar thing for the runtime.
+
 (cinaps
  (files prelude.ml)
  (libraries umberboot)

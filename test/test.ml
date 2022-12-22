@@ -17,7 +17,7 @@ let should_make_mir test =
   should_type_check test && not (List.mem ~equal:String.equal type_only_tests test)
 ;;
 
-(* TODO: expand this to more files *)
+(* TODO: Implement closures and enable these tests for LLVM codegen. *)
 let no_llvm_tests =
   [ "AsPattern"; "Closures"; "MutualRecursion"; "TypeChecking" (* closures *) ]
 ;;
