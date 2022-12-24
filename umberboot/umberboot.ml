@@ -16,7 +16,7 @@ module Stage = struct
       | Generating_mir
       | Generating_llvm
       | Linking
-    [@@deriving compare, sexp]
+    [@@deriving compare, variants, sexp]
   end
 
   include T
@@ -56,6 +56,8 @@ module Output : sig
   val of_targets : Target.t list -> t
   val requires : t -> Stage.t -> bool
   val targets : t -> Target.t -> bool
+  val exe_filename_exn : t -> Filename.t
+  val is_empty : t -> bool
 end = struct
   type t =
     { targets : Target.Set.t
@@ -64,6 +66,7 @@ end = struct
     }
 
   let empty = { targets = Target.Set.empty; max_stage = None; exe_filename = None }
+  let is_empty t = Set.is_empty t.targets
 
   let requires t stage =
     match t.max_stage with
@@ -72,6 +75,10 @@ end = struct
   ;;
 
   let targets t = Set.mem t.targets
+
+  let exe_filename_exn t =
+    Option.value_exn t.exe_filename ~message:"Output.exe_filename missing"
+  ;;
 
   let add_target { targets; max_stage; exe_filename } target =
     { targets = Set.add targets target
@@ -115,57 +122,86 @@ end = struct
   ;;
 end
 
-let compile_and_print_internal ~filename ~output ~no_std ~parent =
-  let or_raise = function
-    | Ok x -> x
-    | Error err -> raise_s [%sexp (err : Compilation_error.t)]
-  in
-  if Output.requires output Parsing
+let rec rmrf path =
+  if Sys_unix.is_directory_exn path
   then (
-    let print_tokens_to = Option.some_if (Output.targets output Tokens) stdout in
-    let ast = or_raise (Parsing.parse_file ?print_tokens_to filename) in
-    if Output.targets output Untyped_ast then print_s [%sexp (ast : Ast.Untyped.Module.t)];
-    if Output.requires output Type_checking
-    then (
-      let names =
-        if no_std
-        then Name_bindings.core
-        else Name_bindings.of_prelude_sexp Umber_std.Prelude.names
-      in
-      let names =
-        match parent with
-        | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
-        | None -> names
-      in
-      let names, ast =
-        or_raise (Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast)
-      in
-      if Output.targets output Typed_ast then print_s [%sexp (ast : Ast.Typed.Module.t)];
-      if Output.targets output Names then print_s [%sexp (names : Name_bindings.t)];
-      if Output.requires output Generating_mir
-      then (
-        let mir = or_raise (Mir.of_typed_module ~names ast) in
-        if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
-        if Output.requires output Generating_llvm
-        then (
-          let codegen = Codegen.of_mir_exn ~source_filename:filename mir in
-          if Output.targets output Llvm then print_endline (Codegen.to_string codegen);
-          if Output.requires output Linking
-          then (
-            let module_name =
-              Ast.Module.module_name ast
-              |> Ast.Module_name.to_ustring
-              |> Ustring.to_string
-            in
-            let object_file = module_name ^ ".o" in
-            Codegen.compile_to_object codegen ~output_file:object_file;
-            let output_exe = module_name ^ ".exe" in
-            Linking.link_with_runtime ~object_file ~output_exe)))))
-  else if Output.targets output Tokens
-  then
-    Parsing.lex_file filename ~print_tokens_to:stdout
-    |> Result.iter_error ~f:(fun error -> print_s [%sexp (error : Compilation_error.t)])
-  else failwith "No output argument supplied"
+    Sys_unix.readdir path |> Array.iter ~f:(fun name -> rmrf (path ^/ name));
+    Core_unix.remove path)
+  else Sys_unix.remove path
+;;
+
+let with_tmpdir f =
+  let dir = Filename_unix.temp_dir "umberboot" "" in
+  Exn.protectx ~f dir ~finally:rmrf
+;;
+
+let or_raise = function
+  | Ok x -> x
+  | Error err -> raise_s [%sexp (err : Compilation_error.t)]
+;;
+
+let compile_and_print_internal ~filename ~output ~no_std ~parent =
+  if Output.is_empty output then failwith "No output arguments supplied";
+  let run_stage acc (variant : Stage.t Variant.t) ~f =
+    Option.bind acc ~f:(fun acc ->
+      if Output.requires output variant.constructor then Some (f acc) else None)
+  in
+  Stage.Variants.fold
+    ~init:(Some ())
+    ~lexing:
+      (run_stage ~f:(fun () ->
+         (* Parsing and lexing are done together, so only lex separately if not parsing. *)
+         if not (Output.requires output Parsing)
+         then
+           Parsing.lex_file filename ~print_tokens_to:stdout
+           |> Result.iter_error ~f:(fun error ->
+                print_s [%sexp (error : Compilation_error.t)])))
+    ~parsing:
+      (run_stage ~f:(fun () ->
+         let print_tokens_to = Option.some_if (Output.targets output Tokens) stdout in
+         let ast = or_raise (Parsing.parse_file ?print_tokens_to filename) in
+         if Output.targets output Untyped_ast
+         then print_s [%sexp (ast : Ast.Untyped.Module.t)];
+         ast))
+    ~type_checking:
+      (run_stage ~f:(fun ast ->
+         let names =
+           if no_std
+           then Name_bindings.core
+           else Name_bindings.of_prelude_sexp Umber_std.Prelude.names
+         in
+         let names =
+           match parent with
+           | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
+           | None -> names
+         in
+         let names, ast =
+           or_raise
+             (Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast)
+         in
+         if Output.targets output Typed_ast
+         then print_s [%sexp (ast : Ast.Typed.Module.t)];
+         if Output.targets output Names then print_s [%sexp (names : Name_bindings.t)];
+         ast, names))
+    ~generating_mir:
+      (run_stage ~f:(fun (ast, names) ->
+         let mir = or_raise (Mir.of_typed_module ~names ast) in
+         if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
+         Ast.Module.module_name ast, mir))
+    ~generating_llvm:
+      (run_stage ~f:(fun (module_name, mir) ->
+         let codegen = Codegen.of_mir_exn ~source_filename:filename mir in
+         if Output.targets output Llvm then print_endline (Codegen.to_string codegen);
+         module_name, codegen))
+    ~linking:
+      (run_stage ~f:(fun (module_name, codegen) ->
+         let module_name = Ast.Module_name.to_ustring module_name |> Ustring.to_string in
+         with_tmpdir (fun tmpdir ->
+           let object_file = tmpdir ^/ module_name ^ ".o" in
+           Codegen.compile_to_object codegen ~output_file:object_file;
+           let output_exe = Output.exe_filename_exn output in
+           Linking.link_with_runtime ~object_file ~output_exe)))
+  |> Option.iter ~f:(fun () -> ())
 ;;
 
 let compile_and_print ?(no_std = false) ?parent ~filename targets =

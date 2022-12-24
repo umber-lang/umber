@@ -12,7 +12,7 @@ module Target : sig
     | Mir
     | Llvm
     | Exe
-  [@@deriving compare, enumerate, sexp]
+  [@@deriving compare, variants, sexp]
 end
 
 val compile_and_print
