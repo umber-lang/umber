@@ -15,11 +15,17 @@ module Target : sig
   [@@deriving compare, variants, sexp]
 end
 
+module File_or_stdout : sig
+  type t =
+    | File of Filename.t
+    | Stdout
+end
+
 val compile_and_print
   :  ?no_std:bool
   -> ?parent:Ast.Module_name.t
   -> filename:string
-  -> Target.t list
+  -> (Target.t * File_or_stdout.t) list
   -> unit
 
 val command : Command.t

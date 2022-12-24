@@ -9,7 +9,7 @@ open! Core
       ~filename:"Std/Prelude.um"
       ~no_std:true
       ~parent:(Umber.Ast.Module_name.of_string_exn "Std")
-      [ target ];
+      [ target, Stdout ];
     print_endline "|}";
     if is_sexp then print_endline "|> Sexp.of_string"
   ;;
