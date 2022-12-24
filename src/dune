@@ -1,13 +1,17 @@
 (library
  (name umber)
  (libraries
-  core_kernel
+  core
+  core_unix.sys_unix
+  dune-site
   sedlex
   menhirLib
   ocamlgraph
   llvm
+  llvm.all_backends
   llvm.analysis
   llvm.irreader
+  llvm.target
   umber_std)
  (preprocess
   (pps sedlex.ppx ppx_jane))
@@ -19,3 +23,7 @@
  (modules parser)
  (flags --table --inspection)
  (infer true))
+
+(generate_sites_module
+ (module sources)
+ (sites umber))

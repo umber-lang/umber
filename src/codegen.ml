@@ -543,3 +543,19 @@ let of_mir ~source_filename mir =
     ~msg:[%message "LLVM codegen failed"]
     (fun () -> of_mir_exn ~source_filename mir)
 ;;
+
+let target_machine =
+  lazy
+    (Llvm_all_backends.initialize ();
+     let triple = Llvm_target.Target.default_triple () in
+     let target = Llvm_target.Target.by_triple triple in
+     Llvm_target.TargetMachine.create ~triple target)
+;;
+
+let compile_to_object t ~output_file =
+  Llvm_target.TargetMachine.emit_to_file
+    t.module_
+    ObjectFile
+    output_file
+    (force target_machine)
+;;

@@ -1,0 +1,10 @@
+(install
+ (section
+  (site
+   (umber runtime)))
+ (files libruntime.a))
+
+(foreign_library
+ (archive_name runtime)
+ (language c)
+ (names io))

@@ -15,6 +15,7 @@ module Stage = struct
       | Type_checking
       | Generating_mir
       | Generating_llvm
+      | Linking
     [@@deriving compare, sexp]
   end
 
@@ -31,6 +32,7 @@ module Target = struct
       | Names
       | Mir
       | Llvm
+      | Exe
     [@@deriving compare, enumerate, sexp]
   end
 
@@ -43,6 +45,7 @@ module Target = struct
     | Typed_ast | Names -> Type_checking
     | Mir -> Generating_mir
     | Llvm -> Generating_llvm
+    | Exe -> Linking
   ;;
 
   let param =
@@ -54,6 +57,7 @@ module Target = struct
     | Names -> flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
     | Mir -> flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
     | Llvm -> flag "llvm" no_arg ~doc:"Print LLVM IR"
+    | Exe -> flag "exe" no_arg ~doc:"Output a compiled executable"
   ;;
 end
 
@@ -130,10 +134,20 @@ let compile_and_print_internal ~filename ~output ~no_std ~parent =
         let mir = or_raise (Mir.of_typed_module ~names ast) in
         if Output.targets output Mir then print_s [%sexp (mir : Mir.t)];
         if Output.requires output Generating_llvm
-        then
-          Codegen.of_mir_exn ~source_filename:filename mir
-          |> Codegen.to_string
-          |> print_endline)))
+        then (
+          let codegen = Codegen.of_mir_exn ~source_filename:filename mir in
+          if Output.targets output Llvm then print_endline (Codegen.to_string codegen);
+          if Output.requires output Linking
+          then (
+            let module_name =
+              Ast.Module.module_name ast
+              |> Ast.Module_name.to_ustring
+              |> Ustring.to_string
+            in
+            let object_file = module_name ^ ".o" in
+            Codegen.compile_to_object codegen ~output_file:object_file;
+            let output_exe = module_name ^ ".exe" in
+            Linking.link_with_runtime ~object_file ~output_exe)))))
   else if Output.targets output Tokens
   then
     Parsing.lex_file filename ~print_tokens_to:stdout

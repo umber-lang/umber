@@ -2,6 +2,7 @@ module Ast = Ast
 module Codegen = Codegen
 module Compilation_error = Compilation_error
 module Lexer = Lexer
+module Linking = Linking
 module Mir = Mir
 module Name_bindings = Name_bindings
 module Parsing = Parsing

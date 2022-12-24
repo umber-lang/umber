@@ -8,7 +8,7 @@ const Block *unit = constant_cnstr(0);
 
 uint64_t string_len(const Block *x)
 {
-    uint8_t last_byte = (uint8_t)(x->fields[x->len - 1]);
+    uint8_t last_byte = (uint8_t)(uint64_t)(x->fields[x->len - 1]);
     return x->len * 8 - last_byte - 1;
 }
 

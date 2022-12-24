@@ -11,6 +11,7 @@ module Target : sig
     | Names
     | Mir
     | Llvm
+    | Exe
   [@@deriving compare, enumerate, sexp]
 end
 
