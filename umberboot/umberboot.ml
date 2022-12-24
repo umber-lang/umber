@@ -33,7 +33,7 @@ module Target = struct
       | Mir
       | Llvm
       | Exe
-    [@@deriving compare, enumerate, sexp]
+    [@@deriving compare, variants, sexp]
   end
 
   include T
@@ -46,18 +46,6 @@ module Target = struct
     | Mir -> Generating_mir
     | Llvm -> Generating_llvm
     | Exe -> Linking
-  ;;
-
-  let param =
-    let open Command.Param in
-    function
-    | Tokens -> flag "tokens" no_arg ~doc:"Print lexer output (tokens)"
-    | Untyped_ast -> flag "untyped-ast" no_arg ~doc:"Print parser output (untyped AST)"
-    | Typed_ast -> flag "typed-ast" no_arg ~doc:"Print type-checker output (typed AST)"
-    | Names -> flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
-    | Mir -> flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
-    | Llvm -> flag "llvm" no_arg ~doc:"Print LLVM IR"
-    | Exe -> flag "exe" no_arg ~doc:"Output a compiled executable"
   ;;
 end
 
@@ -72,9 +60,10 @@ end = struct
   type t =
     { targets : Target.Set.t
     ; max_stage : Stage.t option
+    ; exe_filename : Filename.t option
     }
 
-  let empty = { targets = Target.Set.empty; max_stage = None }
+  let empty = { targets = Target.Set.empty; max_stage = None; exe_filename = None }
 
   let requires t stage =
     match t.max_stage with
@@ -84,21 +73,45 @@ end = struct
 
   let targets t = Set.mem t.targets
 
-  let add_target { targets; max_stage } target =
+  let add_target { targets; max_stage; exe_filename } target =
     { targets = Set.add targets target
     ; max_stage =
         (match max_stage with
          | Some max_stage -> Some (Stage.max max_stage (Target.stage target))
          | None -> Some (Target.stage target))
+    ; exe_filename
     }
   ;;
 
   let of_targets = List.fold ~init:empty ~f:add_target
 
   let param =
-    List.fold Target.all ~init:(Command.Param.return empty) ~f:(fun param target ->
-      Command.Param.map2 param (Target.param target) ~f:(fun t target_present ->
-        if target_present then add_target t target else t))
+    let%map_open.Command tokens = flag "tokens" no_arg ~doc:"Print lexer output (tokens)"
+    and untyped_ast = flag "untyped-ast" no_arg ~doc:"Print parser output (untyped AST)"
+    and typed_ast = flag "typed-ast" no_arg ~doc:"Print type-checker output (typed AST)"
+    and names = flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
+    and mir = flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
+    and llvm = flag "llvm" no_arg ~doc:"Print LLVM IR"
+    and exe_filename =
+      flag "exe" (optional Filename_unix.arg_type) ~doc:"Output a compiled executable"
+    in
+    let add present t (variant : Target.t Variant.t) =
+      if present then add_target t variant.constructor else t
+    in
+    Target.Variants.fold
+      ~init:empty
+      ~tokens:(add tokens)
+      ~untyped_ast:(add untyped_ast)
+      ~typed_ast:(add typed_ast)
+      ~names:(add names)
+      ~mir:(add mir)
+      ~llvm:(add llvm)
+      ~exe:(fun t variant ->
+      match exe_filename with
+      | None -> t
+      | Some exe_filename ->
+        let t = add_target t variant.constructor in
+        { t with exe_filename = Some exe_filename })
   ;;
 end
 

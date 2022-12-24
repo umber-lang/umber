@@ -39,7 +39,7 @@ let print_compilation_error ~out ~filename (error : Compilation_error.t) =
       , ({ error with filename = Some filename; exn } : Compilation_error.t)]
 ;;
 
-(* TODO: should really clean up this function *)
+(* TODO: This should be able to call into umberboot to do what it needs *)
 let run_tests () =
   let test filename =
     let bare_filename = Filename.chop_extension filename in
