@@ -174,9 +174,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_err
       ~type_checking:
         (run_stage ~f:(fun ast ->
            let names =
-             if no_std
-             then Name_bindings.core
-             else Name_bindings.of_prelude_sexp Umber_std.Prelude.names
+             if no_std then Name_bindings.core else force Name_bindings.prelude
            in
            let names =
              match parent with
@@ -220,7 +218,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_err
              with_tmpdir (fun tmpdir ->
                let object_file = tmpdir ^/ module_name ^ ".o" in
                Codegen.compile_to_object codegen ~output_file:object_file;
-               Linking.link_with_runtime ~object_file ~output_exe)))
+               Linking.link_with_std_and_runtime ~object_file ~output_exe)))
   in
   match result with
   | Ok () | Error `Done -> ()

@@ -302,6 +302,7 @@ let core =
   }
 ;;
 
+
 let merge_no_shadow t1 t2 =
   let err to_ustring ~key:name = name_error_msg "Name clash" (to_ustring name) in
   { names = Map.merge_skewed t1.names t2.names ~combine:(err Value_name.to_ustring)
@@ -550,6 +551,8 @@ let of_prelude_sexp sexp =
   let t = into_parent (t_of_sexp sexp) in
   import_all t Intrinsics.prelude_module_path
 ;;
+
+let prelude = lazy (of_prelude_sexp Umber_std.Prelude.names)
 
 let add_val_or_extern
   ?extern_name
