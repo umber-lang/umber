@@ -447,6 +447,8 @@ module Module = struct
              Nested_map.map
                sig_map
                ~f:(Sig_data.map_fixities ~f:(Map.add_exn ~key:value_name ~data:fixity))
+           (* FIXME: Copy Val and Extern correctly here. I don't think it's intended
+              that they're in the catch-all case. *)
            | Val (_, None, _)
            | Extern (_, None, _, _)
            (* TODO: handle imports bringing in type declarations to copy over (?) *)

@@ -34,4 +34,12 @@
              ((Name Classics.n.2) (Primitive (Int 1))))))
           (Fun_call Classics.fib.0
            ((Fun_call umber_int_sub
-             ((Name Classics.n.2) (Primitive (Int 2))))))))))))))))
+             ((Name Classics.n.2) (Primitive (Int 2)))))))))))))))
+ (Extern_decl ((name "Std.Prelude.Operators.;.0") (arity 2)))
+ (Extern_decl ((name umber_print_endline) (arity 1)))
+ (Extern_decl ((name umber_print_int) (arity 1)))
+ (Value_def *binding.0
+  (Fun_call "Std.Prelude.Operators.;.0"
+   ((Fun_call umber_print_endline ((Primitive (String "5! is:"))))
+    (Fun_call umber_print_int
+     ((Fun_call Classics.fact.0 ((Primitive (Int 5))))))))))

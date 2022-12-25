@@ -47,6 +47,7 @@ module :
   val sqrt : Int -> Float
 
   extern print : String -> () = "umber_print_endline"  # TODO: effects
+  extern print_int : Int -> () = "umber_print_int"
 
 # TODO: implement public/private distinction for modules
 
@@ -123,3 +124,4 @@ import Operators with *
 
 extern sqrt : Int -> Float = "umber_int_sqrt"
 extern print : String -> () = "umber_print_endline"
+extern print_int : Int -> () = "umber_print_int"

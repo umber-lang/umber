@@ -66,7 +66,12 @@ let names = {|
                     ((typ
                       (Scheme (Function ((Type_app String ())) (Tuple ()))))
                      (type_source Extern_declared)
-                     (extern_name umber_print_endline))))))
+                     (extern_name umber_print_endline))))
+                  (print_int
+                   (Local
+                    ((typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
+                     (type_source Extern_declared)
+                     (extern_name umber_print_int))))))
                 (types ())
                 (modules
                  ((List
@@ -246,7 +251,12 @@ let names = {|
                    ((typ
                      (Scheme (Function ((Type_app String ())) (Tuple ()))))
                     (type_source Extern_declared)
-                    (extern_name umber_print_endline))))))
+                    (extern_name umber_print_endline))))
+                 (print_int
+                  (Local
+                   ((typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
+                    (type_source Extern_declared)
+                    (extern_name umber_print_int))))))
                (types ())
                (modules
                 ((List
@@ -557,6 +567,8 @@ entry:
 declare %umber_block* @umber_int_sqrt(%umber_block*)
 
 declare %umber_block* @umber_print_endline(%umber_block*)
+
+declare %umber_block* @umber_print_int(%umber_block*)
 
 declare noalias i8* @malloc(i32)
 

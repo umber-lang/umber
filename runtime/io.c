@@ -14,3 +14,9 @@ const Block *umber_print_endline(const Block *s)
     putchar('\n');
     return UNIT;
 }
+
+const Block *umber_print_int(const Block *n)
+{
+    printf("%ld", block_as_int(n));
+    return UNIT;
+}
