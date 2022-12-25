@@ -396,6 +396,21 @@
   (no-infer (diff output/Generalization.expected output/Generalization.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/HelloWorld.expected tokens/HelloWorld.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/HelloWorld.expected ast/HelloWorld.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/HelloWorld.expected mir/HelloWorld.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff llvm/HelloWorld.expected llvm/HelloWorld.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/HelloWorld.expected output/HelloWorld.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Imports.expected tokens/Imports.out))))
 
 (rule (alias runtest) (deps test.dummy)
