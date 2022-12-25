@@ -24,7 +24,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @char.b = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 98 }
 @string.986077178 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [2 x i64] [i64 -2052875192838397053, i64 -4835876847830779392] }
 
-define void @main() {
+define void @"main./examples/Text.um"() {
 entry:
   %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
   %box = bitcast i8* %malloccall to i64*

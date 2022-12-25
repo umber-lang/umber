@@ -10,7 +10,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.0 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 0 }
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
 
-define void @main() {
+define void @"main./examples/Classics.um"() {
 entry:
   ret void
 }

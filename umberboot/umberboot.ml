@@ -217,8 +217,12 @@ let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_err
              in
              with_tmpdir (fun tmpdir ->
                let object_file = tmpdir ^/ module_name ^ ".o" in
-               Codegen.compile_to_object codegen ~output_file:object_file;
-               Linking.link_with_std_and_runtime ~object_file ~output_exe)))
+               let entry_file = tmpdir ^/ "_entry.o" in
+               Codegen.compile_to_object_and_dispose codegen ~output_file:object_file;
+               Codegen.compile_entry_module ~source_filenames:[ filename ] ~entry_file;
+               Linking.link_with_std_and_runtime
+                 ~object_files:[ object_file; entry_file ]
+                 ~output_exe)))
   in
   match result with
   | Ok () | Error `Done -> ()

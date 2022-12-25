@@ -16,7 +16,7 @@ let prelude_object_file =
      output_file)
 ;;
 
-let link_with_std_and_runtime ~object_file ~output_exe =
+let link_with_std_and_runtime ~object_files ~output_exe =
   (* Just shell out to clang because why not *)
   Compilation_error.try_with
     Other
@@ -24,5 +24,6 @@ let link_with_std_and_runtime ~object_file ~output_exe =
     (fun () ->
     Shell.run
       "clang"
-      [ object_file; force prelude_object_file; force runtime_archive; "-o"; output_exe ])
+      (object_files
+      @ [ force prelude_object_file; force runtime_archive; "-o"; output_exe ]))
 ;;

@@ -501,17 +501,19 @@ let codegen_stmt t stmt =
   | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
 ;;
 
+let main_function_name ~source_filename = "main" ^ source_filename
+let main_function_type context = Llvm.function_type (Llvm.void_type context) [||]
+
 let create ~source_filename =
   let context = Llvm.create_context () in
-  let module_ =
-    (* TODO: need to manually free modules and possibly other things: see e.g.
-       `dispose_module` *)
-    Llvm.create_module context source_filename
-  in
+  let module_ = Llvm.create_module context source_filename in
   Llvm.set_data_layout data_layout_string module_;
   let main_function_builder = Llvm.builder context in
   let main_function =
-    Llvm.define_function "main" (Llvm.function_type (Llvm.void_type context) [||]) module_
+    Llvm.define_function
+      (main_function_name ~source_filename)
+      (main_function_type context)
+      module_
   in
   Llvm.position_at_end (Llvm.entry_block main_function) main_function_builder;
   { context
@@ -544,4 +546,28 @@ let of_mir ~source_filename mir =
     (fun () -> of_mir_exn ~source_filename mir)
 ;;
 
-let compile_to_object t = Llvm_helpers.compile_module_to_object t.module_
+let compile_to_object_and_dispose_internal module_ context ~output_file =
+  Llvm_helpers.compile_module_to_object module_ ~output_file;
+  Llvm.dispose_module module_;
+  Llvm.dispose_context context
+;;
+
+let compile_to_object_and_dispose t ~output_file =
+  compile_to_object_and_dispose_internal t.module_ t.context ~output_file
+;;
+
+let compile_entry_module ~source_filenames ~entry_file =
+  let context = Llvm.create_context () in
+  let module_ = Llvm.create_module context entry_file in
+  let builder = Llvm.builder context in
+  let fun_type = main_function_type context in
+  let main_fun = Llvm.define_function "main" fun_type module_ in
+  Llvm.position_at_end (Llvm.entry_block main_fun) builder;
+  List.iter source_filenames ~f:(fun source_filename ->
+    let fun_ =
+      Llvm.declare_function (main_function_name ~source_filename) fun_type module_
+    in
+    ignore_value (Llvm.build_call fun_ [||] "" builder));
+  ignore_value (Llvm.build_ret_void builder);
+  compile_to_object_and_dispose_internal module_ context ~output_file:entry_file
+;;

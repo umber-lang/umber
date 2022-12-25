@@ -420,7 +420,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Std.Prelude.List.Nil.9 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @"Std.Prelude.Operators.::.17" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons.10 to %umber_block*)
 
-define void @main() {
+define void @"mainStd/Prelude.um"() {
 entry:
   ret void
 }
