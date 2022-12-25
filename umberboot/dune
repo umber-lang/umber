@@ -1,5 +1,5 @@
 (library
  (name umberboot)
- (libraries core core_unix.command_unix core_unix.filename_unix umber)
+ (libraries core core_unix.command_unix core_unix.filename_unix shell umber)
  (preprocess
   (pps ppx_jane)))

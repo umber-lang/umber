@@ -11,6 +11,9 @@
  (action (no-infer (diff llvm/AsPattern.expected llvm/AsPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/AsPattern.expected output/AsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Basics.expected tokens/Basics.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -21,6 +24,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Basics.expected llvm/Basics.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Basics.expected output/Basics.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Classics.expected tokens/Classics.out))))
@@ -35,6 +41,9 @@
  (action (no-infer (diff llvm/Classics.expected llvm/Classics.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Classics.expected output/Classics.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Closures.expected tokens/Closures.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -45,6 +54,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Closures.expected llvm/Closures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Closures.expected output/Closures.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -64,6 +76,11 @@
   (no-infer (diff llvm/CrossModuleUsage.expected llvm/CrossModuleUsage.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/CrossModuleUsage.expected output/CrossModuleUsage.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Empty.expected tokens/Empty.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -74,6 +91,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Empty.expected llvm/Empty.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Empty.expected output/Empty.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -102,6 +122,12 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff output/ErrorCrossModuleMutualRecursion.expected
+    output/ErrorCrossModuleMutualRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorCyclicTypeAlias.expected
     tokens/ErrorCyclicTypeAlias.out))))
 
@@ -123,6 +149,12 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff output/ErrorCyclicTypeAlias.expected
+    output/ErrorCyclicTypeAlias.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorDuplicateLet.expected tokens/ErrorDuplicateLet.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -137,6 +169,11 @@
  (action
   (no-infer
    (diff llvm/ErrorDuplicateLet.expected llvm/ErrorDuplicateLet.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorDuplicateLet.expected output/ErrorDuplicateLet.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -165,6 +202,12 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff output/ErrorDuplicateNameAsPattern.expected
+    output/ErrorDuplicateNameAsPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorDuplicateVal.expected tokens/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -179,6 +222,11 @@
  (action
   (no-infer
    (diff llvm/ErrorDuplicateVal.expected llvm/ErrorDuplicateVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorDuplicateVal.expected output/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -200,6 +248,12 @@
  (action
   (no-infer
    (diff llvm/ErrorIncompatibleSig.expected llvm/ErrorIncompatibleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorIncompatibleSig.expected
+    output/ErrorIncompatibleSig.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -228,6 +282,12 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff output/ErrorInexhaustivePattern.expected
+    output/ErrorInexhaustivePattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorPatternUnionNameTypes.expected
     tokens/ErrorPatternUnionNameTypes.out))))
 
@@ -248,6 +308,12 @@
   (no-infer
    (diff llvm/ErrorPatternUnionNameTypes.expected
     llvm/ErrorPatternUnionNameTypes.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorPatternUnionNameTypes.expected
+    output/ErrorPatternUnionNameTypes.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -274,6 +340,12 @@
     llvm/ErrorPolymorphicRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorPolymorphicRecursion.expected
+    output/ErrorPolymorphicRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -286,6 +358,9 @@
  (action (no-infer (diff llvm/ExternInt.expected llvm/ExternInt.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/ExternInt.expected output/ExternInt.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Functions.expected tokens/Functions.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -296,6 +371,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Functions.expected llvm/Functions.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Functions.expected output/Functions.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -314,6 +392,10 @@
   (no-infer (diff llvm/Generalization.expected llvm/Generalization.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/Generalization.expected output/Generalization.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Imports.expected tokens/Imports.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -324,6 +406,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Imports.expected llvm/Imports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Imports.expected output/Imports.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -343,6 +428,11 @@
   (no-infer (diff llvm/LetBindingGroups.expected llvm/LetBindingGroups.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/LetBindingGroups.expected output/LetBindingGroups.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/LetPattern.expected tokens/LetPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -353,6 +443,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/LetPattern.expected llvm/LetPattern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/LetPattern.expected output/LetPattern.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ModuleSig.expected tokens/ModuleSig.out))))
@@ -367,6 +460,9 @@
  (action (no-infer (diff llvm/ModuleSig.expected llvm/ModuleSig.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/ModuleSig.expected output/ModuleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Modules.expected tokens/Modules.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -377,6 +473,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Modules.expected llvm/Modules.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Modules.expected output/Modules.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -396,6 +495,11 @@
   (no-infer (diff llvm/MutualRecursion.expected llvm/MutualRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/MutualRecursion.expected output/MutualRecursion.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Operators.expected tokens/Operators.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -406,6 +510,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Operators.expected llvm/Operators.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Operators.expected output/Operators.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Option.expected tokens/Option.out))))
@@ -420,6 +527,9 @@
  (action (no-infer (diff llvm/Option.expected llvm/Option.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Option.expected output/Option.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Text.expected tokens/Text.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -432,6 +542,9 @@
  (action (no-infer (diff llvm/Text.expected llvm/Text.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Text.expected output/Text.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Traits.expected tokens/Traits.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -442,6 +555,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Traits.expected llvm/Traits.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Traits.expected output/Traits.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -457,6 +573,10 @@
  (action (no-infer (diff llvm/TypeChecking.expected llvm/TypeChecking.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/TypeChecking.expected output/TypeChecking.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Types.expected tokens/Types.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -467,6 +587,9 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff llvm/Types.expected llvm/Types.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Types.expected output/Types.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -481,4 +604,8 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer (diff llvm/WeirdFunCalls.expected llvm/WeirdFunCalls.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/WeirdFunCalls.expected output/WeirdFunCalls.out))))
 

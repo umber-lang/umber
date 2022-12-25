@@ -1,4 +1,4 @@
-(data_only_dirs examples tokens ast mir llvm)
+(data_only_dirs examples tokens ast mir llvm output)
 
 (executables
  (names test gen_dune)
@@ -15,7 +15,8 @@
   (glob_files tokens/*.expected)
   (glob_files ast/*.expected)
   (glob_files mir/*.expected)
-  (glob_files llvm/*.expected))
+  (glob_files llvm/*.expected)
+  (glob_files output/*.expected))
  (action
   (progn
    (ignore-stderr

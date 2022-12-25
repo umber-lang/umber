@@ -10,6 +10,8 @@ let runtime_archive = lazy (look_up_in_site Sources.Sites.runtime ~file:"librunt
 
 let link_with_runtime ~object_file ~output_exe =
   (* Just shell out to clang because why not *)
-  Sys_unix.command_exn
-    [%string "clang %{object_file} %{force runtime_archive} -o %{output_exe}"]
+  Compilation_error.try_with
+    Other
+    ~msg:[%sexp "Error encountered while linking"]
+    (fun () -> Shell.run "clang" [ object_file; force runtime_archive; "-o"; output_exe ])
 ;;

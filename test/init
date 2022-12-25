@@ -6,4 +6,5 @@ for path in "$dir"/examples/*; do
     touch "$dir/ast/$expected"
     touch "$dir/mir/$expected"
     touch "$dir/llvm/$expected"
+    touch "$dir/output/$expected"
 done

@@ -26,6 +26,12 @@ let should_make_llvm test =
   should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
 ;;
 
+let no_exe_tests = []
+
+let should_make_exe test =
+  should_make_llvm test && not (List.mem ~equal:String.equal no_exe_tests test)
+;;
+
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =
   let exn =
     match error.kind with
@@ -41,7 +47,6 @@ let print_compilation_error ~out ~filename (error : Compilation_error.t) =
 
 type target = Umberboot.Target.t * Umberboot.File_or_stdout.t
 
-(* TODO: This should be able to call into umberboot to do what it needs *)
 let run_tests () =
   let test filename =
     let bare_filename = Filename.chop_extension filename in
@@ -50,7 +55,9 @@ let run_tests () =
     let ast_file = concat_current "ast" out_filename in
     let mir_file = concat_current "mir" out_filename in
     let llvm_file = concat_current "llvm" out_filename in
-    List.iter [ tokens_file; ast_file; mir_file; llvm_file ] ~f:(fun file ->
+    let output_file = concat_current "output" out_filename in
+    let tmp_exe_file = Filename_unix.temp_file "umber_test" "" in
+    List.iter [ tokens_file; ast_file; mir_file; llvm_file; output_file ] ~f:(fun file ->
       (* Touch each file so that we always end up with at least an empty for every target,
          even if we error out on an earlier case or otherwise don't generate some outputs. *)
       Out_channel.write_all file ~data:"");
@@ -66,26 +73,31 @@ let run_tests () =
         ~init:base_targets
         [ should_make_mir, (Mir, File mir_file : target)
         ; should_make_llvm, (Llvm, File llvm_file)
+        ; should_make_exe, (Exe, File tmp_exe_file)
         ]
         ~finish:Fn.id
         ~f:(fun targets (should_make, target) ->
           if should_make bare_filename then Continue (target :: targets) else Stop targets)
     in
+    let encountered_error = ref false in
     Umberboot.compile
       targets
       ~renumber_mir_ids:true
       ~filename:in_file
       ~on_error:(fun stage error ->
+      encountered_error := true;
       let file =
         match stage with
         | Lexing -> tokens_file
         | Parsing | Type_checking -> ast_file
         | Generating_mir -> mir_file
         | Generating_llvm -> llvm_file
-        | Linking -> raise_s [%message "Linking error" (error : Compilation_error.t)]
+        | Linking -> output_file
       in
       Out_channel.with_file file ~f:(fun out ->
-        print_compilation_error error ~out ~filename))
+        print_compilation_error error ~out ~filename);
+      if (not !encountered_error) && should_make_exe bare_filename
+      then Sys_unix.command_exn [%string "%{tmp_exe_file} > %{output_file} 2>&1"])
   in
   Array.iter (Util.sorted_files_in_local_dir "examples") ~f:(fun file ->
     try test file with

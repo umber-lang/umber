@@ -127,17 +127,9 @@ end = struct
   ;;
 end
 
-let rec rmrf path =
-  if Sys_unix.is_directory_exn path
-  then (
-    Sys_unix.readdir path |> Array.iter ~f:(fun name -> rmrf (path ^/ name));
-    Core_unix.remove path)
-  else Sys_unix.remove path
-;;
-
 let with_tmpdir f =
   let dir = Filename_unix.temp_dir "umberboot" "" in
-  Exn.protectx ~f dir ~finally:rmrf
+  Exn.protectx ~f dir ~finally:(Shell.rm ~r:() ~f:())
 ;;
 
 let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_error =
@@ -228,8 +220,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_err
              with_tmpdir (fun tmpdir ->
                let object_file = tmpdir ^/ module_name ^ ".o" in
                Codegen.compile_to_object codegen ~output_file:object_file;
-               Linking.link_with_runtime ~object_file ~output_exe);
-             Ok ()))
+               Linking.link_with_runtime ~object_file ~output_exe)))
   in
   match result with
   | Ok () | Error `Done -> ()

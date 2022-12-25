@@ -22,5 +22,6 @@ let () =
     handle_dir "tokens" bare_filename;
     handle_dir "ast" bare_filename;
     handle_dir "mir" bare_filename;
-    handle_dir "llvm" bare_filename)
+    handle_dir "llvm" bare_filename;
+    handle_dir "output" bare_filename)
 ;;
