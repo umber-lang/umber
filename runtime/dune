@@ -7,4 +7,4 @@
 (foreign_library
  (archive_name runtime)
  (language c)
- (names io))
+ (names block int io poly string))
