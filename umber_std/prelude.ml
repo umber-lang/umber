@@ -5,7 +5,7 @@ open! Core
 
   let compile_and_print ~name ~is_sexp target =
     print_endline [%string "\nlet %{name} = {|"];
-    Umberboot.compile_and_print
+    Umberboot.compile
       ~filename:"Std/Prelude.um"
       ~no_std:true
       ~parent:(Umber.Ast.Module_name.of_string_exn "Std")

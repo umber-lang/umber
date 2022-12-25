@@ -1,5 +1,5 @@
-; ModuleID = 'Text.um'
-source_filename = "Text.um"
+; ModuleID = './examples/Text.um'
+source_filename = "./examples/Text.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -50,3 +50,4 @@ entry:
 }
 
 declare noalias i8* @malloc(i32)
+

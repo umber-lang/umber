@@ -261,11 +261,10 @@ let try_lex ~print_tokens_to lexbuf lexer =
   handle_syntax_error (fun () -> lex ~print_tokens_to lexbuf lexer)
 ;;
 
-let parse ?print_tokens_to ?(full_lex = false) lexbuf =
+let parse ?print_tokens_to lexbuf =
   let lex_remaining ~print_tokens_to lexbuf lexer =
-    match print_tokens_to with
-    | Some print_tokens_to when full_lex -> lex ~print_tokens_to lexbuf lexer
-    | _ -> ()
+    Option.iter print_tokens_to ~f:(fun print_tokens_to ->
+      lex ~print_tokens_to lexbuf lexer)
   in
   let last_prod = ref None in
   let rec parse ?print_tokens_to last_token lexbuf checkpoint lexer =
@@ -285,37 +284,22 @@ let parse ?print_tokens_to ?(full_lex = false) lexbuf =
       parse ?print_tokens_to last_token lexbuf checkpoint lexer
     | I.HandlingError env ->
       (* TODO: you can actually resume the parser here, should look into that *)
-      let error () =
-        lex_remaining ~print_tokens_to lexbuf lexer;
-        let state = I.current_state_number env in
-        let prod_msg =
-          match !last_prod with
-          | Some prod ->
-            let (X symbol) = I.lhs prod in
-            let empty_sexp _ = Sexp.List [] in
-            let str =
-              match symbol with
-              | T terminal -> Terminal.sexp_of_t empty_sexp terminal
-              | N nonterminal -> Nonterminal.sexp_of_t empty_sexp nonterminal
-            in
-            sprintf ". (Last production: %s)" (Sexp.to_string str)
-          | None -> ""
-        in
-        Lexer.syntax_error
-          ~msg:(sprintf "Parser error in state %d%s" state prod_msg)
-          lexbuf
+      lex_remaining ~print_tokens_to lexbuf lexer;
+      let state = I.current_state_number env in
+      let prod_msg =
+        match !last_prod with
+        | Some prod ->
+          let (X symbol) = I.lhs prod in
+          let empty_sexp _ = Sexp.List [] in
+          let str =
+            match symbol with
+            | T terminal -> Terminal.sexp_of_t empty_sexp terminal
+            | N nonterminal -> Nonterminal.sexp_of_t empty_sexp nonterminal
+          in
+          sprintf ". (Last production: %s)" (Sexp.to_string str)
+        | None -> ""
       in
-      (*(match last_token with
-      | INDENT | DEDENT | LINE_SEP ->
-        (match I.pop env with
-        | Some env ->
-          let checkpoint = I.input_needed env in
-          print_s [%message "Yeeting an error away" (last_token : token)];
-          (* TODO: probably remove this - this is such a hack *)
-          parse ?print_tokens_to last_token lexbuf checkpoint lexer
-        | None -> error ())
-      | _ -> error ())*)
-      error ()
+      Lexer.syntax_error ~msg:(sprintf "Parser error in state %d%s" state prod_msg) lexbuf
     | I.Accepted v -> v
     | I.Rejected ->
       lex_remaining ~print_tokens_to lexbuf lexer;
@@ -327,8 +311,8 @@ let parse ?print_tokens_to ?(full_lex = false) lexbuf =
     start.pos_fname
 ;;
 
-let try_parse ?print_tokens_to ~full_lex lexbuf =
-  handle_syntax_error (fun () -> parse ?print_tokens_to ~full_lex lexbuf)
+let try_parse ?print_tokens_to lexbuf =
+  handle_syntax_error (fun () -> parse ?print_tokens_to lexbuf)
 ;;
 
 let with_file filename ~f =
@@ -342,6 +326,4 @@ let lex_file ~print_tokens_to =
   with_file ~f:(fun lexbuf -> try_lex ~print_tokens_to lexbuf (Lexer.create ()))
 ;;
 
-let parse_file ?print_tokens_to ?(full_lex = false) =
-  with_file ~f:(try_parse ?print_tokens_to ~full_lex)
-;;
+let parse_file ?print_tokens_to = with_file ~f:(try_parse ?print_tokens_to)

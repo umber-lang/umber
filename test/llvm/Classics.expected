@@ -1,5 +1,5 @@
-; ModuleID = 'Classics.um'
-source_filename = "Classics.um"
+; ModuleID = './examples/Classics.um'
+source_filename = "./examples/Classics.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block1 = type { %umber_header, [1 x i64] }
@@ -90,3 +90,4 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   %cond_otherwise_merge9 = phi %umber_block* [ bitcast (%umber_block1* @int.1 to %umber_block*), %cond_binding_merge ], [ %fun_call8, %cond_otherwise ]
   ret %umber_block* %cond_otherwise_merge9
 }
+

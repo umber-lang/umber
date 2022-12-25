@@ -2,7 +2,7 @@
 
 (executables
  (names test gen_dune)
- (libraries core core_unix.sys_unix umber)
+ (libraries core core_unix.sys_unix umber umberboot)
  (preprocess
   (pps ppx_jane)))
 

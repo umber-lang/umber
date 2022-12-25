@@ -1,14 +1,8 @@
 open Core
 open Umber
 
-(* TODO: Could make Stage/Target GADTS and put the functions inside them. I think GADTs
-   will probably ruin everything but I am kinda sad you still have to think about target/
-   stage dependencies a lot when writing this command. *)
-
 module Stage = struct
   module T = struct
-    (** Stages of compilation. The order is significant; later stages depend on earlier
-        stages. *)
     type t =
       | Lexing
       | Parsing
@@ -146,95 +140,121 @@ let with_tmpdir f =
   Exn.protectx ~f dir ~finally:rmrf
 ;;
 
-let or_raise = function
-  | Ok x -> x
-  | Error err -> raise_s [%sexp (err : Compilation_error.t)]
-;;
-
-let compile_and_print_internal ~filename ~output ~no_std ~parent =
+let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_error =
   if Output.is_empty output then failwith "No output arguments supplied";
   let run_stage acc (variant : Stage.t Variant.t) ~f =
-    Option.bind acc ~f:(fun acc ->
-      if Output.requires output variant.constructor then Some (f acc) else None)
+    Result.bind acc ~f:(fun acc ->
+      let stage = variant.constructor in
+      if Output.requires output stage
+      then Result.map_error (f acc) ~f:(fun error -> `Compilation_error (stage, error))
+      else Error `Done)
   in
   let maybe_output target ~f =
     Option.iter (Output.find_target output target) ~f:(fun file_or_stdout ->
       File_or_stdout.with_out_channel file_or_stdout ~f)
   in
-  Stage.Variants.fold
-    ~init:(Some ())
-    ~lexing:
-      (run_stage ~f:(fun () ->
-         (* Parsing and lexing are done together, so only lex separately if not parsing. *)
-         if not (Output.requires output Parsing)
-         then
-           maybe_output Tokens ~f:(fun print_tokens_to ->
-             Parsing.lex_file filename ~print_tokens_to
-             |> Result.iter_error ~f:(fun error ->
-                  print_s [%sexp (error : Compilation_error.t)]))))
-    ~parsing:
-      (run_stage ~f:(fun () ->
-         let get_ast print_tokens_to =
-           or_raise (Parsing.parse_file ?print_tokens_to filename)
-         in
-         let ast =
-           match Output.find_target output Tokens with
-           | None -> get_ast None
-           | Some print_tokens_to ->
-             File_or_stdout.with_out_channel print_tokens_to ~f:(fun print_tokens_to ->
-               get_ast (Some print_tokens_to))
-         in
-         maybe_output Untyped_ast ~f:(fun out ->
-           Parsing.fprint_s [%sexp (ast : Ast.Untyped.Module.t)] ~out);
-         ast))
-    ~type_checking:
-      (run_stage ~f:(fun ast ->
-         let names =
-           if no_std
-           then Name_bindings.core
-           else Name_bindings.of_prelude_sexp Umber_std.Prelude.names
-         in
-         let names =
-           match parent with
-           | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
-           | None -> names
-         in
-         let names, ast =
-           or_raise
-             (Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast)
-         in
-         maybe_output Typed_ast ~f:(fun out ->
-           Parsing.fprint_s [%sexp (ast : Ast.Typed.Module.t)] ~out);
-         maybe_output Names ~f:(fun out ->
-           Parsing.fprint_s [%sexp (names : Name_bindings.t)] ~out);
-         ast, names))
-    ~generating_mir:
-      (run_stage ~f:(fun (ast, names) ->
-         let mir = or_raise (Mir.of_typed_module ~names ast) in
-         maybe_output Mir ~f:(fun out -> Parsing.fprint_s [%sexp (mir : Mir.t)] ~out);
-         Ast.Module.module_name ast, mir))
-    ~generating_llvm:
-      (run_stage ~f:(fun (module_name, mir) ->
-         let codegen = Codegen.of_mir_exn ~source_filename:filename mir in
-         maybe_output Llvm ~f:(fun out -> fprintf out "%s\n" (Codegen.to_string codegen));
-         module_name, codegen))
-    ~linking:
-      (run_stage ~f:(fun (module_name, codegen) ->
-         Option.iter (Output.find_target output Exe) ~f:(function
-           | Stdout -> failwith "Can't write executable file to stdout"
-           | File output_exe ->
+  let result =
+    Stage.Variants.fold
+      ~init:(Ok ())
+      ~lexing:
+        (run_stage ~f:(fun () ->
+           (* Parsing and lexing are done together, so only lex separately if not parsing. *)
+           if not (Output.requires output Parsing)
+           then
+             maybe_output Tokens ~f:(fun print_tokens_to ->
+               Parsing.lex_file filename ~print_tokens_to
+               |> Result.iter_error ~f:(fun error ->
+                    print_s [%sexp (error : Compilation_error.t)]));
+           Ok ()))
+      ~parsing:
+        (run_stage ~f:(fun () ->
+           let get_ast print_tokens_to = Parsing.parse_file ?print_tokens_to filename in
+           let%map.Result ast =
+             match Output.find_target output Tokens with
+             | None -> get_ast None
+             | Some print_tokens_to ->
+               File_or_stdout.with_out_channel print_tokens_to ~f:(fun print_tokens_to ->
+                 get_ast (Some print_tokens_to))
+           in
+           maybe_output Untyped_ast ~f:(fun out ->
+             Parsing.fprint_s [%sexp (ast : Ast.Untyped.Module.t)] ~out);
+           ast))
+      ~type_checking:
+        (run_stage ~f:(fun ast ->
+           let names =
+             if no_std
+             then Name_bindings.core
+             else Name_bindings.of_prelude_sexp Umber_std.Prelude.names
+           in
+           let names =
+             match parent with
+             | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
+             | None -> names
+           in
+           let%map.Result names, ast =
+             Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast
+           in
+           maybe_output Typed_ast ~f:(fun out ->
+             Parsing.fprint_s [%sexp (ast : Ast.Typed.Module.t)] ~out);
+           maybe_output Names ~f:(fun out ->
+             Parsing.fprint_s [%sexp (names : Name_bindings.t)] ~out);
+           ast, names))
+      ~generating_mir:
+        (run_stage ~f:(fun (ast, names) ->
+           let%map.Result mir = Mir.of_typed_module ~names ast in
+           let mir = if renumber_mir_ids then Mir.renumber_ids mir else mir in
+           maybe_output Mir ~f:(fun out -> Parsing.fprint_s [%sexp (mir : Mir.t)] ~out);
+           Ast.Module.module_name ast, mir))
+      ~generating_llvm:
+        (run_stage ~f:(fun (module_name, mir) ->
+           let%map.Result codegen = Codegen.of_mir ~source_filename:filename mir in
+           maybe_output Llvm ~f:(fun out ->
+             fprintf out "%s\n" (Codegen.to_string codegen));
+           module_name, codegen))
+      ~linking:
+        (run_stage ~f:(fun (module_name, codegen) ->
+           match Output.find_target output Exe with
+           | None -> Ok ()
+           | Some Stdout ->
+             Error
+               (Compilation_error.create
+                  ~filename
+                  ~msg:[%sexp "Can't write executable file to stdout"]
+                  Other)
+           | Some (File output_exe) ->
              let module_name =
                Ast.Module_name.to_ustring module_name |> Ustring.to_string
              in
              with_tmpdir (fun tmpdir ->
                let object_file = tmpdir ^/ module_name ^ ".o" in
                Codegen.compile_to_object codegen ~output_file:object_file;
-               Linking.link_with_runtime ~object_file ~output_exe))))
-  |> Option.iter ~f:(fun () -> ())
+               Linking.link_with_runtime ~object_file ~output_exe);
+             Ok ()))
+  in
+  match result with
+  | Ok () | Error `Done -> ()
+  | Error (`Compilation_error (stage, error)) -> on_error stage error
 ;;
 
-let compile_and_print ?(no_std = false) ?parent ~filename targets =
-  compile_and_print_internal ~no_std ~parent ~filename ~output:(Output.create targets)
+let on_error_raise stage error =
+  raise_s [%message "Compilation failed" (stage : Stage.t) (error : Compilation_error.t)]
+;;
+
+let compile
+  ?(no_std = false)
+  ?parent
+  ?(renumber_mir_ids = false)
+  ?(on_error = on_error_raise)
+  ~filename
+  targets
+  =
+  compile_internal
+    ~no_std
+    ~parent
+    ~renumber_mir_ids
+    ~on_error
+    ~filename
+    ~output:(Output.create targets)
 ;;
 
 let command =
@@ -250,5 +270,12 @@ let command =
          (optional Ast.Module_name.arg_type_lenient)
          ~doc:"MODULE_NAME The name of the parent module"
      in
-     fun () -> compile_and_print_internal ~filename ~output ~no_std ~parent)
+     fun () ->
+       compile_internal
+         ~filename
+         ~output
+         ~no_std
+         ~parent
+         ~renumber_mir_ids:false
+         ~on_error:on_error_raise)
 ;;

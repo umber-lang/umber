@@ -1,5 +1,5 @@
-; ModuleID = 'Functions.um'
-source_filename = "Functions.um"
+; ModuleID = './examples/Functions.um'
+source_filename = "./examples/Functions.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -30,3 +30,4 @@ entry:
   %fun_call = tail call %umber_block* @umber_int_mul(%umber_block* %Functions.x.1, %umber_block* %Functions.x.1)
   ret %umber_block* %fun_call
 }
+
