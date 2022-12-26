@@ -41,7 +41,7 @@ let rec rev_append_list xs ys =
 
 let rev_append xs = rev_append_list (to_list xs)
 
-include Container.Make (struct
+module C = Container.Make (struct
   type nonrec 'a t = 'a t
 
   let fold xs = List.fold (to_list xs)
@@ -49,10 +49,19 @@ include Container.Make (struct
   let iter = `Define_using_fold
 end)
 
-(* FIXME: including Container.Make is shadowing to_list, which is quite sad. We should
-   explicitly enumerate what we're including. We should also fix Monad.Make, and any other
-   includes. *)
-let to_list (x :: xs) : _ list = x :: xs
+(* Enumerate the values we want to include so we don't unintentionally shadow things like
+   [to_list]. *)
+let fold = C.fold
+let length = C.length
+let iter = C.iter
+let fold_result = C.fold_result
+let exists = C.exists
+let for_all = C.for_all
+let count = C.count
+let sum = C.sum
+let find = C.find
+let find_map = C.find_map
+let to_array = C.to_array
 
 let map (x :: xs) ~f =
   let rec loop acc = function

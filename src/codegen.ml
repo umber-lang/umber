@@ -161,7 +161,6 @@ let codegen_literal t literal =
       let c = Uchar.to_int c in
       constant_block t ~tag:Tag.char ~len:1 ~type_:"char" ~name (Llvm.const_int type_ c)
     | String s ->
-      (* FIXME: Strings will need handling of the final word, similar to how OCaml does it *)
       let s = Ustring.to_string s in
       let n_chars = String.length s in
       let name = String.hash s |> Int.to_string in
