@@ -502,7 +502,7 @@ let codegen_stmt t stmt =
 ;;
 
 let main_function_name ~source_filename = "main" ^ source_filename
-let main_function_type context = Llvm.function_type (Llvm.void_type context) [||]
+let main_function_type context = Llvm.function_type (Llvm.i32_type context) [||]
 
 let create ~source_filename =
   let context = Llvm.create_context () in
@@ -529,7 +529,8 @@ let of_mir_exn ~source_filename mir =
   let t = create ~source_filename in
   List.iter mir ~f:(preprocess_stmt t);
   List.iter mir ~f:(codegen_stmt t);
-  ignore_value (Llvm.build_ret_void t.main_function_builder);
+  ignore_value
+    (Llvm.build_ret (Llvm.const_int (Llvm.i32_type t.context) 0) t.main_function_builder);
   match Llvm_analysis.verify_module t.module_ with
   | None -> t
   | Some error ->
@@ -568,6 +569,6 @@ let compile_entry_module ~source_filenames ~entry_file =
       Llvm.declare_function (main_function_name ~source_filename) fun_type module_
     in
     ignore_value (Llvm.build_call fun_ [||] "" builder));
-  ignore_value (Llvm.build_ret_void builder);
+  ignore_value (Llvm.build_ret (Llvm.const_int (Llvm.i32_type context) 0) builder);
   compile_to_object_and_dispose_internal module_ context ~output_file:entry_file
 ;;
