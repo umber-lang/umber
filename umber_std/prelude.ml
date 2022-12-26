@@ -431,9 +431,9 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Std.Prelude.List.Nil.0 = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @"Std.Prelude.Operators.::.0" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons.0 to %umber_block*)
 
-define void @"mainStd/Prelude.um"() {
+define i32 @"mainStd/Prelude.um"() {
 entry:
-  ret void
+  ret i32 0
 }
 
 define tailcc %umber_block* @Std.Prelude.List.Cons.0(%umber_block* %arg0.0, %umber_block* %arg1.0) {

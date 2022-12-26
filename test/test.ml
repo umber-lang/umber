@@ -56,8 +56,8 @@ let run_tests () =
     let mir_file = concat_current "mir" out_filename in
     let llvm_file = concat_current "llvm" out_filename in
     let output_file = concat_current "output" out_filename in
-    let tmp_exe_file = Filename_unix.temp_file "umber_test" "" in
-    List.iter [ tokens_file; ast_file; mir_file; llvm_file; output_file ] ~f:(fun file ->
+    let tmp_exe_file = Filename_unix.temp_file ("umber_test." ^ filename) "" in
+    List.iter [ tokens_file; ast_file; mir_file; llvm_file ] ~f:(fun file ->
       (* Touch each file so that we always end up with at least an empty for every target,
          even if we error out on an earlier case or otherwise don't generate some outputs. *)
       Out_channel.write_all file ~data:"");
@@ -80,6 +80,9 @@ let run_tests () =
           if should_make bare_filename then Continue (target :: targets) else Stop targets)
     in
     let encountered_error = ref false in
+    (* FIXME: Renumbering the MIR IDs is a hack to make cross-module linking with
+       unique ids generated separately work. I think we just need to move that
+       functionality to the name_bindings so it's in one place. *)
     Umberboot.compile
       targets
       ~renumber_mir_ids:true
@@ -95,9 +98,9 @@ let run_tests () =
         | Linking -> output_file
       in
       Out_channel.with_file file ~f:(fun out ->
-        print_compilation_error error ~out ~filename);
-      if (not !encountered_error) && should_make_exe bare_filename
-      then Sys_unix.command_exn [%string "%{tmp_exe_file} > %{output_file} 2>&1"])
+        print_compilation_error error ~out ~filename));
+    if (not !encountered_error) && should_make_exe bare_filename
+    then Shell.sh "%s > %s 2>&1" tmp_exe_file output_file
   in
   Array.iter (Util.sorted_files_in_local_dir "examples") ~f:(fun file ->
     try test file with
