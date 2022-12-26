@@ -1,0 +1,7 @@
+LET
+L_PAREN
+R_PAREN
+EQUALS
+(LOWER_NAME print)
+(STRING "Hello world!")
+EOF
