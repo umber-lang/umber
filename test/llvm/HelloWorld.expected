@@ -9,11 +9,11 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @"*binding.0" = global %umber_block* null
 @string.578489388 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [2 x i64] [i64 5216694956355254127, i64 8245075110705233923] }
 
-define void @"main./examples/HelloWorld.um"() {
+define i32 @"main./examples/HelloWorld.um"() {
 entry:
   %fun_call = tail call %umber_block* @umber_print_endline(%umber_block* bitcast (%umber_block2* @string.578489388 to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @"*binding.0", align 8
-  ret void
+  ret i32 0
 }
 
 declare %umber_block* @umber_print_endline(%umber_block*)

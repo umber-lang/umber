@@ -21,7 +21,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
 @int.3 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
 
-define void @"main./examples/Basics.um"() {
+define i32 @"main./examples/Basics.um"() {
 entry:
   br label %cond
 
@@ -60,7 +60,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   store %umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block** %box10, align 8
   %box11 = bitcast i64* %box to %umber_block*
   store %umber_block* %box11, %umber_block** @Basics.xyz.0, align 8
-  ret void
+  ret i32 0
 }
 
 define tailcc %umber_block* @Basics.Regular.0(%umber_block* %arg0.0) {

@@ -599,20 +599,10 @@ module Expr = struct
      The highest tag value (7) indicates that the constructor tag must be looked up from
      the info table. Not sure if we want to have info tables, so in that case maybe it
      should be another field on the object. We could also do what OCaml does and take up
-     some bits in the block header. *)
-  (* For now, lets just store tags in the block itself as another field
+     some bits in the block header.
+
+     For now, lets just store tags in the block itself as another field
      Later, we can store them in the pointer or block header *)
-  (* Block representation: header + fields (fields must all be 64 bits (1 word) in length)
-     Header describes which fields are pointers for the GC: i32, i32 for pointers, non-pointers
-     - TODO: where should constructor tags go? Get their own field?
-     - This is also doesn't quite work for things like strings
-     - Haskell does this, but also has a pointer to a table with info about layout
-     See:
-     - https://dev.realworldocaml.org/runtime-memory-layout.html
-     - https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/storage/heap-objects *)
-  (* TODO: support for strings (literal is a weird place probably) as well as arrays *)
-  (* TODO: since llvm requires type annotations everywhere, I'll probably have to add type
-     information to this at some point. Seems easy to do when needed. *)
   type t =
     | Primitive of Literal.t
     | Name of Mir_name.t
@@ -726,22 +716,6 @@ module Expr = struct
         in
         Some (List.fold conds ~init:tag_cond ~f:(fun cond cond' -> And (cond, cond'))))
   ;;
-
-  (* TODO: We need to insert conditional bindings in match statements
-     How the binding is done can depend on runtime values e.g.
-     `let ((5, x) | (x, _)) = (4, 5)`
-     We can take nonrecursive `let`s and make them the same as match statements.
-     Recursive lets seem a little harder - actually wait, you just need the parent
-     names to be bound in the child contexts (anything else?)
-     - Actually, recursion in our let statements is really tricky, since it's possible
-       to create non-terminating values e.g. `let x = x`
-       Some options:
-       - Restrict recursive lets to just values/functions and then restrict the
-         right-hand side like OCaml does. This is very sad as we are rec by default.
-       - Work out if the value is *actually* recursive (referencing itself) - we can
-         have the type checker do this and remove the rec flag - and only apply the
-         restrictions if this is the case. This sounds pretty good. We may also be able
-         to remove some restrictions later. *)
 
   (* TODO: switch statement optimization
      See:

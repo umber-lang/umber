@@ -10,12 +10,12 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Functions.still_zero_wow.0 = global %umber_block* null
 @float.0. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 0.000000e+00 }
 
-define void @"main./examples/Functions.um"() {
+define i32 @"main./examples/Functions.um"() {
 entry:
   %Functions.zero.0 = load %umber_block*, %umber_block** @Functions.zero.0, align 8
   %fun_call = tail call %umber_block* @Functions.id.0(%umber_block* %Functions.zero.0)
   store %umber_block* %fun_call, %umber_block** @Functions.still_zero_wow.0, align 8
-  ret void
+  ret i32 0
 }
 
 define tailcc %umber_block* @Functions.id.0(%umber_block* %Functions.x.0) {
