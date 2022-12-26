@@ -31,7 +31,6 @@ let factMemo n =
 # ^ note that size is a property
 
 # --- REDONE AFTER THIS POINT ---
-# TODO: cleanup
 
 val fact_memo : Nat -> <?> Natural # What effect? Heap?
 let fact_memo =

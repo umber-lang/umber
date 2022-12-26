@@ -267,15 +267,9 @@ end = struct
     | _ ->
       let name =
         try Name_bindings.absolutify_value_name t.name_bindings name with
-        | Name_bindings.Name_error error ->
-          (* FIXME: Cleanup *)
-          if String.is_substring (Ustring.to_string error) ~substring:"List.Cons"
-          then
-            raise_s
-              [%message
-                "name error absolutifying value name"
-                  (error : Ustring.t)
-                  (t.name_bindings : Name_bindings.t)];
+        | Name_bindings.Name_error _ ->
+          (* This is a name for a variable local to an expression (these aren't in the
+             name bindings). *)
           Name_bindings.(current_path t.name_bindings |> Path.to_module_path), snd name
       in
       find t name
@@ -308,8 +302,6 @@ end = struct
   let with_find_observer t ~f = { t with find_observer = f t.find_observer }
 
   let of_name_bindings name_bindings =
-    (* FIXME: We add all these names, but then still allow looking them up from the name
-       bindings later. I don't think this makes sense. *)
     let t =
       { names = Value_name.Qualified.Map.empty
       ; name_bindings

@@ -57,7 +57,7 @@ let run_tests () =
     let llvm_file = concat_current "llvm" out_filename in
     let output_file = concat_current "output" out_filename in
     let tmp_exe_file = Filename_unix.temp_file ("umber_test." ^ filename) "" in
-    List.iter [ tokens_file; ast_file; mir_file; llvm_file ] ~f:(fun file ->
+    List.iter [ tokens_file; ast_file; mir_file; llvm_file; output_file ] ~f:(fun file ->
       (* Touch each file so that we always end up with at least an empty for every target,
          even if we error out on an earlier case or otherwise don't generate some outputs. *)
       Out_channel.write_all file ~data:"");
