@@ -70,15 +70,15 @@ module Expr = struct
     | Retry typ -> map typ ~f ~var ~pf
     | Defer typ ->
       (match typ with
-      | Var v -> Var (var v)
-      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var ~pf))
-      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf))
-      | Function (args, body) ->
-        let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
-        Function (args, map ~f ~var ~pf body)
-      | Partial_function (args, v) ->
-        let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
-        Partial_function (args, pf v))
+       | Var v -> Var (var v)
+       | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var ~pf))
+       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf))
+       | Function (args, body) ->
+         let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
+         Function (args, map ~f ~var ~pf body)
+       | Partial_function (args, v) ->
+         let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
+         Partial_function (args, pf v))
   ;;
 
   let rec fold_until typ ~init ~f =
@@ -86,16 +86,16 @@ module Expr = struct
     | Stop _ as stop -> stop
     | Continue init as continue ->
       (match typ with
-      | Var _ -> continue
-      | Type_app (_, fields) | Tuple fields ->
-        List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
-      | Function (args, body) ->
-        let%bind.Fold_action init =
-          Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
-        in
-        fold_until body ~init ~f
-      | Partial_function (args, _) ->
-        Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f))
+       | Var _ -> continue
+       | Type_app (_, fields) | Tuple fields ->
+         List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
+       | Function (args, body) ->
+         let%bind.Fold_action init =
+           Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
+         in
+         fold_until body ~init ~f
+       | Partial_function (args, _) ->
+         Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f))
   ;;
 
   let fold_vars typ ~init ~f =
@@ -143,9 +143,10 @@ module Scheme = struct
     Expr.map
       typ
       ~var:(Param.Env_to_vars.find_or_add params)
-      ~f:(function
-        | Type_app (name, args) -> Defer (Expr.Type_app (map_name name, args))
-        | typ -> Defer typ)
+      ~f:
+        (function
+         | Type_app (name, args) -> Defer (Expr.Type_app (map_name name, args))
+         | typ -> Defer typ)
       ~pf:Nothing.unreachable_code
   ;;
 

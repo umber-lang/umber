@@ -1,7 +1,9 @@
 open Import
 
 let parse_module module_string =
-  Llvm_irreader.parse_ir (Llvm.create_context ()) (Llvm.MemoryBuffer.of_string module_string)
+  Llvm_irreader.parse_ir
+    (Llvm.create_context ())
+    (Llvm.MemoryBuffer.of_string module_string)
 ;;
 
 let target_machine =

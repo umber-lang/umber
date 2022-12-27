@@ -209,9 +209,9 @@ let get_indent t lexbuf =
   in
   let size, typ = loop lexbuf in
   (match t.indent_type, typ with
-  | Spaces, Tabs | Tabs, Spaces -> syntax_error ~msg:"Mixing spaces and tabs" lexbuf
-  | Unknown, _ -> t.indent_type <- typ
-  | _ -> ());
+   | Spaces, Tabs | Tabs, Spaces -> syntax_error ~msg:"Mixing spaces and tabs" lexbuf
+   | Unknown, _ -> t.indent_type <- typ
+   | _ -> ());
   size
 ;;
 
@@ -260,16 +260,16 @@ let read =
         read_after_indent t lexbuf
       | _ ->
         (match t.lex_state with
-        | Start_of_file -> read_after_indent t lexbuf
-        | _ ->
-          (match%sedlex lexbuf with
-          | '#' ->
-            rollback lexbuf;
-            read_after_indent t lexbuf
-          | '=', Star inline_space, Plus line_sep -> EQUALS_ONLY_LINE
-          | _ ->
-            t.lex_state <- After_indent;
-            LINE_SEP)))
+         | Start_of_file -> read_after_indent t lexbuf
+         | _ ->
+           (match%sedlex lexbuf with
+            | '#' ->
+              rollback lexbuf;
+              read_after_indent t lexbuf
+            | '=', Star inline_space, Plus line_sep -> EQUALS_ONLY_LINE
+            | _ ->
+              t.lex_state <- After_indent;
+              LINE_SEP)))
   and read_after_indent t lexbuf =
     (* [read_after_indent] handles block comments (which can be only preceeded
        by whitespace on the same line) *)
@@ -373,18 +373,18 @@ let read =
     | Chars ")]}" ->
       let actual = lexeme_str lexbuf in
       (match Stack.pop t.brackets with
-      | Some bracket_type ->
-        let expected = Bracket_type.to_char_right bracket_type in
-        if String.(of_char expected = actual)
-        then (
-          if Stack.is_empty t.brackets then t.ignoring_indents <- false;
-          Bracket_type.to_token_right bracket_type)
-        else (
-          let msg =
-            sprintf "Mismatched brackets: expected `%c` but got `%s`" expected actual
-          in
-          syntax_error lexbuf ~msg)
-      | None -> syntax_error ~msg:(sprintf "Unexpected `%s`" actual) lexbuf)
+       | Some bracket_type ->
+         let expected = Bracket_type.to_char_right bracket_type in
+         if String.(of_char expected = actual)
+         then (
+           if Stack.is_empty t.brackets then t.ignoring_indents <- false;
+           Bracket_type.to_token_right bracket_type)
+         else (
+           let msg =
+             sprintf "Mismatched brackets: expected `%c` but got `%s`" expected actual
+           in
+           syntax_error lexbuf ~msg)
+       | None -> syntax_error ~msg:(sprintf "Unexpected `%s`" actual) lexbuf)
     (* Names *)
     | lowercase, Star (digit | alphabetic | '\'' | '_') -> LOWER_NAME (lexeme lexbuf)
     | '_', Plus (digit | alphabetic | '\'' | '_') -> LOWER_NAME (lexeme lexbuf)
@@ -407,8 +407,8 @@ let read =
         | Start_of_file | Before_indent ->
           let token = read_before_indent t lexbuf in
           (match t.lex_state with
-          | Start_of_file | Before_indent -> t.lex_state <- Inline
-          | _ -> ());
+           | Start_of_file | Before_indent -> t.lex_state <- Inline
+           | _ -> ());
           token
         | After_indent ->
           t.lex_state <- Inline;
@@ -468,9 +468,9 @@ let read =
     | (INDENT | DEDENT | LINE_SEP) when t.ignoring_indents -> read t lexbuf
     | token ->
       (match token with
-      | EQUALS | COLON | ARROW -> t.ignoring_indents <- false
-      | COMMA -> t.ignoring_indents <- true
-      | _ -> ());
+       | EQUALS | COLON | ARROW -> t.ignoring_indents <- false
+       | COMMA -> t.ignoring_indents <- true
+       | _ -> ());
       handle token
   in
   read

@@ -302,7 +302,6 @@ let core =
   }
 ;;
 
-
 let merge_no_shadow t1 t2 =
   let err to_ustring ~key:name = name_error_msg "Name clash" (to_ustring name) in
   { names = Map.merge_skewed t1.names t2.names ~combine:(err Value_name.to_ustring)
