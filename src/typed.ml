@@ -415,16 +415,47 @@ module Module = struct
         - Need to re-order and re-group bindings by their dependencies
         - After re-ordering, type each expression and generalize each binding group *)
 
-  module Sig_data = struct
-    type t =
-      { type_decls : Untyped.Module.def Node.t Type_name.Map.t
-      ; fixities : Fixity.t Value_name.Map.t
-      }
+  module Sig_data : sig
+    (** Represents data from a module signature that might want to be copied to its
+        definition. Currently we only copy type definitions, but you could imagine copying
+        more things like fixities from val/extern declarations, or just the whole
+        val/extern declaration. If we were to implicitly copy mmore, we would have to
+        think about the interaction with sig/def diffs and error messages. Keeping sigs
+        and defs mostly separate is simpler to think about. *)
+    type t
+
+    val empty : t
+    val add_type_decl : t -> type_name:Type_name.t -> def:Untyped.Module.def Node.t -> t
+    val remove_type_decl : t -> Type_name.t -> t
+
+    val fold_defs
+      :  t
+      -> init:'acc
+      -> f:('acc -> Untyped.Module.def Node.t -> 'acc)
+      -> 'acc
+  end = struct
+    type t = { type_decls : Untyped.Module.def Node.t Type_name.Map.t }
     [@@deriving fields]
 
-    let empty = { type_decls = Type_name.Map.empty; fixities = Value_name.Map.empty }
-    let map_type_decls t ~f = { t with type_decls = f t.type_decls }
-    let map_fixities t ~f = { t with fixities = f t.fixities }
+    let empty = { type_decls = Type_name.Map.empty }
+
+    let add_internal map ~key ~data =
+      match Map.add map ~key ~data with
+      | `Ok map -> map
+      | `Duplicate -> compiler_bug [%message "Sig_data.add: duplicate value"]
+    ;;
+
+    let add_type_decl { type_decls } ~type_name ~def =
+      { type_decls = add_internal type_decls ~key:type_name ~data:def }
+    ;;
+
+    let remove_type_decl { type_decls } type_name =
+      { type_decls = Map.remove type_decls type_name }
+    ;;
+
+    let fold_defs { type_decls } ~init ~f =
+      Map.fold type_decls ~init ~f:(fun ~key:_ ~data:def acc -> f acc def)
+    ;;
   end
 
   let copy_some_sigs_to_defs sigs defs =
@@ -436,28 +467,24 @@ module Module = struct
         | Common_sig common ->
           (match common with
            | Type_decl (type_name, _) ->
-             let data = { sig_ with node = Common_def common } in
-             (* TODO: won't these [Map.add_exn]s raise from duplicate vals in the sig? 
-               We should be raising a proper compile error instead *)
-             Nested_map.map
-               sig_map
-               ~f:(Sig_data.map_type_decls ~f:(Map.add_exn ~key:type_name ~data))
+             let def = { sig_ with node = Common_def common } in
+             Nested_map.map sig_map ~f:(Sig_data.add_type_decl ~type_name ~def)
            | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-           | Val (value_name, Some fixity, _) | Extern (value_name, Some fixity, _, _) ->
-             Nested_map.map
-               sig_map
-               ~f:(Sig_data.map_fixities ~f:(Map.add_exn ~key:value_name ~data:fixity))
-           (* FIXME: Copy Val and Extern correctly here. I don't think it's intended
-              that they're in the catch-all case. *)
-           | Val (_, None, _)
-           | Extern (_, None, _, _)
-           (* TODO: handle imports bringing in type declarations to copy over (?) *)
-           | Import _ | Import_with _ | Import_without _ -> sig_map)
+           | Val _
+           | Extern _
+           (* We could consider handling imports bringing in type declarations to copy
+              over, but the cost-benefit of this feature isn't clear right now. *)
+           | Import _
+           | Import_with _
+           | Import_without _ -> sig_map)
         | Module_sig (module_name, sigs) ->
           Nested_map.with_module sig_map module_name ~f:(fun sig_map ->
             gather_decls ~sig_map:(Option.value sig_map ~default:empty_sig_map) sigs))
     in
     let rec copy_to_defs ~sig_map defs =
+      (* We want to add missing information from the sig to the def e.g. type declarations.
+         This is done by removing matching entries from [sig_map] when found, then adding
+         the remaining ones at the end. *)
       let sig_map, defs =
         List.fold_map
           defs
@@ -470,24 +497,11 @@ module Module = struct
                   | Type_decl (type_name, _) ->
                     ( Nested_map.map
                         sig_map
-                        ~f:(Sig_data.map_type_decls ~f:(Fn.flip Map.remove type_name))
+                        ~f:(Fn.flip Sig_data.remove_type_decl type_name)
                     , def )
                   | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-                  | Val (value_name, None, typ) ->
-                    (* Merge the fixity from the sig *)
-                    let fixity =
-                      Map.find (Nested_map.current sig_map).fixities value_name
-                    in
-                    sig_map, Common_def (Val (value_name, fixity, typ))
-                  | Extern (value_name, None, typ, extern_name) ->
-                    (* Merge the fixity from the sig *)
-                    let fixity =
-                      Map.find (Nested_map.current sig_map).fixities value_name
-                    in
-                    sig_map, Common_def (Extern (value_name, fixity, typ, extern_name))
-                  | Val (_, Some _, _)
-                  | Extern (_, Some _, _, _)
-                  | Import _ | Import_with _ | Import_without _ -> sig_map, def)
+                  | Val _ | Extern _ | Import _ | Import_with _ | Import_without _ ->
+                    sig_map, def)
                | Module (module_name, sigs, defs) ->
                  (match Nested_map.find_module sig_map module_name with
                   | Some child_map ->
@@ -504,10 +518,8 @@ module Module = struct
                | Let _ | Impl _ -> sig_map, def))
       in
       let defs =
-        Map.fold
-          (Nested_map.current sig_map).type_decls
-          ~init:defs
-          ~f:(fun ~key:_ ~data:def defs -> def :: defs)
+        Sig_data.fold_defs (Nested_map.current sig_map) ~init:defs ~f:(fun defs def ->
+          def :: defs)
       in
       (* Copy over modules and try to populate them with declarations *)
       Nested_map.fold_modules
