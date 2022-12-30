@@ -9,12 +9,16 @@ module Pattern : sig
   val of_untyped_with_names
     :  names:Name_bindings.t
     -> types:Type_bindings.t
+    -> name_table:Name_id.Table.t
+    -> in_expr:bool
     -> Untyped.Pattern.t
     -> Names.t * (t * Type.t)
 
   val of_untyped_into
     :  names:Name_bindings.t
     -> types:Type_bindings.t
+    -> name_table:Name_id.Table.t
+    -> in_expr:bool
     -> Untyped.Pattern.t
     -> Name_bindings.t * (Names.t * (t * Type.t))
 end
@@ -40,6 +44,7 @@ module Expr : sig
   val of_untyped
     :  names:Name_bindings.t
     -> types:Type_bindings.t
+    -> name_table:Name_id.Table.t
     -> Untyped.Expr.t
     -> (Type.t * Pattern.Names.t) t * Type.t
 end

@@ -33,7 +33,8 @@ module Name_entry = struct
   (* TODO: Consider having this type be responsible for assigning/tracking unique names,
      rather than doing it in the MIR. *)
   type t =
-    { typ : Type_or_scheme.t
+    { name_id : Name_id.t
+    ; typ : Type_or_scheme.t
     ; type_source : Type_source.t [@default Val_declared] [@sexp_drop_default.equal]
     ; fixity : Fixity.t option [@sexp.option]
     ; extern_name : Extern_name.t option [@sexp.option]
@@ -52,16 +53,17 @@ module Name_entry = struct
     | Type _ -> None
   ;;
 
-  let val_declared ?fixity ?extern_name typ =
-    { type_source = Val_declared; typ = Scheme typ; fixity; extern_name }
+  let val_declared ?fixity ?extern_name name_id typ =
+    { name_id; type_source = Val_declared; typ = Scheme typ; fixity; extern_name }
   ;;
 
-  let let_inferred ?fixity ?extern_name typ =
-    { type_source = Let_inferred; typ = Type typ; fixity; extern_name }
+  let let_inferred ?fixity ?extern_name name_id typ =
+    { name_id; type_source = Let_inferred; typ = Type typ; fixity; extern_name }
   ;;
 
-  let placeholder =
-    { type_source = Placeholder
+  let placeholder name_id =
+    { name_id
+    ; type_source = Placeholder
     ; typ = Scheme (Var Type.Param.dummy)
     ; fixity = None
     ; extern_name = None
@@ -84,7 +86,8 @@ module Name_entry = struct
         entry', typ, entry
     in
     let pick getter = Option.first_some (getter preferred) (getter other) in
-    { typ
+    { name_id = entry.name_id
+    ; typ
     ; type_source = preferred.type_source
     ; fixity = pick fixity
     ; extern_name = pick extern_name
@@ -289,14 +292,14 @@ let core =
           List.fold
             Intrinsics.Bool.cnstrs
             ~init:empty_bindings.names
-            ~f:(fun names (cnstr_name, extern_name) ->
+            ~f:(fun names (cnstr_name, name_id) ->
             Map.set
               names
               ~key:(Value_name.of_cnstr_name cnstr_name)
               ~data:
                 (Local
                    (Name_entry.val_declared
-                      ~extern_name
+                      name_id
                       (Type.Concrete.cast Intrinsics.Bool.typ))))
       }
   }
@@ -575,7 +578,12 @@ let add_val_or_extern
             Local
               (Name_entry.merge
                  existing_entry
-                 { type_source; typ = Scheme scheme; fixity; extern_name })
+                 { name_id = Name_id.dummy
+                 ; type_source
+                 ; typ = Scheme scheme
+                 ; fixity
+                 ; extern_name
+                 })
           | Some (Imported imported_name) ->
             (* TODO: consider allowing this use case
                e.g. importing from another module, and then giving that import a new,
@@ -605,7 +613,7 @@ let add_to_types ?(err_msg = "Type name clash") types name decl =
     | Some _ -> name_error_msg err_msg (Type_name.to_ustring name))
 ;;
 
-let add_type_decl ({ current_path; _ } as t) type_name decl =
+let add_type_decl ({ current_path; _ } as t) type_name decl ~name_table =
   let f bindings =
     if not (Type.Decl.no_free_params decl)
     then raise (Name_error (Ustring.of_string_exn "Free params in type decl"));
@@ -627,8 +635,15 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
              Type_app ((path, type_name), params)
            in
            List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
+             let name_id =
+               Name_id.create_value_name
+                 name_table
+                 (Path.to_module_path t.current_path, Value_name.of_cnstr_name cnstr_name)
+                 ~in_expr:false
+             in
              let entry =
                Name_entry.val_declared
+                 name_id
                  (match Nonempty.of_list args with
                   | Some args -> Function (args, result_type)
                   | None -> result_type)
@@ -646,7 +661,8 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
 let set_inferred_scheme t name scheme =
   let f bindings =
     let inferred_entry =
-      { Name_entry.type_source = Let_inferred
+      { name_id = Name_id.dummy
+      ; Name_entry.type_source = Let_inferred
       ; typ = Scheme scheme
       ; fixity = None
       ; extern_name = None
@@ -670,12 +686,19 @@ let set_inferred_scheme t name scheme =
   update_current t ~f:{ f }
 ;;
 
-let add_name_placeholder t name =
+let add_name_placeholder t name ~name_table =
   let f bindings =
     { bindings with
       names =
         Map.update bindings.names name ~f:(function
-          | None -> Local Name_entry.placeholder
+          | None ->
+            let name_id =
+              Name_id.create_value_name
+                name_table
+                (Path.to_module_path t.current_path, name)
+                ~in_expr:false
+            in
+            Local (Name_entry.placeholder name_id)
           | Some (Local { Name_entry.type_source = Let_inferred; _ } as entry) -> entry
           | _ -> name_error_msg "Duplicate name" (Value_name.to_ustring name))
     }

@@ -10,9 +10,12 @@ module Pattern = struct
 
   (* TODO: either split up Untyped/Typed patterns into different types or stop returning
      a pattern from these functions *)
-  let of_untyped_with_names ~names ~types (pat : Untyped.Pattern.t)
+  let of_untyped_with_names ~names ~types ~name_table ~in_expr (pat : Untyped.Pattern.t)
     : Names.t * (t * Type.t)
     =
+    let current_path =
+      Name_bindings.current_path names |> Name_bindings.Path.to_module_path
+    in
     let rec of_untyped_with_names ~names ~types pat_names
       : Untyped.Pattern.t -> Names.t * (t * Type.t)
       = function
@@ -20,7 +23,8 @@ module Pattern = struct
       | Catch_all name ->
         let pat_names, typ =
           match name with
-          | Some name -> Pattern.Names.add_fresh_name pat_names name
+          | Some name ->
+            Pattern.Names.add_fresh_name pat_names name ~name_table ~current_path ~in_expr
           | None -> pat_names, Type.fresh_var ()
         in
         pat_names, (Catch_all name, typ)
@@ -90,22 +94,29 @@ module Pattern = struct
         in
         Type_bindings.unify ~names ~types typ1 typ2;
         (* Unions must define the same names with the same types *)
-        if not
-             (Map.equal
-                (fun entry1 entry2 ->
-                  Type_bindings.unify
-                    ~names
-                    ~types
-                    (Name_bindings.Name_entry.typ entry1)
-                    (Name_bindings.Name_entry.typ entry2);
-                  true)
-                pat_names1
-                pat_names2)
-        then type_error_msg "Pattern unions must define the same names";
+        Pattern.Names.fold_name_diff
+          pat_names1
+          pat_names2
+          ~init:()
+          ~f:(fun () name diff ->
+          match diff with
+          | `Left | `Right ->
+            let name = Value_name.to_ustring name in
+            type_error_msg
+              [%string
+                "Variable %{name#Ustring} must appear on both sides of this | pattern"]
+          | `Both (entry1, entry2) ->
+            Type_bindings.unify
+              ~names
+              ~types
+              (Name_bindings.Name_entry.typ entry1)
+              (Name_bindings.Name_entry.typ entry2));
         pat_names1, (Union (pat1, pat2), typ1)
       | As (pat, name) ->
         let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
-        let pat_names = Pattern.Names.add_name pat_names name typ in
+        let pat_names =
+          Pattern.Names.add_name pat_names name typ ~name_table ~current_path ~in_expr
+        in
         pat_names, (As (pat, name), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
@@ -117,23 +128,26 @@ module Pattern = struct
         Type_bindings.unify ~names ~types typ1 typ2;
         pat_names, (pat, typ2)
     in
-    let pat_names, (pat, typ) =
-      of_untyped_with_names ~names ~types Value_name.Map.empty pat
-    in
+    let pat_names, (pat, typ) = of_untyped_with_names ~names ~types Names.empty pat in
     pat_names, (pat, Type_bindings.substitute types typ)
   ;;
 
-  let of_untyped_into ~names ~types pattern =
-    let ((pat_names, _) as pat) = of_untyped_with_names ~names ~types pattern in
+  let of_untyped_into ~names ~types ~name_table ~in_expr pattern =
+    let ((pat_names, _) as pat) =
+      of_untyped_with_names ~names ~types ~name_table pattern ~in_expr
+    in
     let names =
-      Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
+      Name_bindings.merge_names
+        names
+        (Names.to_map pat_names)
+        ~combine:(fun _ _ new_entry -> new_entry)
     in
     names, pat
   ;;
 
   let generalize ~names ~types pat_names typ =
     let names =
-      Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
+      Pattern.Names.fold pat_names ~init:names ~f:(fun names name entry ->
         Name_bindings.Name_entry.typ entry
         |> Type_bindings.generalize types
         |> Name_bindings.set_inferred_scheme names name)
@@ -159,7 +173,7 @@ module Expr = struct
   type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp_of]
 
   let of_untyped, type_recursive_let_bindings =
-    let rec of_untyped ~names ~types ~f_name expr =
+    let rec of_untyped ~names ~types ~name_table ~f_name expr =
       match (expr : Untyped.Expr.t) with
       | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit)
       | Name name ->
@@ -167,12 +181,17 @@ module Expr = struct
         f_name name name_entry;
         Name name, Name_bindings.Name_entry.typ name_entry
       | Qualified (path, expr) ->
-        of_untyped ~names:(Name_bindings.import_all names path) ~types ~f_name expr
+        of_untyped
+          ~names:(Name_bindings.import_all names path)
+          ~types
+          ~name_table
+          ~f_name
+          expr
       | Fun_call (fun_, args) ->
-        let fun_, fun_type = of_untyped ~names ~types ~f_name fun_ in
+        let fun_, fun_type = of_untyped ~names ~types ~name_table ~f_name fun_ in
         let args =
           Nonempty.map args ~f:(fun arg ->
-            let arg, arg_type = of_untyped ~names ~types ~f_name arg in
+            let arg, arg_type = of_untyped ~names ~types ~name_table ~f_name arg in
             arg, (arg_type, Pattern.Names.empty))
         in
         let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
@@ -184,22 +203,25 @@ module Expr = struct
           (Partial_function (arg_types, result_var));
         Fun_call (fun_, args), Var result_var
       | Op_tree tree ->
-        of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
+        of_untyped ~names ~types ~name_table ~f_name (Op_tree.to_untyped_expr ~names tree)
       | Lambda (args, body) ->
         let names, args_and_types =
           Nonempty.fold_map args ~init:names ~f:(fun names arg ->
-            let names, (_, (arg, arg_type)) = Pattern.of_untyped_into ~names ~types arg in
+            let names, (_, (arg, arg_type)) =
+              Pattern.of_untyped_into ~names ~types ~name_table arg ~in_expr:true
+            in
             names, (arg, arg_type))
         in
         let args, arg_types = Nonempty.unzip args_and_types in
-        let body, body_type = of_untyped ~names ~types ~f_name body in
+        let body, body_type = of_untyped ~names ~types ~name_table ~f_name body in
         Lambda (args, body), Function (arg_types, body_type)
       | If (cond, then_, else_) ->
-        let cond, cond_type = of_untyped ~names ~types ~f_name cond in
+        let cond, cond_type = of_untyped ~names ~types ~name_table ~f_name cond in
         let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
         Type_bindings.unify ~names ~types cond_type bool_type;
         let (then_, then_type), (else_, else_type) =
-          of_untyped ~names ~types ~f_name then_, of_untyped ~names ~types ~f_name else_
+          ( of_untyped ~names ~types ~name_table ~f_name then_
+          , of_untyped ~names ~types ~name_table ~f_name else_ )
         in
         Type_bindings.unify ~names ~types then_type else_type;
         (* TODO: should really be referring to Bool as a primitive of some kind since
@@ -213,12 +235,16 @@ module Expr = struct
             )
         , then_type )
       | Match (expr, branches) ->
-        let expr, expr_type = of_untyped ~names ~types ~f_name expr in
+        let expr, expr_type = of_untyped ~names ~types ~name_table ~f_name expr in
         let branches, branch_type :: rest =
           Nonempty.map branches ~f:(fun (pat, branch) ->
-            let names, (_, (pat, pat_typ)) = Pattern.of_untyped_into ~names ~types pat in
+            let names, (_, (pat, pat_typ)) =
+              Pattern.of_untyped_into ~names ~name_table ~types pat ~in_expr:true
+            in
             Type_bindings.unify ~names ~types expr_type pat_typ;
-            let branch, branch_type = of_untyped ~names ~types ~f_name branch in
+            let branch, branch_type =
+              of_untyped ~names ~types ~name_table ~f_name branch
+            in
             (pat, branch), branch_type)
           |> Nonempty.unzip
         in
@@ -231,29 +257,29 @@ module Expr = struct
             let names, bindings =
               Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
                 let names, (pat_names, (pat, pat_type)) =
-                  Pattern.of_untyped_into ~names ~types pat
+                  Pattern.of_untyped_into ~names ~types ~name_table pat ~in_expr:true
                 in
                 names, ((pat, (pat_type, pat_names)), expr))
             in
-            type_recursive_let_bindings ~names ~types ~f_name bindings)
+            type_recursive_let_bindings ~names ~types ~name_table ~f_name bindings)
           else (
             (* Process bindings in order without any recursion *)
             let names, bindings =
               Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
                 let names, (pat_names, (pat, pat_type)) =
-                  Pattern.of_untyped_into ~names ~types pat
+                  Pattern.of_untyped_into ~names ~types ~name_table pat ~in_expr:true
                 in
-                let expr, expr_type = of_untyped ~names ~types ~f_name expr in
+                let expr, expr_type = of_untyped ~names ~types ~name_table ~f_name expr in
                 Type_bindings.unify ~names ~types pat_type expr_type;
                 names, ((pat, (pat_type, pat_names)), expr))
             in
             names, false, bindings)
         in
-        let body, body_type = of_untyped ~names ~types ~f_name body in
+        let body, body_type = of_untyped ~names ~types ~name_table ~f_name body in
         Let { rec_; bindings; body }, body_type
       | Tuple items ->
         let items, types =
-          List.map items ~f:(of_untyped ~names ~types ~f_name) |> List.unzip
+          List.map items ~f:(of_untyped ~names ~types ~name_table ~f_name) |> List.unzip
         in
         Tuple items, Tuple types
       | Seq_literal _items -> failwith "TODO: seq"
@@ -266,10 +292,10 @@ module Expr = struct
             ~map_name:(Name_bindings.absolutify_type_name names)
             typ
         in
-        let expr, t2 = of_untyped ~names ~types ~f_name expr in
+        let expr, t2 = of_untyped ~names ~types ~name_table ~f_name expr in
         Type_bindings.unify ~names ~types t1 t2;
         expr, t1
-    and type_recursive_let_bindings ~names ~types ~f_name bindings =
+    and type_recursive_let_bindings ~names ~types ~name_table ~f_name bindings =
       let all_bound_names =
         Nonempty.fold
           bindings
@@ -295,15 +321,15 @@ module Expr = struct
       in
       let bindings =
         Nonempty.map bindings ~f:(fun (((_, (pat_type, _)) as pat), expr) ->
-          let expr, expr_type = of_untyped expr ~f_name ~names ~types in
+          let expr, expr_type = of_untyped expr ~f_name ~names ~types ~name_table in
           Type_bindings.unify ~names ~types pat_type expr_type;
           pat, expr)
       in
       let rec_ = !used_a_bound_name in
       names, rec_, bindings
     in
-    let of_untyped ~names ~types expr =
-      of_untyped ~names ~types ~f_name:(fun _ _ -> ()) expr
+    let of_untyped ~names ~types ~name_table expr =
+      of_untyped ~names ~types ~name_table ~f_name:(fun _ _ -> ()) expr
       |> Tuple2.map_snd ~f:(Type_bindings.substitute types)
     in
     of_untyped, type_recursive_let_bindings ~f_name:(fun _ _ -> ())
@@ -535,12 +561,15 @@ module Module = struct
 
   (** Gather placeholders for all declared names and types.
       (Needed for imports of submodules to work.) *)
-  let rec gather_name_placeholders ~names module_name sigs defs =
+  let rec gather_name_placeholders ~names ~name_table module_name sigs defs =
     let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
-        Name_bindings.add_name_placeholder names name
+        Name_bindings.add_name_placeholder names name ~name_table
       | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
+    in
+    let current_path =
+      Name_bindings.current_path names |> Name_bindings.Path.to_module_path
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
       match def.node with
@@ -549,14 +578,15 @@ module Module = struct
         Nonempty.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
           Name_bindings.merge_names
             names
-            (Pattern.Names.gather pat)
+            (Pattern.Names.gather pat ~name_table ~current_path ~in_expr:false
+            |> Pattern.Names.to_map)
             ~combine:(fun name entry entry' ->
-            match Name_bindings.Name_entry.type_source entry with
-            | Placeholder -> entry'
-            | Let_inferred | Val_declared | Extern_declared ->
-              Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)))
+              match Name_bindings.Name_entry.type_source entry with
+              | Placeholder -> entry'
+              | Let_inferred | Val_declared | Extern_declared ->
+                Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)))
       | Module (module_name, sigs, defs) ->
-        gather_name_placeholders ~names module_name sigs defs
+        gather_name_placeholders ~names ~name_table module_name sigs defs
       | Common_def common -> f_common names common
       | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)")
   ;;
@@ -565,12 +595,13 @@ module Module = struct
   (* TODO: figure out import shadowing semantics - basically, probably ban shadowing *)
 
   (** Gather all imported names and local type/trait declarations. *)
-  let gather_imports_and_type_decls ~names sigs defs =
+  let gather_imports_and_type_decls ~names ~name_table sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Import module_name -> Name_bindings.import names module_name
       | Import_with (path, imports) -> Name_bindings.import_with names path imports
       | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
-      | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
+      | Type_decl (type_name, decl) ->
+        Name_bindings.add_type_decl names type_name decl ~name_table
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ -> names)
   ;;
@@ -615,7 +646,7 @@ module Module = struct
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
       variables. *)
-  let rec handle_value_bindings ~names ~types module_name sigs defs
+  let rec handle_value_bindings ~names ~types ~name_table module_name sigs defs
     : Name_bindings.t * intermediate_def Node.t list
     =
     let handle_common ~names = function
@@ -645,10 +676,15 @@ module Module = struct
     let handle_bindings ~names =
       Nonempty.fold_map ~init:names ~f:(fun binding ->
         Node.fold_map binding ~f:(fun names (pat, expr) ->
-          let pat_names, pat = Pattern.of_untyped_with_names ~names ~types pat in
+          let pat_names, pat =
+            Pattern.of_untyped_with_names ~names ~types ~name_table pat ~in_expr:false
+          in
           let names =
             (* Unify pattern bindings with local type information (e.g. val declarations) *)
-            Name_bindings.merge_names names pat_names ~combine:(fun _ entry entry' ->
+            Name_bindings.merge_names
+              names
+              (Pattern.Names.to_map pat_names)
+              ~combine:(fun _ entry entry' ->
               let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
               Type_bindings.unify ~names ~types typ typ';
               Name_bindings.Name_entry.merge entry entry')
@@ -663,13 +699,13 @@ module Module = struct
             handle_bindings ~names bindings
             |> Tuple2.map_snd ~f:(fun bindings -> Let { rec_; bindings })
           | Module (module_name, sigs, defs) ->
-            let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
+            let names, defs =
+              handle_value_bindings ~names ~types ~name_table module_name sigs defs
+            in
             names, Module (module_name, sigs, defs)
           | Common_def common as def -> handle_common ~names common, def
           | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls")))
   ;;
-
-  (* TODO: add type annotations to these functions *)
 
   (** Re-group and re-order toplevel let bindings so that each group is mutually
       recursive, and the groups are given in an order appropriate for generalization.
@@ -690,7 +726,7 @@ module Module = struct
             ~init:bindings
             ~f:(fun { Node.node = ((_, (_, pat_names)) as pat), expr; span } bindings ->
             let current_path = Name_bindings.current_path names in
-            let bound_names = Map.key_set pat_names in
+            let bound_names = Pattern.Names.name_set pat_names in
             let used_names = Untyped.Expr.names_used ~names expr in
             ( { Call_graph.Binding.bound_names; used_names; info = pat, expr, span }
             , current_path )
@@ -711,7 +747,7 @@ module Module = struct
     other_defs, binding_groups
   ;;
 
-  let type_binding_group ~names ~types bindings =
+  let type_binding_group ~names ~types ~name_table bindings =
     (* Order bindings in the group by span, then take the first span to represent the
        whole group. This is done to get a consistent ordering among bindings. *)
     let get_span { Call_graph.Binding.info = _, _, span; _ } = span in
@@ -729,7 +765,7 @@ module Module = struct
     let bindings = Nonempty.of_list_exn bindings in
     let spans = Nonempty.of_list_exn spans in
     let (_ : Name_bindings.t), rec_, bindings =
-      Expr.type_recursive_let_bindings ~names ~types bindings
+      Expr.type_recursive_let_bindings ~names ~types ~name_table bindings
     in
     Nonempty.fold_map
       (Nonempty.zip_exn bindings spans)
@@ -780,7 +816,12 @@ module Module = struct
       Performs let-generalization on free variables in let statement bindings.
       (Let-generalization is not currently done for local let bindings within expressions.)
       This is the final step in the type checking process. *)
-  let type_defs ~names ~types module_name (defs : intermediate_def Node.t list)
+  let type_defs
+    ~names
+    ~types
+    ~name_table
+    module_name
+    (defs : intermediate_def Node.t list)
     : Name_bindings.t * def Node.t list
     =
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
@@ -793,7 +834,7 @@ module Module = struct
               surely wrong.
               - It also doesn't handle sigs/defs properly - it needs to know the original bindings_path *)
              Name_bindings.with_path names path ~f:(fun names ->
-               let names, def = type_binding_group ~names ~types bindings in
+               let names, def = type_binding_group ~names ~types ~name_table bindings in
                names, (def, path)))
       in
       let path = Name_bindings.current_path names in
@@ -803,10 +844,15 @@ module Module = struct
   let of_untyped ~names ~types (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
-      let names = gather_name_placeholders ~names module_name sigs defs in
-      let names = gather_imports_and_type_decls ~names module_name sigs defs in
-      let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
-      let names, defs = type_defs ~names ~types module_name defs in
+      let name_table = Name_id.Table.create () in
+      let names = gather_name_placeholders ~names ~name_table module_name sigs defs in
+      let names =
+        gather_imports_and_type_decls ~names ~name_table module_name sigs defs
+      in
+      let names, defs =
+        handle_value_bindings ~names ~types ~name_table module_name sigs defs
+      in
+      let names, defs = type_defs ~names ~types ~name_table module_name defs in
       (* TODO: should check every [Val] has a corresponding [Let]. *)
       Sig_def_diff.create ~names module_name |> Sig_def_diff.raise_if_nonempty;
       Ok (names, (module_name, sigs, defs))

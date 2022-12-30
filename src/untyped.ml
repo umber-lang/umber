@@ -32,7 +32,7 @@ module Expr = struct
   (** Get all the external names referenced by an expression. Names local to the
       expression (e.g. those bound by match expressions or lambdas) are not included. *)
   let names_used ~names =
-    let add_locals init = Pattern.Names.fold ~init ~f:Set.add in
+    let add_locals init = Pattern.fold_names ~init ~f:Set.add in
     let rec loop ~names used locals = function
       | Literal _ -> used
       | Name ([], name) when Set.mem locals name -> used

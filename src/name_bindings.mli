@@ -13,12 +13,20 @@ module Name_entry : sig
 
   type t [@@deriving equal, sexp]
 
+  val name_id : t -> Name_id.t
   val typ : t -> Type.t
   val scheme : t -> Type.Scheme.t option
   val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
-  val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
+
+  val let_inferred
+    :  ?fixity:Fixity.t
+    -> ?extern_name:Extern_name.t
+    -> Name_id.t
+    -> Type.t
+    -> t
+
   val merge : t -> t -> t
 end
 
@@ -50,7 +58,7 @@ val find_type : t -> Value_name.Qualified.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Qualified.t -> Type.t
 val find_fixity : t -> Value_name.Qualified.t -> Fixity.t
 val set_inferred_scheme : t -> Value_name.t -> Type.Scheme.t -> t
-val add_name_placeholder : t -> Value_name.t -> t
+val add_name_placeholder : t -> Value_name.t -> name_table:Name_id.Table.t -> t
 val add_type_placeholder : t -> Type_name.t -> t
 
 (** Fold over all the local (non-imported) names bound. *)
@@ -120,7 +128,7 @@ val add_extern
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
-val add_type_decl : t -> Type_name.t -> Type.Decl.t -> t
+val add_type_decl : t -> Type_name.t -> Type.Decl.t -> name_table:Name_id.Table.t -> t
 
 module Sigs_or_defs : sig
   type name_bindings = t

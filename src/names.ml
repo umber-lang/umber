@@ -284,6 +284,82 @@ end = struct
   ;;
 end
 
+module Name_id : sig
+  type t [@@deriving sexp]
+
+  include Stringable.S with type t := t
+  include Comparable.S with type t := t
+  include Hashable.S with type t := t
+
+  val to_ustring : t -> Ustring.t
+
+  module Table : sig
+    (** A table assigning names to ids. One should be created and used for each file. *)
+    type t
+
+    val create : unit -> t
+  end
+
+  (** Create a name id given a name table and qualified value name. The name must be an
+      absolute path. *)
+  val create_value_name : Table.t -> Value_name.Qualified.t -> in_expr:bool -> t
+
+  (** Create a name id from an external name. External names have to be unique to link
+      properly, so it just taken verbatim. *)
+  val create_extern_name : Extern_name.t -> t
+
+  val dummy : t
+end = struct
+  (* FIXME: What about the sig/def distinction? I think that can maybe break uniqueness *)
+  (* The idea is that we keep track of each namespace (for values, types, etc.) and then
+     assign ids sequentially for duplicates. Duplicates can only occur when shadowing
+     names inside expressions, since the absolute path must uniquely refer to some
+     definition at the module level. *)
+
+  module T = struct
+    module U = struct
+      type t = Ustring.t * int [@@deriving compare, equal, hash]
+
+      let to_string (ustr, id) =
+        if id = 0 then Ustring.to_string ustr else [%string "%{ustr#Ustring}.%{id#Int}"]
+      ;;
+
+      let to_ustring (ustr, id) = Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
+
+      let of_string str =
+        match String.rsplit2 str ~on:'.' with
+        | Some (name, id) -> Ustring.of_string_exn name, Int.of_string id
+        | None -> Ustring.of_string_exn str, 0
+      ;;
+    end
+
+    include U
+    include Sexpable.Of_stringable (U)
+  end
+
+  include T
+  include Comparable.Make (T)
+  include Hashable.Make (T)
+
+  module Table = struct
+    type t = { value_names : int Value_name.Qualified.Table.t }
+
+    let create () = { value_names = Value_name.Qualified.Table.create () }
+  end
+
+  let create_value_name { Table.value_names } value_name ~in_expr =
+    let id =
+      if in_expr then Option.value (Hashtbl.find value_names value_name) ~default:0 else 0
+    in
+    Hashtbl.incr value_names value_name;
+    Value_name.Qualified.to_ustring value_name, id
+  ;;
+
+  let create_extern_name extern_name = Extern_name.to_ustring extern_name, 0
+  let dummy = Ustring.of_string_exn "<dummy name>", 0
+end
+
+(* FIXME: Have [Mir_name] use [Name_id] instead of [Unique_name] *)
 module Mir_name : sig
   type t [@@deriving compare, equal, hash, sexp]
 
@@ -295,7 +371,6 @@ module Mir_name : sig
   val of_extern_name : Extern_name.t -> t
   val extern_name : t -> Extern_name.t option
   val to_ustring : t -> Ustring.t
-  val to_string : t -> string
   val map_parts : t -> f:(Ustring.t -> int -> int) -> t
 end = struct
   module Unique_name = struct

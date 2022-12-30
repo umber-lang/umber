@@ -18,7 +18,7 @@ end
 module type Variants = sig
   include Type
 
-  val cnstrs : (Cnstr_name.t * Extern_name.t) list
+  val cnstrs : (Cnstr_name.t * Name_id.t) list
   val decl : Type.Decl.t
 end
 
@@ -32,7 +32,8 @@ end) : Variants = struct
   let cnstrs =
     List.map T.cnstrs ~f:(fun cnstr_name ->
       ( Cnstr_name.of_string_unchecked cnstr_name
-      , Extern_name.of_string_exn [%string "%%{String.uncapitalize cnstr_name}"] ))
+      , Name_id.create_extern_name
+          (Extern_name.of_string_exn [%string "%%{String.uncapitalize cnstr_name}"]) ))
   ;;
 
   let decl = [], Type.Decl.Variants (List.map cnstrs ~f:(fun (name, _) -> name, []))

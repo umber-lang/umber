@@ -336,6 +336,7 @@ end = struct
           then Local
           else fallback_to_external ()
         | Some extern_name ->
+          (* FIXME: Replace this by checking the name id *)
           (match Extern_name.to_ustring extern_name |> Ustring.to_string with
            | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
            | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
@@ -767,7 +768,7 @@ module Expr = struct
       Nonempty.fold_map bindings ~init:ctx ~f:(fun ctx_for_body binding ->
         let pattern, _, _ = extract_binding binding in
         let ctx_for_body, names_bound =
-          Pattern.Names.fold
+          Pattern.fold_names
             pattern
             ~init:(ctx_for_body, Mir_name.Set.empty)
             ~f:(fun (ctx_for_body, names_bound) name ->
