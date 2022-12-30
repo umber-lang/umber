@@ -316,31 +316,26 @@ end = struct
       ~init:t
       ~f:(fun t ((path, _) as name) entry ->
       let extern_name = Name_bindings.Name_entry.extern_name entry in
-      let fallback_to_external () : Extern_info.t =
-        let scheme =
-          Option.value_or_thunk
-            (Name_bindings.Name_entry.scheme entry)
-            ~default:(fun () ->
-            compiler_bug
-              [%message
-                "Didn't find type scheme for external name entry"
-                  (name : Value_name.Qualified.t)
-                  (entry : Name_bindings.Name_entry.t)])
-        in
-        External { arity = arity_of_type ~names:name_bindings scheme }
-      in
+      let name_id = Name_bindings.Name_entry.name_id entry in
       let extern_info : Extern_info.t =
-        match extern_name with
+        match Name_id.intrinsic_val name_id with
+        | Some False -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
+        | Some True -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
         | None ->
-          if Module_path.is_prefix ~prefix:current_path path
+          if Option.is_none extern_name && Module_path.is_prefix ~prefix:current_path path
           then Local
-          else fallback_to_external ()
-        | Some extern_name ->
-          (* FIXME: Replace this by checking the name id *)
-          (match Extern_name.to_ustring extern_name |> Ustring.to_string with
-           | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
-           | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
-           | _ -> fallback_to_external ())
+          else (
+            let scheme =
+              Option.value_or_thunk
+                (Name_bindings.Name_entry.scheme entry)
+                ~default:(fun () ->
+                compiler_bug
+                  [%message
+                    "Didn't find type scheme for external name entry"
+                      (name : Value_name.Qualified.t)
+                      (entry : Name_bindings.Name_entry.t)])
+            in
+            External { arity = arity_of_type ~names:name_bindings scheme })
       in
       fst (add t name ~extern_name ~extern_info))
   ;;

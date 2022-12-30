@@ -309,6 +309,17 @@ module Name_id : sig
   val create_extern_name : Extern_name.t -> t
 
   val dummy : t
+
+  module Intrinsic : sig
+    type t =
+      | False
+      | True
+
+    include Stringable.S with type t := t
+  end
+
+  val create_intrinsic : Intrinsic.t -> t
+  val intrinsic_val : t -> Intrinsic.t option
 end = struct
   (* FIXME: What about the sig/def distinction? I think that can maybe break uniqueness *)
   (* The idea is that we keep track of each namespace (for values, types, etc.) and then
@@ -357,6 +368,36 @@ end = struct
 
   let create_extern_name extern_name = Extern_name.to_ustring extern_name, 0
   let dummy = Ustring.of_string_exn "<dummy name>", 0
+
+  module Intrinsic = struct
+    type t =
+      | False
+      | True
+
+    let to_string = function
+      | False -> "%false"
+      | True -> "%true"
+    ;;
+
+    let of_string_opt = function
+      | "%false" -> Some False
+      | "%true" -> Some True
+      | _ -> None
+    ;;
+
+    let of_string name =
+      Option.value_or_thunk (of_string_opt name) ~default:(fun () ->
+        compiler_bug [%message "Invalid intrinsic name" (name : string)])
+    ;;
+  end
+
+  let create_intrinsic intrinsic =
+    Ustring.of_string_exn (Intrinsic.to_string intrinsic), 0
+  ;;
+
+  let intrinsic_val (ustr, id) =
+    if Int.( = ) id 0 then Intrinsic.of_string_opt (Ustring.to_string ustr) else None
+  ;;
 end
 
 (* FIXME: Have [Mir_name] use [Name_id] instead of [Unique_name] *)

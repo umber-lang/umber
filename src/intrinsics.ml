@@ -32,8 +32,8 @@ end) : Variants = struct
   let cnstrs =
     List.map T.cnstrs ~f:(fun cnstr_name ->
       ( Cnstr_name.of_string_unchecked cnstr_name
-      , Name_id.create_extern_name
-          (Extern_name.of_string_exn [%string "%%{String.uncapitalize cnstr_name}"]) ))
+      , Name_id.create_intrinsic
+          (Name_id.Intrinsic.of_string [%string "%%{String.uncapitalize cnstr_name}"]) ))
   ;;
 
   let decl = [], Type.Decl.Variants (List.map cnstrs ~f:(fun (name, _) -> name, []))

@@ -21,8 +21,8 @@ let names = {|
 ((current_path "Std(d)")
  (toplevel
   ((names
-    ((True (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %true))))
-     (False (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %false))))))
+    ((True (Local ((name_id %true) (typ (Scheme (Type_app Bool ()))))))
+     (False (Local ((name_id %false) (typ (Scheme (Type_app Bool ()))))))))
    (types
     ((Int ((Local (() Abstract))))
      (Bool ((Local (() (Variants ((False ()) (True ())))))))
@@ -58,18 +58,21 @@ let names = {|
                   (Cons (Imported Std.Prelude.List.Cons))
                   (sqrt
                    (Local
-                    ((typ
+                    ((name_id Std.Prelude.sqrt)
+                     (typ
                       (Scheme
                        (Function ((Type_app Int ())) (Type_app Float ())))))))
                   (print
                    (Local
-                    ((typ
+                    ((name_id Std.Prelude.print)
+                     (typ
                       (Scheme (Function ((Type_app String ())) (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_endline))))
                   (print_int
                    (Local
-                    ((typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
+                    ((name_id Std.Prelude.print_int)
+                     (typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_int))))))
                 (types ())
@@ -80,12 +83,14 @@ let names = {|
                      ((names
                        ((Nil
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.List.Nil)
+                           (typ
                             (Scheme
                              (Type_app Std.Prelude.List.List ((Var a))))))))
                         (Cons
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.List.Cons)
+                           (typ
                             (Scheme
                              (Function
                               ((Var a)
@@ -107,28 +112,32 @@ let names = {|
                      ((names
                        ((*
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.*)
+                           (typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
                               (Type_app Int ()))))
                            (fixity (Left 7)))))
                         (+
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.+)
+                           (typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
                               (Type_app Int ()))))
                            (fixity (Left 6)))))
                         (-
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.-)
+                           (typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
                               (Type_app Int ()))))
                            (fixity (Left 6)))))
                         (.
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators..)
+                           (typ
                             (Scheme
                              (Function
                               ((Function ((Var b)) (Var c))
@@ -137,37 +146,43 @@ let names = {|
                            (fixity (Right 9)))))
                         (";"
                          (Local
-                          ((typ
+                          ((name_id "Std.Prelude.Operators.;")
+                           (typ
                             (Scheme (Function ((Tuple ()) (Var a)) (Var a))))
                            (fixity (Left 0)))))
                         (<
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.<)
+                           (typ
                             (Scheme
                              (Function ((Var a) (Var a)) (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (>
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.>)
+                           (typ
                             (Scheme
                              (Function ((Var a) (Var a)) (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (^
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.^)
+                           (typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
                               (Type_app Int ()))))
                            (fixity (Right 8)))))
                         (!=
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.!=)
+                           (typ
                             (Scheme
                              (Function ((Var a) (Var a)) (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (&&
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.&&)
+                           (typ
                             (Scheme
                              (Function
                               ((Type_app Bool ()) (Type_app Bool ()))
@@ -175,7 +190,8 @@ let names = {|
                            (fixity (Left 3)))))
                         (::
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.::)
+                           (typ
                             (Scheme
                              (Function
                               ((Var a) (Type_app Std.Prelude.List ((Var a))))
@@ -183,32 +199,37 @@ let names = {|
                            (fixity (Right 5)))))
                         (<=
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.<=)
+                           (typ
                             (Scheme
                              (Function ((Var a) (Var a)) (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (==
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.==)
+                           (typ
                             (Scheme
                              (Function ((Var a) (Var a)) (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (>=
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.>=)
+                           (typ
                             (Scheme
                              (Function ((Var a) (Var a)) (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (|>
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.|>)
+                           (typ
                             (Scheme
                              (Function ((Var a) (Function ((Var a)) (Var b)))
                               (Var b))))
                            (fixity (Left 0)))))
                         (||
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.||)
+                           (typ
                             (Scheme
                              (Function
                               ((Type_app Bool ()) (Type_app Bool ()))
@@ -216,7 +237,8 @@ let names = {|
                            (fixity (Left 2)))))
                         (not
                          (Local
-                          ((typ
+                          ((name_id Std.Prelude.Operators.not)
+                           (typ
                             (Scheme
                              (Function ((Type_app Bool ()))
                               (Type_app Bool ())))))))))
@@ -241,20 +263,23 @@ let names = {|
                  (not (Imported Std.Prelude.Operators.not))
                  (sqrt
                   (Local
-                   ((typ
+                   ((name_id Std.Prelude.sqrt)
+                    (typ
                      (Scheme
                       (Function ((Type_app Int ())) (Type_app Float ()))))
                     (type_source Extern_declared)
                     (extern_name umber_int_sqrt))))
                  (print
                   (Local
-                   ((typ
+                   ((name_id Std.Prelude.print)
+                    (typ
                      (Scheme (Function ((Type_app String ())) (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_endline))))
                  (print_int
                   (Local
-                   ((typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
+                   ((name_id Std.Prelude.print_int)
+                    (typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_int))))))
                (types ())
@@ -265,12 +290,14 @@ let names = {|
                     ((names
                       ((Nil
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.List.Nil)
+                          (typ
                            (Scheme
                             (Type_app Std.Prelude.List.List ((Var a))))))))
                        (Cons
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.List.Cons)
+                          (typ
                            (Scheme
                             (Function
                              ((Var a)
@@ -292,7 +319,8 @@ let names = {|
                     ((names
                       ((*
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.*)
+                          (typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
@@ -300,7 +328,8 @@ let names = {|
                           (extern_name umber_int_mul))))
                        (+
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.+)
+                          (typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
@@ -308,7 +337,8 @@ let names = {|
                           (extern_name umber_int_add))))
                        (-
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.-)
+                          (typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
@@ -316,7 +346,8 @@ let names = {|
                           (extern_name umber_int_sub))))
                        (.
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude..)
+                          (typ
                            (Scheme
                             (Function
                              ((Function ((Var b)) (Var c))
@@ -325,26 +356,30 @@ let names = {|
                           (fixity (Right 9)))))
                        (";"
                         (Local
-                         ((typ
+                         ((name_id "Std.Prelude.;")
+                          (typ
                            (Scheme (Function ((Tuple ()) (Var a)) (Var a))))
                           (fixity (Left 0)))))
                        (<
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.<)
+                          (typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lt))))
                        (>
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.>)
+                          (typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gt))))
                        (^
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.^)
+                          (typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
                              (Type_app Int ()))))
@@ -352,21 +387,24 @@ let names = {|
                           (extern_name umber_int_pow))))
                        (!=
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.!=)
+                          (typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_neq))))
                        (&&
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.&&)
+                          (typ
                            (Scheme
                             (Function ((Type_app Bool ()) (Type_app Bool ()))
                              (Type_app Bool ()))))
                           (fixity (Left 3)))))
                        (::
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.::)
+                          (typ
                            (Scheme
                             (Function
                              ((Var a) (Type_app Std.Prelude.List ((Var a))))
@@ -374,42 +412,48 @@ let names = {|
                           (fixity (Right 5)))))
                        (<=
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.<=)
+                          (typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lte))))
                        (==
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.==)
+                          (typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_eq))))
                        (>=
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.Operators.>=)
+                          (typ
                            (Scheme
                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gte))))
                        (|>
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.|>)
+                          (typ
                            (Scheme
                             (Function ((Var a) (Function ((Var a)) (Var b)))
                              (Var b))))
                           (fixity (Left 0)))))
                        (||
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.||)
+                          (typ
                            (Scheme
                             (Function ((Type_app Bool ()) (Type_app Bool ()))
                              (Type_app Bool ()))))
                           (fixity (Left 2)))))
                        (not
                         (Local
-                         ((typ
+                         ((name_id Std.Prelude.not)
+                          (typ
                            (Scheme
                             (Function ((Type_app Bool ()))
                              (Type_app Bool ()))))
