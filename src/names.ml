@@ -338,9 +338,15 @@ end = struct
       let to_ustring (ustr, id) = Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
 
       let of_string str =
-        match String.rsplit2 str ~on:'.' with
-        | Some (name, id) -> Ustring.of_string_exn name, Int.of_string id
-        | None -> Ustring.of_string_exn str, 0
+        let name, id =
+          match String.rsplit2 str ~on:'.' with
+          | Some (name, id) ->
+            if (not (String.is_empty id)) && String.for_all ~f:Char.is_digit id
+            then name, Int.of_string id
+            else str, 0
+          | None -> str, 0
+        in
+        Ustring.of_string_exn name, id
       ;;
     end
 
