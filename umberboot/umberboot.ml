@@ -132,7 +132,7 @@ let with_tmpdir f =
   Exn.protectx ~f dir ~finally:(Shell.rm ~r:() ~f:())
 ;;
 
-let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_error =
+let compile_internal ~filename ~output ~no_std ~parent ~on_error =
   if Output.is_empty output then failwith "No output arguments supplied";
   let run_stage acc (variant : Stage.t Variant.t) ~f =
     Result.bind acc ~f:(fun acc ->
@@ -181,18 +181,22 @@ let compile_internal ~filename ~output ~no_std ~parent ~renumber_mir_ids ~on_err
              | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
              | None -> names
            in
+           let name_table = Ast.Name_id.Name_table.create () in
            let%map.Result names, ast =
-             Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast
+             Ast.Typed.Module.of_untyped
+               ~names
+               ~name_table
+               ~types:(Type_bindings.create ())
+               ast
            in
            maybe_output Typed_ast ~f:(fun out ->
              Parsing.fprint_s [%sexp (ast : Ast.Typed.Module.t)] ~out);
            maybe_output Names ~f:(fun out ->
              Parsing.fprint_s [%sexp (names : Name_bindings.t)] ~out);
-           ast, names))
+           ast, names, name_table))
       ~generating_mir:
-        (run_stage ~f:(fun (ast, names) ->
-           let%map.Result mir = Mir.of_typed_module ~names ast in
-           let mir = if renumber_mir_ids then Mir.renumber_ids mir else mir in
+        (run_stage ~f:(fun (ast, names, name_table) ->
+           let%map.Result mir = Mir.of_typed_module ~names ~name_table ast in
            maybe_output Mir ~f:(fun out -> Parsing.fprint_s [%sexp (mir : Mir.t)] ~out);
            Ast.Module.module_name ast, mir))
       ~generating_llvm:
@@ -233,21 +237,8 @@ let on_error_raise stage error =
   raise_s [%message "Compilation failed" (stage : Stage.t) (error : Compilation_error.t)]
 ;;
 
-let compile
-  ?(no_std = false)
-  ?parent
-  ?(renumber_mir_ids = false)
-  ?(on_error = on_error_raise)
-  ~filename
-  targets
-  =
-  compile_internal
-    ~no_std
-    ~parent
-    ~renumber_mir_ids
-    ~on_error
-    ~filename
-    ~output:(Output.create targets)
+let compile ?(no_std = false) ?parent ?(on_error = on_error_raise) ~filename targets =
+  compile_internal ~no_std ~parent ~on_error ~filename ~output:(Output.create targets)
 ;;
 
 let command =
@@ -263,12 +254,5 @@ let command =
          (optional Ast.Module_name.arg_type_lenient)
          ~doc:"MODULE_NAME The name of the parent module"
      in
-     fun () ->
-       compile_internal
-         ~filename
-         ~output
-         ~no_std
-         ~parent
-         ~renumber_mir_ids:false
-         ~on_error:on_error_raise)
+     fun () -> compile_internal ~filename ~output ~no_std ~parent ~on_error:on_error_raise)
 ;;

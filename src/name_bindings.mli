@@ -58,7 +58,7 @@ val find_type : t -> Value_name.Qualified.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Qualified.t -> Type.t
 val find_fixity : t -> Value_name.Qualified.t -> Fixity.t
 val set_inferred_scheme : t -> Value_name.t -> Type.Scheme.t -> t
-val add_name_placeholder : t -> Value_name.t -> name_table:Name_id.Table.t -> t
+val add_name_placeholder : t -> Value_name.t -> name_table:Name_id.Name_table.t -> t
 val add_type_placeholder : t -> Type_name.t -> t
 
 (** Fold over all the local (non-imported) names bound. *)
@@ -128,7 +128,12 @@ val add_extern
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
-val add_type_decl : t -> Type_name.t -> Type.Decl.t -> name_table:Name_id.Table.t -> t
+val add_type_decl
+  :  t
+  -> Type_name.t
+  -> Type.Decl.t
+  -> name_table:Name_id.Name_table.t
+  -> t
 
 module Sigs_or_defs : sig
   type name_bindings = t

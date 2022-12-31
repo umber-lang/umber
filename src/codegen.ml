@@ -14,12 +14,12 @@ module Value_table : sig
   type t [@@deriving sexp_of]
 
   val create : unit -> t
-  val add : t -> Mir_name.t -> Llvm.llvalue -> unit
-  val find : t -> Mir_name.t -> Llvm.llvalue
+  val add : t -> Name_id.t -> Llvm.llvalue -> unit
+  val find : t -> Name_id.t -> Llvm.llvalue
 end = struct
-  type t = Llvm_sexp.llvalue Mir_name.Table.t [@@deriving sexp_of]
+  type t = Llvm_sexp.llvalue Name_id.Table.t [@@deriving sexp_of]
 
-  let create () = Mir_name.Table.create ()
+  let create () = Name_id.Table.create ()
 
   let add t name value =
     match Hashtbl.add t ~key:name ~data:value with
@@ -27,7 +27,7 @@ end = struct
     | `Duplicate ->
       compiler_bug
         [%message
-          "Tried to add duplicate LLVM value definition" (name : Mir_name.t) (t : t)]
+          "Tried to add duplicate LLVM value definition" (name : Name_id.t) (t : t)]
   ;;
 
   let find t name =
@@ -35,7 +35,7 @@ end = struct
     | Some value -> value
     | None ->
       compiler_bug
-        [%message "Failed to find LLVM value for name" (name : Mir_name.t) (t : t)]
+        [%message "Failed to find LLVM value for name" (name : Name_id.t) (t : t)]
   ;;
 end
 
@@ -219,7 +219,7 @@ let rec codegen_expr t expr =
                arg_type
                (Array.create arg_type ~len:(Nonempty.length args)))
         in
-        let fun_name = Mir_name.to_string fun_name in
+        let fun_name = Name_id.to_string fun_name in
         Llvm.build_bitcast fun_value fun_pointer_type fun_name t.builder
     in
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
@@ -275,7 +275,7 @@ let rec codegen_expr t expr =
             (Llvm.build_extractelement
                phi_value
                (Llvm.const_int (Llvm.i64_type t.context) i)
-               (Mir_name.to_string var)
+               (Name_id.to_string var)
                t.builder));
         Some phi_value)
     in
@@ -287,7 +287,7 @@ let rec codegen_expr t expr =
       let binding_values =
         List.map2_exn vars bindings ~f:(fun name expr ->
           let value = codegen_expr t expr in
-          Llvm.set_value_name (Mir_name.to_string name) value;
+          Llvm.set_value_name (Name_id.to_string name) value;
           value)
       in
       ignore_value (Llvm.build_br phi_block t.builder);
@@ -443,7 +443,7 @@ let preprocess_stmt t stmt =
   | Value_def (name, _) ->
     let global_value =
       Llvm.define_global
-        (Mir_name.to_string name)
+        (Name_id.to_string name)
         (Llvm.const_null (block_pointer_type t))
         t.module_
     in
@@ -453,12 +453,12 @@ let preprocess_stmt t stmt =
     let fun_type =
       Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
     in
-    let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
+    let fun_ = Llvm.define_function (Name_id.to_string fun_name) fun_type t.module_ in
     Llvm.set_function_call_conv tailcc fun_;
     Value_table.add t.values fun_name fun_
   | Extern_decl { name; arity } ->
     let type_ = block_pointer_type t in
-    let name_str = Mir_name.to_string name in
+    let name_str = Name_id.to_string name in
     let value =
       if arity = 0
       then Llvm.declare_global type_ name_str t.module_
@@ -485,12 +485,12 @@ let codegen_stmt t stmt =
     else ignore_value (Llvm.build_store expr_value global_value t.main_function_builder)
   | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over)
-    then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
+    then raise_s [%message "TODO: closures" (closed_over : Name_id.Set.t)];
     let fun_ = Value_table.find t.values fun_name in
     let fun_params = Llvm.params fun_ in
     Nonempty.iteri args ~f:(fun i arg_name ->
       let arg_value = fun_params.(i) in
-      Llvm.set_value_name (Mir_name.to_string arg_name) arg_value;
+      Llvm.set_value_name (Name_id.to_string arg_name) arg_value;
       Value_table.add t.values arg_name arg_value);
     let entry_block = Llvm.entry_block fun_ in
     Llvm.position_at_end entry_block t.builder;

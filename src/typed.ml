@@ -841,10 +841,9 @@ module Module = struct
       names, reintegrate_binding_groups path other_defs binding_groups)
   ;;
 
-  let of_untyped ~names ~types (module_name, sigs, defs) =
+  let of_untyped ~names ~types ~name_table (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
-      let name_table = Name_id.Table.create () in
       let names = gather_name_placeholders ~names ~name_table module_name sigs defs in
       let names =
         gather_imports_and_type_decls ~names ~name_table module_name sigs defs

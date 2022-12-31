@@ -173,7 +173,7 @@ end
 
 module Extern_decl = struct
   type t =
-    { name : Mir_name.t
+    { name : Name_id.t
     ; arity : int
     }
   [@@deriving sexp]
@@ -194,8 +194,8 @@ let rec arity_of_type ~names : Type.Scheme.t -> int = function
 module Context : sig
   type t [@@deriving sexp_of]
 
-  val of_name_bindings : Name_bindings.t -> t
-  val add_value_name : t -> Value_name.t -> t * Mir_name.t
+  val create : names:Name_bindings.t -> name_table:Name_id.Name_table.t -> t
+  val add_value_name : t -> Value_name.t -> t * Name_id.t
 
   module Extern_info : sig
     type t =
@@ -205,11 +205,11 @@ module Context : sig
     [@@deriving sexp_of]
   end
 
-  val find_value_name : t -> Value_name.Qualified.t -> Mir_name.t * Extern_info.t
-  val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
-  val peek_value_name : t -> Value_name.Qualified.t -> Mir_name.t option
+  val find_value_name : t -> Value_name.Qualified.t -> Name_id.t * Extern_info.t
+  val find_value_name_assert_local : t -> Value_name.t -> Name_id.t
+  val peek_value_name : t -> Value_name.Qualified.t -> Name_id.t option
 
-  type find_observer := Value_name.Qualified.t -> Mir_name.t -> unit
+  type find_observer := Value_name.Qualified.t -> Name_id.t -> unit
 
   val with_find_observer : t -> f:(find_observer -> find_observer) -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
@@ -225,11 +225,15 @@ end = struct
   end
 
   type t =
-    { names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t
+    { names : (Name_id.t * Extern_info.t) Value_name.Qualified.Map.t
     ; name_bindings : Name_bindings.t [@sexp.opaque]
-    ; find_observer : Value_name.Qualified.t -> Mir_name.t -> unit [@sexp.opaque]
+    ; name_table : Name_id.Name_table.t [@sexp.opaque]
+    ; find_observer : Value_name.Qualified.t -> Name_id.t -> unit [@sexp.opaque]
     }
-  [@@deriving sexp_of]
+
+  let sexp_of_t t =
+    [%sexp (t.names : (Name_id.t * Extern_info.t) Value_name.Qualified.Map.t)]
+  ;;
 
   let with_module t module_name ~f =
     let name_bindings =
@@ -239,24 +243,36 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
-  (* TODO: Creating new unique names here means uses of imported names are
-     different in different files, which is weird. Maybe [Name_bindings] should be
-     responsible for assigning unique names for names in its own file? *)
-  let add t name ~extern_name ~extern_info =
-    let mir_name =
-      match extern_name with
-      | None -> Mir_name.create (Value_name.Qualified.to_ustring name)
-      | Some extern_name -> Mir_name.of_extern_name extern_name
-    in
-    { t with names = Map.set t.names ~key:name ~data:(mir_name, extern_info) }, mir_name
+  let add t name name_id ~extern_info =
+    { t with names = Map.set t.names ~key:name ~data:(name_id, extern_info) }
   ;;
 
   let add_value_name t name =
     if Constant_names.mem name
-    then add t ([], name) ~extern_name:None ~extern_info:Local
+    then (
+      let name_id = Name_id.create_value_name t.name_table ([], name) ~in_expr:true in
+      add t ([], name) name_id ~extern_info:Local, name_id)
     else (
-      let path = Name_bindings.(current_path t.name_bindings |> Path.to_module_path) in
-      add t (path, name) ~extern_name:None ~extern_info:Local)
+      let path =
+        Name_bindings.current_path t.name_bindings |> Name_bindings.Path.to_module_path
+      in
+      let name = path, name in
+      (* FIXME: Creating new names here doesn't quite feel right since it will be
+         duplicated work already done in the type-checking stage. We don't have a great
+         place to put that information, though, unless we united the name bindings and
+         ast more and/or put name_ids on the ast.
+         
+         I think this just won't work as seen right now since we can't create the same
+         names in expressions more than once. *)
+      let name_id =
+        try
+          Name_bindings.find_entry t.name_bindings name
+          |> Name_bindings.Name_entry.name_id
+        with
+        | Name_bindings.Name_error _ ->
+          Name_id.create_value_name t.name_table name ~in_expr:true
+      in
+      add t name name_id ~extern_info:Local, name_id)
   ;;
 
   let find { names; _ } name = Map.find names name
@@ -285,7 +301,7 @@ end = struct
         [%message
           "Name missing from context"
             (name : Value_name.Qualified.t)
-            (t.names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t)]
+            (t.names : (Name_id.t * Extern_info.t) Value_name.Qualified.Map.t)]
   ;;
 
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
@@ -301,10 +317,11 @@ end = struct
 
   let with_find_observer t ~f = { t with find_observer = f t.find_observer }
 
-  let of_name_bindings name_bindings =
+  let create ~names:name_bindings ~name_table =
     let t =
       { names = Value_name.Qualified.Map.empty
       ; name_bindings
+      ; name_table
       ; find_observer = (fun _ _ -> ())
       }
     in
@@ -337,7 +354,7 @@ end = struct
             in
             External { arity = arity_of_type ~names:name_bindings scheme })
       in
-      fst (add t name ~extern_name ~extern_info))
+      add t name name_id ~extern_info)
   ;;
 
   let cnstr_info_lookup_failed type_ =
@@ -593,18 +610,18 @@ module Expr = struct
      Later, we can store them in the pointer or block header *)
   type t =
     | Primitive of Literal.t
-    | Name of Mir_name.t
+    | Name of Name_id.t
     (* TODO: recursive lets? Mutual recursion? (will surely need a rec flag at least)
        Can maybe handle that in toplevel function definitions. *)
-    | Let of Mir_name.t * t * t
-    | Fun_call of Mir_name.t * t Nonempty.t
+    | Let of Name_id.t * t * t
+    | Fun_call of Name_id.t * t Nonempty.t
     | Make_block of
         { tag : Cnstr_tag.t
         ; fields : t list [@sexp.omit_nil]
         }
     | Get_block_field of Block_index.t * t
     | Cond_assign of
-        { vars : Mir_name.t list [@sexp.omit_nil]
+        { vars : Name_id.t list [@sexp.omit_nil]
         ; conds : (cond * (t list[@sexp.omit_nil])) Nonempty.t
         ; body : t
         ; if_none_matched : cond_if_none_matched
@@ -625,9 +642,9 @@ module Expr = struct
 
   module Fun_def = struct
     type nonrec t =
-      { fun_name : Mir_name.t
-      ; closed_over : Mir_name.Set.t [@sexp.omit_nil]
-      ; args : Mir_name.t Nonempty.t
+      { fun_name : Name_id.t
+      ; closed_over : Name_id.Set.t [@sexp.omit_nil]
+      ; args : Name_id.t Nonempty.t
       ; body : t
       }
     [@@deriving sexp_of]
@@ -715,14 +732,14 @@ module Expr = struct
   module Just_bound = struct
     type t =
       { rec_ : bool
-      ; names_bound : Mir_name.Set.t
+      ; names_bound : Name_id.Set.t
       }
   end
 
   let add_let_bindings ~bindings ~body =
     List.fold bindings ~init:body ~f:(fun body (name, mir_expr) ->
       match mir_expr with
-      | Name name' when Mir_name.equal name name' ->
+      | Name name' when Name_id.equal name name' ->
         (* Avoid genereating code that looks like let x.0 = x.0 *)
         body
       | _ -> Let (name, mir_expr, body))
@@ -765,7 +782,7 @@ module Expr = struct
         let ctx_for_body, names_bound =
           Pattern.fold_names
             pattern
-            ~init:(ctx_for_body, Mir_name.Set.empty)
+            ~init:(ctx_for_body, Name_id.Set.empty)
             ~f:(fun (ctx_for_body, names_bound) name ->
             let ctx, name = Context.add_value_name ctx_for_body name in
             ctx, Set.add names_bound name)
@@ -954,12 +971,12 @@ module Expr = struct
           Set.choose_exn names_bound
         | Some _ | None -> snd (Context.add_value_name ctx Constant_names.fun_)
       in
-      let closed_over = ref Mir_name.Set.empty in
+      let closed_over = ref Name_id.Set.empty in
       let ctx =
         let from_which_context name mir_name =
           let in_context ctx =
             Context.peek_value_name ctx name
-            |> Option.value_map ~default:false ~f:(Mir_name.equal mir_name)
+            |> Option.value_map ~default:false ~f:(Name_id.equal mir_name)
           in
           if in_context outer_ctx
           then `From_outer_stmts
@@ -1071,9 +1088,9 @@ module Expr = struct
           in
           let bindings =
             (* Bindings must be sorted by their names to match up with [vars] above. This
-               relies on the [Value_name.t]s and [Mir_name.t]s having the same ordering
+               relies on the [Value_name.t]s and [Name_id.t]s having the same ordering
                due to the former being a prefix of the latter. *)
-            List.sort bindings ~compare:[%compare: Mir_name.t * _] |> List.map ~f:snd
+            List.sort bindings ~compare:[%compare: Name_id.t * _] |> List.map ~f:snd
           in
           match cond with
           | None ->
@@ -1114,79 +1131,16 @@ module Expr = struct
     in
     of_typed_expr ~just_bound:outer_just_bound ~ctx:outer_ctx outer_expr outer_type
   ;;
-
-  let rec map_names expr ~f =
-    match expr with
-    | Primitive _ -> expr
-    | Name name -> Name (f name)
-    | Let (name, expr, body) ->
-      let name = f name in
-      let expr = map_names expr ~f in
-      let body = map_names body ~f in
-      Let (name, expr, body)
-    | Fun_call (fun_name, args) ->
-      let fun_name = f fun_name in
-      let args = Nonempty.map args ~f:(map_names ~f) in
-      Fun_call (fun_name, args)
-    | Make_block { tag; fields } ->
-      let fields = List.map fields ~f:(map_names ~f) in
-      Make_block { tag; fields }
-    | Get_block_field (i, expr) -> Get_block_field (i, map_names expr ~f)
-    | Cond_assign { vars; conds; body; if_none_matched } ->
-      let vars = List.map vars ~f in
-      let conds =
-        Nonempty.map conds ~f:(fun (cond, bindings) ->
-          let cond = map_cond_names cond ~f in
-          let bindings = List.map bindings ~f:(map_names ~f) in
-          cond, bindings)
-      in
-      let body = map_names body ~f in
-      let if_none_matched = map_if_none_matched_names if_none_matched ~f in
-      Cond_assign { vars; conds; body; if_none_matched }
-
-  and map_cond_names cond ~f =
-    match cond with
-    | Equals (expr, lit) -> Equals (map_names expr ~f, lit)
-    | Constant_tag_equals (expr, tag) -> Constant_tag_equals (map_names expr ~f, tag)
-    | Non_constant_tag_equals (expr, tag) ->
-      Non_constant_tag_equals (map_names expr ~f, tag)
-    | And (cond, cond') ->
-      let cond = map_cond_names cond ~f in
-      let cond' = map_cond_names cond' ~f in
-      And (cond, cond')
-
-  and map_if_none_matched_names if_none_matched ~f =
-    match if_none_matched with
-    | Otherwise expr -> Otherwise (map_names expr ~f)
-    | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map_names ~f))
-  ;;
 end
 
 module Stmt = struct
   (* TODO: Consider passing through information about whether the values/functions are
      exposed to other files so we can decide on proper LLVM linkage for them. *)
   type t =
-    | Value_def of Mir_name.t * Expr.t
+    | Value_def of Name_id.t * Expr.t
     | Fun_def of Expr.Fun_def.t
     | Extern_decl of Extern_decl.t
   [@@deriving sexp_of, variants]
-
-  let map_names stmt ~f =
-    match stmt with
-    | Value_def (name, expr) ->
-      let name = f name in
-      let expr = Expr.map_names expr ~f in
-      Value_def (name, expr)
-    | Fun_def { fun_name; closed_over; args; body } ->
-      let fun_name = f fun_name in
-      let closed_over = Mir_name.Set.map closed_over ~f in
-      let args = Nonempty.map args ~f in
-      let body = Expr.map_names body ~f in
-      Fun_def { fun_name; closed_over; args; body }
-    | Extern_decl { name; arity } ->
-      let name = f name in
-      Extern_decl { name; arity }
-  ;;
 end
 
 type t = Stmt.t list [@@deriving sexp_of]
@@ -1215,7 +1169,7 @@ let of_typed_module =
     in
     let add_let stmts name mir_expr =
       match (mir_expr : Expr.t) with
-      | Name name' when Mir_name.(name = name') ->
+      | Name name' when Name_id.(name = name') ->
         (* Don't make a Value_def in the case where all we did is make a Fun_def *)
         stmts
       | _ -> Stmt.Value_def (name, mir_expr) :: stmts
@@ -1251,7 +1205,7 @@ let of_typed_module =
               in
               Fun_def
                 { fun_name = name
-                ; closed_over = Mir_name.Set.empty
+                ; closed_over = Name_id.Set.empty
                 ; args = arg_names |> Nonempty.of_list_exn
                 ; body =
                     Make_block
@@ -1276,35 +1230,19 @@ let of_typed_module =
           (Extern ((_ : Value_name.t), (_ : Fixity.t option), type_, extern_name)) ->
         ( ctx
         , Extern_decl
-            { name = Mir_name.of_extern_name extern_name
+            { name = Name_id.create_extern_name extern_name
             ; arity = arity_of_type ~names type_
             }
           :: stmts )
       | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _) ->
         ctx, stmts)
   in
-  fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
+  fun ~names ~name_table ((module_name, _sigs, defs) : Typed.Module.t) ->
     let names = Name_bindings.into_module names module_name ~place:`Def in
-    let ctx = Context.of_name_bindings names in
-    let extern_decls = Mir_name.Hash_set.create () in
+    let ctx = Context.create ~names ~name_table in
+    let extern_decls = Name_id.Hash_set.create () in
     match loop ~ctx ~names ~stmts:[] ~extern_decls defs with
     | (_ : Context.t), stmts -> Ok (List.rev stmts)
     | exception Compilation_error.Compilation_error error -> Error error
     | exception Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
-;;
-
-let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
-
-let renumber_ids stmts =
-  let name_table = Ustring.Table.create () in
-  map_names stmts ~f:(fun name ->
-    Mir_name.map_parts name ~f:(fun name id ->
-      match Hashtbl.find name_table name with
-      | None ->
-        let id_table = Int.Table.create () in
-        Hashtbl.set id_table ~key:id ~data:0;
-        Hashtbl.set name_table ~key:name ~data:id_table;
-        0
-      | Some id_table ->
-        Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
 ;;

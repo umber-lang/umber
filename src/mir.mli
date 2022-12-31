@@ -19,16 +19,16 @@ end
 module Expr : sig
   type t =
     | Primitive of Literal.t
-    | Name of Mir_name.t
-    | Let of Mir_name.t * t * t
-    | Fun_call of Mir_name.t * t Nonempty.t
+    | Name of Name_id.t
+    | Let of Name_id.t * t * t
+    | Fun_call of Name_id.t * t Nonempty.t
     | Make_block of
         { tag : Cnstr_tag.t
         ; fields : t list
         }
     | Get_block_field of Block_index.t * t
     | Cond_assign of
-        { vars : Mir_name.t list
+        { vars : Name_id.t list
         ; conds : (cond * t list) Nonempty.t
         ; body : t
         ; if_none_matched : cond_if_none_matched
@@ -47,9 +47,9 @@ module Expr : sig
 
   module Fun_def : sig
     type nonrec t =
-      { fun_name : Mir_name.t
-      ; closed_over : Mir_name.Set.t
-      ; args : Mir_name.t Nonempty.t
+      { fun_name : Name_id.t
+      ; closed_over : Name_id.Set.t
+      ; args : Name_id.t Nonempty.t
       ; body : t
       }
     [@@deriving sexp_of]
@@ -58,7 +58,7 @@ end
 
 module Extern_decl : sig
   type t =
-    { name : Mir_name.t
+    { name : Name_id.t
     ; arity : int
     }
   [@@deriving sexp]
@@ -66,7 +66,7 @@ end
 
 module Stmt : sig
   type t =
-    | Value_def of Mir_name.t * Expr.t
+    | Value_def of Name_id.t * Expr.t
     | Fun_def of Expr.Fun_def.t
     | Extern_decl of Extern_decl.t
   [@@deriving sexp_of, variants]
@@ -76,7 +76,6 @@ type t = Stmt.t list [@@deriving sexp_of]
 
 val of_typed_module
   :  names:Name_bindings.t
+  -> name_table:Name_id.Name_table.t
   -> Typed.Module.t
   -> (t, Compilation_error.t) result
-
-val renumber_ids : t -> t

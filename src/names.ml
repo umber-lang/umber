@@ -293,7 +293,7 @@ module Name_id : sig
 
   val to_ustring : t -> Ustring.t
 
-  module Table : sig
+  module Name_table : sig
     (** A table assigning names to ids. One should be created and used for each file. *)
     type t
 
@@ -302,7 +302,7 @@ module Name_id : sig
 
   (** Create a name id given a name table and qualified value name. The name must be an
       absolute path. *)
-  val create_value_name : Table.t -> Value_name.Qualified.t -> in_expr:bool -> t
+  val create_value_name : Name_table.t -> Value_name.Qualified.t -> in_expr:bool -> t
 
   (** Create a name id from an external name. External names have to be unique to link
       properly, so it just taken verbatim. *)
@@ -358,13 +358,13 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  module Table = struct
+  module Name_table = struct
     type t = { value_names : int Value_name.Qualified.Table.t }
 
     let create () = { value_names = Value_name.Qualified.Table.create () }
   end
 
-  let create_value_name { Table.value_names } value_name ~in_expr =
+  let create_value_name { Name_table.value_names } value_name ~in_expr =
     let id =
       if in_expr then Option.value (Hashtbl.find value_names value_name) ~default:0 else 0
     in

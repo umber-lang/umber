@@ -68,7 +68,7 @@ module Names : sig
     :  t
     -> Value_name.t
     -> Type.t
-    -> name_table:Name_id.Table.t
+    -> name_table:Name_id.Name_table.t
     -> current_path:Module_path.t
     -> in_expr:bool
     -> t
@@ -76,12 +76,18 @@ module Names : sig
   val add_fresh_name
     :  t
     -> Value_name.t
-    -> name_table:Name_id.Table.t
+    -> name_table:Name_id.Name_table.t
     -> current_path:Module_path.t
     -> in_expr:bool
     -> t * Type.t
 
-  val gather : _ pattern -> name_table:Name_id.Table.t -> current_path:Module_path.t -> in_expr:bool ->t
+  val gather
+    :  _ pattern
+    -> name_table:Name_id.Name_table.t
+    -> current_path:Module_path.t
+    -> in_expr:bool
+    -> t
+
   val find : t -> Value_name.t -> Name_bindings.Name_entry.t option
   val mem : t -> Value_name.t -> bool
 

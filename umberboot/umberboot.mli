@@ -39,7 +39,6 @@ end
 val compile
   :  ?no_std:bool
   -> ?parent:Ast.Module_name.t
-  -> ?renumber_mir_ids:bool
   -> ?on_error:(Stage.t -> Compilation_error.t -> unit)
   -> filename:string
   -> (Target.t * File_or_stdout.t) list
