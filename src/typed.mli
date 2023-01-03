@@ -4,7 +4,7 @@ open Names
 module Pattern : sig
   include module type of Pattern
 
-  type nonrec t = Nothing.t t [@@deriving sexp]
+  type nonrec t = (Nothing.t, Name_id.t) t [@@deriving sexp]
 
   val of_untyped_with_names
     :  names:Name_bindings.t
@@ -18,7 +18,6 @@ module Pattern : sig
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> name_table:Name_id.Name_table.t
-    -> in_expr:bool
     -> Untyped.Pattern.t
     -> Name_bindings.t * (Names.t * (t * Type.t))
 end
@@ -26,7 +25,7 @@ end
 module Expr : sig
   type 'typ t =
     | Literal of Literal.t
-    | Name of Value_name.Qualified.t
+    | Name of Name_id.t
     | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
     | Lambda of Pattern.t Nonempty.t * 'typ t
     | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t

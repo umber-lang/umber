@@ -46,6 +46,7 @@ module type Name = sig
   val of_string_unchecked : string -> t
   val of_string_exn : string -> t
   val of_string_lenient_exn : string -> t
+  val to_string : t -> string
   val arg_type_lenient : t Command.Arg_type.t
 end
 

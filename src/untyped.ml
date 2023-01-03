@@ -7,7 +7,7 @@ open Names
 module Pattern = struct
   include Pattern
 
-  type nonrec t = Type.Scheme.Bounded.t t [@@deriving sexp]
+  type nonrec t = (Type.Scheme.Bounded.t, Value_name.t) t [@@deriving sexp]
 end
 
 module Expr = struct

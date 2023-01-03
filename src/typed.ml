@@ -6,7 +6,7 @@ let type_error_msg = Type_bindings.type_error_msg
 module Pattern = struct
   include Pattern
 
-  type nonrec t = Nothing.t t [@@deriving sexp]
+  type nonrec t = (Nothing.t, Name_id.t) t [@@deriving sexp]
 
   (* TODO: either split up Untyped/Typed patterns into different types or stop returning
      a pattern from these functions *)
@@ -16,18 +16,22 @@ module Pattern = struct
     let current_path =
       Name_bindings.current_path names |> Name_bindings.Path.to_module_path
     in
-    let rec of_untyped_with_names ~names ~types pat_names
-      : Untyped.Pattern.t -> Names.t * (t * Type.t)
-      = function
+    let rec of_untyped_with_names ~names ~types pat_names pat : Names.t * (t * Type.t) =
+      match (pat : Untyped.Pattern.t) with
       | Constant lit -> pat_names, (Constant lit, Type.Concrete.cast (Literal.typ lit))
       | Catch_all name ->
-        let pat_names, typ =
+        let typ = Type.fresh_var () in
+        let pat_names, name_id =
           match name with
           | Some name ->
-            Pattern.Names.add_fresh_name pat_names name ~name_table ~current_path ~in_expr
-          | None -> pat_names, Type.fresh_var ()
+            let path =
+              Name_bindings.current_path names |> Name_bindings.Path.to_module_path
+            in
+            let name_id = Name_id.create_value_name name_table (path, name) ~in_expr in
+            Pattern.Names.add_name pat_names name name_id typ, Some name_id
+          | None -> pat_names, None
         in
-        pat_names, (Catch_all name, typ)
+        pat_names, (Catch_all name_id, typ)
       | Cnstr_appl (cnstr, args) ->
         (* TODO: inferring unqualified name given type information *)
         let arg_types, body_type =
@@ -101,23 +105,22 @@ module Pattern = struct
           ~f:(fun () name diff ->
           match diff with
           | `Left | `Right ->
-            let name = Value_name.to_ustring name in
             type_error_msg
               [%string
-                "Variable %{name#Ustring} must appear on both sides of this | pattern"]
-          | `Both (entry1, entry2) ->
-            Type_bindings.unify
-              ~names
-              ~types
-              (Name_bindings.Name_entry.typ entry1)
-              (Name_bindings.Name_entry.typ entry2));
+                "Variable %{name#Value_name} must appear on both sides of this | pattern"]
+          | `Both ((_, type1), (_, type2)) ->
+            (* FIXME: union pattern variables have to get the same name ids for things to
+               make sense. Just taking one of the ids might not be quite the most
+               elegant solution. *)
+            Type_bindings.unify ~names ~types type1 type2);
         pat_names1, (Union (pat1, pat2), typ1)
       | As (pat, name) ->
         let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
-        let pat_names =
-          Pattern.Names.add_name pat_names name typ ~name_table ~current_path ~in_expr
+        let name_id =
+          Name_id.create_value_name name_table (current_path, name) ~in_expr
         in
-        pat_names, (As (pat, name), typ)
+        let pat_names = Pattern.Names.add_name pat_names name name_id typ in
+        pat_names, (As (pat, name_id), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
           Type.Scheme.instantiate_bounded
@@ -132,25 +135,21 @@ module Pattern = struct
     pat_names, (pat, Type_bindings.substitute types typ)
   ;;
 
-  let of_untyped_into ~names ~types ~name_table ~in_expr pattern =
+  let of_untyped_into ~names ~types ~name_table pattern =
     let ((pat_names, _) as pat) =
-      of_untyped_with_names ~names ~types ~name_table pattern ~in_expr
+      of_untyped_with_names ~names ~types ~name_table pattern ~in_expr:true
     in
     let names =
-      Name_bindings.merge_names
-        names
-        (Names.to_map pat_names)
-        ~combine:(fun _ _ new_entry -> new_entry)
+      Pattern.Names.fold pat_names ~init:names ~f:(fun names name (name_id, typ) ->
+        Name_bindings.add_let_shadowing names name name_id typ)
     in
     names, pat
   ;;
 
   let generalize ~names ~types pat_names typ =
     let names =
-      Pattern.Names.fold pat_names ~init:names ~f:(fun names name entry ->
-        Name_bindings.Name_entry.typ entry
-        |> Type_bindings.generalize types
-        |> Name_bindings.set_inferred_scheme names name)
+      Pattern.Names.fold pat_names ~init:names ~f:(fun names name (_, typ) ->
+        Type_bindings.generalize types typ |> Name_bindings.set_inferred_scheme names name)
     in
     names, Type_bindings.generalize types typ
   ;;
@@ -159,7 +158,7 @@ end
 module Expr = struct
   type 'typ t =
     | Literal of Literal.t
-    | Name of Value_name.Qualified.t
+    | Name of Name_id.t
     | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
     | Lambda of Pattern.t Nonempty.t * 'typ t
     | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
@@ -179,7 +178,8 @@ module Expr = struct
       | Name name ->
         let name_entry = Name_bindings.find_entry names name in
         f_name name name_entry;
-        Name name, Name_bindings.Name_entry.typ name_entry
+        ( Name (Name_bindings.Name_entry.name_id name_entry)
+        , Name_bindings.Name_entry.typ name_entry )
       | Qualified (path, expr) ->
         of_untyped
           ~names:(Name_bindings.import_all names path)
@@ -208,7 +208,7 @@ module Expr = struct
         let names, args_and_types =
           Nonempty.fold_map args ~init:names ~f:(fun names arg ->
             let names, (_, (arg, arg_type)) =
-              Pattern.of_untyped_into ~names ~types ~name_table arg ~in_expr:true
+              Pattern.of_untyped_into ~names ~types ~name_table arg
             in
             names, (arg, arg_type))
         in
@@ -239,7 +239,7 @@ module Expr = struct
         let branches, branch_type :: rest =
           Nonempty.map branches ~f:(fun (pat, branch) ->
             let names, (_, (pat, pat_typ)) =
-              Pattern.of_untyped_into ~names ~name_table ~types pat ~in_expr:true
+              Pattern.of_untyped_into ~names ~name_table ~types pat
             in
             Type_bindings.unify ~names ~types expr_type pat_typ;
             let branch, branch_type =
@@ -257,7 +257,7 @@ module Expr = struct
             let names, bindings =
               Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
                 let names, (pat_names, (pat, pat_type)) =
-                  Pattern.of_untyped_into ~names ~types ~name_table pat ~in_expr:true
+                  Pattern.of_untyped_into ~names ~types ~name_table pat
                 in
                 names, ((pat, (pat_type, pat_names)), expr))
             in
@@ -267,7 +267,7 @@ module Expr = struct
             let names, bindings =
               Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
                 let names, (pat_names, (pat, pat_type)) =
-                  Pattern.of_untyped_into ~names ~types ~name_table pat ~in_expr:true
+                  Pattern.of_untyped_into ~names ~types ~name_table pat
                 in
                 let expr, expr_type = of_untyped ~names ~types ~name_table ~f_name expr in
                 Type_bindings.unify ~names ~types pat_type expr_type;
@@ -314,8 +314,8 @@ module Expr = struct
         match name with
         | [], name ->
           if Option.exists
-               ~f:(Name_bindings.Name_entry.equal name_entry)
                (Pattern.Names.find all_bound_names name)
+               ~f:(Name_id.equal (Name_bindings.Name_entry.name_id name_entry) << fst)
           then used_a_bound_name := true
         | _ :: _, _ -> ()
       in
@@ -348,7 +348,7 @@ module Expr = struct
          in
          let body = map ~f ~f_type body in
          Let { rec_; bindings; body }
-       | (Literal _ | Name (_, _)) as expr -> expr
+       | (Literal _ | Name _) as expr -> expr
        | Fun_call (fun_, args) ->
          let fun_ = map ~f ~f_type fun_ in
          let args =
@@ -564,27 +564,18 @@ module Module = struct
   let rec gather_name_placeholders ~names ~name_table module_name sigs defs =
     let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
+        (* FIXME: This code is not getting reached for some reason. *)
         Name_bindings.add_name_placeholder names name ~name_table
       | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
-    in
-    let current_path =
-      Name_bindings.current_path names |> Name_bindings.Path.to_module_path
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
       match def.node with
       | Let { bindings; rec_ } ->
         assert_or_compiler_bug ~here:[%here] rec_;
         Nonempty.fold bindings ~init:names ~f:(fun names { node = pat, _; _ } ->
-          Name_bindings.merge_names
-            names
-            (Pattern.Names.gather pat ~name_table ~current_path ~in_expr:false
-            |> Pattern.Names.to_map)
-            ~combine:(fun name entry entry' ->
-              match Name_bindings.Name_entry.type_source entry with
-              | Placeholder -> entry'
-              | Let_inferred | Val_declared | Extern_declared ->
-                Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)))
+          Pattern.fold_names pat ~init:names ~f:(fun names name ->
+            Name_bindings.add_name_placeholder names name ~name_table))
       | Module (module_name, sigs, defs) ->
         gather_name_placeholders ~names ~name_table module_name sigs defs
       | Common_def common -> f_common names common
@@ -681,13 +672,9 @@ module Module = struct
           in
           let names =
             (* Unify pattern bindings with local type information (e.g. val declarations) *)
-            Name_bindings.merge_names
-              names
-              (Pattern.Names.to_map pat_names)
-              ~combine:(fun _ entry entry' ->
-              let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
-              Type_bindings.unify ~names ~types typ typ';
-              Name_bindings.Name_entry.merge entry entry')
+            Pattern.Names.fold pat_names ~init:names ~f:(fun names name (name_id, typ) ->
+              let unify = Type_bindings.unify ~names ~types in
+              Name_bindings.add_let_merging names name name_id typ ~unify)
           in
           let pat, pat_type = pat in
           names, ((pat, (pat_type, pat_names)), expr)))

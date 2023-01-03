@@ -1,4 +1,5 @@
 open Import
+open Names
 open Sedlexing
 
 type token = Parser.token =
@@ -162,15 +163,16 @@ module Nonterminal = struct
     | N_qualified_either_LOWER_NAME_UPPER_NAME__ : (Ustring.t list * Ustring.t) t
     | N_qualified_UPPER_NAME_ : (Ustring.t list * Ustring.t) t
     | N_prog : Untyped.Module.t t
-    | N_pattern_term : Type.Scheme.Bounded.t Pattern.t t
+    | N_pattern_term : (Type.Scheme.Bounded.t, Value_name.t) Pattern.t t
     | N_pattern_name : Parser_scope.Value_name.t option t
-    | N_pattern : Type.Scheme.Bounded.t Pattern.t t
+    | N_pattern : (Type.Scheme.Bounded.t, Value_name.t) Pattern.t t
     | N_optional_sig_def
         : (Module.sig_ Node.t list
           * (Umber__Untyped.Pattern.t, Untyped.Expr.t) Module.def Node.t list)
           t
     | N_option_preceded_EQUALS_type_decl__ : Type.Decl.decl option t
-    | N_option_preceded_EQUALS_pattern__ : Type.Scheme.Bounded.t Pattern.t option t
+    | N_option_preceded_EQUALS_pattern__
+        : (Type.Scheme.Bounded.t, Value_name.t) Pattern.t option t
     | N_option_preceded_EQUALS_expr__ : Untyped.Expr.t option t
     | N_option_parens_fixity__ : Fixity.t option t
     | N_option_PIPE_ : unit option t
@@ -178,7 +180,8 @@ module Nonterminal = struct
     | N_operator : (Ustring.t list * Ustring.t) t
     | N_op_section : Untyped.Expr.t t
     | N_nonempty_list_type_term_ : (Type.Param.t, Core.never_returns) Type.Expr.t list t
-    | N_nonempty_list_pattern_term_ : Type.Scheme.Bounded.t Pattern.t list t
+    | N_nonempty_list_pattern_term_
+        : (Type.Scheme.Bounded.t, Value_name.t) Pattern.t list t
     | N_nonempty_list_expr_term_ : Untyped.Expr.t list t
     | N_nonempty_list_LOWER_NAME_ : Ustring.t list t
     | N_match_branches : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Nonempty.t t
@@ -204,11 +207,14 @@ module Nonterminal = struct
     | N_flexible_nonempty_COMMA_type_annot_non_fun_LOWER_NAME__
         : (Ustring.t * Type.Scheme.Table.key) Nonempty.t t
     | N_flexible_nonempty_COMMA_record_field_equals_pattern__
-        : (Parser_scope.Value_name.t * Type.Scheme.Bounded.t Pattern.t option) Nonempty.t
+        : (Parser_scope.Value_name.t
+          * (Type.Scheme.Bounded.t, Value_name.t) Pattern.t option)
+          Nonempty.t
           t
     | N_flexible_nonempty_COMMA_record_field_equals_expr__
         : (Parser_scope.Value_name.t * Untyped.Expr.t option) Nonempty.t t
-    | N_flexible_nonempty_COMMA_pattern_ : Type.Scheme.Bounded.t Pattern.t Nonempty.t t
+    | N_flexible_nonempty_COMMA_pattern_
+        : (Type.Scheme.Bounded.t, Value_name.t) Pattern.t Nonempty.t t
     | N_flexible_nonempty_COMMA_pair_UPPER_NAME_type_params_nonempty__
         : (Ustring.t, Type.Param.t Nonempty.t) Import.Tuple2.t Nonempty.t t
     | N_flexible_nonempty_COMMA_expr_ : Untyped.Expr.t Nonempty.t t

@@ -28,6 +28,11 @@ module Name_entry = struct
       | Type of Type.t
       | Scheme of Type.Scheme.t
     [@@deriving equal, sexp]
+
+    let instantiate = function
+      | Type typ -> typ
+      | Scheme scheme -> Type.Scheme.instantiate scheme
+    ;;
   end
 
   (* TODO: Consider having this type be responsible for assigning/tracking unique names,
@@ -589,7 +594,7 @@ let add_val_or_extern
                e.g. importing from another module, and then giving that import a new,
                compatible type declaration *)
             name_error_msg
-              "Duplicate val for imported item"
+              "Duplicate declaration for imported item"
               Ustring.(
                 Value_name.to_ustring name
                 ^ of_string_exn " vs "
@@ -603,6 +608,61 @@ let add_val = add_val_or_extern ?extern_name:None ~type_source:Val_declared
 
 let add_extern t name fixity typ extern_name ~unify =
   add_val_or_extern t name fixity typ ~extern_name ~unify ~type_source:Extern_declared
+;;
+
+let add_let_shadowing t name name_id typ =
+  let f bindings =
+    { bindings with
+      names =
+        Map.set
+          bindings.names
+          ~key:name
+          ~data:
+            (Local
+               { name_id
+               ; type_source = Let_inferred
+               ; typ = Type typ
+               ; fixity = None
+               ; extern_name = None
+               })
+    }
+  in
+  update_current t ~f:{ f }
+;;
+
+let add_let_merging_internal t name name_id typ ~unify =
+  let f bindings =
+    let inferred_entry : Name_entry.t =
+      { name_id; type_source = Let_inferred; typ; fixity = None; extern_name = None }
+    in
+    { bindings with
+      names =
+        Map.update bindings.names name ~f:(function
+          | None -> Local inferred_entry
+          | Some (Local existing_entry) ->
+            unify existing_entry.typ typ;
+            Local (Name_entry.merge existing_entry inferred_entry)
+          | Some (Imported _) ->
+            (* TODO: Think about the exact semantics of this. I think we want to disallow
+               shadowing/name clashes between imported and local names, but I'm not sure
+               if here is the best place to do it. *)
+            name_error_msg
+              "Name clash between imported and local binding"
+              (Value_name.to_ustring name))
+    }
+  in
+  update_current t ~f:{ f }
+;;
+
+let add_let_merging t name name_id typ ~unify =
+  add_let_merging_internal t name name_id (Type typ) ~unify:(fun typ typ' ->
+    unify
+      (Name_entry.Type_or_scheme.instantiate typ)
+      (Name_entry.Type_or_scheme.instantiate typ'))
+;;
+
+let set_inferred_scheme t name scheme =
+  add_let_merging_internal t name Name_id.dummy (Scheme scheme) ~unify:(fun _ _ -> ())
 ;;
 
 let absolutify_type_decl t = Type.Decl.map_exprs ~f:(absolutify_type_expr t)
@@ -658,35 +718,8 @@ let add_type_decl ({ current_path; _ } as t) type_name decl ~name_table =
   update_current t ~f:{ f }
 ;;
 
-let set_inferred_scheme t name scheme =
-  let f bindings =
-    let inferred_entry =
-      { name_id = Name_id.dummy
-      ; Name_entry.type_source = Let_inferred
-      ; typ = Scheme scheme
-      ; fixity = None
-      ; extern_name = None
-      }
-    in
-    { bindings with
-      names =
-        Map.update bindings.names name ~f:(function
-          | None -> Local inferred_entry
-          | Some (Local existing_entry) ->
-            Local (Name_entry.merge existing_entry inferred_entry)
-          | Some (Imported _) ->
-            (* TODO: Think about the exact semantics of this. I think we want to disallow
-               shadowing/name clashes between imported and local names, but I'm not sure
-               if here is the best place to do it. *)
-            name_error_msg
-              "Name clash between imported and local binding"
-              (Value_name.to_ustring name))
-    }
-  in
-  update_current t ~f:{ f }
-;;
-
 let add_name_placeholder t name ~name_table =
+  print_s [%message "start add_name_placeholdder" (name : Value_name.t)];
   let f bindings =
     { bindings with
       names =
@@ -698,8 +731,13 @@ let add_name_placeholder t name ~name_table =
                 (Path.to_module_path t.current_path, name)
                 ~in_expr:false
             in
+            print_s
+              [%message
+                "add_name_placeholder" (name : Value_name.t) (name_id : Name_id.t)];
             Local (Name_entry.placeholder name_id)
-          | Some (Local { Name_entry.type_source = Let_inferred; _ } as entry) -> entry
+          | Some (Local { Name_entry.type_source = Let_inferred; _ } as entry) ->
+            (* We may add placeholder values for both val and let statements. *)
+            entry
           | _ -> name_error_msg "Duplicate name" (Value_name.to_ustring name))
     }
   in
@@ -735,6 +773,7 @@ let fold_local_names t ~init ~f =
   fold_defs t [] t.toplevel ~init ~f
 ;;
 
+(* FIXME: Delete this function I think. *)
 let merge_names t new_names ~combine =
   let new_names = Map.map new_names ~f:Or_imported.local in
   let f bindings =

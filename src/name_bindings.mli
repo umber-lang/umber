@@ -110,6 +110,15 @@ val import : t -> Module_name.t -> t
 val import_with : t -> Module_path.t -> Unidentified_name.t list -> t
 val import_all : t -> Module_path.t -> t
 val import_without : t -> Module_path.t -> Unidentified_name.t Nonempty.t -> t
+val add_let_shadowing : t -> Value_name.t -> Name_id.t -> Type.t -> t
+
+val add_let_merging
+  :  t
+  -> Value_name.t
+  -> Name_id.t
+  -> Type.t
+  -> unify:(Type.t -> Type.t -> unit)
+  -> t
 
 val add_val
   :  t
