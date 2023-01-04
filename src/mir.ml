@@ -196,6 +196,7 @@ module Context : sig
 
   val create : names:Name_bindings.t -> name_table:Name_id.Name_table.t -> t
   val add_value_name : t -> Value_name.t -> t * Name_id.t
+  val add_name_id : t -> Name_id.t -> t
 
   module Extern_info : sig
     type t =
@@ -205,11 +206,11 @@ module Context : sig
     [@@deriving sexp_of]
   end
 
-  val find_value_name : t -> Value_name.Qualified.t -> Name_id.t * Extern_info.t
-  val find_value_name_assert_local : t -> Value_name.t -> Name_id.t
-  val peek_value_name : t -> Value_name.Qualified.t -> Name_id.t option
+  val find_extern_info : t -> Name_id.t -> Extern_info.t
+  val find_extern_info_assert_local : t -> Name_id.t -> Extern_info.t
+  val peek_extern_info : t -> Name_id.t -> Extern_info.t option
 
-  type find_observer := Value_name.Qualified.t -> Name_id.t -> unit
+  type find_observer := Name_id.t -> unit
 
   val with_find_observer : t -> f:(find_observer -> find_observer) -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
@@ -225,15 +226,13 @@ end = struct
   end
 
   type t =
-    { names : (Name_id.t * Extern_info.t) Value_name.Qualified.Map.t
-    ; name_bindings : Name_bindings.t [@sexp.opaque]
-    ; name_table : Name_id.Name_table.t [@sexp.opaque]
-    ; find_observer : Value_name.Qualified.t -> Name_id.t -> unit [@sexp.opaque]
+    { names : Extern_info.t Name_id.Map.t
+    ; name_bindings : Name_bindings.t
+    ; name_table : Name_id.Name_table.t
+    ; find_observer : Name_id.t -> unit
     }
 
-  let sexp_of_t t =
-    [%sexp (t.names : (Name_id.t * Extern_info.t) Value_name.Qualified.Map.t)]
-  ;;
+  let sexp_of_t t = [%sexp (t.names : Extern_info.t Name_id.Map.t)]
 
   let with_module t module_name ~f =
     let name_bindings =
@@ -243,86 +242,47 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
-  let add t name name_id ~extern_info =
-    { t with names = Map.set t.names ~key:name ~data:(name_id, extern_info) }
+  let add_internal t name_id ~extern_info =
+    { t with names = Map.set t.names ~key:name_id ~data:extern_info }
   ;;
 
+  let add_name_id t name_id = add_internal t name_id ~extern_info:Local
+
+  (* TODO: Should probably convert constant names to an opaque type or variant and accept
+     that. *)
   let add_value_name t name =
-    if Constant_names.mem name
-    then (
-      let name_id = Name_id.create_value_name t.name_table ([], name) ~in_expr:true in
-      add t ([], name) name_id ~extern_info:Local, name_id)
-    else (
-      let path =
-        Name_bindings.current_path t.name_bindings |> Name_bindings.Path.to_module_path
-      in
-      let name = path, name in
-      (* FIXME: Creating new names here doesn't quite feel right since it will be
-         duplicated work already done in the type-checking stage. We don't have a great
-         place to put that information, though, unless we united the name bindings and
-         ast more and/or put name_ids on the ast.
-         
-         I think this just won't work as seen right now since we can't create the same
-         names in expressions more than once. *)
-      let name_id =
-        try
-          Name_bindings.find_entry t.name_bindings name
-          |> Name_bindings.Name_entry.name_id
-        with
-        | Name_bindings.Name_error _ ->
-          Name_id.create_value_name t.name_table name ~in_expr:true
-      in
-      add t name name_id ~extern_info:Local, name_id)
+    let name_id = Name_id.create_value_name t.name_table ([], name) ~in_expr:true in
+    add_name_id t name_id, name_id
   ;;
 
-  let find { names; _ } name = Map.find names name
+  let peek_extern_info { names; _ } name = Map.find names name
 
-  let peek_value_name_internal t name =
-    match name with
-    | [], name when Constant_names.mem name -> find t ([], name)
-    | _ ->
-      let name =
-        try Name_bindings.absolutify_value_name t.name_bindings name with
-        | Name_bindings.Name_error _ ->
-          (* This is a name for a variable local to an expression (these aren't in the
-             name bindings). *)
-          Name_bindings.(current_path t.name_bindings |> Path.to_module_path), snd name
-      in
-      find t name
-  ;;
-
-  let find_value_name t name =
-    match peek_value_name_internal t name with
-    | Some ((name', _) as entry) ->
-      t.find_observer name name';
-      entry
+  let find_extern_info t name_id =
+    match peek_extern_info t name_id with
+    | Some extern_info ->
+      t.find_observer name_id;
+      extern_info
     | None ->
-      compiler_bug
-        [%message
-          "Name missing from context"
-            (name : Value_name.Qualified.t)
-            (t.names : (Name_id.t * Extern_info.t) Value_name.Qualified.Map.t)]
+      compiler_bug [%message "Name missing from context" (name_id : Name_id.t) (t : t)]
   ;;
 
-  let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
-
-  let find_value_name_assert_local t name =
-    let name, extern_info = find_value_name t ([], name) in
+  let find_extern_info_assert_local t name_id =
+    let extern_info = find_extern_info t name_id in
     (match extern_info with
      | Local | Bool_intrinsic _ -> ()
      | External _ ->
        compiler_bug [%message "Unexpected non-local value" (extern_info : Extern_info.t)]);
-    name
+    extern_info
   ;;
 
   let with_find_observer t ~f = { t with find_observer = f t.find_observer }
 
   let create ~names:name_bindings ~name_table =
     let t =
-      { names = Value_name.Qualified.Map.empty
+      { names = Name_id.Map.empty
       ; name_bindings
       ; name_table
-      ; find_observer = (fun _ _ -> ())
+      ; find_observer = (fun _ -> ())
       }
     in
     let current_path =
@@ -354,7 +314,7 @@ end = struct
             in
             External { arity = arity_of_type ~names:name_bindings scheme })
       in
-      add t name name_id ~extern_info)
+      add_internal t name_id ~extern_info)
   ;;
 
   let cnstr_info_lookup_failed type_ =
@@ -387,14 +347,14 @@ end
 module Simple_pattern : sig
   type t =
     | Constant of Literal.t
-    | Catch_all of Value_name.t option
-    | As of t * Value_name.t
+    | Catch_all of Name_id.t option
+    | As of t * Name_id.t
     | Cnstr_appl of Cnstr.t * t list
   [@@deriving sexp, variants]
 
   val flatten_typed_pattern : Typed.Pattern.t -> t Nonempty.t
   val flatten_typed_pattern_no_unions : Typed.Pattern.t -> label:string -> t
-  val names : t -> Value_name.Set.t
+  val names : t -> Name_id.Set.t
 
   module Coverage : sig
     type simple_pattern = t
@@ -413,8 +373,8 @@ module Simple_pattern : sig
 end = struct
   type t =
     | Constant of Literal.t
-    | Catch_all of Value_name.t option
-    | As of t * Value_name.t
+    | Catch_all of Name_id.t option
+    | As of t * Name_id.t
     | Cnstr_appl of Cnstr.t * t list
   [@@deriving sexp, variants]
 
@@ -426,7 +386,7 @@ end = struct
       | As (t, name) -> loop (Set.add acc name) t
       | Cnstr_appl (_, ts) -> List.fold ts ~init:acc ~f:loop
     in
-    fun t -> loop Value_name.Set.empty t
+    fun t -> loop Name_id.Set.empty t
   ;;
 
   (* TODO: remove or make into a proper thing *)
@@ -665,30 +625,36 @@ module Expr = struct
       associated with an expression. The expression passed in should be atomic as it will
       be duplicated when generating bindings. *)
   let fold_pattern_bindings =
-    let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
+    let add_name ~name_handling ~ctx name_id =
+      match name_handling with
+      | `Add -> Context.add_name_id ctx name_id
+      | `Find_local ->
+        ignore (Context.find_extern_info_assert_local ctx name_id : Context.Extern_info.t);
+        ctx
+    in
+    let rec loop ~ctx ~name_handling ~add_let acc pat mir_expr type_ =
       match (pat : Simple_pattern.t) with
       | Catch_all None ->
         (* TODO: warn about unused expressions. NOTE: we can only elide the bound expression
            as we are currently assuming purity. Later we should check for effects. *)
         ctx, acc
       | Catch_all (Some name) ->
-        let ctx, name = add_name ctx name in
-        ctx, add_let acc name mir_expr
+        add_name ~name_handling ~ctx name, add_let acc name mir_expr
       | As (pattern, name) ->
-        let ctx, name = add_name ctx name in
+        let ctx = add_name ~name_handling ~ctx name in
         let acc = add_let acc name mir_expr in
-        loop ~ctx ~add_let ~add_name acc pattern (Name name) type_
+        loop ~ctx ~name_handling ~add_let acc pattern (Name name) type_
       | Cnstr_appl (cnstr, args) ->
         let cnstr_info = Context.find_cnstr_info ctx type_ in
         List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
           let arg_index = Block_index.of_int i in
           let arg_type = Cnstr_info.arg_type cnstr_info cnstr arg_index in
           let arg_expr = Get_block_field (arg_index, mir_expr) in
-          loop ~ctx ~add_let ~add_name acc arg arg_expr arg_type)
+          loop ~ctx ~name_handling ~add_let acc arg arg_expr arg_type)
       | Constant _ -> ctx, acc
     in
-    fun ?(add_name = Context.add_value_name) ~ctx ~init:acc ~add_let pat mir_expr type_ ->
-      loop ~ctx ~add_let ~add_name acc pat mir_expr type_
+    fun ~ctx ~init:acc ~name_handling ~add_let pat mir_expr type_ ->
+      loop ~ctx ~name_handling ~add_let acc pat mir_expr type_
   ;;
 
   let make_atomic ~ctx ~default ~add_let ~binding_name mir_expr =
@@ -852,8 +818,7 @@ module Expr = struct
       match (expr : Type.Scheme.t Typed.Expr.t), (expr_type : Type.Scheme.t) with
       | Literal lit, _ -> Primitive lit
       | Name name, _ ->
-        let name, extern_info = Context.find_value_name ctx name in
-        (match extern_info with
+        (match Context.find_extern_info ctx name with
          | Local -> Name name
          | External { arity } ->
            add_extern_decl { Extern_decl.name; arity };
@@ -985,7 +950,7 @@ module Expr = struct
           else `Newly_bound
         in
         (* Determine if names looked up were closed over from the parent context. *)
-        Context.with_find_observer ctx ~f:(fun parent_observer name unique_name ->
+        Context.with_find_observer ctx ~f:(fun parent_observer name_id ->
           match from_which_context name unique_name with
           | `Newly_bound | `From_outer_stmts -> ()
           | `Closed_over_from_parent ->
@@ -1050,12 +1015,7 @@ module Expr = struct
       ~fallback
       patterns
       =
-      let ctx, vars =
-        List.fold_map
-          (Simple_pattern.names (Nonempty.hd patterns) |> Set.to_list)
-          ~init:ctx
-          ~f:Context.add_value_name
-      in
+      let ctx, vars = Simple_pattern.names (Nonempty.hd patterns) |> Set.to_list in
       let ctx, wrapping_binding, input_expr =
         make_atomic
           ~ctx
