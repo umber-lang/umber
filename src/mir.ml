@@ -1120,52 +1120,6 @@ module Expr = struct
     in
     of_typed_expr ~just_bound:outer_just_bound ~ctx:outer_ctx outer_expr outer_type
   ;;
-
-  let rec map_names expr ~f =
-    match expr with
-    | Primitive _ -> expr
-    | Name name -> Name (f name)
-    | Let (name, expr, body) ->
-      let name = f name in
-      let expr = map_names expr ~f in
-      let body = map_names body ~f in
-      Let (name, expr, body)
-    | Fun_call (fun_name, args) ->
-      let fun_name = f fun_name in
-      let args = Nonempty.map args ~f:(map_names ~f) in
-      Fun_call (fun_name, args)
-    | Make_block { tag; fields } ->
-      let fields = List.map fields ~f:(map_names ~f) in
-      Make_block { tag; fields }
-    | Get_block_field (i, expr) -> Get_block_field (i, map_names expr ~f)
-    | Cond_assign { vars; conds; body; if_none_matched } ->
-      let vars = List.map vars ~f in
-      let conds =
-        Nonempty.map conds ~f:(fun (cond, bindings) ->
-          let cond = map_cond_names cond ~f in
-          let bindings = List.map bindings ~f:(map_names ~f) in
-          cond, bindings)
-      in
-      let body = map_names body ~f in
-      let if_none_matched = map_if_none_matched_names if_none_matched ~f in
-      Cond_assign { vars; conds; body; if_none_matched }
-
-  and map_cond_names cond ~f =
-    match cond with
-    | Equals (expr, lit) -> Equals (map_names expr ~f, lit)
-    | Constant_tag_equals (expr, tag) -> Constant_tag_equals (map_names expr ~f, tag)
-    | Non_constant_tag_equals (expr, tag) ->
-      Non_constant_tag_equals (map_names expr ~f, tag)
-    | And (cond, cond') ->
-      let cond = map_cond_names cond ~f in
-      let cond' = map_cond_names cond' ~f in
-      And (cond, cond')
-
-  and map_if_none_matched_names if_none_matched ~f =
-    match if_none_matched with
-    | Otherwise expr -> Otherwise (map_names expr ~f)
-    | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map_names ~f))
-  ;;
 end
 
 module Stmt = struct
@@ -1176,23 +1130,6 @@ module Stmt = struct
     | Fun_def of Expr.Fun_def.t
     | Extern_decl of Extern_decl.t
   [@@deriving sexp_of, variants]
-
-  let map_names stmt ~f =
-    match stmt with
-    | Value_def (name, expr) ->
-      let name = f name in
-      let expr = Expr.map_names expr ~f in
-      Value_def (name, expr)
-    | Fun_def { fun_name; closed_over; args; body } ->
-      let fun_name = f fun_name in
-      let closed_over = Mir_name.Set.map closed_over ~f in
-      let args = Nonempty.map args ~f in
-      let body = Expr.map_names body ~f in
-      Fun_def { fun_name; closed_over; args; body }
-    | Extern_decl { name; arity } ->
-      let name = f name in
-      Extern_decl { name; arity }
-  ;;
 end
 
 type t = Stmt.t list [@@deriving sexp_of]
@@ -1297,20 +1234,4 @@ let of_typed_module =
     | (_ : Context.t), stmts -> Ok (List.rev stmts)
     | exception Compilation_error.Compilation_error error -> Error error
     | exception Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
-;;
-
-let map_names stmts ~f = List.map stmts ~f:(Stmt.map_names ~f)
-
-let renumber_ids stmts =
-  let name_table = Ustring.Table.create () in
-  map_names stmts ~f:(fun name ->
-    Mir_name.map_parts name ~f:(fun name id ->
-      match Hashtbl.find name_table name with
-      | None ->
-        let id_table = Int.Table.create () in
-        Hashtbl.set id_table ~key:id ~data:0;
-        Hashtbl.set name_table ~key:name ~data:id_table;
-        0
-      | Some id_table ->
-        Hashtbl.find_or_add id_table id ~default:(fun () -> Hashtbl.length id_table)))
 ;;

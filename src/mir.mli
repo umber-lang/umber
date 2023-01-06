@@ -78,5 +78,3 @@ val of_typed_module
   :  names:Name_bindings.t
   -> Typed.Module.t
   -> (t, Compilation_error.t) result
-
-val renumber_ids : t -> t

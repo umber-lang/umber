@@ -80,14 +80,7 @@ let run_tests () =
           if should_make bare_filename then Continue (target :: targets) else Stop targets)
     in
     let encountered_error = ref false in
-    (* FIXME: Renumbering the MIR IDs is a hack to make cross-module linking with
-       unique ids generated separately work. I think we just need to move that
-       functionality to the name_bindings so it's in one place. *)
-    Umberboot.compile
-      targets
-      ~renumber_mir_ids:true
-      ~filename:in_file
-      ~on_error:(fun stage error ->
+    Umberboot.compile targets ~filename:in_file ~on_error:(fun stage error ->
       encountered_error := true;
       let file =
         match stage with

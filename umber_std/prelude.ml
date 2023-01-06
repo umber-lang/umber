@@ -9,7 +9,6 @@ open! Core
       ~filename:"Std/Prelude.um"
       ~no_std:true
       ~parent:(Umber.Ast.Module_name.of_string_exn "Std")
-      ~renumber_mir_ids:true
       [ target, Stdout ];
     print_endline "|}";
     if is_sexp then print_endline "|> Sexp.of_string"
@@ -17,7 +16,8 @@ open! Core
 $*)
 
 (*$ let () = compile_and_print ~name:"names" ~is_sexp:true Names *)
-let names = {|
+let names =
+  {|
 ((current_path "Std(d)")
  (toplevel
   ((names
@@ -416,11 +416,14 @@ let names = {|
                           (type_source Let_inferred))))))
                      (types ()) (modules ()))))))))))))))))))))))
 |}
-|> Sexp.of_string
+  |> Sexp.of_string
+;;
+
 (*$*)
 
 (*$ let () = compile_and_print ~name:"llvm" ~is_sexp:false Llvm *)
-let llvm = {|
+let llvm =
+  {|
 ; ModuleID = 'Std/Prelude.um'
 source_filename = "Std/Prelude.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
@@ -573,4 +576,5 @@ declare %umber_block* @umber_print_int(%umber_block*)
 declare noalias i8* @malloc(i32)
 
 |}
+;;
 (*$*)
