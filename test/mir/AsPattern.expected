@@ -1,30 +1,29 @@
-((Value_def AsPattern.pair.0
+((Value_def AsPattern.pair
   (Make_block (tag 0) (fields ((Primitive (Int 1)) (Primitive (Int 2))))))
- (Value_def AsPattern.one.0 (Get_block_field 0 (Name AsPattern.pair.0)))
- (Value_def AsPattern.two.0 (Get_block_field 1 (Name AsPattern.pair.0)))
- (Extern_decl ((name "Std.Prelude.Operators.;.0") (arity 2)))
- (Extern_decl ((name Std.Prelude.Operators.::.0) (arity 2)))
+ (Value_def AsPattern.one (Get_block_field 0 (Name AsPattern.pair)))
+ (Value_def AsPattern.two (Get_block_field 1 (Name AsPattern.pair)))
+ (Extern_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Extern_decl ((name Std.Prelude.Operators.::) (arity 2)))
  (Fun_def
-  ((fun_name AsPattern.iter_pairs.0) (args (AsPattern.f.0 AsPattern.lst.0))
+  ((fun_name AsPattern.iter_pairs) (args (AsPattern.f AsPattern.lst))
    (body
     (Cond_assign
      (conds
-      (((Constant_tag_equals (Name AsPattern.lst.0) 0) ())
-       ((And (Non_constant_tag_equals (Name AsPattern.lst.0) 0)
-         (Constant_tag_equals (Get_block_field 1 (Name AsPattern.lst.0)) 0))
+      (((Constant_tag_equals (Name AsPattern.lst) 0) ())
+       ((And (Non_constant_tag_equals (Name AsPattern.lst) 0)
+         (Constant_tag_equals (Get_block_field 1 (Name AsPattern.lst)) 0))
         ())))
      (body (Make_block (tag 0)))
      (if_none_matched
       (Otherwise
-       (Let AsPattern.rest.0
-        (Get_block_field 1 (Get_block_field 1 (Name AsPattern.lst.0)))
-        (Let AsPattern.b.0
-         (Get_block_field 0 (Get_block_field 1 (Name AsPattern.lst.0)))
-         (Let AsPattern.a.0 (Get_block_field 0 (Name AsPattern.lst.0))
-          (Fun_call "Std.Prelude.Operators.;.0"
-           ((Fun_call AsPattern.f.0
-             ((Name AsPattern.a.0) (Name AsPattern.b.0)))
-            (Fun_call AsPattern.iter_pairs.0
-             ((Name AsPattern.f.0)
-              (Fun_call Std.Prelude.Operators.::.0
-               ((Name AsPattern.b.0) (Name AsPattern.rest.0)))))))))))))))))
+       (Let AsPattern.rest
+        (Get_block_field 1 (Get_block_field 1 (Name AsPattern.lst)))
+        (Let AsPattern.b
+         (Get_block_field 0 (Get_block_field 1 (Name AsPattern.lst)))
+         (Let AsPattern.a (Get_block_field 0 (Name AsPattern.lst))
+          (Fun_call "Std.Prelude.Operators.;"
+           ((Fun_call AsPattern.f ((Name AsPattern.a) (Name AsPattern.b)))
+            (Fun_call AsPattern.iter_pairs
+             ((Name AsPattern.f)
+              (Fun_call Std.Prelude.Operators.::
+               ((Name AsPattern.b) (Name AsPattern.rest)))))))))))))))))

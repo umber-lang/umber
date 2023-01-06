@@ -1,72 +1,71 @@
-((Extern_decl ((name Std.Prelude.List.Nil.0) (arity 0)))
- (Value_def MutualRecursion.f.0 (Name Std.Prelude.List.Nil.0))
+((Extern_decl ((name Std.Prelude.List.Nil) (arity 0)))
+ (Value_def MutualRecursion.f (Name Std.Prelude.List.Nil))
  (Extern_decl ((name umber_int_add) (arity 2)))
  (Fun_def
-  ((fun_name MutualRecursion.loop.0)
-   (args (MutualRecursion.acc.0 MutualRecursion.forest.0))
+  ((fun_name MutualRecursion.loop)
+   (args (MutualRecursion.acc MutualRecursion.forest))
    (body
     (Cond_assign
-     (conds (((Constant_tag_equals (Name MutualRecursion.forest.0) 0) ())))
-     (body (Name MutualRecursion.acc.0))
+     (conds (((Constant_tag_equals (Name MutualRecursion.forest) 0) ())))
+     (body (Name MutualRecursion.acc))
      (if_none_matched
       (Otherwise
-       (Let MutualRecursion.trees.0
-        (Get_block_field 1 (Name MutualRecursion.forest.0))
-        (Let MutualRecursion.tree.0
-         (Get_block_field 0 (Name MutualRecursion.forest.0))
-         (Fun_call MutualRecursion.loop.0
+       (Let MutualRecursion.trees
+        (Get_block_field 1 (Name MutualRecursion.forest))
+        (Let MutualRecursion.tree
+         (Get_block_field 0 (Name MutualRecursion.forest))
+         (Fun_call MutualRecursion.loop
           ((Fun_call umber_int_add
-            ((Name MutualRecursion.acc.0)
-             (Fun_call MutualRecursion.sum_tree.0
-              ((Name MutualRecursion.tree.0)))))
-           (Name MutualRecursion.trees.0)))))))))))
+            ((Name MutualRecursion.acc)
+             (Fun_call MutualRecursion.sum_tree
+              ((Name MutualRecursion.tree)))))
+           (Name MutualRecursion.trees)))))))))))
  (Fun_def
-  ((fun_name *fun.0) (closed_over (MutualRecursion.loop.0))
+  ((fun_name *fun) (closed_over (MutualRecursion.loop))
    (args (MutualRecursion.forest.1))
    (body
-    (Fun_call MutualRecursion.loop.0
+    (Fun_call MutualRecursion.loop
      ((Primitive (Int 0)) (Name MutualRecursion.forest.1))))))
- (Value_def MutualRecursion.sum_forest.0 (Name *fun.0))
+ (Value_def MutualRecursion.sum_forest (Name *fun))
  (Fun_def
-  ((fun_name MutualRecursion.sum_tree.0) (args (MutualRecursion..0))
+  ((fun_name MutualRecursion.sum_tree) (args (MutualRecursion.))
    (body
     (Cond_assign
-     (conds (((Constant_tag_equals (Name MutualRecursion..0) 0) ())))
+     (conds (((Constant_tag_equals (Name MutualRecursion.) 0) ())))
      (body (Primitive (Int 0)))
      (if_none_matched
       (Otherwise
        (Let MutualRecursion.forest.2
-        (Get_block_field 1 (Name MutualRecursion..0))
-        (Let MutualRecursion.x.0
-         (Get_block_field 0 (Name MutualRecursion..0))
+        (Get_block_field 1 (Name MutualRecursion.))
+        (Let MutualRecursion.x (Get_block_field 0 (Name MutualRecursion.))
          (Fun_call umber_int_add
-          ((Name MutualRecursion.x.0)
-           (Fun_call MutualRecursion.sum_forest.0
+          ((Name MutualRecursion.x)
+           (Fun_call MutualRecursion.sum_forest
             ((Name MutualRecursion.forest.2)))))))))))))
- (Value_def MutualRecursion.Nil.0 (Make_block (tag 0)))
+ (Value_def MutualRecursion.Nil (Make_block (tag 0)))
  (Fun_def
-  ((fun_name MutualRecursion.Cons.0) (args (arg0.0 arg1.0))
-   (body (Make_block (tag 0) (fields ((Name arg0.0) (Name arg1.0)))))))
- (Value_def MutualRecursion.Leaf.0 (Make_block (tag 0)))
+  ((fun_name MutualRecursion.Cons) (args (arg0 arg1))
+   (body (Make_block (tag 0) (fields ((Name arg0) (Name arg1)))))))
+ (Value_def MutualRecursion.Leaf (Make_block (tag 0)))
  (Fun_def
-  ((fun_name MutualRecursion.Node.0) (args (arg0.1 arg1.1))
+  ((fun_name MutualRecursion.Node) (args (arg0.1 arg1.1))
    (body (Make_block (tag 0) (fields ((Name arg0.1) (Name arg1.1)))))))
  (Extern_decl ((name umber_eq) (arity 2)))
  (Extern_decl ((name umber_int_sub) (arity 2)))
  (Fun_def
-  ((fun_name MutualRecursion.even.0) (args (MutualRecursion.x.1))
+  ((fun_name MutualRecursion.even) (args (MutualRecursion.x.1))
    (body
-    (Let match.0
+    (Let match
      (Fun_call umber_eq ((Name MutualRecursion.x.1) (Primitive (Int 0))))
-     (Cond_assign (conds (((Constant_tag_equals (Name match.0) 1) ())))
+     (Cond_assign (conds (((Constant_tag_equals (Name match) 1) ())))
       (body (Make_block (tag 1)))
       (if_none_matched
        (Otherwise
-        (Fun_call MutualRecursion.odd.0
+        (Fun_call MutualRecursion.odd
          ((Fun_call umber_int_sub
            ((Name MutualRecursion.x.1) (Primitive (Int 1)))))))))))))
  (Fun_def
-  ((fun_name MutualRecursion.odd.0) (args (MutualRecursion.x.2))
+  ((fun_name MutualRecursion.odd) (args (MutualRecursion.x.2))
    (body
     (Let match.1
      (Fun_call umber_eq ((Name MutualRecursion.x.2) (Primitive (Int 0))))
@@ -74,10 +73,10 @@
       (body (Make_block (tag 0)))
       (if_none_matched
        (Otherwise
-        (Fun_call MutualRecursion.even.0
+        (Fun_call MutualRecursion.even
          ((Fun_call umber_int_sub
            ((Name MutualRecursion.x.2) (Primitive (Int 1)))))))))))))
- (Value_def MutualRecursion.number.0
+ (Value_def MutualRecursion.number
   (Let MutualRecursion.number.1 (Primitive (Int 5))
    (Let MutualRecursion.number.2
     (Fun_call umber_int_add

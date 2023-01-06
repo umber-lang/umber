@@ -8,14 +8,14 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block2 = type { %umber_header, [2 x i64] }
 %umber_block3 = type { %umber_header, [3 x i64] }
 
-@Text.c.0 = constant %umber_block* bitcast (%umber_block1* @char.a to %umber_block*)
-@Text.hello.0 = constant %umber_block* bitcast (%umber_block2* @string.774705101 to %umber_block*)
-@Text.spacing.0 = constant %umber_block* bitcast (%umber_block3* @string.398489461 to %umber_block*)
-@Text.dec_code_exclam.0 = constant %umber_block* bitcast (%umber_block1* @string.229771883 to %umber_block*)
-@"*binding.0" = global %umber_block* null
-@Text.a.0 = global %umber_block* null
-@Text.b.0 = global %umber_block* null
-@Text._UNICODE_WORKS_TOO.0 = constant %umber_block* bitcast (%umber_block2* @string.986077178 to %umber_block*)
+@Text.c = constant %umber_block* bitcast (%umber_block1* @char.a to %umber_block*)
+@Text.hello = constant %umber_block* bitcast (%umber_block2* @string.774705101 to %umber_block*)
+@Text.spacing = constant %umber_block* bitcast (%umber_block3* @string.398489461 to %umber_block*)
+@Text.dec_code_exclam = constant %umber_block* bitcast (%umber_block1* @string.229771883 to %umber_block*)
+@"*binding" = global %umber_block* null
+@Text.a = global %umber_block* null
+@Text.b = global %umber_block* null
+@Text._UNICODE_WORKS_TOO = constant %umber_block* bitcast (%umber_block2* @string.986077178 to %umber_block*)
 @char.a = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 97 }
 @string.774705101 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [2 x i64] [i64 7522537965568948079, i64 8245075110705233923] }
 @string.398489461 = constant %umber_block3 { %umber_header { i16 -32764, i16 3, i32 0 }, [3 x i64] [i64 7811896409261673738, i64 657644745675579442, i64 7] }
@@ -39,13 +39,13 @@ entry:
   %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 2
   store %umber_block* bitcast (%umber_block1* @char.b to %umber_block*), %umber_block** %box6, align 8
   %box7 = bitcast i64* %box to %umber_block*
-  store %umber_block* %box7, %umber_block** @"*binding.0", align 8
-  %"*binding.0" = load %umber_block*, %umber_block** @"*binding.0", align 8
-  %block_field = getelementptr %umber_block, %umber_block* %"*binding.0", i16 1
-  store %umber_block* %block_field, %umber_block** @Text.a.0, align 8
-  %"*binding.08" = load %umber_block*, %umber_block** @"*binding.0", align 8
-  %block_field9 = getelementptr %umber_block, %umber_block* %"*binding.08", i16 2
-  store %umber_block* %block_field9, %umber_block** @Text.b.0, align 8
+  store %umber_block* %box7, %umber_block** @"*binding", align 8
+  %"*binding" = load %umber_block*, %umber_block** @"*binding", align 8
+  %block_field = getelementptr %umber_block, %umber_block* %"*binding", i16 1
+  store %umber_block* %block_field, %umber_block** @Text.a, align 8
+  %"*binding8" = load %umber_block*, %umber_block** @"*binding", align 8
+  %block_field9 = getelementptr %umber_block, %umber_block* %"*binding8", i16 2
+  store %umber_block* %block_field9, %umber_block** @Text.b, align 8
   ret i32 0
 }
 

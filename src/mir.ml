@@ -194,7 +194,7 @@ let rec arity_of_type ~names : Type.Scheme.t -> int = function
 module Context : sig
   type t [@@deriving sexp_of]
 
-  val of_name_bindings : Name_bindings.t -> t
+  val create : names:Name_bindings.t -> name_table:Mir_name.Name_table.t -> t
   val add_value_name : t -> Value_name.t -> t * Mir_name.t
 
   module Extern_info : sig
@@ -226,10 +226,14 @@ end = struct
 
   type t =
     { names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t
-    ; name_bindings : Name_bindings.t [@sexp.opaque]
-    ; find_observer : Value_name.Qualified.t -> Mir_name.t -> unit [@sexp.opaque]
+    ; name_bindings : Name_bindings.t
+    ; name_table : Mir_name.Name_table.t
+    ; find_observer : Value_name.Qualified.t -> Mir_name.t -> unit
     }
-  [@@deriving sexp_of]
+
+  let sexp_of_t t =
+    [%sexp (t.names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t)]
+  ;;
 
   let with_module t module_name ~f =
     let name_bindings =
@@ -239,14 +243,11 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
-  (* TODO: Creating new unique names here means uses of imported names are
-     different in different files, which is weird. Maybe [Name_bindings] should be
-     responsible for assigning unique names for names in its own file? *)
   let add t name ~extern_name ~extern_info =
     let mir_name =
       match extern_name with
-      | None -> Mir_name.create (Value_name.Qualified.to_ustring name)
-      | Some extern_name -> Mir_name.of_extern_name extern_name
+      | None -> Mir_name.create_value_name t.name_table name
+      | Some extern_name -> Mir_name.create_extern_name extern_name
     in
     { t with names = Map.set t.names ~key:name ~data:(mir_name, extern_info) }, mir_name
   ;;
@@ -301,10 +302,11 @@ end = struct
 
   let with_find_observer t ~f = { t with find_observer = f t.find_observer }
 
-  let of_name_bindings name_bindings =
+  let create ~names:name_bindings ~name_table =
     let t =
       { names = Value_name.Qualified.Map.empty
       ; name_bindings
+      ; name_table
       ; find_observer = (fun _ _ -> ())
       }
     in
@@ -1280,7 +1282,7 @@ let of_typed_module =
           (Extern ((_ : Value_name.t), (_ : Fixity.t option), type_, extern_name)) ->
         ( ctx
         , Extern_decl
-            { name = Mir_name.of_extern_name extern_name
+            { name = Mir_name.create_extern_name extern_name
             ; arity = arity_of_type ~names type_
             }
           :: stmts )
@@ -1289,7 +1291,7 @@ let of_typed_module =
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     let names = Name_bindings.into_module names module_name ~place:`Def in
-    let ctx = Context.of_name_bindings names in
+    let ctx = Context.create ~names ~name_table:(Mir_name.Name_table.create ()) in
     let extern_decls = Mir_name.Hash_set.create () in
     match loop ~ctx ~names ~stmts:[] ~extern_decls defs with
     | (_ : Context.t), stmts -> Ok (List.rev stmts)

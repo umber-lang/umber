@@ -1,24 +1,23 @@
 ((Extern_decl ((name umber_int_mul) (arity 2)))
  (Extern_decl ((name umber_int_sub) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fact.0) (args (Classics..0))
+  ((fun_name Classics.fact) (args (Classics.))
    (body
     (Cond_assign
      (conds
-      (((Equals (Name Classics..0) (Int 0)) ())
-       ((Equals (Name Classics..0) (Int 1)) ())))
+      (((Equals (Name Classics.) (Int 0)) ())
+       ((Equals (Name Classics.) (Int 1)) ())))
      (body (Primitive (Int 1)))
      (if_none_matched
       (Otherwise
-       (Let Classics.n.0 (Name Classics..0)
+       (Let Classics.n (Name Classics.)
         (Fun_call umber_int_mul
-         ((Name Classics.n.0)
-          (Fun_call Classics.fact.0
-           ((Fun_call umber_int_sub
-             ((Name Classics.n.0) (Primitive (Int 1)))))))))))))))
+         ((Name Classics.n)
+          (Fun_call Classics.fact
+           ((Fun_call umber_int_sub ((Name Classics.n) (Primitive (Int 1)))))))))))))))
  (Extern_decl ((name umber_int_add) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fib.0) (args (Classics.n.1))
+  ((fun_name Classics.fib) (args (Classics.n.1))
    (body
     (Cond_assign
      (conds
@@ -29,17 +28,17 @@
       (Otherwise
        (Let Classics.n.2 (Name Classics.n.1)
         (Fun_call umber_int_add
-         ((Fun_call Classics.fib.0
+         ((Fun_call Classics.fib
            ((Fun_call umber_int_sub
              ((Name Classics.n.2) (Primitive (Int 1))))))
-          (Fun_call Classics.fib.0
+          (Fun_call Classics.fib
            ((Fun_call umber_int_sub
              ((Name Classics.n.2) (Primitive (Int 2)))))))))))))))
- (Extern_decl ((name "Std.Prelude.Operators.;.0") (arity 2)))
+ (Extern_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Extern_decl ((name umber_print_endline) (arity 1)))
  (Extern_decl ((name umber_print_int) (arity 1)))
- (Value_def *binding.0
-  (Fun_call "Std.Prelude.Operators.;.0"
+ (Value_def *binding
+  (Fun_call "Std.Prelude.Operators.;"
    ((Fun_call umber_print_endline ((Primitive (String "5! is:"))))
     (Fun_call umber_print_int
-     ((Fun_call Classics.fact.0 ((Primitive (Int 5))))))))))
+     ((Fun_call Classics.fact ((Primitive (Int 5))))))))))

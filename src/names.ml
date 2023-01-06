@@ -291,26 +291,48 @@ module Mir_name : sig
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 
-  val create : Ustring.t -> t
-  val of_extern_name : Extern_name.t -> t
+  module Name_table : sig
+    type t
+
+    val create : unit -> t
+  end
+
+  val create_value_name : Name_table.t -> Value_name.Qualified.t -> t
+  val create_extern_name : Extern_name.t -> t
   val extern_name : t -> Extern_name.t option
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
   val map_parts : t -> f:(Ustring.t -> int -> int) -> t
 end = struct
-  module Unique_name = struct
-    module Id = Unique_id.Int ()
+  module Name_table = struct
+    type t = int Value_name.Qualified.Table.t
 
+    let create () = Value_name.Qualified.Table.create ()
+  end
+
+  module Unique_name = struct
     module T = struct
       module U = struct
-        type t = Ustring.t * Id.t [@@deriving compare, equal, hash]
+        type t = Ustring.t * int [@@deriving compare, equal, hash]
 
-        let to_string (ustr, id) = [%string "%{ustr#Ustring}.%{id#Id}"]
-        let to_ustring (ustr, id) = Ustring.(ustr ^ of_string_exn [%string ".%{id#Id}"])
+        let to_string (ustr, id) =
+          if id = 0 then Ustring.to_string ustr else [%string "%{ustr#Ustring}.%{id#Int}"]
+        ;;
+
+        let to_ustring (ustr, id) =
+          if id = 0 then ustr else Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
+        ;;
 
         let of_string str =
-          let name, id = String.rsplit2_exn str ~on:'.' in
-          Ustring.of_string_exn name, Id.of_string id
+          let name, id =
+            match String.rsplit2 str ~on:'.' with
+            | Some (name, id) ->
+              if (not (String.is_empty id)) && String.for_all ~f:Char.is_digit id
+              then name, Int.of_string id
+              else str, 0
+            | None -> str, 0
+          in
+          Ustring.of_string_exn name, id
         ;;
       end
 
@@ -322,10 +344,14 @@ end = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
-    let create ustr = ustr, Id.create ()
+    let create_value_name name_table value_name =
+      let id = Option.value (Hashtbl.find name_table value_name) ~default:0 in
+      Hashtbl.incr name_table value_name;
+      Value_name.Qualified.to_ustring value_name, id
+    ;;
 
     let map_parts (ustr, id) ~f =
-      let id = f ustr (Id.to_int_exn id) |> Id.of_int_exn in
+      let id = f ustr id in
       ustr, id
     ;;
   end
@@ -358,8 +384,11 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let create ustr = Internal (Unique_name.create ustr)
-  let of_extern_name name = External name
+  let create_value_name name_table ustr =
+    Internal (Unique_name.create_value_name name_table ustr)
+  ;;
+
+  let create_extern_name name = External name
 
   let extern_name = function
     | Internal _ -> None
