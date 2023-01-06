@@ -225,6 +225,7 @@ let rec codegen_expr t expr =
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     let call = Llvm.build_call fun_ args "fun_call" t.builder in
     Llvm.set_tail_call true call;
+    Llvm.set_instruction_call_conv (Llvm.function_call_conv fun_) call;
     call
   | Make_block { tag; fields } ->
     (match Nonempty.of_list fields with

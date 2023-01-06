@@ -13,10 +13,10 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 define i32 @"main./examples/ModuleSig.um"() {
 entry:
-  %fun_call = tail call %umber_block* @ModuleSig.Range.between(%umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.10 to %umber_block*))
+  %fun_call = tail call tailcc %umber_block* @ModuleSig.Range.between(%umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.10 to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @ModuleSig.my_range, align 8
   %ModuleSig.my_range = load %umber_block*, %umber_block** @ModuleSig.my_range, align 8
-  %fun_call1 = tail call %umber_block* @ModuleSig.Range.in(%umber_block* bitcast (%umber_block1* @int.10 to %umber_block*), %umber_block* %ModuleSig.my_range)
+  %fun_call1 = tail call tailcc %umber_block* @ModuleSig.Range.in(%umber_block* bitcast (%umber_block1* @int.10 to %umber_block*), %umber_block* %ModuleSig.my_range)
   store %umber_block* %fun_call1, %umber_block** @ModuleSig.is_10_in_range, align 8
   ret i32 0
 }

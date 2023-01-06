@@ -16,7 +16,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 define i32 @"main./examples/Classics.um"() {
 entry:
   %fun_call = tail call %umber_block* @umber_print_endline(%umber_block* bitcast (%umber_block1* @string.558432565 to %umber_block*))
-  %fun_call1 = tail call %umber_block* @Classics.fact(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
+  %fun_call1 = tail call tailcc %umber_block* @Classics.fact(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
   %fun_call2 = tail call %umber_block* @umber_print_int(%umber_block* %fun_call1)
   %fun_call3 = tail call %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call, %umber_block* %fun_call2)
   store %umber_block* %fun_call3, %umber_block** @"*binding", align 8
@@ -52,7 +52,7 @@ cond_binding4:                                    ; preds = %cond1
 
 cond_otherwise:                                   ; preds = %cond1
   %fun_call = tail call %umber_block* @umber_int_sub(%umber_block* %Classics., %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*))
-  %fun_call5 = tail call %umber_block* @Classics.fact(%umber_block* %fun_call)
+  %fun_call5 = tail call tailcc %umber_block* @Classics.fact(%umber_block* %fun_call)
   %fun_call6 = tail call %umber_block* @umber_int_mul(%umber_block* %Classics., %umber_block* %fun_call5)
   br label %cond_otherwise_merge
 
@@ -88,9 +88,9 @@ cond_binding4:                                    ; preds = %cond1
 
 cond_otherwise:                                   ; preds = %cond1
   %fun_call = tail call %umber_block* @umber_int_sub(%umber_block* %Classics.n.1, %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*))
-  %fun_call5 = tail call %umber_block* @Classics.fib(%umber_block* %fun_call)
+  %fun_call5 = tail call tailcc %umber_block* @Classics.fib(%umber_block* %fun_call)
   %fun_call6 = tail call %umber_block* @umber_int_sub(%umber_block* %Classics.n.1, %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
-  %fun_call7 = tail call %umber_block* @Classics.fib(%umber_block* %fun_call6)
+  %fun_call7 = tail call tailcc %umber_block* @Classics.fib(%umber_block* %fun_call6)
   %fun_call8 = tail call %umber_block* @umber_int_add(%umber_block* %fun_call5, %umber_block* %fun_call7)
   br label %cond_otherwise_merge
 
