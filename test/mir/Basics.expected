@@ -1,6 +1,6 @@
 ((Value_def Basics.false (Make_block (tag 0)))
  (Value_def Basics.true (Make_block (tag 1)))
- (Value_def Basics._
+ (Value_def _
   (Cond_assign (conds (((Constant_tag_equals (Name Basics.false) 1) ())))
    (body (Primitive (Float 1)))
    (if_none_matched (Otherwise (Primitive (Float 2.5))))))

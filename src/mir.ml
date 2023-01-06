@@ -61,8 +61,9 @@ end
 module Constant_names : sig
   val binding : Value_name.t
   val fun_ : Value_name.t
-  val lambda_arg : Value_name.t
   val match_ : Value_name.t
+  val lambda_arg : Value_name.t
+  val underscore : Value_name.t
   val synthetic_arg : int -> Value_name.t
   val mem : Value_name.t -> bool
 end = struct
@@ -72,9 +73,10 @@ end = struct
   let fun_ = Value_name.of_string_unchecked "*fun"
   let match_ = Value_name.of_string_unchecked "match"
   let lambda_arg = Value_name.of_string_unchecked "*lambda_arg"
+  let underscore = Value_name.of_string_unchecked "_"
 
   let constant_names_table =
-    Value_name.Hash_set.of_list [ binding; fun_; match_; lambda_arg ]
+    Value_name.Hash_set.of_list [ binding; fun_; match_; lambda_arg; underscore ]
   ;;
 
   let synthetic_arg i =
@@ -317,33 +319,39 @@ end = struct
       name_bindings
       ~init:t
       ~f:(fun t ((path, _) as name) entry ->
-      let extern_name = Name_bindings.Name_entry.extern_name entry in
-      let fallback_to_external () : Extern_info.t =
-        let scheme =
-          Option.value_or_thunk
-            (Name_bindings.Name_entry.scheme entry)
-            ~default:(fun () ->
-            compiler_bug
-              [%message
-                "Didn't find type scheme for external name entry"
-                  (name : Value_name.Qualified.t)
-                  (entry : Name_bindings.Name_entry.t)])
+      (* TODO: This is kind of a gross way to avoid including names from the current
+         module (which would then be added again as we process their definitions). It
+         might make more sense if we did the name bindings lookups lazily as needed. *)
+      if Module_path.is_prefix path ~prefix:current_path
+      then t
+      else (
+        let extern_name = Name_bindings.Name_entry.extern_name entry in
+        let fallback_to_external () : Extern_info.t =
+          let scheme =
+            Option.value_or_thunk
+              (Name_bindings.Name_entry.scheme entry)
+              ~default:(fun () ->
+              compiler_bug
+                [%message
+                  "Didn't find type scheme for external name entry"
+                    (name : Value_name.Qualified.t)
+                    (entry : Name_bindings.Name_entry.t)])
+          in
+          External { arity = arity_of_type ~names:name_bindings scheme }
         in
-        External { arity = arity_of_type ~names:name_bindings scheme }
-      in
-      let extern_info : Extern_info.t =
-        match extern_name with
-        | None ->
-          if Module_path.is_prefix ~prefix:current_path path
-          then Local
-          else fallback_to_external ()
-        | Some extern_name ->
-          (match Extern_name.to_ustring extern_name |> Ustring.to_string with
-           | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
-           | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
-           | _ -> fallback_to_external ())
-      in
-      fst (add t name ~extern_name ~extern_info))
+        let extern_info : Extern_info.t =
+          match extern_name with
+          | None ->
+            if Module_path.is_prefix ~prefix:current_path path
+            then Local
+            else fallback_to_external ()
+          | Some extern_name ->
+            (match Extern_name.to_ustring extern_name |> Ustring.to_string with
+             | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
+             | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
+             | _ -> fallback_to_external ())
+        in
+        fst (add t name ~extern_name ~extern_info)))
   ;;
 
   let cnstr_info_lookup_failed type_ =
@@ -680,11 +688,18 @@ module Expr = struct
       loop ~ctx ~add_let ~add_name acc pat mir_expr type_
   ;;
 
-  let make_atomic ~ctx ~default ~add_let ~binding_name mir_expr =
+  let make_atomic
+    ?(add_name = Context.add_value_name)
+    ~ctx
+    ~default
+    ~add_let
+    ~binding_name
+    mir_expr
+    =
     if is_atomic mir_expr
     then ctx, default, mir_expr
     else (
-      let ctx_for_body, expr_name = Context.add_value_name ctx binding_name in
+      let ctx_for_body, expr_name = add_name ctx binding_name in
       let acc = add_let expr_name mir_expr in
       ctx_for_body, acc, Name expr_name)
   ;;
@@ -805,11 +820,11 @@ module Expr = struct
         process_expr acc ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
       in
       let add_name ctx name = ctx, Context.find_value_name_assert_local ctx name in
-      let binding_name =
+      let binding_name, add_binding_name =
         match pat' with
-        | Catch_all (Some name) | As (_, name) -> name
-        | Catch_all None -> Value_name.of_string_unchecked "_"
-        | Constant _ | Cnstr_appl _ -> Constant_names.binding
+        | Catch_all (Some name) | As (_, name) -> name, add_name
+        | Catch_all None -> Constant_names.underscore, Context.add_value_name
+        | Constant _ | Cnstr_appl _ -> Constant_names.binding, Context.add_value_name
       in
       let ctx_for_body, acc, mir_expr =
         make_atomic
@@ -817,6 +832,7 @@ module Expr = struct
           ~default:acc
           ~add_let:(add_let acc)
           ~binding_name
+          ~add_name:add_binding_name
           mir_expr
       in
       fold_pattern_bindings

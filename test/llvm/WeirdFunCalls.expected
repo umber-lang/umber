@@ -46,13 +46,13 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
 
 declare %umber_block* @umber_print_endline(%umber_block*)
 
-define tailcc %umber_block* @"*fun"(%umber_block* %"*lambda_arg") {
+define tailcc %umber_block* @"*fun"(%umber_block* %"*lambda_arg.1") {
 entry:
   %fun_call = tail call %umber_block* @umber_print_endline(%umber_block* bitcast (%umber_block2* @string.812905539 to %umber_block*))
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @WeirdFunCalls.fun_call(%umber_block* %"*lambda_arg.1") {
+define tailcc %umber_block* @WeirdFunCalls.fun_call(%umber_block* %"*lambda_arg") {
 entry:
   ret %umber_block* bitcast (%umber_block* (%umber_block*)* @"*fun" to %umber_block*)
 }

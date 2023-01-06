@@ -292,7 +292,7 @@ module Mir_name : sig
   include Hashable.S with type t := t
 
   module Name_table : sig
-    type t
+    type t [@@deriving sexp_of]
 
     val create : unit -> t
   end
@@ -305,7 +305,7 @@ module Mir_name : sig
   val map_parts : t -> f:(Ustring.t -> int -> int) -> t
 end = struct
   module Name_table = struct
-    type t = int Value_name.Qualified.Table.t
+    type t = int Value_name.Qualified.Table.t [@@deriving sexp_of]
 
     let create () = Value_name.Qualified.Table.create ()
   end
@@ -346,7 +346,7 @@ end = struct
 
     let create_value_name name_table value_name =
       let id = Option.value (Hashtbl.find name_table value_name) ~default:0 in
-      Hashtbl.incr name_table value_name;
+      Hashtbl.set name_table ~key:value_name ~data:(id + 1);
       Value_name.Qualified.to_ustring value_name, id
     ;;
 

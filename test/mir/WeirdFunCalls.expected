@@ -2,11 +2,10 @@
  (Value_def *binding
   (Fun_call umber_print_endline ((Primitive (String plain)))))
  (Fun_def
-  ((fun_name *fun) (args (*lambda_arg))
+  ((fun_name *fun) (args (*lambda_arg.1))
    (body (Fun_call umber_print_endline ((Primitive (String "fun call")))))))
  (Fun_def
-  ((fun_name WeirdFunCalls.fun_call) (args (*lambda_arg.1))
-   (body (Name *fun))))
+  ((fun_name WeirdFunCalls.fun_call) (args (*lambda_arg)) (body (Name *fun))))
  (Value_def *binding.1
   (Let *fun.1 (Fun_call WeirdFunCalls.fun_call ((Make_block (tag 0))))
    (Fun_call *fun.1 ((Make_block (tag 0))))))

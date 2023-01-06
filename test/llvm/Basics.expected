@@ -8,7 +8,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 @Basics.false = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Basics.true = constant %umber_block* inttoptr (i64 3 to %umber_block*)
-@Basics._ = global %umber_block* null
+@_ = global %umber_block* null
 @Basics.Red = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Basics.Blue = constant %umber_block* inttoptr (i64 3 to %umber_block*)
 @Basics.Green = constant %umber_block* inttoptr (i64 1 to %umber_block*)
@@ -42,7 +42,7 @@ cond_otherwise:                                   ; preds = %cond
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
   %cond_otherwise_merge2 = phi %umber_block* [ bitcast (%umber_block1* @float.1. to %umber_block*), %cond_binding_merge ], [ bitcast (%umber_block1* @float.2.5 to %umber_block*), %cond_otherwise ]
-  store %umber_block* %cond_otherwise_merge2, %umber_block** @Basics._, align 8
+  store %umber_block* %cond_otherwise_merge2, %umber_block** @_, align 8
   %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 4))
   %box = bitcast i8* %malloccall to i64*
   %box3 = bitcast i64* %box to i16*
