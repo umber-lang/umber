@@ -135,7 +135,7 @@ let constant_block t ~tag ~len ~type_ ~name constant_value =
   let global_name = [%string "%{type_}.%{name}"] in
   let global = Llvm.define_global global_name value t.module_ in
   Llvm.set_global_constant true global;
-  Llvm.const_bitcast global (block_pointer_type t)
+  global
 ;;
 
 let codegen_literal t literal =
@@ -187,16 +187,35 @@ let codegen_literal t literal =
 ;;
 
 let get_block_tag t value =
-  Llvm.build_gep value [| Llvm.const_int (block_index_type t.context) 0 |] "tag" t.builder
+  (* The tag is at index 0 in the block header. *)
+  let gep =
+    let typ = Llvm.i32_type t.context in
+    Llvm.build_gep
+      value
+      [| Llvm.const_int typ 0; Llvm.const_int typ 0; Llvm.const_int typ 0 |]
+      "tag_gep"
+      t.builder
+  in
+  Llvm.build_load gep "tag" t.builder
 ;;
 
 let ptr_to_int t value =
   Llvm.build_ptrtoint value (Llvm.i64_type t.context) (Llvm.value_name value) t.builder
 ;;
 
+let block_indexes_for_gep t ~field_index =
+  let typ = Llvm.i32_type t.context in
+  (* 0 indexes through the pointer. 1 gets the second element in the umber_block struct
+     (the fields array). Then [field_index] gets the nth field of the block. We stick
+     with i32 since that type is required for struct indexing. *)
+  [| Llvm.const_int typ 0; Llvm.const_int typ 1; Llvm.const_int typ field_index |]
+;;
+
 let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
-  | Primitive lit -> codegen_literal t lit
+  | Primitive lit ->
+    let literal = codegen_literal t lit in
+    Llvm.const_bitcast literal (block_pointer_type t)
   | Name name ->
     let value = Value_table.find t.values name in
     (match Llvm.classify_value value with
@@ -234,11 +253,15 @@ let rec codegen_expr t expr =
        let fields = Nonempty.map fields ~f:(codegen_expr t) in
        box t ~tag ~fields)
   | Get_block_field (i, expr) ->
-    Llvm.build_gep
-      (codegen_expr t expr)
-      [| Llvm.const_int (Llvm.i16_type t.context) (Mir.Block_index.to_int i + 1) |]
-      "block_field"
-      t.builder
+    let gep =
+      Llvm.build_gep
+        (codegen_expr t expr)
+        (block_indexes_for_gep t ~field_index:(Mir.Block_index.to_int i + 1))
+        "block_field_gep"
+        t.builder
+    in
+    let load_i64 = Llvm.build_load gep "block_field_raw" t.builder in
+    Llvm.build_inttoptr load_i64 (block_pointer_type t) "block_field" t.builder
   | Cond_assign { vars; conds; body; if_none_matched } ->
     (* Problem: How do we assign multiple values conditionally? Phi nodes only
          accept one value. We can't use multiple phi blocks because you lose the
@@ -372,16 +395,22 @@ and codegen_cond t cond =
   | Equals (expr, literal) ->
     let expr_value = codegen_expr t expr in
     let literal_value = codegen_literal t literal in
-    let indexes = [| Llvm.const_int (Llvm.i64_type t.context) 1 |] in
-    let build_gep value = Llvm.build_gep value indexes "equals_expr" t.builder in
-    let const_gep value = Llvm.const_gep value indexes in
+    let indexes = block_indexes_for_gep t ~field_index:0 in
+    let load_expr ~expr_value =
+      let expr_gep = Llvm.build_gep expr_value indexes "equals_expr_gep" t.builder in
+      Llvm.build_load expr_gep "equals_expr" t.builder
+    in
+    let load_literal ~literal_value =
+      let literal_gep = Llvm.const_gep literal_value indexes in
+      Llvm.build_load literal_gep "equals_literal" t.builder
+    in
     (match literal with
-     | Int _ | Char _ -> make_icmp (build_gep expr_value) (const_gep literal_value)
+     | Int _ | Char _ -> make_icmp (load_expr ~expr_value) (load_literal ~literal_value)
      | Float _ ->
        Llvm.build_fcmp
          Oeq
-         (build_gep expr_value)
-         (const_gep literal_value)
+         (load_expr ~expr_value)
+         (load_literal ~literal_value)
          "equals"
          t.builder
      | String _ -> failwith "TODO: string equality in patterns")

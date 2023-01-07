@@ -41,11 +41,15 @@ entry:
   %box7 = bitcast i64* %box to %umber_block*
   store %umber_block* %box7, %umber_block** @"*binding", align 8
   %"*binding" = load %umber_block*, %umber_block** @"*binding", align 8
-  %block_field = getelementptr %umber_block, %umber_block* %"*binding", i16 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"*binding", i32 0, i32 1, i32 1
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
   store %umber_block* %block_field, %umber_block** @Text.a, align 8
   %"*binding8" = load %umber_block*, %umber_block** @"*binding", align 8
-  %block_field9 = getelementptr %umber_block, %umber_block* %"*binding8", i16 2
-  store %umber_block* %block_field9, %umber_block** @Text.b, align 8
+  %block_field_gep9 = getelementptr %umber_block, %umber_block* %"*binding8", i32 0, i32 1, i32 2
+  %block_field_raw10 = load i64, i64* %block_field_gep9, align 8
+  %block_field11 = inttoptr i64 %block_field_raw10 to %umber_block*
+  store %umber_block* %block_field11, %umber_block** @Text.b, align 8
   ret i32 0
 }
 
