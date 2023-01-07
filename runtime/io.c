@@ -20,3 +20,8 @@ const Block *umber_print_int(const Block *n)
     printf("%ld", block_as_int(n));
     return UNIT;
 }
+
+const Block *umber_print_bool(const Block *b)
+{
+    printf("%s", block_as_constant_cnstr(b) ? "true" : "false");
+}

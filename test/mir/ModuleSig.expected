@@ -21,4 +21,7 @@
    ((Primitive (Int 1)) (Primitive (Int 10)))))
  (Value_def ModuleSig.is_10_in_range
   (Fun_call ModuleSig.Range.in
-   ((Primitive (Int 10)) (Name ModuleSig.my_range)))))
+   ((Primitive (Int 10)) (Name ModuleSig.my_range))))
+ (Extern_decl ((name umber_print_bool) (arity 1)))
+ (Value_def *binding
+  (Fun_call umber_print_bool ((Name ModuleSig.is_10_in_range)))))
