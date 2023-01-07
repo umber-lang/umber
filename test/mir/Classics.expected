@@ -39,6 +39,8 @@
  (Extern_decl ((name umber_print_int) (arity 1)))
  (Value_def *binding
   (Fun_call "Std.Prelude.Operators.;"
-   ((Fun_call umber_print_endline ((Primitive (String "5! is:"))))
-    (Fun_call umber_print_int
-     ((Fun_call Classics.fact ((Primitive (Int 5))))))))))
+   ((Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call umber_print_endline ((Primitive (String "5! is:"))))
+      (Fun_call umber_print_int
+       ((Fun_call Classics.fact ((Primitive (Int 5))))))))
+    (Fun_call umber_print_endline ((Primitive (String ""))))))))

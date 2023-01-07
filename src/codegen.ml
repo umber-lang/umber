@@ -492,11 +492,18 @@ let preprocess_stmt t stmt =
     let value =
       if arity = 0
       then Llvm.declare_global type_ name_str t.module_
-      else
-        Llvm.declare_function
-          name_str
-          (Llvm.function_type type_ (Array.create type_ ~len:arity))
-          t.module_
+      else (
+        let fun_ =
+          Llvm.declare_function
+            name_str
+            (Llvm.function_type type_ (Array.create type_ ~len:arity))
+            t.module_
+        in
+        let call_conv =
+          if Mir_name.is_extern_name name then Llvm.CallConv.c else tailcc
+        in
+        Llvm.set_function_call_conv call_conv fun_;
+        fun_)
     in
     Value_table.add t.values name value
 ;;

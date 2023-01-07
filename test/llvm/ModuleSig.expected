@@ -39,7 +39,7 @@ entry:
   ret %umber_block* %box7
 }
 
-declare %umber_block* @"Std.Prelude.Operators.&&"(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.&&"(%umber_block*, %umber_block*)
 
 declare %umber_block* @umber_lte(%umber_block*, %umber_block*)
 
@@ -53,7 +53,7 @@ entry:
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
   %fun_call = tail call %umber_block* @umber_lte(%umber_block* %block_field, %umber_block* %ModuleSig.Range.x)
   %fun_call4 = tail call %umber_block* @umber_lte(%umber_block* %ModuleSig.Range.x, %umber_block* %block_field3)
-  %fun_call5 = tail call %umber_block* @"Std.Prelude.Operators.&&"(%umber_block* %fun_call, %umber_block* %fun_call4)
+  %fun_call5 = tail call tailcc %umber_block* @"Std.Prelude.Operators.&&"(%umber_block* %fun_call, %umber_block* %fun_call4)
   ret %umber_block* %fun_call5
 }
 

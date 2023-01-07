@@ -300,6 +300,7 @@ module Mir_name : sig
   val create_value_name : Name_table.t -> Value_name.Qualified.t -> t
   val create_extern_name : Extern_name.t -> t
   val extern_name : t -> Extern_name.t option
+  val is_extern_name : t -> bool
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
   val map_parts : t -> f:(Ustring.t -> int -> int) -> t
@@ -393,6 +394,11 @@ end = struct
   let extern_name = function
     | Internal _ -> None
     | External name -> Some name
+  ;;
+
+  let is_extern_name = function
+    | Internal _ -> false
+    | External _ -> true
   ;;
 
   let map_parts t ~f =

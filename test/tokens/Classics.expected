@@ -67,4 +67,7 @@ L_PAREN
 (LOWER_NAME fact)
 (INT 5)
 R_PAREN
+(OPERATOR ";")
+(LOWER_NAME print)
+(STRING "")
 EOF

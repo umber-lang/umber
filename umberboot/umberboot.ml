@@ -218,6 +218,8 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
                let object_file = tmpdir ^/ module_name ^ ".o" in
                let entry_file = tmpdir ^/ "_entry.o" in
                Codegen.compile_to_object_and_dispose codegen ~output_file:object_file;
+               (* TODO: I think the entry module will have to consider main functions for
+                  the stdlib as well. *)
                Codegen.compile_entry_module ~source_filenames:[ filename ] ~entry_file;
                Linking.link_with_std_and_runtime
                  ~object_files:[ object_file; entry_file ]
