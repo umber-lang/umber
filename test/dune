@@ -16,7 +16,8 @@
   (glob_files ast/*.expected)
   (glob_files mir/*.expected)
   (glob_files llvm/*.expected)
-  (glob_files output/*.expected))
+  (glob_files output/*.expected)
+  (file ../runtime/libruntime.a))
  (action
   (progn
    (ignore-stderr
