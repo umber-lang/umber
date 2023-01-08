@@ -40,7 +40,8 @@ end = struct
 end
 
 type t =
-  { context : Llvm.llcontext
+  { source_filename : Filename.t
+  ; context : Llvm.llcontext
   ; module_ : Llvm.llmodule
   ; builder : Llvm.llbuilder
   ; values : Value_table.t
@@ -556,7 +557,8 @@ let create ~source_filename =
       module_
   in
   Llvm.position_at_end (Llvm.entry_block main_function) main_function_builder;
-  { context
+  { source_filename
+  ; context
   ; builder = Llvm.builder context
   ; module_
   ; values = Value_table.create ()
@@ -565,25 +567,24 @@ let create ~source_filename =
   }
 ;;
 
-let of_mir_exn ~source_filename mir =
-  let t = create ~source_filename in
+let add_mir_exn t mir =
   List.iter mir ~f:(preprocess_stmt t);
   List.iter mir ~f:(codegen_stmt t);
   build_main_ret t.context t.main_function_builder;
   match Llvm_analysis.verify_module t.module_ with
-  | None -> t
+  | None -> ()
   | Some error ->
     compiler_bug
       [%message
         "Llvm_analysis found invalid module" (error : string) ~module_:(to_string t)]
 ;;
 
-let of_mir ~source_filename mir =
+let add_mir t mir =
   Compilation_error.try_with
-    ~filename:source_filename
     Codegen_error
+    ~filename:t.source_filename
     ~msg:[%message "LLVM codegen failed"]
-    (fun () -> of_mir_exn ~source_filename mir)
+    (fun () -> add_mir_exn t mir)
 ;;
 
 let compile_to_object_and_dispose_internal module_ context ~output_file =
@@ -610,4 +611,17 @@ let compile_entry_module ~source_filenames ~entry_file =
     ignore_value (Llvm.build_call fun_ [||] "" builder));
   build_main_ret context builder;
   compile_to_object_and_dispose_internal module_ context ~output_file:entry_file
+;;
+
+let execution_engine_backend =
+  lazy
+    (match Llvm_executionengine.initialize () with
+     | true -> ()
+     | false -> failwith "Failed to initialize LLVM ExecutionEngine backend")
+;;
+
+let run_jit t =
+  force execution_engine_backend;
+  let execution_engine = Llvm_executionengine.create t.module_ in
+  Llvm_executionengine.get_function_address
 ;;

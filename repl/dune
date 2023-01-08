@@ -1,0 +1,6 @@
+(library
+ (name umberboot_repl)
+ (libraries core core_unix.command_unix core_unix.filename_unix umber)
+ (foreign_archives ../runtime/runtime)
+ (preprocess
+  (pps ppx_jane)))

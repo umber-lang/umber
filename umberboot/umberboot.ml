@@ -196,7 +196,8 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
            Ast.Module.module_name ast, mir))
       ~generating_llvm:
         (run_stage ~f:(fun (module_name, mir) ->
-           let%map.Result codegen = Codegen.of_mir ~source_filename:filename mir in
+           let codegen = Codegen.create ~source_filename:filename in
+           let%map.Result () = Codegen.add_mir codegen mir in
            maybe_output Llvm ~f:(fun out ->
              fprintf out "%s\n" (Codegen.to_string codegen));
            module_name, codegen))
