@@ -1,0 +1,15 @@
+(install
+ (section
+  (site
+   (umber runtime)))
+ (files libruntime.a))
+
+(rule
+ (target libruntime.a)
+ (deps
+  (glob_files src/*.rs)
+  (file Cargo.toml))
+ (action
+  (progn
+   (system "cargo build")
+   (copy target/debug/libruntime.a libruntime.a))))
