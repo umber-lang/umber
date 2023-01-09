@@ -1,4 +1,4 @@
-use crate::types::BlockPtr;
+use crate::block::BlockPtr;
 
 #[no_mangle]
 pub extern "C" fn umber_print_int(x: BlockPtr) {
