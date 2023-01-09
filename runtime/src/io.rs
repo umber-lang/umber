@@ -1,3 +1,4 @@
+use libc_print::std_name::{print};
 use crate::block::BlockPtr;
 
 #[no_mangle]

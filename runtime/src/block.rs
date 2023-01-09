@@ -1,5 +1,5 @@
-use std::ptr::{copy_nonoverlapping, NonNull};
-use std::{mem, slice, str};
+use core::ptr::{copy_nonoverlapping, NonNull};
+use core::{mem, slice, str};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
