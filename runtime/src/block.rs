@@ -23,13 +23,14 @@ impl BlockPtr {
         }
     }
 
-    pub fn as_constant_cnstr(&self) -> ConstantCnstr {
-        if self.is_block() {
-            panic!("Expected constant constructor but got block")
-        } else {
-            unsafe { self.constant_cnstr }
-        }
-    }
+    // TODO: use
+    // pub fn as_constant_cnstr(&self) -> ConstantCnstr {
+    //     if self.is_block() {
+    //         panic!("Expected constant constructor but got block")
+    //     } else {
+    //         unsafe { self.constant_cnstr }
+    //     }
+    // }
 
     pub fn as_int(&self) -> i64 {
         unsafe { self.as_block().as_ref().as_int() }
@@ -44,14 +45,17 @@ impl BlockPtr {
     }
 }
 
-// Blocks consist of this header followed by their fields inline
+// Blocks consist of this one-word header followed by their fields inline
+// Rust's dynamically-sized types don't let us do this without fat pointers getting
+// involved, and we want to store the block length inline, so we just malloc and manage
+// the pointers ourselves.
 #[repr(C, align(8))]
 pub struct Block {
     tag: Tag,
     len: u16,
 }
 
-// This must be kept in sync with the same definitions in codegen.ml
+// This must be kept in sync with the same definitions in codegen.ml.
 #[repr(u16)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum Tag {
@@ -62,21 +66,13 @@ pub enum Tag {
 }
 
 impl Block {
-    fn fields(&self) -> &[BlockPtr] {
-        unsafe {
-            slice::from_raw_parts(
-                (self as *const Self as *const BlockPtr).add(1),
-                self.len as usize,
-            )
-        }
-    }
-
-    fn first_field(&self) -> BlockPtr {
-        unsafe { *(self as *const Self as *const BlockPtr).add(1) }
+    fn get_field(&self, index: u16) -> BlockPtr {
+        unsafe { *(self as *const Self as *const BlockPtr).add(index as usize + 1) }
     }
 
     // These kinds of runtime checks shouldn't be needed if the compiler produced correct
-    // code, but is helpful for debugging.
+    // code, but is helpful for debugging the compiler.
+    // TODO: Put this stuff behind some kind of debug cfg
     fn expect_tag(&self, tag: Tag) {
         if self.tag != tag {
             panic!(
@@ -88,9 +84,10 @@ impl Block {
 
     pub fn as_int(&self) -> i64 {
         self.expect_tag(Tag::Int);
-        unsafe { mem::transmute(self.first_field()) }
+        unsafe { mem::transmute(self.get_field(0)) }
     }
 
+    // TODO: use
     // pub fn as_char(&self) -> char {
     //     self.expect_tag(Tag::Char);
     //     let u64: u64 = unsafe { mem::transmute(self.first_field()) };
@@ -99,20 +96,22 @@ impl Block {
 
     pub fn as_float(&self) -> f64 {
         self.expect_tag(Tag::Float);
-        unsafe { mem::transmute(self.first_field()) }
+        unsafe { mem::transmute(self.get_field(0)) }
     }
 
     fn string_len(&self) -> usize {
         let last_byte =
-            unsafe { *(self as *const Self as *const u64).add(self.len as usize) as u8 };
+            unsafe { *(self as *const Block as *const u8).add(8 * (self.len as usize + 1)) };
         (self.len as usize) * 8 - (last_byte as usize) - 1
     }
 
-    // FIXME: Need handling for the real length. Also, we can't just make a slice due to
-    // the byte ordering not working for little endian
     pub fn as_str(&self) -> &str {
         self.expect_tag(Tag::String);
-        unsafe { str::from_utf8_unchecked(mem::transmute(self.fields())) }
+        unsafe {
+            let bytes =
+                slice::from_raw_parts((self as *const Self).add(1) as *const u8, self.string_len());
+            str::from_utf8_unchecked(bytes)
+        }
     }
 
     // Just malloc and leak memory for now. We can implement GC later.

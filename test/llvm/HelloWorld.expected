@@ -7,7 +7,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block2 = type { %umber_header, [2 x i64] }
 
 @"*binding" = global %umber_block* null
-@string.578489388 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [2 x i64] [i64 5216694956355254127, i64 8245075110705233923] }
+@string.578489388 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"Hello world!\00\00\00\03" }
 
 define i32 @"main./examples/HelloWorld.um"() {
 entry:

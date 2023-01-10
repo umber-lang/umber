@@ -1,5 +1,5 @@
-use libc_print::std_name::{print};
 use crate::block::BlockPtr;
+use libc_print::std_name::print;
 
 #[no_mangle]
 pub extern "C" fn umber_print_int(x: BlockPtr) {

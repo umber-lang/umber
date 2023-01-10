@@ -10,9 +10,9 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @"*binding" = global %umber_block* null
 @"*binding.1" = global %umber_block* null
 @WeirdFunCalls.if_ = global %umber_block* null
-@string.465106951 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [1 x i64] [i64 8100956935177633794] }
-@string.812905539 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [2 x i64] [i64 7382928249529134188, i64 7] }
-@string.1035704714 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [1 x i64] [i64 7594757821606920197] }
+@string.465106951 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"plain\00\00\02" }
+@string.812905539 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"fun call\00\00\00\00\00\00\00\07" }
+@string.1035704714 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"if\00\00\00\00\00\05" }
 
 define i32 @"main./examples/WeirdFunCalls.um"() {
 entry:

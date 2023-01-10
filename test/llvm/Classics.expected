@@ -10,9 +10,9 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
 @int.0 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 0 }
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
-@string.558432565 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [1 x i64] [i64 3828376795518468097] }
+@string.558432565 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"5! is:\00\01" }
 @int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
-@string.0 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [1 x i64] [i64 7] }
+@string.0 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\00\00\00\00\00\00\00\07" }
 
 define i32 @"main./examples/Classics.um"() {
 entry:

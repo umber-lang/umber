@@ -164,26 +164,20 @@ let codegen_literal t literal =
       let s = Ustring.to_string s in
       let n_chars = String.length s in
       let name = String.hash s |> Int.to_string in
-      let len = (n_chars / 8) + 1 in
+      let n_words = (n_chars / 8) + 1 in
       let packed_char_array =
-        Array.init len ~f:(fun i ->
-          let j = i * 8 in
-          let get_char offset =
-            let c =
-              if j + offset < n_chars
-              then Int64.of_int (Char.to_int s.[j + offset])
-              else if offset = 7
-              then (* Last byte *) Int64.of_int (7 - (n_chars % 8))
-              else (* Padding null prefix of last word *) 0L
-            in
-            Int64.( lsl ) c ((7 - offset) * 8)
+        Array.init (n_words * 8) ~f:(fun char_index ->
+          let byte =
+            if char_index < n_chars
+            then Char.to_int s.[char_index]
+            else if char_index = (n_words * 8) - 1
+            then (* Last byte *) 7 - (n_chars % 8)
+            else (* Padding null prefix of last word *) 0
           in
-          let int64_value = List.reduce_exn (List.init 8 ~f:get_char) ~f:Int64.( + ) in
-          let is_signed = false in
-          Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed)
+          Llvm.const_int (Llvm.i8_type t.context) byte)
       in
-      let value = Llvm.const_array (Llvm.i64_type t.context) packed_char_array in
-      constant_block t ~tag:Tag.string ~len ~type_:"string" ~name value)
+      let value = Llvm.const_array (Llvm.i8_type t.context) packed_char_array in
+      constant_block t ~tag:Tag.string ~len:n_words ~type_:"string" ~name value)
 ;;
 
 let get_block_tag t value =
