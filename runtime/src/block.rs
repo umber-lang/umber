@@ -180,10 +180,20 @@ impl Block {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ConstantCnstr(pub u64);
+pub struct ConstantCnstr(u64);
+
+impl ConstantCnstr {
+    pub fn new(tag: u64) -> Self {
+        Self((tag << 1) & BLOCK_PTR_MASK)
+    }
+
+    pub fn tag(&self) -> u64 {
+        self.0 >> 1
+    }
+}
 
 impl From<bool> for ConstantCnstr {
     fn from(value: bool) -> Self {
-        Self(value.into())
+        Self::new(value.into())
     }
 }
