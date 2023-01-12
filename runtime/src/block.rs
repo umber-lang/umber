@@ -5,7 +5,7 @@ use core::{mem, slice, str};
 #[derive(Clone, Copy)]
 pub union BlockPtr {
     block: NonNull<Block>,
-    constant_cnstr: ConstantCnstr,
+    pub constant_cnstr: ConstantCnstr,
 }
 
 const BLOCK_PTR_MASK: u64 = 0x1;
@@ -13,6 +13,21 @@ const BLOCK_PTR_MASK: u64 = 0x1;
 impl BlockPtr {
     fn is_block(&self) -> bool {
         (self as *const Self as u64) & BLOCK_PTR_MASK == 0
+    }
+
+    pub fn classify<'a>(&'a self) -> Value<'a> {
+        if self.is_block() {
+            unsafe {
+                match KnownTag::try_from((*self.block.as_ptr()).tag) {
+                    Ok(KnownTag::Int) => Value::Int((*self.block.as_ptr()).as_int()),
+                    Ok(KnownTag::Float) => Value::Float((*self.block.as_ptr()).as_float()),
+                    Ok(KnownTag::String) => Value::String((*self.block.as_ptr()).as_str()),
+                    Err(()) => Value::OtherBlock(self.block),
+                }
+            }
+        } else {
+            unsafe { Value::ConstantCnstr(self.constant_cnstr) }
+        }
     }
 
     pub fn as_block(&self) -> NonNull<Block> {
@@ -23,14 +38,13 @@ impl BlockPtr {
         }
     }
 
-    // TODO: use
-    // pub fn as_constant_cnstr(&self) -> ConstantCnstr {
-    //     if self.is_block() {
-    //         panic!("Expected constant constructor but got block")
-    //     } else {
-    //         unsafe { self.constant_cnstr }
-    //     }
-    // }
+    pub fn as_constant_cnstr(&self) -> ConstantCnstr {
+        if self.is_block() {
+            panic!("Expected constant constructor but got block")
+        } else {
+            unsafe { self.constant_cnstr }
+        }
+    }
 
     pub fn as_int(&self) -> i64 {
         unsafe { self.as_block().as_ref().as_int() }
@@ -51,21 +65,52 @@ impl BlockPtr {
 // the pointers ourselves.
 #[repr(C, align(8))]
 pub struct Block {
-    tag: Tag,
-    len: u16,
+    pub tag: u16,
+    pub len: u16,
 }
 
 // This must be kept in sync with the same definitions in codegen.ml.
 #[repr(u16)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum Tag {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum KnownTag {
     Int = 0x8001,
     // Char = 0x8002,
     Float = 0x8003,
     String = 0x8004,
 }
 
+impl TryFrom<u16> for KnownTag {
+    type Error = ();
+
+    fn try_from(tag: u16) -> Result<Self, Self::Error> {
+        match tag {
+            0x8001 => Ok(KnownTag::Int),
+            0x8003 => Ok(KnownTag::Float),
+            0x8004 => Ok(KnownTag::String),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Value<'a> {
+    Int(i64),
+    Float(f64),
+    String(&'a str),
+    ConstantCnstr(ConstantCnstr),
+    OtherBlock(NonNull<Block>),
+}
+
 impl Block {
+    pub fn fields(&self) -> &[BlockPtr] {
+        unsafe {
+            slice::from_raw_parts(
+                (self as *const Self as *const BlockPtr).add(1),
+                self.len as usize,
+            )
+        }
+    }
+
     fn get_field(&self, index: u16) -> BlockPtr {
         unsafe { *(self as *const Self as *const BlockPtr).add(index as usize + 1) }
     }
@@ -73,8 +118,8 @@ impl Block {
     // These kinds of runtime checks shouldn't be needed if the compiler produced correct
     // code, but is helpful for debugging the compiler.
     // TODO: Put this stuff behind some kind of debug cfg
-    fn expect_tag(&self, tag: Tag) {
-        if self.tag != tag {
+    fn expect_tag(&self, tag: KnownTag) {
+        if self.tag.try_into() != Ok(tag) {
             panic!(
                 "Expected block with tag {:?} but got tag {:?}",
                 tag, self.tag
@@ -83,7 +128,7 @@ impl Block {
     }
 
     pub fn as_int(&self) -> i64 {
-        self.expect_tag(Tag::Int);
+        self.expect_tag(KnownTag::Int);
         unsafe { mem::transmute(self.get_field(0)) }
     }
 
@@ -95,7 +140,7 @@ impl Block {
     // }
 
     pub fn as_float(&self) -> f64 {
-        self.expect_tag(Tag::Float);
+        self.expect_tag(KnownTag::Float);
         unsafe { mem::transmute(self.get_field(0)) }
     }
 
@@ -106,7 +151,7 @@ impl Block {
     }
 
     pub fn as_str(&self) -> &str {
-        self.expect_tag(Tag::String);
+        self.expect_tag(KnownTag::String);
         unsafe {
             let bytes =
                 slice::from_raw_parts((self as *const Self).add(1) as *const u8, self.string_len());
@@ -115,11 +160,11 @@ impl Block {
     }
 
     // Just malloc and leak memory for now. We can implement GC later.
-    fn new<const N: usize>(tag: Tag, fields: [BlockPtr; N]) -> BlockPtr {
+    fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
         let len = fields.len() as u16;
         unsafe {
             let block = libc::malloc(8 * (len + 1) as usize) as *mut Block;
-            (*block).tag = tag;
+            (*block).tag = tag as u16;
             (*block).len = len;
             copy_nonoverlapping(fields.as_ptr(), block.add(1) as *mut BlockPtr, len as usize);
             BlockPtr {
@@ -129,10 +174,16 @@ impl Block {
     }
 
     pub fn new_int(x: i64) -> BlockPtr {
-        unsafe { Self::new(Tag::Int, [mem::transmute(x)]) }
+        unsafe { Self::new(KnownTag::Int, [mem::transmute(x)]) }
     }
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct ConstantCnstr(u64);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ConstantCnstr(pub u64);
+
+impl From<bool> for ConstantCnstr {
+    fn from(value: bool) -> Self {
+        Self(value.into())
+    }
+}

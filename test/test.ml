@@ -29,7 +29,7 @@ let should_make_llvm test =
 let no_exe_tests = []
 
 let should_make_exe test =
-  false && should_make_llvm test && not (List.mem ~equal:String.equal no_exe_tests test)
+  should_make_llvm test && not (List.mem ~equal:String.equal no_exe_tests test)
 ;;
 
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =
