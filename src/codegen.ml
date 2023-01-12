@@ -202,7 +202,10 @@ let block_indexes_for_gep t ~field_index =
   (* 0 indexes through the pointer. 1 gets the second element in the umber_block struct
      (the fields array). Then [field_index] gets the nth field of the block. We stick
      with i32 since that type is required for struct indexing. *)
-  [| Llvm.const_int typ 0; Llvm.const_int typ 1; Llvm.const_int typ field_index |]
+  [| Llvm.const_int typ 0
+   ; Llvm.const_int typ 1
+   ; Llvm.const_int typ (Mir.Block_index.to_int field_index)
+  |]
 ;;
 
 let rec codegen_expr t expr =
@@ -246,11 +249,11 @@ let rec codegen_expr t expr =
      | Some fields ->
        let fields = Nonempty.map fields ~f:(codegen_expr t) in
        box t ~tag ~fields)
-  | Get_block_field (i, expr) ->
+  | Get_block_field (field_index, expr) ->
     let gep =
       Llvm.build_gep
         (codegen_expr t expr)
-        (block_indexes_for_gep t ~field_index:(Mir.Block_index.to_int i + 1))
+        (block_indexes_for_gep t ~field_index)
         "block_field_gep"
         t.builder
     in
@@ -389,7 +392,7 @@ and codegen_cond t cond =
   | Equals (expr, literal) ->
     let expr_value = codegen_expr t expr in
     let literal_value = codegen_literal t literal in
-    let indexes = block_indexes_for_gep t ~field_index:0 in
+    let indexes = block_indexes_for_gep t ~field_index:(Mir.Block_index.of_int 0) in
     let load_expr ~expr_value =
       let expr_gep = Llvm.build_gep expr_value indexes "equals_expr_gep" t.builder in
       Llvm.build_load expr_gep "equals_expr" t.builder
@@ -414,9 +417,9 @@ and codegen_cond t cond =
     make_icmp (get_block_tag t (codegen_expr t expr)) (int_non_constant_tag t tag)
   | And _ -> failwith "TODO: And conditions"
 
-and box ?(tag = Mir.Cnstr_tag.default) t ~fields =
+and box t ~tag ~fields =
   (* TODO: Use GC instead of leaking memory. For now, let's just try to plug in a
-       conservative GC e.g. Boehm. *)
+     conservative GC e.g. Boehm. *)
   let block_field_num = Nonempty.length fields in
   let heap_pointer =
     Llvm.build_array_malloc
@@ -437,24 +440,24 @@ and box ?(tag = Mir.Cnstr_tag.default) t ~fields =
     (let heap_pointer =
        Llvm.build_gep
          heap_pointer_16
-         [| Llvm.const_int (Llvm.i64_type t.context) 1 |]
+         [| Llvm.const_int (Llvm.i32_type t.context) 1 |]
          "box"
          t.builder
      in
      Llvm.build_store (codegen_block_len t block_field_num) heap_pointer t.builder);
+  let heap_pointer =
+    Llvm.build_bitcast
+      heap_pointer
+      (Llvm.pointer_type (block_pointer_type t))
+      "box"
+      t.builder
+  in
   Nonempty.iteri fields ~f:(fun i field_value ->
     ignore_value
       (let heap_pointer =
-         Llvm.build_bitcast
-           heap_pointer
-           (Llvm.pointer_type (block_pointer_type t))
-           "box"
-           t.builder
-       in
-       let heap_pointer =
          Llvm.build_gep
            heap_pointer
-           [| Llvm.const_int (Llvm.i64_type t.context) (i + 1) |]
+           [| Llvm.const_int (Llvm.i32_type t.context) (i + 1) |]
            "box"
            t.builder
        in
@@ -531,7 +534,7 @@ let codegen_stmt t stmt =
   | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
 ;;
 
-let main_function_name ~source_filename = "main" ^ source_filename
+let main_function_name ~source_filename = [%string "umber_main:%{source_filename}"]
 let main_function_type context = Llvm.function_type (Llvm.i32_type context) [||]
 
 let build_main_ret context builder =

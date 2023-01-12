@@ -59,7 +59,7 @@ impl BlockPtr {
     }
 }
 
-// Blocks consist of this one-word header followed by their fields inline
+// Blocks consist of this one-word header followed by their fields inline.
 // Rust's dynamically-sized types don't let us do this without fat pointers getting
 // involved, and we want to store the block length inline, so we just malloc and manage
 // the pointers ourselves.
