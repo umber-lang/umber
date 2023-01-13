@@ -441,7 +441,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Std.Prelude.List.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @"Std.Prelude.Operators.::" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons to %umber_block*)
 
-define i32 @"mainStd/Prelude.um"() {
+define i32 @"umber_main:Std/Prelude.um"() {
 entry:
   ret i32 0
 }
@@ -452,16 +452,15 @@ entry:
   %box = bitcast i8* %malloccall to i64*
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
-  %box2 = getelementptr i16, i16* %box1, i64 1
+  %box2 = getelementptr i16, i16* %box1, i32 1
   store i16 2, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
-  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
   store %umber_block* %arg0, %umber_block** %box4, align 8
-  %box5 = bitcast i64* %box to %umber_block**
-  %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 2
-  store %umber_block* %arg1, %umber_block** %box6, align 8
-  %box7 = bitcast i64* %box to %umber_block*
-  ret %umber_block* %box7
+  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
+  store %umber_block* %arg1, %umber_block** %box5, align 8
+  %box6 = bitcast %umber_block** %box3 to %umber_block*
+  ret %umber_block* %box6
 }
 
 define tailcc %umber_block* @Std.Prelude.Operators..(%umber_block* %Std.Prelude.Operators.f, %umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x) {

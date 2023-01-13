@@ -21,7 +21,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
 @int.3 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
 
-define i32 @"main./examples/Basics.um"() {
+define i32 @"umber_main:./examples/Basics.um"() {
 entry:
   br label %cond
 
@@ -47,19 +47,17 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   %box = bitcast i8* %malloccall to i64*
   %box3 = bitcast i64* %box to i16*
   store i16 0, i16* %box3, align 2
-  %box4 = getelementptr i16, i16* %box3, i64 1
+  %box4 = getelementptr i16, i16* %box3, i32 1
   store i16 3, i16* %box4, align 2
   %box5 = bitcast i64* %box to %umber_block**
-  %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 1
+  %box6 = getelementptr %umber_block*, %umber_block** %box5, i32 1
   store %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block** %box6, align 8
-  %box7 = bitcast i64* %box to %umber_block**
-  %box8 = getelementptr %umber_block*, %umber_block** %box7, i64 2
-  store %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block** %box8, align 8
-  %box9 = bitcast i64* %box to %umber_block**
-  %box10 = getelementptr %umber_block*, %umber_block** %box9, i64 3
-  store %umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block** %box10, align 8
-  %box11 = bitcast i64* %box to %umber_block*
-  store %umber_block* %box11, %umber_block** @Basics.xyz, align 8
+  %box7 = getelementptr %umber_block*, %umber_block** %box5, i32 2
+  store %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block** %box7, align 8
+  %box8 = getelementptr %umber_block*, %umber_block** %box5, i32 3
+  store %umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block** %box8, align 8
+  %box9 = bitcast %umber_block** %box5 to %umber_block*
+  store %umber_block* %box9, %umber_block** @Basics.xyz, align 8
   ret i32 0
 }
 
@@ -69,12 +67,12 @@ entry:
   %box = bitcast i8* %malloccall to i64*
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
-  %box2 = getelementptr i16, i16* %box1, i64 1
+  %box2 = getelementptr i16, i16* %box1, i32 1
   store i16 1, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
-  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
   store %umber_block* %arg0, %umber_block** %box4, align 8
-  %box5 = bitcast i64* %box to %umber_block*
+  %box5 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box5
 }
 
@@ -84,12 +82,12 @@ entry:
   %box = bitcast i8* %malloccall to i64*
   %box1 = bitcast i64* %box to i16*
   store i16 1, i16* %box1, align 2
-  %box2 = getelementptr i16, i16* %box1, i64 1
+  %box2 = getelementptr i16, i16* %box1, i32 1
   store i16 1, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
-  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
   store %umber_block* %arg0.1, %umber_block** %box4, align 8
-  %box5 = bitcast i64* %box to %umber_block*
+  %box5 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box5
 }
 
@@ -99,19 +97,17 @@ entry:
   %box = bitcast i8* %malloccall to i64*
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
-  %box2 = getelementptr i16, i16* %box1, i64 1
+  %box2 = getelementptr i16, i16* %box1, i32 1
   store i16 3, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
-  %box4 = getelementptr %umber_block*, %umber_block** %box3, i64 1
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
   store %umber_block* %arg0.2, %umber_block** %box4, align 8
-  %box5 = bitcast i64* %box to %umber_block**
-  %box6 = getelementptr %umber_block*, %umber_block** %box5, i64 2
-  store %umber_block* %arg1, %umber_block** %box6, align 8
-  %box7 = bitcast i64* %box to %umber_block**
-  %box8 = getelementptr %umber_block*, %umber_block** %box7, i64 3
-  store %umber_block* %arg2, %umber_block** %box8, align 8
-  %box9 = bitcast i64* %box to %umber_block*
-  ret %umber_block* %box9
+  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
+  store %umber_block* %arg1, %umber_block** %box5, align 8
+  %box6 = getelementptr %umber_block*, %umber_block** %box3, i32 3
+  store %umber_block* %arg2, %umber_block** %box6, align 8
+  %box7 = bitcast %umber_block** %box3 to %umber_block*
+  ret %umber_block* %box7
 }
 
 declare noalias i8* @malloc(i32)
