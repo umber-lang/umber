@@ -221,42 +221,41 @@ let handle_syntax_error f =
          ~msg:(Atom (Ustring.to_string msg)))
 ;;
 
-let rec lex ~print_tokens_to lexbuf lexer =
-  let token = Lexer.read lexer lexbuf in
+let rec lex ~print_tokens_to lexbuf =
+  let token = Lexer.read lexbuf in
   sexp_of_token token |> fprint_s ~out:print_tokens_to;
   match token with
   | EOF -> ()
-  | _ -> lex ~print_tokens_to lexbuf lexer
+  | _ -> lex ~print_tokens_to lexbuf
 ;;
 
-let try_lex ~print_tokens_to lexbuf lexer =
-  handle_syntax_error (fun () -> lex ~print_tokens_to lexbuf lexer)
+let try_lex ~print_tokens_to lexbuf =
+  handle_syntax_error (fun () -> lex ~print_tokens_to lexbuf)
 ;;
 
 let parse ?print_tokens_to lexbuf =
-  let lex_remaining ~print_tokens_to lexbuf lexer =
-    Option.iter print_tokens_to ~f:(fun print_tokens_to ->
-      lex ~print_tokens_to lexbuf lexer)
+  let lex_remaining ~print_tokens_to lexbuf =
+    Option.iter print_tokens_to ~f:(fun print_tokens_to -> lex ~print_tokens_to lexbuf)
   in
   let last_prod = ref None in
-  let rec parse ?print_tokens_to last_token lexbuf checkpoint lexer =
+  let rec parse ?print_tokens_to last_token lexbuf checkpoint =
     match checkpoint with
     | I.InputNeeded _env ->
-      let token = Lexer.read lexer lexbuf in
+      let token = Lexer.read lexbuf in
       Option.iter print_tokens_to ~f:(fun out -> sexp_of_token token |> fprint_s ~out);
       let start_pos, end_pos = Sedlexing.lexing_positions lexbuf in
       let checkpoint = I.offer checkpoint (token, start_pos, end_pos) in
-      parse ?print_tokens_to token lexbuf checkpoint lexer
+      parse ?print_tokens_to token lexbuf checkpoint
     | I.Shifting _ ->
       let checkpoint = I.resume checkpoint in
-      parse ?print_tokens_to last_token lexbuf checkpoint lexer
+      parse ?print_tokens_to last_token lexbuf checkpoint
     | I.AboutToReduce (_, prod) ->
       last_prod := Some prod;
       let checkpoint = I.resume checkpoint in
-      parse ?print_tokens_to last_token lexbuf checkpoint lexer
+      parse ?print_tokens_to last_token lexbuf checkpoint
     | I.HandlingError env ->
       (* TODO: you can actually resume the parser here, should look into that *)
-      lex_remaining ~print_tokens_to lexbuf lexer;
+      lex_remaining ~print_tokens_to lexbuf;
       let state = I.current_state_number env in
       let prod_msg =
         match !last_prod with
@@ -274,12 +273,12 @@ let parse ?print_tokens_to lexbuf =
       Lexer.syntax_error ~msg:(sprintf "Parser error in state %d%s" state prod_msg) lexbuf
     | I.Accepted v -> v
     | I.Rejected ->
-      lex_remaining ~print_tokens_to lexbuf lexer;
+      lex_remaining ~print_tokens_to lexbuf;
       Lexer.syntax_error ~msg:"Invalid syntax (parser rejected the input)" lexbuf
   in
   let start, _ = lexing_positions lexbuf in
   Module.with_filename
-    (parse ?print_tokens_to EOF lexbuf (Parser.Incremental.prog start) (Lexer.create ()))
+    (parse ?print_tokens_to EOF lexbuf (Parser.Incremental.prog start))
     start.pos_fname
 ;;
 
@@ -295,7 +294,7 @@ let with_file filename ~f =
 ;;
 
 let lex_file ~print_tokens_to =
-  with_file ~f:(fun lexbuf -> try_lex ~print_tokens_to lexbuf (Lexer.create ()))
+  with_file ~f:(fun lexbuf -> try_lex ~print_tokens_to lexbuf)
 ;;
 
 let parse_file ?print_tokens_to = with_file ~f:(try_parse ?print_tokens_to)

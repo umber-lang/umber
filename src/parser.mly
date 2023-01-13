@@ -87,6 +87,7 @@
 val_operator:
   | op = OPERATOR { op }
   | ASTERISK { Ustring.of_string_exn "*" }
+  | SEMICOLON { Ustring.of_string_exn ";" }
 
 operator:
   | COLON; name = qualified(val_name); colon { name }
