@@ -1,13 +1,15 @@
-module :
-  module List :
+module : {
+  module List : {
     type List a = Nil | Cons a (List a)
+  }
+
   import List with Nil, Cons
 
-  module Operators :
+  module Operators : {
     val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
     # `() =>` is a hack for the parser as it confuses the `(` in `(b -> c)` as the start
-      of a trait bound (it would need arbitrary lookahead or some other trickery to
-      avoid doing so)
+    # of a trait bound (it would need arbitrary lookahead or some other trickery to
+    # avoid doing so)
 
     val (^) (infixr 8) : Int, Int -> Int
     #val (^^) (infixr 8) : Float, Int -> Float
@@ -41,6 +43,7 @@ module :
     val (|>) (infixl 0) : a, (a -> b) -> b
 
     val (;) (infixl 0) : () => (), a -> a
+  }
 
   import Operators with *
 
@@ -49,46 +52,46 @@ module :
   extern print : String -> () = "umber_print_endline"  # TODO: effects
   extern print_int : Int -> () = "umber_print_int"
   extern print_bool : Bool -> () = "umber_print_bool"
+}
 
 # TODO: implement public/private distinction for modules
 
-#
-  import Bool with *
-  import Fun
-  # TODO: need some kind of syntax for re-exporting things easily
-  # Idea: just put the imports inside `module :` (could work)
-    Perhaps nicer: just use `include` instead of `import`
-    - or some variant of `import` e.g. `import'`, `import!`
-    - I think `include` is nice as it's more intuitive
+#import Bool with *
+#import Fun
+# TODO: need some kind of syntax for re-exporting things easily
+# Idea: just put the imports inside `module :` (could work)
+# Perhaps nicer: just use `include` instead of `import`
+# - or some variant of `import` e.g. `import'`, `import!`
+# - I think `include` is nice as it's more intuitive
 
-  # see https://hackage.haskell.org/package/base-4.14.0.0/docs/src/Prelude.html
-    as a starting point
+# see https://hackage.haskell.org/package/base-4.14.0.0/docs/src/Prelude.html
+# as a starting point
 
-  # TODO: Char, Int, Integer, Float, etc.
-    - different sizes (actually, if the overhead isn't that large,
-      could just use arbitrary-length integers by default)
-    - numeric traits
-    - arithmetic functions (Math module)
+# TODO: Char, Int, Integer, Float, etc.
+# - different sizes (actually, if the overhead isn't that large,
+#   could just use arbitrary-length integers by default)
+# - numeric traits
+# - arithmetic functions (Math module)
 
-  # TODO: collections e.g. Iterable, Collection, Seq, Array, List, Map, HashMap, TreeMap, Set, HashSet, TreeSet
+# TODO: collections e.g. Iterable, Collection, Seq, Array, List, Map, HashMap, TreeMap, Set, HashSet, TreeSet
 
-  # TODO: semigroups, monoids (eh...), functors, monads, applicatives
+# TODO: semigroups, monoids (eh...), functors, monads, applicatives
 
-  # TODO: IO e.g. reading to/writing from stdin/stdout/stderr and files
+# TODO: IO e.g. reading to/writing from stdin/stdout/stderr and files
 
-  # TODO: effects and errors
+# TODO: effects and errors
 
-  # TODO: Sys/Os handling (syscals: file interactions, time, misc.)
+# TODO: Sys/Os handling (syscals: file interactions, time, misc.)
 
-  # TODO: macro support
+# TODO: macro support
 
-  # TODO: randomness
+# TODO: randomness
 
-module Operators =
+module Operators = {
   # FIXME: There's a lexer bug when the extra #s under this are removed
   # TODO: Consider removing these fixity declarations and copying them from the sig
-    This requires a way to specify fixity in a let binding. (Also consider that there's 
-    currently there's no way to put fixity declarations inside nested expressions).
+  # This requires a way to specify fixity in a let binding. (Also consider that there's 
+  # currently there's no way to put fixity declarations inside nested expressions).
   val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
   let (.) f g x = f (g x)
 
@@ -120,6 +123,7 @@ module Operators =
 
   val (;) (infixl 0) : () => (), a -> a
   let (;) () x = x
+}
 
 import Operators with *
 
