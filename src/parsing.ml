@@ -11,7 +11,6 @@ type token = Parser.token =
   | TRAIT
   | THEN
   | STRING of Ustring.t
-  | SEMICOLON
   | R_PAREN
   | R_BRACKET
   | R_BRACE
@@ -30,6 +29,7 @@ type token = Parser.token =
   | INFIXR
   | INFIXL
   | INFIX
+  | IN
   | IMPORT
   | IMPL
   | IF
@@ -74,7 +74,6 @@ module Terminal = struct
     | T_TRAIT : unit t
     | T_THEN : unit t
     | T_STRING : Ustring.t t
-    | T_SEMICOLON : unit t
     | T_R_PAREN : unit t
     | T_R_BRACKET : unit t
     | T_R_BRACE : unit t
@@ -93,6 +92,7 @@ module Terminal = struct
     | T_INFIXR : unit t
     | T_INFIXL : unit t
     | T_INFIX : unit t
+    | T_IN : unit t
     | T_IMPORT : unit t
     | T_IMPL : unit t
     | T_IF : unit t
@@ -154,6 +154,8 @@ module Nonterminal = struct
     | N_separated_nonempty_list_COMMA_expr_ : Untyped.Expr.t list t
     | N_separated_nonempty_list_AND_let_binding__
         : (Umber__Untyped.Pattern.t * Untyped.Expr.t) list t
+    | N_separated_nonempty_list_AND_let_binding_
+        : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Node.t list t
     | N_qualified_val_name_ : (Ustring.t list * Ustring.t) t
     | N_qualified_tuple_expr__ : (Ustring.t list * Untyped.Expr.t list) t
     | N_qualified_parens_operator__ : (Ustring.t list * (Ustring.t list * Ustring.t)) t
@@ -164,7 +166,7 @@ module Nonterminal = struct
     | N_pattern_term : Type.Scheme.Bounded.t Pattern.t t
     | N_pattern_name : Parser_scope.Value_name.t option t
     | N_pattern : Type.Scheme.Bounded.t Pattern.t t
-    | N_optional_sig_def
+    | N_optional_sig_equals_def
         : (Module.sig_ Node.t list
           * (Umber__Untyped.Pattern.t, Untyped.Expr.t) Module.def Node.t list)
           t
@@ -238,23 +240,33 @@ let parse ?print_tokens_to lexbuf =
     Option.iter print_tokens_to ~f:(fun print_tokens_to -> lex ~print_tokens_to lexbuf)
   in
   let last_prod = ref None in
+  let debug_s = ignore in
   let rec parse ?print_tokens_to last_token lexbuf checkpoint =
     match checkpoint with
     | I.InputNeeded _env ->
       let token = Lexer.read lexbuf in
+      debug_s [%message "Reading token" (token : token)];
       Option.iter print_tokens_to ~f:(fun out -> sexp_of_token token |> fprint_s ~out);
       let start_pos, end_pos = Sedlexing.lexing_positions lexbuf in
       let checkpoint = I.offer checkpoint (token, start_pos, end_pos) in
       parse ?print_tokens_to token lexbuf checkpoint
     | I.Shifting _ ->
+      debug_s [%message "Shifting"];
       let checkpoint = I.resume checkpoint in
       parse ?print_tokens_to last_token lexbuf checkpoint
     | I.AboutToReduce (_, prod) ->
+      let prod_sexp =
+        let (X symbol) = I.lhs prod in
+        let empty_sexp _ = Sexp.List [] in
+        match symbol with
+        | T terminal -> Terminal.sexp_of_t empty_sexp terminal
+        | N nonterminal -> Nonterminal.sexp_of_t empty_sexp nonterminal
+      in
+      debug_s [%message "Reducing" ~production:(prod_sexp : Sexp.t)];
       last_prod := Some prod;
       let checkpoint = I.resume checkpoint in
       parse ?print_tokens_to last_token lexbuf checkpoint
     | I.HandlingError env ->
-      (* TODO: you can actually resume the parser here, should look into that *)
       lex_remaining ~print_tokens_to lexbuf;
       let state = I.current_state_number env in
       let prod_msg =

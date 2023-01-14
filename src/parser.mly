@@ -12,6 +12,7 @@
 %token LET
 %token LET_NONREC
 %token AND
+%token IN
 %token MATCH
 %token WITH
 %token WITHOUT
@@ -51,7 +52,6 @@
 %token <Uchar.t> CHAR
 %token <Ustring.t> STRING
 
-%token SEMICOLON
 %token UNDERSCORE
 (* TODO: prevent underscore being used as a variable with a name_error, and create patterns
    using a new catch_all creator. Want to be able to parse it as a LOWER_NAME to use as 
@@ -64,30 +64,12 @@
 
 %token EOF
 
-(* TODO: Make sure all desirable forms of indentation are supported. 
-   e.g. some from http://people.csail.mit.edu/mikelin/ocaml+twt/quick_reference.pdf
-   
-   Actually, what if we do more of the haskell thing and just allow INDENTs
-   at basically any point in expressions?
-   - Could have an error handler that just moves on if in an expression context
-     and erroring on an INDENT (yeah nah)
-   - exprs can then end in any number of DEDENTs (or is that going to cause ambiguity?)
-   
-   Here's an option: enforce a specific kind of indentation (even in tuples, etc.)
-   and just use that for now -- once this is self-hosting, I'll re-write the parser by hand
-   
-   can look into indentation-sensitive parsing:
-     https://michaeldadams.org/papers/layout_parsing/LayoutParsing.pdf 
-     - probably relevant for the parser re-write which will happen once we are self-hosting
-     - for now, let's just get something basic working (doesn't need to support every case) *)
-
 %start <Untyped.Module.t> prog
 %%
 
 val_operator:
   | op = OPERATOR { op }
   | ASTERISK { Ustring.of_string_exn "*" }
-  | SEMICOLON { Ustring.of_string_exn ";" }
 
 operator:
   | COLON; name = qualified(val_name); colon { name }
@@ -196,8 +178,7 @@ expr:
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
-  | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding_);
-    SEMICOLON; body = expr
+  | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding_); IN; body = expr
     { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
 
@@ -224,7 +205,7 @@ type_non_fun:
         Type_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
 
 (* Writing this out like this instead of just using 
-   `separated_nonempty_list(COMMA< type_non_fun)` prevents conflicts for some reason. *)
+   `separated_nonempty(COMMA, type_non_fun)` prevents conflicts for some reason. *)
 type_fun_args:
   | arg = type_non_fun { Nonempty.singleton arg }
   | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
@@ -319,22 +300,24 @@ stmt_sig_:
 
 %inline stmt_sig: s = with_loc(stmt_sig_) { s }
 
-%inline def:
+%inline equals_def:
   | EQUALS; def = braces(list(stmt)) { def }
 
-optional_sig_def:
-  | colon; body = pair(braces(list(stmt_sig)), def) { body }
-  | def = def { [], def }
+optional_sig_equals_def:
+  | colon; body = pair(braces(list(stmt_sig)), equals_def) { body }
+  | def = equals_def { [], def }
 
 stmt_:
   | s = stmt_common { Module.Common_def s }
-  | LET; binding = let_binding { Module.Let { rec_ = true ; bindings = [binding] } }
-  | MODULE; name = UPPER_NAME; body = optional_sig_def
+  | LET; bindings = separated_nonempty(AND, let_binding)
+    { Module.Let { rec_ = true ; bindings } }
+  | MODULE; name = UPPER_NAME; body = optional_sig_equals_def
     { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
-  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; body = optional_sig_def
+  | TRAIT; name = UPPER_NAME; params = type_params_nonempty;
+    body = optional_sig_equals_def
     { Module.Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body) }
   | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; args = nonempty(type_term);
-    def = def
+    def = equals_def
     { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, args, def) }
 
 %inline stmt: s = with_loc(stmt_) { s }

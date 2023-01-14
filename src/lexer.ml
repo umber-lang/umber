@@ -65,10 +65,8 @@ let read_string lexbuf =
 
 let rec read lexbuf =
   match%sedlex lexbuf with
-  (* Comments, indentation, and other whitespace *)
+  (* Ignore comments and whitespace. *)
   | line_comment -> read lexbuf
-  (* FIXME: cleanup *)
-  (* | '#', Star (Compl '\n'), eof -> handle_eof t *)
   | Plus white_space -> read lexbuf
   (* TODO: Do int/float conversions manually and support underscores
      Even further: abstract the functionality behind a trait e.g. Num?
@@ -92,6 +90,8 @@ let rec read lexbuf =
   | "else" -> ELSE
   | "let'" -> LET_NONREC
   | "let" -> LET
+  | "and" -> AND
+  | "in" -> IN
   | "match" -> MATCH
   | "with" -> WITH
   | "without" -> WITHOUT
@@ -139,7 +139,7 @@ let rec read lexbuf =
   | uppercase, Star (digit | alphabetic | '\'' | '_') -> UPPER_NAME (lexeme lexbuf)
   (* Symbolic Operators (any unicode punctuation/symbol) *)
   | Plus operator_symbol -> OPERATOR (lexeme lexbuf)
-  (* Misc. *)
+  (* Catch-all *)
   | eof -> EOF
   | _ -> syntax_error ~msg:"Invalid character(s)" lexbuf
 ;;

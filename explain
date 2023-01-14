@@ -1,2 +1,2 @@
-menhir --explain src/parser.mly
+menhir --explain --infer src/parser.mly
 rm -f src/parser.ml src/parser.mli
