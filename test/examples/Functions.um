@@ -4,19 +4,17 @@ let still_zero_wow = id zero
 
 let sqr x = x * x
 
-# TODO: implement function call syntax like this
-  (may have to wait for a big refactor on indentation parsing)
-  let lots_of_args
-    a
-    b
-    c
-    d
-    e = ()  # This should trigger unused arg warnings
+let lots_of_args
+  a
+  b
+  c
+  d
+  e = ()
 
-  let () =
-    lots_of_args
-      5
-      1e13
-      -89
-      "huh"
-      'c'
+let () =
+  lots_of_args
+    5
+    1e13
+    -89
+    "huh"
+    'c'

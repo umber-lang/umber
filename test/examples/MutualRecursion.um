@@ -13,6 +13,7 @@ let sum_forest =
     # TODO: syntactic sugar for lists and other sequences
     | Nil -> acc
     | Cons tree trees -> loop (acc + sum_tree tree) trees
+  in
   # FIXME: This function closes over `loop`, which isn't quite right. The closure check
     should exclude variables which will be hoisted to toplevel (locally defined
     functions)
@@ -32,10 +33,10 @@ let odd x = if x == 0 then False else even (x - 1)
 
 # Test non-recursive let statements as well
 let number =
-  let number = 5  # This shadows the outer `number`, which is fine
-  let' number = number + number
+  let number = 5 in  # This shadows the outer `number`, which is fine
+  let' number = number + number in
   number
 
 # TODO: add tests for use between submodules
-  e.g. imports to/from, usage between the parent and child
-  ^ make the above module `Tree` and have mutual usage with the parent
+# e.g. imports to/from, usage between the parent and child
+# ^ make the above module `Tree` and have mutual usage with the parent

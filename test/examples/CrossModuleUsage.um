@@ -1,14 +1,12 @@
 let source = "everything depends on me"
 
-module A =
-  # FIXME: LEXER BUG: This doesn't lex right if you remove the second # below
-  # Comment continued on next line:
-  # test
+module A = {
   let a = b
   let b = a
 
   let print = Std.Prelude.print
   let print_source () = print source
+}
 
 let print_source () = A.print_source (); print source
 

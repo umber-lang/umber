@@ -17,7 +17,7 @@ let dec_code_exclam = "\033"
      
       
 let (a, b) =
-  let empty = ""
+  let empty = "" in
   # TODO: Tuple patterns shouldn't need parens
   ('a', 'b')
 let _UNICODE_WORKS_TOO = "ジェームズ"
