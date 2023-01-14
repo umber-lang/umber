@@ -4,12 +4,10 @@ LET
 (LOWER_NAME count_by)
 (LOWER_NAME end_after)
 EQUALS
-INDENT
 LET
 (LOWER_NAME loop)
 (LOWER_NAME current)
 EQUALS
-INDENT
 IF
 (LOWER_NAME current)
 (OPERATOR <)
@@ -23,8 +21,7 @@ L_PAREN
 R_PAREN
 ELSE
 (LOWER_NAME current)
-DEDENT
+IN
 (LOWER_NAME loop)
 (LOWER_NAME start_at)
-DEDENT
 EOF

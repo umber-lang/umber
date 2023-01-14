@@ -13,12 +13,12 @@ module : {
 
 # TODO: should the value (*) automatically get re-exported or do you have to write this:
 # Maybe there could be a compiler directive at the top of the file to switch re-exports
-  on, but have them off by default (seems like good behavior)
+# on, but have them off by default (seems like good behavior)
 # Actually, I should just be able to use `include` instead of import: seems good
-  Signatures can still be changed by adding them under `module :`
+# Signatures can still be changed by adding them under `module :`
 # Probably the best behavior:
-  - When there is no `module :`, imports are not re-exported
-  - When there is a `module :`, imports are re-exported if listed in the signature
-  What about something like the Prelude?
-  Maybe something like `import@export`?
+# - When there is no `module :`, imports are not re-exported
+# - When there is a `module :`, imports are re-exported if listed in the signature
+# What about something like the Prelude?
+# Maybe something like `import@export`?
 let (*) = (*)
