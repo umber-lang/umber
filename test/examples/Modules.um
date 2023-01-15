@@ -14,7 +14,7 @@ module A : {
       val wow : a -> a
     }
   } = {
-    module D = let wow x = x
+    module D = { let wow x = x }
 
     type Bacon = Delicious
   }
