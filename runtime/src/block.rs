@@ -153,7 +153,7 @@ impl Block {
 
     fn string_len(&self) -> usize {
         let last_byte =
-            unsafe { *(self as *const Block as *const u8).add(8 * (self.len as usize + 1)) };
+            unsafe { *(self as *const Block as *const u8).add(8 * (self.len as usize + 1) - 1) };
         (self.len as usize) * 8 - (last_byte as usize) - 1
     }
 
