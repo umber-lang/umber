@@ -14,4 +14,4 @@ let my_range = Range.between 1 10
 
 let is_10_in_range = 10 :Range.elem: my_range
 
-let () = print_bool is_10_in_range
+let () = print_bool is_10_in_range; print ""

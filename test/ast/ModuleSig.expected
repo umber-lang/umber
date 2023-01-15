@@ -47,6 +47,11 @@
   (Let (rec_ false)
    (bindings
     (((Tuple ())
-      ((Fun_call (Name print_bool)
-        (((Name is_10_in_range) (Type_app Bool ()))))
+      ((Fun_call (Name ";")
+        (((Fun_call (Name print_bool)
+           (((Name is_10_in_range) (Type_app Bool ()))))
+          (Tuple ()))
+         ((Fun_call (Name print)
+           (((Literal (String "")) (Type_app String ()))))
+          (Tuple ()))))
        (Tuple ()))))))))

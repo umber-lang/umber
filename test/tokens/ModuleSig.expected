@@ -83,4 +83,7 @@ R_PAREN
 EQUALS
 (LOWER_NAME print_bool)
 (LOWER_NAME is_10_in_range)
+(OPERATOR ";")
+(LOWER_NAME print)
+(STRING "")
 EOF

@@ -22,6 +22,10 @@
  (Value_def ModuleSig.is_10_in_range
   (Fun_call ModuleSig.Range.elem
    ((Primitive (Int 10)) (Name ModuleSig.my_range))))
+ (Extern_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Extern_decl ((name umber_print_bool) (arity 1)))
+ (Extern_decl ((name umber_print_endline) (arity 1)))
  (Value_def *binding
-  (Fun_call umber_print_bool ((Name ModuleSig.is_10_in_range)))))
+  (Fun_call "Std.Prelude.Operators.;"
+   ((Fun_call umber_print_bool ((Name ModuleSig.is_10_in_range)))
+    (Fun_call umber_print_endline ((Primitive (String ""))))))))

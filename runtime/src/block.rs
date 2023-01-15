@@ -12,7 +12,8 @@ const BLOCK_PTR_MASK: u64 = 0x1;
 
 impl BlockPtr {
     fn is_block(&self) -> bool {
-        (self as *const Self as u64) & BLOCK_PTR_MASK == 0
+        let value: u64 = unsafe { mem::transmute(*self) };
+        value & BLOCK_PTR_MASK == 0
     }
 
     pub fn classify<'a>(&'a self) -> Value<'a> {
@@ -34,13 +35,19 @@ impl BlockPtr {
         if self.is_block() {
             unsafe { self.block }
         } else {
-            panic!("Expected block but got constant constructor")
+            panic!(
+                "Expected block but got constant constructor: {:x?}",
+                self as *const Self
+            )
         }
     }
 
     pub fn as_constant_cnstr(&self) -> ConstantCnstr {
         if self.is_block() {
-            panic!("Expected constant constructor but got block")
+            panic!(
+                "Expected constant constructor but got block: {:x?}",
+                self as *const Self
+            )
         } else {
             unsafe { self.constant_cnstr }
         }
@@ -184,7 +191,7 @@ pub struct ConstantCnstr(u64);
 
 impl ConstantCnstr {
     pub fn new(tag: u64) -> Self {
-        Self((tag << 1) & BLOCK_PTR_MASK)
+        Self((tag << 1) | BLOCK_PTR_MASK)
     }
 
     pub fn tag(&self) -> u64 {
