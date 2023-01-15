@@ -125,7 +125,7 @@ expr_term:
   | name = qualified(either(LOWER_NAME, UPPER_NAME))
     { Expr.Name (Value_name.Qualified.of_ustrings_unchecked name) }
   | l = literal { Expr.Literal l }
-  | items = brackets(separated_list(COMMA, expr)) { Expr.Seq_literal items }
+  | items = brackets(flexible_list(COMMA, expr)) { Expr.Seq_literal items }
   | fields = braces(record_literal_fields(expr)) { Expr.Record_literal fields }
   (* TODO: add more advanced syntax like Idris'
     http://docs.idris-lang.org/en/latest/tutorial/typesfuns.html
@@ -184,7 +184,7 @@ expr:
 
 type_record:
   (* TODO Support function types directly as record fields *)
-  | fields = braces(separated_nonempty(COMMA, type_annot_non_fun(LOWER_NAME)))
+  | fields = braces(flexible_nonempty(COMMA, type_annot_non_fun(LOWER_NAME)))
     { Type.Decl.Record (Nonempty.map fields ~f:(fun (name, typ) ->
         Value_name.of_ustring_unchecked name, typ)) }
 
@@ -204,6 +204,7 @@ type_non_fun:
     { Type.Expr.Type_app (
         Type_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
 
+(* FIXME: try using flexible *)
 (* Writing this out like this instead of just using 
    `separated_nonempty(COMMA, type_non_fun)` prevents conflicts for some reason. *)
 type_fun_args:
@@ -220,7 +221,7 @@ type_expr:
 (* TODO: Consider having trait bounds use brackets [] instead of parens (). I think it
    looks a little clearer and would also be easier to parse. *)
 %inline trait_bound:
-  | bounds = parens(separated_list(COMMA, pair(UPPER_NAME, type_params_nonempty)));
+  | bounds = parens(flexible_list(COMMA, pair(UPPER_NAME, type_params_nonempty)));
     FAT_ARROW
     { List.map bounds ~f:(Tuple2.map_fst ~f:Trait_name.of_ustring_unchecked) }
 
@@ -263,7 +264,7 @@ fixity:
 %inline import_item:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
-%inline import_items: items = separated_nonempty(COMMA, import_item) { items }
+%inline import_items: items = flexible_nonempty(COMMA, import_item) { items }
 
 import_stmt:
   | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
@@ -287,38 +288,33 @@ stmt_common:
   | TYPE; ALIAS; name = UPPER_NAME; params = type_params; EQUALS; e = type_expr
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name, (params, Type.Decl.Alias e)) }
-  (* TODO: support trait bounds (inheritance) on traits *)
-  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; colon;
-    sig_ = braces(nonempty_list(stmt_sig))
-    { Module.Trait_sig (Trait_name.of_ustring_unchecked name, params, sig_) }
   | import = import_stmt { import }
 
 stmt_sig_:
   | s = stmt_common { Module.Common_sig s }
+  (* TODO: support trait bounds (inheritance) on traits *)
+  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; sigs = colon_sigs 
+    { Module.Common_sig (Trait_sig (Trait_name.of_ustring_unchecked name, params, sigs)) }
   | MODULE; name = UPPER_NAME; colon; stmts = braces(list(stmt_sig))
     { Module.Module_sig (Module_name.of_ustring_unchecked name, stmts) }
 
 %inline stmt_sig: s = with_loc(stmt_sig_) { s }
 
-%inline equals_def:
-  | EQUALS; def = braces(list(stmt)) { def }
-
-optional_sig_equals_def:
-  | colon; body = pair(braces(list(stmt_sig)), equals_def) { body }
-  | def = equals_def { [], def }
+%inline colon_sigs: colon; sigs = braces(list(stmt_sig)) { sigs }
+%inline equals_defs: EQUALS; defs = braces(list(stmt)) { defs }
 
 stmt_:
   | s = stmt_common { Module.Common_def s }
+  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; sigs = colon_sigs;
+    defs = loption(equals_defs)
+    { Module.Trait (Trait_name.of_ustring_unchecked name, params, sigs, defs) }
   | LET; bindings = separated_nonempty(AND, let_binding)
     { Module.Let { rec_ = true ; bindings } }
-  | MODULE; name = UPPER_NAME; body = optional_sig_equals_def
-    { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
-  | TRAIT; name = UPPER_NAME; params = type_params_nonempty;
-    body = optional_sig_equals_def
-    { Module.Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body) }
+  | MODULE; name = UPPER_NAME; sigs = loption(colon_sigs); defs = equals_defs 
+    { Module.Module (Module_name.of_ustring_unchecked name, sigs, defs) }
   | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; args = nonempty(type_term);
-    def = equals_def
-    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, args, def) }
+    defs = equals_defs
+    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, args, defs) }
 
 %inline stmt: s = with_loc(stmt_) { s }
 
@@ -341,18 +337,26 @@ prog:
     { (Value_name.of_ustring_unchecked field, x) }
 
 %inline record_literal_fields(X):
-  | fields = separated_nonempty(COMMA, record_field_EQUALS(X)) { fields }
+  | fields = flexible_nonempty(COMMA, record_field_EQUALS(X)) { fields }
 
 qualified(X):
   | name = UPPER_NAME; PERIOD; rest = qualified(X)
     { name :: fst rest, snd rest }
   | x = X { [], x }
 
-%inline tuple(X): items = parens(separated_list(COMMA, X)) { items }
+%inline tuple(X): items = parens(flexible_list(COMMA, X)) { items }
 
 %inline parens(X): x = delimited(L_PAREN, X, R_PAREN) { x }
 %inline brackets(X): x = delimited(L_BRACKET, X, R_BRACKET) { x }
 %inline braces(X): x = delimited(L_BRACE, X, R_BRACE) { x }
+
+flexible_list(separator, X):
+  | { [] }
+  | xs = flexible_nonempty(separator, X) { Nonempty.to_list xs }
+
+flexible_nonempty(separator, X):
+  | x = X { Nonempty.singleton x }
+  | x = X; separator; xs = flexible_list(separator, X) { Nonempty.(x :: xs) }
 
 %inline nonempty(X): xs = nonempty_list(X) { Nonempty.of_list_exn xs }
 
