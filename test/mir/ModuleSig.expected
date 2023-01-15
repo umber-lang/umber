@@ -7,7 +7,7 @@
  (Extern_decl ((name Std.Prelude.Operators.&&) (arity 2)))
  (Extern_decl ((name umber_lte) (arity 2)))
  (Fun_def
-  ((fun_name ModuleSig.Range.in) (args (ModuleSig.Range.x *lambda_arg))
+  ((fun_name ModuleSig.Range.elem) (args (ModuleSig.Range.x *lambda_arg))
    (body
     (Let ModuleSig.Range.lo.1 (Get_block_field 0 (Name *lambda_arg))
      (Let ModuleSig.Range.hi.1 (Get_block_field 1 (Name *lambda_arg))
@@ -20,7 +20,7 @@
   (Fun_call ModuleSig.Range.between
    ((Primitive (Int 1)) (Primitive (Int 10)))))
  (Value_def ModuleSig.is_10_in_range
-  (Fun_call ModuleSig.Range.in
+  (Fun_call ModuleSig.Range.elem
    ((Primitive (Int 10)) (Name ModuleSig.my_range))))
  (Extern_decl ((name umber_print_bool) (arity 1)))
  (Value_def *binding

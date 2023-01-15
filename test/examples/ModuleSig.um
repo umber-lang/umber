@@ -2,16 +2,16 @@ module Range : {
   type Range
 
   val between : Int, Int -> Range
-  val in : Int, Range -> Bool
+  val elem : Int, Range -> Bool
 } = {
   type alias Range = (Int, Int)
 
   let between lo hi = (lo, hi)
-  let in x (lo, hi) = lo <= x && x <= hi
+  let elem x (lo, hi) = lo <= x && x <= hi
 }
 
 let my_range = Range.between 1 10
 
-let is_10_in_range = 10 :Range.in: my_range
+let is_10_in_range = 10 :Range.elem: my_range
 
 let () = print_bool is_10_in_range
