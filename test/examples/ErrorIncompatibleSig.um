@@ -21,6 +21,7 @@ module : {
 type alias T = String
 type Weather = Rainy
 
-module A =
+module A = {
   type A = A1 | A2
   let a = "not a"
+}
