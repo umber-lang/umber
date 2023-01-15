@@ -37,4 +37,13 @@
          (((Cnstr_appl True ()) (Name print_twice))
           ((Cnstr_appl False ()) (Name print))))
         (((Literal (String if)) (Type_app String ()))))
+       (Tuple ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Tuple ())
+      ((Fun_call
+        (Let
+         ((rec_ false) (bindings ((((Tuple ()) (Tuple ())) (Tuple ()))))
+          (body (Name print))))
+        (((Literal (String let)) (Type_app String ()))))
        (Tuple ()))))))))

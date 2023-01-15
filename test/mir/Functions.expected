@@ -7,4 +7,12 @@
  (Fun_def
   ((fun_name Functions.sqr) (args (Functions.x.1))
    (body
-    (Fun_call umber_int_mul ((Name Functions.x.1) (Name Functions.x.1)))))))
+    (Fun_call umber_int_mul ((Name Functions.x.1) (Name Functions.x.1))))))
+ (Fun_def
+  ((fun_name Functions.lots_of_args)
+   (args (Functions.a Functions.b Functions.c Functions.d Functions.e))
+   (body (Make_block (tag 0)))))
+ (Value_def *binding
+  (Fun_call Functions.lots_of_args
+   ((Primitive (Int 5)) (Primitive (Float 10000000000000))
+    (Primitive (Int -89)) (Primitive (String huh)) (Primitive (Char c))))))

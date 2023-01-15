@@ -1,19 +1,24 @@
-module A :
+module A : {
   val foo : Int
-  =
+} = {
   let foo = 5
 
-  module B :
-    module C :
-      trait D d :
+  module B : {
+    module C : {
+      trait D d : {
         val d : d -> Nat
+      }
+    }
 
-    module D :
+    module D : {
       val wow : a -> a
-    =
-    module D = let wow x = x
+    }
+  } = {
+    module D = { let wow x = x }
 
     type Bacon = Delicious
+  }
+}
 
 let () = match A.B.Delicious | A.B.Delicious -> ()
 let _ = match A.B.Delicious | Delicious -> True

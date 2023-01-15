@@ -10,4 +10,7 @@ let fib n =
   | 0 | 1 -> 1
   | n -> fib (n - 1) + fib (n - 2)
 
-let () = print "5! is:"; print_int (fact 5); print ""
+let () =
+  print "5! is:";
+  print_int (fact 5);
+  print ""

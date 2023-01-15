@@ -17,4 +17,22 @@
       ((Lambda ((Catch_all (x)))
         (Fun_call (Name *)
          (((Name x) (Type_app Int ())) ((Name x) (Type_app Int ())))))
-       (Function ((Type_app Int ())) (Type_app Int ())))))))))
+       (Function ((Type_app Int ())) (Type_app Int ())))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all (lots_of_args))
+      ((Lambda
+        ((Catch_all (a)) (Catch_all (b)) (Catch_all (c)) (Catch_all (d))
+         (Catch_all (e)))
+        (Tuple ()))
+       (Function ((Var a) (Var b) (Var c) (Var d) (Var e)) (Tuple ())))))))
+  (Let (rec_ false)
+   (bindings
+    (((Tuple ())
+      ((Fun_call (Name lots_of_args)
+        (((Literal (Int 5)) (Type_app Int ()))
+         ((Literal (Float 10000000000000)) (Type_app Float ()))
+         ((Literal (Int -89)) (Type_app Int ()))
+         ((Literal (String huh)) (Type_app String ()))
+         ((Literal (Char c)) (Type_app Char ()))))
+       (Tuple ()))))))))

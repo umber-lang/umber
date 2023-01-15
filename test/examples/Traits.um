@@ -1,26 +1,28 @@
 import Date
 
-trait Eq a :
+trait Eq a : {
   val (==) : a, a -> Bool
+}
 
 type Person = {
   name : String,
   dob : Date 
-} # TODO: see if I can remove the DEDENT generated here
+}
 
 let (p : Person) = {  # TODO: try and get this to parse without parens
   name = "Bob",
   dob = Date.of_string "2020-10-11",
 }
 
-impl Eq Person =
+impl Eq Person = {
   let (==) p1 p2 = p1.name == p2.name && p1.dob == p2.dob
+}
 
-impl (Eq a, Eq b) => Eq (a, b) = let (==) (a, b) (c, d) = a == c && b == d
+impl (Eq a, Eq b) => Eq (a, b) = { let (==) (a, b) (c, d) = a == c && b == d }
 
-#let _x = (  # TODO: figure out how to handle extra dedents properly
+let _x = (
   1, 2)
 let _y = (
   1, 2
 )
-let () = assert ((x, x) == (y, y,))# Trailing commas work
+let () = assert ((_x, _x) == (_y, _y,))# Trailing commas work

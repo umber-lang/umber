@@ -7,7 +7,7 @@
        (()
         (Function ((Type_app Int ()) (Type_app Int ())) (Type_app Range ())))))
      (Common_sig
-      (Val in ()
+      (Val elem ()
        (()
         (Function ((Type_app Int ()) (Type_app Range ())) (Type_app Bool ()))))))
     ((Common_def
@@ -21,7 +21,7 @@
           (Function ((Var a) (Var b)) (Tuple ((Var a) (Var b)))))))))
      (Let (rec_ false)
       (bindings
-       (((Catch_all (in))
+       (((Catch_all (elem))
          ((Lambda
            ((Catch_all (x)) (Tuple ((Catch_all (lo)) (Catch_all (hi)))))
            (Fun_call (Name &&)
@@ -40,7 +40,7 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all (is_10_in_range))
-      ((Fun_call (Name Range.in)
+      ((Fun_call (Name Range.elem)
         (((Literal (Int 10)) (Type_app Int ()))
          ((Name my_range) (Type_app ModuleSig.Range.Range ()))))
        (Type_app Bool ()))))))

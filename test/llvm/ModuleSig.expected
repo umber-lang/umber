@@ -17,7 +17,7 @@ entry:
   %fun_call = tail call tailcc %umber_block* @ModuleSig.Range.between(%umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.10 to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @ModuleSig.my_range, align 8
   %ModuleSig.my_range = load %umber_block*, %umber_block** @ModuleSig.my_range, align 8
-  %fun_call1 = tail call tailcc %umber_block* @ModuleSig.Range.in(%umber_block* bitcast (%umber_block1* @int.10 to %umber_block*), %umber_block* %ModuleSig.my_range)
+  %fun_call1 = tail call tailcc %umber_block* @ModuleSig.Range.elem(%umber_block* bitcast (%umber_block1* @int.10 to %umber_block*), %umber_block* %ModuleSig.my_range)
   store %umber_block* %fun_call1, %umber_block** @ModuleSig.is_10_in_range, align 8
   %ModuleSig.is_10_in_range = load %umber_block*, %umber_block** @ModuleSig.is_10_in_range, align 8
   %fun_call2 = tail call %umber_block* @umber_print_bool(%umber_block* %ModuleSig.is_10_in_range)
@@ -46,7 +46,7 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.&&"(%umber_block*, %umber_b
 
 declare %umber_block* @umber_lte(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @ModuleSig.Range.in(%umber_block* %ModuleSig.Range.x, %umber_block* %"*lambda_arg") {
+define tailcc %umber_block* @ModuleSig.Range.elem(%umber_block* %ModuleSig.Range.x, %umber_block* %"*lambda_arg") {
 entry:
   %block_field_gep = getelementptr %umber_block, %umber_block* %"*lambda_arg", i32 0, i32 1, i32 0
   %block_field_raw = load i64, i64* %block_field_gep, align 8

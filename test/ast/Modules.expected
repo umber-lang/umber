@@ -15,8 +15,8 @@
          (D ()
           ((Let (rec_ true)
             (bindings
-             (((Catch_all (wow)) (Lambda ((Catch_all (x))) (Name x))))))
-           (Common_def (Type_decl Bacon (() (Variants ((Delicious ())))))))))))))))
+             (((Catch_all (wow)) (Lambda ((Catch_all (x))) (Name x)))))))))
+        (Common_def (Type_decl Bacon (() (Variants ((Delicious ()))))))))))))
   (Let (rec_ true)
    (bindings
     (((Tuple ())

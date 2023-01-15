@@ -11,6 +11,8 @@
 %token ELSE
 %token LET
 %token LET_NONREC
+%token AND
+%token IN
 %token MATCH
 %token WITH
 %token WITHOUT
@@ -29,7 +31,6 @@
 %token IMPORT
 
 %token EQUALS
-%token EQUALS_ONLY_LINE
 %token PIPE
 %token COLON
 %token COLON_SPACED
@@ -61,27 +62,7 @@
 %token <Ustring.t> UPPER_NAME
 %token <Ustring.t> OPERATOR
 
-%token INDENT
-%token DEDENT
-%token LINE_SEP
 %token EOF
-
-(* TODO: Make sure all desirable forms of indentation are supported. 
-   e.g. some from http://people.csail.mit.edu/mikelin/ocaml+twt/quick_reference.pdf
-   
-   Actually, what if we do more of the haskell thing and just allow INDENTs
-   at basically any point in expressions?
-   - Could have an error handler that just moves on if in an expression context
-     and erroring on an INDENT (yeah nah)
-   - exprs can then end in any number of DEDENTs (or is that going to cause ambiguity?)
-   
-   Here's an option: enforce a specific kind of indentation (even in tuples, etc.)
-   and just use that for now -- once this is self-hosting, I'll re-write the parser by hand
-   
-   can look into indentation-sensitive parsing:
-     https://michaeldadams.org/papers/layout_parsing/LayoutParsing.pdf 
-     - probably relevant for the parser re-write which will happen once we are self-hosting
-     - for now, let's just get something basic working (doesn't need to support every case) *)
 
 %start <Untyped.Module.t> prog
 %%
@@ -95,7 +76,6 @@ operator:
   | COLON; name = qualified(UPPER_NAME); colon { name }
   | op = val_operator { [], op }
 
-%inline equals: either(EQUALS, EQUALS_ONLY_LINE) { }
 %inline colon: either(COLON, COLON_SPACED) { }
 
 literal:
@@ -145,7 +125,7 @@ expr_term:
   | name = qualified(either(LOWER_NAME, UPPER_NAME))
     { Expr.Name (Value_name.Qualified.of_ustrings_unchecked name) }
   | l = literal { Expr.Literal l }
-  | items = brackets(block_items(expr)) { Expr.Seq_literal items }
+  | items = brackets(flexible_list(COMMA, expr)) { Expr.Seq_literal items }
   | fields = braces(record_literal_fields(expr)) { Expr.Record_literal fields }
   (* TODO: add more advanced syntax like Idris'
     http://docs.idris-lang.org/en/latest/tutorial/typesfuns.html
@@ -173,33 +153,24 @@ expr_op_tree:
 
 match_branch:
   | branch = separated_pair(pattern, ARROW, expr) { branch }
-  | left = pattern; LINE_SEP; PIPE; right = match_branch
+  | left = pattern; PIPE; right = match_branch
     { Pattern.union left (fst right), snd right }
 
 match_branches:
   | PIPE; branches = separated_nonempty(PIPE, match_branch) { branches }
-  | INDENT; PIPE; branches = separated_nonempty(line_sep_pipe, match_branch); DEDENT
-    { branches }
-  | LINE_SEP; PIPE; branches = separated_nonempty(line_sep_pipe, match_branch)
-    { branches }
 
 let_rec:
   | LET { true }
   | LET_NONREC { false }
 
 let_binding_:
-  | pat = pattern; equals; expr = expr { pat, expr }
-  | fun_name = pattern_name; args = nonempty(pattern_term); equals; body = expr
+  | pat = pattern; EQUALS; expr = expr { pat, expr }
+  | fun_name = pattern_name; args = nonempty(pattern_term); EQUALS; body = expr
     { Pattern.Catch_all fun_name, Expr.Lambda (args, body) }
 
 let_binding: b = with_loc(let_binding_) { b }
 
 expr:
-  | e = delimited(INDENT, expr, DEDENT) { e }
-  (* TODO: ^ need better handling of stuff like this
-     What it should really be is that you just have to have the same number of INDENTs &
-     DEDENTs by the time you finish the expression - they shouldn't have to perfectly
-     wrap it *)
   | op_tree = expr_op_tree { Expr.Op_tree op_tree }
   | e = expr_op_term { e }
   | BACKSLASH; args = nonempty(pattern_term); ARROW; body = expr
@@ -207,16 +178,13 @@ expr:
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
-  | rec_ = let_rec; binding = let_binding_; LINE_SEP?; body = expr
-    { Expr.Let { rec_; bindings = [binding]; body } }
-  | rec_ = let_rec; INDENT; bindings = separated_nonempty(LINE_SEP, let_binding_);
-    DEDENT; body = expr
+  | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding_); IN; body = expr
     { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
 
 type_record:
   (* TODO Support function types directly as record fields *)
-  | fields = braces(block_items_nonempty(type_annot_non_fun(LOWER_NAME)))
+  | fields = braces(flexible_nonempty(COMMA, type_annot_non_fun(LOWER_NAME)))
     { Type.Decl.Record (Nonempty.map fields ~f:(fun (name, typ) ->
         Value_name.of_ustring_unchecked name, typ)) }
 
@@ -236,8 +204,9 @@ type_non_fun:
     { Type.Expr.Type_app (
         Type_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
 
+(* FIXME: try using flexible *)
 (* Writing this out like this instead of just using 
-   `separated_nonempty_list(COMMA< type_non_fun)` prevents conflicts for some reason. *)
+   `separated_nonempty(COMMA, type_non_fun)` prevents conflicts for some reason. *)
 type_fun_args:
   | arg = type_non_fun { Nonempty.singleton arg }
   | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
@@ -252,7 +221,7 @@ type_expr:
 (* TODO: Consider having trait bounds use brackets [] instead of parens (). I think it
    looks a little clearer and would also be easier to parse. *)
 %inline trait_bound:
-  | bounds = parens(block_items(pair(UPPER_NAME, type_params_nonempty)));
+  | bounds = parens(flexible_list(COMMA, pair(UPPER_NAME, type_params_nonempty)));
     FAT_ARROW
     { List.map bounds ~f:(Tuple2.map_fst ~f:Trait_name.of_ustring_unchecked) }
 
@@ -266,14 +235,11 @@ type_cnstr_decl:
 type_decl_variants:
   | PIPE?; branches = separated_nonempty(PIPE, type_cnstr_decl)
     { Nonempty.to_list branches }
-  | INDENT; PIPE?; branches = separated_nonempty(line_sep_pipe, type_cnstr_decl);
-    DEDENT
-    { Nonempty.to_list branches }
 
 type_decl:
   | PIPE { Type.Decl.Variants [] }
   | variants = type_decl_variants { Type.Decl.Variants variants }
-  | r = block(type_record) { r }
+  | record = type_record { record }
 
 %inline type_params:
   | params = list(LOWER_NAME) { List.map ~f:Type_param_name.of_ustring_unchecked params }
@@ -298,7 +264,7 @@ fixity:
 %inline import_item:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
-%inline import_items: items = separated_nonempty(COMMA, import_item) { items }
+%inline import_items: items = flexible_nonempty(COMMA, import_item) { items }
 
 import_stmt:
   | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
@@ -309,9 +275,9 @@ import_stmt:
     { Module.Import_without (path, items) }
 
 stmt_common:
-  | VAL; name = val_name; fix = parens(fixity)?; colon; t = block(type_expr_bounded)
+  | VAL; name = val_name; fix = parens(fixity)?; colon; t = type_expr_bounded
     { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
-  | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = block(type_expr); equals;
+  | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = type_expr; EQUALS;
     s = STRING
     { Module.Extern (
         Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
@@ -319,102 +285,78 @@ stmt_common:
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
-  | TYPE; ALIAS; name = UPPER_NAME; params = type_params; equals; e = type_expr
+  | TYPE; ALIAS; name = UPPER_NAME; params = type_params; EQUALS; e = type_expr
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name, (params, Type.Decl.Alias e)) }
-  (* TODO: support trait bounds (inheritance) on traits *)
-  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; colon;
-    sig_ = block(nonempty_lines(stmt_sig))
-    { Module.Trait_sig (Trait_name.of_ustring_unchecked name, params, sig_) }
   | import = import_stmt { import }
 
 stmt_sig_:
   | s = stmt_common { Module.Common_sig s }
-  | MODULE; name = UPPER_NAME; colon; stmts = block(lines(stmt_sig))
+  (* TODO: support trait bounds (inheritance) on traits *)
+  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; sigs = colon_sigs 
+    { Module.Common_sig (Trait_sig (Trait_name.of_ustring_unchecked name, params, sigs)) }
+  | MODULE; name = UPPER_NAME; colon; stmts = braces(list(stmt_sig))
     { Module.Module_sig (Module_name.of_ustring_unchecked name, stmts) }
 
 %inline stmt_sig: s = with_loc(stmt_sig_) { s }
 
-%inline def:
-  (* TODO: try removing EQUALS_ONLY_LINE: allow sig to end in LINE_SEP? *)
-  | equals; def = block(nonempty_lines(stmt)) { def }
-
-optional_sig_def:
-  | colon; body = block(pair(lines(stmt_sig), def)) { body }
-  | def = def { [], def }
+%inline colon_sigs: colon; sigs = braces(list(stmt_sig)) { sigs }
+%inline equals_defs: EQUALS; defs = braces(list(stmt)) { defs }
 
 stmt_:
   | s = stmt_common { Module.Common_def s }
-  | LET; binding = let_binding { Module.Let { rec_ = true ; bindings = [binding] } }
-  | LET; INDENT; bindings = separated_nonempty(LINE_SEP, let_binding); DEDENT
+  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; sigs = colon_sigs;
+    defs = loption(equals_defs)
+    { Module.Trait (Trait_name.of_ustring_unchecked name, params, sigs, defs) }
+  | LET; bindings = separated_nonempty(AND, let_binding)
     { Module.Let { rec_ = true ; bindings } }
-  | MODULE; name = UPPER_NAME; body = optional_sig_def
-    { Module.Module (Module_name.of_ustring_unchecked name, fst body, snd body) }
-  | TRAIT; name = UPPER_NAME; params = type_params_nonempty; body = optional_sig_def
-    { Module.Trait (Trait_name.of_ustring_unchecked name, params, fst body, snd body) }
+  | MODULE; name = UPPER_NAME; sigs = loption(colon_sigs); defs = equals_defs 
+    { Module.Module (Module_name.of_ustring_unchecked name, sigs, defs) }
   | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; args = nonempty(type_term);
-    def = def
-    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, args, def) }
+    defs = equals_defs
+    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, args, defs) }
 
 %inline stmt: s = with_loc(stmt_) { s }
 
 %inline file_module_sig:
-  | sig_ = loption(preceded(FILE_MODULE, block(lines(stmt_sig)))) { sig_ }
+  | sig_ = loption(preceded(FILE_MODULE, braces(list(stmt_sig)))) { sig_ }
 
 prog:
-  | def1 = flexible_optional_list(LINE_SEP, stmt); sig_ = file_module_sig;
-    def2 = lines(stmt); EOF
+  | def1 = list(stmt); sig_ = file_module_sig; def2 = list(stmt); EOF
     { Module_name.empty, sig_, def1 @ def2 }
 
 %inline with_loc(X): node = X { { Node.node ; span = Span.of_loc $loc } }
-
-%inline lines(X): x = separated_list(LINE_SEP?, X) { x }
-
-(* TODO: converting back to a list probably doesn't make sense *)
-%inline nonempty_lines(X): x = separated_nonempty(LINE_SEP?, X) { Nonempty.to_list x }
 
 %inline type_annot(X): a = separated_pair(X, colon, type_expr) { a }
 %inline type_annot_non_fun(X): a = separated_pair(X, colon, type_non_fun) { a }
 %inline type_annot_bounded(X):
   | a = separated_pair(X, colon, type_expr_bounded) { a }
 
-%inline line_sep_pipe: LINE_SEP?; PIPE { }
-
-%inline record_field_equals(X):
+%inline record_field_EQUALS(X):
   | field = LOWER_NAME; x = preceded(EQUALS, X)?
     { (Value_name.of_ustring_unchecked field, x) }
 
 %inline record_literal_fields(X):
-  | fields = block_items_nonempty(record_field_equals(X)) { fields }
+  | fields = flexible_nonempty(COMMA, record_field_EQUALS(X)) { fields }
 
 qualified(X):
   | name = UPPER_NAME; PERIOD; rest = qualified(X)
     { name :: fst rest, snd rest }
   | x = X { [], x }
 
-%inline tuple(X): items = parens(block_items(X)) { items }
+%inline tuple(X): items = parens(flexible_list(COMMA, X)) { items }
 
 %inline parens(X): x = delimited(L_PAREN, X, R_PAREN) { x }
 %inline brackets(X): x = delimited(L_BRACKET, X, R_BRACKET) { x }
 %inline braces(X): x = delimited(L_BRACE, X, R_BRACE) { x }
 
-%inline block(X): b = maybe_delimited(INDENT, X, DEDENT) { b }
-
-%inline block_items(X): items = flexible_list(COMMA, X); DEDENT* { items }
-%inline block_items_nonempty(X):
-  | items = flexible_nonempty(COMMA, X); DEDENT* { items }
-
-%inline flexible_list(separator, X):
+flexible_list(separator, X):
   | { [] }
   | xs = flexible_nonempty(separator, X) { Nonempty.to_list xs }
 
 flexible_nonempty(separator, X):
   | x = X { Nonempty.singleton x }
   | x = X; separator; xs = flexible_list(separator, X) { Nonempty.(x :: xs) }
-
-flexible_optional_list(separator, X):
-  | separator? { [] }
-  | x = X; separator?; xs = flexible_optional_list(separator, X) { x :: xs }
 
 %inline nonempty(X): xs = nonempty_list(X) { Nonempty.of_list_exn xs }
 

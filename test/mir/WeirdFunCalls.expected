@@ -21,4 +21,6 @@
    (Cond_assign (conds (((Constant_tag_equals (Make_block (tag 1)) 1) ())))
     (body (Name WeirdFunCalls.print_twice))
     (if_none_matched (Otherwise (Name umber_print_endline))))
-   (Fun_call *fun.2 ((Primitive (String if)))))))
+   (Fun_call *fun.2 ((Primitive (String if))))))
+ (Value_def *binding.2
+  (Fun_call umber_print_endline ((Primitive (String let))))))

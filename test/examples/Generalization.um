@@ -5,5 +5,5 @@
 # things e.g. GADTs easier. If this ever gets annoying we can implement it.
 val f : a -> ((a, Char), (a, Bool))
 let f x =
-  let g y = (x, y)
+  let g y = (x, y) in
   (g 'v', g True)
