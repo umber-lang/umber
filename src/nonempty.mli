@@ -28,6 +28,7 @@ val concat_map : 'a t -> f:('a -> 'b t) -> 'b t
 val fold_right : 'a t -> init:'acc -> f:('a -> 'acc -> 'acc) -> 'acc
 val fold_map : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc * 'b) -> 'acc * 'b t
 val foldi : 'a t -> init:'acc -> f:(int -> 'acc -> 'a -> 'acc) -> 'acc
+val filter : 'a t -> f:('a -> bool) -> 'a list
 
 val fold_until
   :  'a t
@@ -58,6 +59,7 @@ val fold2
 val fold2_exn : 'a t -> 'b t -> init:'acc -> f:('acc -> 'a -> 'b -> 'acc) -> 'acc
 val iteri : 'a t -> f:(int -> 'a -> unit) -> unit
 val iter2 : 'a t -> 'b t -> f:('a -> 'b -> unit) -> ('a, 'b) Fold2_result.t
+val iter2_exn : 'a t -> 'b t -> f:('a -> 'b -> unit) -> unit
 val reduce : 'a t -> f:('a -> 'a -> 'a) -> 'a
 val mapi : 'a t -> f:(int -> 'a -> 'b) -> 'b t
 val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t

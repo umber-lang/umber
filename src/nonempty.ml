@@ -79,6 +79,8 @@ let concat_map (x :: xs) ~f =
   loop (rev (f x)) xs
 ;;
 
+let filter t ~f = to_list t |> List.filter ~f
+
 include Monad.Make (struct
   type nonrec 'a t = 'a t
 
@@ -176,6 +178,7 @@ let fold2 xs ys ~init ~f =
 let fold2_exn xs ys ~init ~f = List.fold2_exn (to_list xs) (to_list ys) ~init ~f
 let iteri t ~f = foldi t ~init:() ~f:(fun i () x -> f i x)
 let iter2 xs ys ~f = fold2 xs ys ~init:() ~f:(fun () x y -> f x y) |> snd
+let iter2_exn xs ys ~f = fold2_exn xs ys ~init:() ~f:(fun () x y -> f x y)
 
 let split_last xs =
   let (last :: rest) = rev xs in

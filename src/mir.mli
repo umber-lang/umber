@@ -2,7 +2,7 @@ open! Import
 open Names
 
 module Cnstr_tag : sig
-  type t
+  type t [@@deriving equal, sexp]
 
   val of_int : int -> t
   val to_int : t -> int

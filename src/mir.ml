@@ -52,7 +52,7 @@ module Block_index : sig
   val of_int : int -> t
   val to_int : t -> int
 end = struct
-  type t = int [@@deriving sexp]
+  type t = int [@@deriving equal, sexp]
 
   let of_int = Fn.id
   let to_int = Fn.id
