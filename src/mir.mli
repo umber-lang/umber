@@ -1,27 +1,13 @@
 open! Import
 open Names
 
-module Cnstr_tag : sig
-  type t [@@deriving equal, sexp]
-
-  val of_int : int -> t
-  val to_int : t -> int
-  val default : t
-end
-
-module Block_index : sig
-  type t [@@deriving sexp]
-
-  val of_int : int -> t
-  val to_int : t -> int
-end
-
 module Expr : sig
   type t =
     | Primitive of Literal.t
     | Name of Mir_name.t
     | Let of Mir_name.t * t * t
-    | Fun_call of Mir_name.t * t Nonempty.t
+    (* FIXME: actually I don't think I need the types here *)
+    | Fun_call of Mir_name.t * (t * Mir_type.t) Nonempty.t
     | Make_block of
         { tag : Cnstr_tag.t
         ; fields : t list
@@ -49,7 +35,7 @@ module Expr : sig
     type nonrec t =
       { fun_name : Mir_name.t
       ; closed_over : Mir_name.Set.t
-      ; args : Mir_name.t Nonempty.t
+      ; args : (Mir_name.t * Mir_type.t) Nonempty.t
       ; body : t
       }
     [@@deriving sexp_of]
@@ -59,7 +45,7 @@ end
 module Extern_decl : sig
   type t =
     { name : Mir_name.t
-    ; arity : int
+    ; type_ : Mir_type.t
     }
   [@@deriving sexp]
 end

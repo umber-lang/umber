@@ -53,10 +53,10 @@ let print t ~to_:file = Llvm.print_module file t.module_
 
 module Tag = struct
   (* let no_scan = 0x8000 *)
-  let int = Mir.Cnstr_tag.of_int 0x8001
-  let char = Mir.Cnstr_tag.of_int 0x8002
-  let float = Mir.Cnstr_tag.of_int 0x8003
-  let string = Mir.Cnstr_tag.of_int 0x8004
+  let int = Cnstr_tag.of_int 0x8001
+  let char = Cnstr_tag.of_int 0x8002
+  let float = Cnstr_tag.of_int 0x8003
+  let string = Cnstr_tag.of_int 0x8004
 end
 
 let block_tag_type = Llvm.i16_type
@@ -102,7 +102,7 @@ let block_pointer_type = Llvm.pointer_type << block_type
 
 let int_constant_tag t tag =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
-  let int63_value = Mir.Cnstr_tag.to_int tag |> Int64.of_int in
+  let int63_value = Cnstr_tag.to_int tag |> Int64.of_int in
   let int64_value = Int64.shift_left int63_value 1 |> Int64.( + ) Int64.one in
   let is_signed = false in
   Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed
@@ -113,7 +113,7 @@ let codegen_constant_tag t tag =
 ;;
 
 let int_non_constant_tag t tag =
-  Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr_tag.to_int tag)
+  Llvm.const_int (Llvm.i16_type t.context) (Cnstr_tag.to_int tag)
 ;;
 
 let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
@@ -204,7 +204,7 @@ let block_indexes_for_gep t ~field_index =
      with i32 since that type is required for struct indexing. *)
   [| Llvm.const_int typ 0
    ; Llvm.const_int typ 1
-   ; Llvm.const_int typ (Mir.Block_index.to_int field_index)
+   ; Llvm.const_int typ (Block_index.to_int field_index)
   |]
 ;;
 
@@ -238,7 +238,7 @@ let rec codegen_expr t expr =
         let fun_name = Mir_name.to_string fun_name in
         Llvm.build_bitcast fun_value fun_pointer_type fun_name t.builder
     in
-    let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
+    let args = Array.of_list_map ~f:(codegen_expr t << fst) (Nonempty.to_list args) in
     let call = Llvm.build_call fun_ args "fun_call" t.builder in
     Llvm.set_tail_call true call;
     Llvm.set_instruction_call_conv (Llvm.function_call_conv fun_) call;
@@ -392,7 +392,7 @@ and codegen_cond t cond =
   | Equals (expr, literal) ->
     let expr_value = codegen_expr t expr in
     let literal_value = codegen_literal t literal in
-    let indexes = block_indexes_for_gep t ~field_index:(Mir.Block_index.of_int 0) in
+    let indexes = block_indexes_for_gep t ~field_index:(Block_index.of_int 0) in
     let load_expr ~expr_value =
       let expr_gep = Llvm.build_gep expr_value indexes "equals_expr_gep" t.builder in
       Llvm.build_load expr_gep "equals_expr" t.builder
@@ -483,7 +483,8 @@ let preprocess_stmt t stmt =
     let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
     Llvm.set_function_call_conv tailcc fun_;
     Value_table.add t.values fun_name fun_
-  | Extern_decl { name; arity } ->
+  | Extern_decl { name; type_ } ->
+    let arity = Mir_type.arity type_ in
     let type_ = block_pointer_type t in
     let name_str = Mir_name.to_string name in
     let value =
@@ -522,7 +523,7 @@ let codegen_stmt t stmt =
     then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
     let fun_ = Value_table.find t.values fun_name in
     let fun_params = Llvm.params fun_ in
-    Nonempty.iteri args ~f:(fun i arg_name ->
+    Nonempty.iteri args ~f:(fun i (arg_name, _) ->
       let arg_value = fun_params.(i) in
       Llvm.set_value_name (Mir_name.to_string arg_name) arg_value;
       Value_table.add t.values arg_name arg_value);

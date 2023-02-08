@@ -1,46 +1,6 @@
 open! Import
 open Names
 
-module Mir_type = struct
-  module Primitive = struct
-    type t =
-      | Int
-      | Float
-      | Char
-      | String
-    [@@deriving equal, sexp_of]
-
-    let of_literal : Literal.t -> t = function
-      | Int _ -> Int
-      | Float _ -> Float
-      | Char _ -> Char
-      | String _ -> String
-    ;;
-  end
-
-  type t =
-    | Primitive of Primitive.t
-    | Block of (Mir.Cnstr_tag.t * t list) Nonempty.t
-    | Function of t Nonempty.t * t
-  [@@deriving equal, sexp_of]
-
-  let assert_equal t1 t2 =
-    if not (equal t1 t2) then compiler_bug [%message "Unequal types" (t1 : t) (t2 : t)]
-  ;;
-
-  let expect_block = function
-    | Block variants -> variants
-    | (Primitive _ | Function _) as type_ ->
-      compiler_bug [%message "Unexpected non-block type" (type_ : t)]
-  ;;
-
-  let expect_function = function
-    | Function (arg_types, return_type) -> arg_types, return_type
-    | (Primitive _ | Block _) as type_ ->
-      compiler_bug [%message "Unexpected non-function type" (type_ : t)]
-  ;;
-end
-
 module State : sig
   type t
 
@@ -91,30 +51,29 @@ let rec type_of_expr state expr : Mir_type.t =
     (* FIXME: We should be removing all partial applications before this point, which I'm
        almost certain is not happening. *)
     let arg_types, return_type = Mir_type.expect_function (State.find state fun_name) in
-    Nonempty.iter2_exn
-      (Nonempty.map args ~f:(type_of_expr state))
-      arg_types
-      ~f:Mir_type.assert_equal;
+    Nonempty.iter2_exn args arg_types ~f:(fun (arg, arg_type) inferred_arg_type ->
+      Mir_type.assert_equal arg_type inferred_arg_type;
+      Mir_type.assert_equal arg_type (type_of_expr state arg));
     return_type
   | Make_block { tag; fields } -> Block [ tag, List.map fields ~f:(type_of_expr state) ]
   | Get_block_field (index, expr) ->
     (match Mir_type.expect_block (type_of_expr state expr) with
-     | [ ((_ : Mir.Cnstr_tag.t), fields) ] ->
-       (match List.nth fields (Mir.Block_index.to_int index) with
+     | [ ((_ : Cnstr_tag.t), fields) ] ->
+       (match List.nth fields (Block_index.to_int index) with
         | Some type_ -> type_
         | None ->
           compiler_bug
             [%message
               "Out of bounds block index"
-                (index : Mir.Block_index.t)
+                (index : Block_index.t)
                 (fields : Mir_type.t list)
                 (expr : Mir.Expr.t)])
      | _ :: _ :: _ as variants ->
        compiler_bug
          [%message
            "Multiple possible variants for block in Get_block_field"
-             (index : Mir.Block_index.t)
-             (variants : (Mir.Cnstr_tag.t * Mir_type.t list) Nonempty.t)
+             (index : Block_index.t)
+             (variants : (Cnstr_tag.t * Mir_type.t list) Nonempty.t)
              (expr : Mir.Expr.t)])
   | Cond_assign { vars; conds; body; if_none_matched } ->
     let state_after_conds, var_types_per_cond =
@@ -148,28 +107,20 @@ let rec type_of_expr state expr : Mir_type.t =
 and update_types_with_cond state cond =
   let check_variants ~expr ~tag ~is_constant =
     let variants = Mir_type.expect_block (type_of_expr state expr) in
+    let condition = if is_constant then List.is_empty else Fn.non List.is_empty in
     let valid_variants =
-      Nonempty.filter variants ~f:([%equal: Mir.Cnstr_tag.t] tag << fst)
+      Nonempty.filter variants ~f:(fun (tag', fields) ->
+        Cnstr_tag.equal tag tag' && condition fields)
     in
     match Nonempty.of_list valid_variants with
     | None ->
       compiler_bug
         [%message
           "No valid variants from Constant_tag_equals"
-            (tag : Mir.Cnstr_tag.t)
-            (variants : (Mir.Cnstr_tag.t * Mir_type.t list) Nonempty.t)
+            (tag : Cnstr_tag.t)
+            (variants : (Cnstr_tag.t * Mir_type.t list) Nonempty.t)
             (cond : Mir.Expr.cond)]
     | Some valid_variants ->
-      let condition = if is_constant then List.is_empty else Fn.non List.is_empty in
-      if not (Nonempty.for_all valid_variants ~f:(condition << snd))
-      then
-        compiler_bug
-          [%message
-            "Mismatched constant/non-constant tag check with block"
-              (tag : Mir.Cnstr_tag.t)
-              (is_constant : bool)
-              (valid_variants : (Mir.Cnstr_tag.t * Mir_type.t list) Nonempty.t)
-              (cond : Mir.Expr.cond)];
       refine_expr_type state expr ~refined_type:(Block valid_variants)
   in
   match (cond : Mir.Expr.cond) with
@@ -186,15 +137,16 @@ and update_types_with_cond state cond =
 let validate_stmt state stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) -> State.add state name (type_of_expr state expr)
-  | Fun_def { fun_name = _; closed_over; args = _; body = _ } ->
+  | Fun_def { fun_name; closed_over; args; body } ->
     if not (Set.is_empty closed_over) then failwith "TODO: closures";
-    (* FIXME: Need types on the MIR to do this validation. *)
-    (* let body_type =
-      let state = Nonempty.fold ~init:state ~f:(fun state name -> State.add name idk) in
+    let body_type =
+      let state =
+        Nonempty.fold args ~init:state ~f:(fun state (arg_name, arg_type) ->
+          State.add state arg_name arg_type)
+      in
       type_of_expr state body
     in
-    State.add state fun_name body_type () *)
-    state
+    State.add state fun_name body_type
   | Extern_decl _ ->
     (* FIXME: implement this *)
     state

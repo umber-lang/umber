@@ -18,46 +18,6 @@ module Cnstr = struct
   include Comparable.Make (T)
 end
 
-module Cnstr_tag : sig
-  (** Constructor tags are represented as follows:
-      - For constant constructors (i.e. constructors with no arguments), the tag is given
-        inline as a 64-bit integer where the least significant bit is always set to 1.
-        This is identical to the OCaml representation.
-      - For non-constant constructors (i.e. those with arguments), the tag is given in a
-        block header as the first 16 bits. In that case, as with any block, the pointer to
-        the block will have its least signficiant bit set to 0. *)
-
-  (* TODO: what about putting constructor tags in the pointer sometimes? On 64-bit
-       platforms we should have 3 free bits. This could be especially helpful for
-       implementing unboxed options or similar types. *)
-
-  type t [@@deriving compare, equal, hash, sexp]
-
-  include Comparable.S with type t := t
-
-  val of_int : int -> t
-  val to_int : t -> int
-  val default : t
-end = struct
-  include Int
-
-  let of_int t = t
-  let to_int t = t
-  let default = 0
-end
-
-module Block_index : sig
-  type t [@@deriving sexp]
-
-  val of_int : int -> t
-  val to_int : t -> int
-end = struct
-  type t = int [@@deriving equal, sexp]
-
-  let of_int = Fn.id
-  let to_int = Fn.id
-end
-
 module Constant_names : sig
   val binding : Value_name.t
   val fun_ : Value_name.t
@@ -88,6 +48,7 @@ end = struct
   let mem = Hash_set.mem constant_names_table
 end
 
+(* TODO: Should probably unify this with [Mir_type] *)
 module Cnstr_info : sig
   type t [@@deriving sexp_of]
 
@@ -176,22 +137,10 @@ end
 module Extern_decl = struct
   type t =
     { name : Mir_name.t
-    ; arity : int
+    ; type_ : Mir_type.t
     }
   [@@deriving sexp]
 end
-
-(* TODO: This doesn't handle polymorphic types particularly smartly. Should think about
-   whether that matters. *)
-let rec arity_of_type ~names : Type.Scheme.t -> int = function
-  | Var _ | Tuple _ -> 0
-  | Type_app (type_name, _) ->
-    (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
-     | Abstract | Variants _ | Record _ -> 0
-     | Alias type_ -> arity_of_type ~names type_)
-  | Function (args, _) -> Nonempty.length args
-  | Partial_function _ -> .
-;;
 
 module Context : sig
   type t [@@deriving sexp_of]
@@ -202,7 +151,7 @@ module Context : sig
   module Extern_info : sig
     type t =
       | Local
-      | External of { arity : int }
+      | External of Mir_type.t
       | Bool_intrinsic of { tag : Cnstr_tag.t }
     [@@deriving sexp_of]
   end
@@ -217,11 +166,12 @@ module Context : sig
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
   val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
   val find_cnstr_info_from_decl : t -> Type.Decl.decl -> Cnstr_info.t option
+  val name_bindings : t -> Name_bindings.t
 end = struct
   module Extern_info = struct
     type t =
       | Local
-      | External of { arity : int }
+      | External of Mir_type.t
       | Bool_intrinsic of { tag : Cnstr_tag.t }
     [@@deriving sexp_of]
   end
@@ -236,6 +186,8 @@ end = struct
   let sexp_of_t t =
     [%sexp (t.names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t)]
   ;;
+
+  let name_bindings t = t.name_bindings
 
   let with_module t module_name ~f =
     let name_bindings =
@@ -337,7 +289,7 @@ end = struct
                     (name : Value_name.Qualified.t)
                     (entry : Name_bindings.Name_entry.t)])
           in
-          External { arity = arity_of_type ~names:name_bindings scheme }
+          External (Mir_type.of_type_scheme ~names:name_bindings scheme)
         in
         let extern_info : Extern_info.t =
           match extern_name with
@@ -611,7 +563,7 @@ module Expr = struct
     (* TODO: recursive lets? Mutual recursion? (will surely need a rec flag at least)
        Can maybe handle that in toplevel function definitions. *)
     | Let of Mir_name.t * t * t
-    | Fun_call of Mir_name.t * t Nonempty.t
+    | Fun_call of Mir_name.t * (t * Mir_type.t) Nonempty.t
     | Make_block of
         { tag : Cnstr_tag.t
         ; fields : t list [@sexp.omit_nil]
@@ -641,7 +593,7 @@ module Expr = struct
     type nonrec t =
       { fun_name : Mir_name.t
       ; closed_over : Mir_name.Set.t [@sexp.omit_nil]
-      ; args : Mir_name.t Nonempty.t
+      ; args : (Mir_name.t * Mir_type.t) Nonempty.t
       ; body : t
       }
     [@@deriving sexp_of]
@@ -860,8 +812,8 @@ module Expr = struct
         let name, extern_info = Context.find_value_name ctx name in
         (match extern_info with
          | Local -> Name name
-         | External { arity } ->
-           add_extern_decl { Extern_decl.name; arity };
+         | External type_ ->
+           add_extern_decl { Extern_decl.name; type_ };
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
       | Fun_call (fun_, args_and_types), body_type ->
@@ -871,7 +823,8 @@ module Expr = struct
           let fun_ = of_typed_expr ~ctx fun_ fun_type in
           let args =
             Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
-              of_typed_expr ~ctx arg arg_type)
+              ( of_typed_expr ~ctx arg arg_type
+              , Mir_type.of_type_scheme ~names:(Context.name_bindings ctx) arg_type ))
           in
           match fun_ with
           | Name fun_name -> Fun_call (fun_name, args)
@@ -950,12 +903,15 @@ module Expr = struct
                  arg
                  ~label:"function argument patterns"
              in
+             let arg_mir_type =
+               Mir_type.of_type_scheme ~names:(Context.name_bindings ctx) arg_type
+             in
              match arg with
              | Catch_all (Some arg_name) ->
                (* Special-case named catch-all patterns (the dominant case) to skip the
                   [lambda_arg] step and use the name directly. *)
                let ctx, arg_name = Context.add_value_name ctx arg_name in
-               (ctx, bindings), arg_name
+               (ctx, bindings), (arg_name, arg_mir_type)
              | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
                let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
                let add_let acc name mir_expr = (name, mir_expr) :: acc in
@@ -968,7 +924,7 @@ module Expr = struct
                    ~init:bindings
                    ~add_let
                in
-               (ctx, bindings), arg_name)
+               (ctx, bindings), (arg_name, arg_mir_type))
       in
       let fun_name =
         match just_bound with
@@ -1200,21 +1156,21 @@ let of_typed_module =
             Context.add_value_name ctx (Value_name.of_cnstr_name cnstr_name)
           in
           let stmt : Stmt.t =
-            let arg_count = List.length args in
-            if arg_count = 0
+            if List.is_empty args
             then Value_def (name, Make_block { tag; fields = [] })
             else (
-              let arg_names =
-                List.init arg_count ~f:(fun i ->
-                  snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
+              let args =
+                List.mapi args ~f:(fun i arg_type ->
+                  ( snd (Context.add_value_name ctx (Constant_names.synthetic_arg i))
+                  , Mir_type.of_type_scheme ~names:(Context.name_bindings ctx) arg_type ))
               in
               Fun_def
                 { fun_name = name
                 ; closed_over = Mir_name.Set.empty
-                ; args = arg_names |> Nonempty.of_list_exn
+                ; args = Nonempty.of_list_exn args
                 ; body =
                     Make_block
-                      { tag; fields = List.map arg_names ~f:(fun name -> Expr.Name name) }
+                      { tag; fields = List.map args ~f:(fun (name, _) -> Expr.Name name) }
                 })
           in
           outer_ctx, stmt :: stmts)
@@ -1236,7 +1192,7 @@ let of_typed_module =
         ( ctx
         , Extern_decl
             { name = Mir_name.create_extern_name extern_name
-            ; arity = arity_of_type ~names type_
+            ; type_ = Mir_type.of_type_scheme ~names type_
             }
           :: stmts )
       | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _) ->
