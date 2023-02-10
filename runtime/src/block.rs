@@ -1,3 +1,4 @@
+use crate::gc::Gc;
 use core::ptr::{copy_nonoverlapping, NonNull};
 use core::{mem, slice, str};
 
@@ -68,8 +69,8 @@ impl BlockPtr {
 
 // Blocks consist of this one-word header followed by their fields inline.
 // Rust's dynamically-sized types don't let us do this without fat pointers getting
-// involved, and we want to store the block length inline, so we just malloc and manage
-// the pointers ourselves.
+// involved, and we want to store the block length inline, so we just manage the pointers
+// ourselves.
 #[repr(C, align(8))]
 pub struct Block {
     pub tag: u16,
@@ -166,11 +167,11 @@ impl Block {
         }
     }
 
-    // Just malloc and leak memory for now. We can implement GC later.
     fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
         let len = fields.len() as u16;
         unsafe {
-            let block = libc::malloc(8 * (len + 1) as usize) as *mut Block;
+            let nbytes = 8 * (len + 1) as usize;
+            let block = Gc::get().alloc(nbytes) as *mut Self;
             (*block).tag = tag as u16;
             (*block).len = len;
             copy_nonoverlapping(fields.as_ptr(), block.add(1) as *mut BlockPtr, len as usize);
