@@ -1,13 +1,11 @@
 open Import
 open Names
 
+(* See https://llvm.org/doxygen/namespacellvm_1_1CallingConv.html *)
 let tailcc = 18
 
-let data_layout_string =
-  (* See https://llvm.org/docs/LangRef.html#data-layout *)
-  "i32:64-i64:64-p:64:64-f64:64"
-;;
-
+(* See https://llvm.org/docs/LangRef.html#data-layout *)
+let data_layout_string = "i32:64-i64:64-p:64:64-f64:64"
 let ignore_value (_ : Llvm.llvalue) = ()
 
 module Value_table : sig
@@ -100,9 +98,9 @@ let block_type ?(len = 0) t =
    looks like the OCaml bindings only support up to version 13, though. *)
 let block_pointer_type = Llvm.pointer_type << block_type
 
-let fun_pointer_type t ~n_args =
+let block_function_type t ~n_args =
   let arg_type = block_pointer_type t in
-  Llvm.pointer_type (Llvm.function_type arg_type (Array.create arg_type ~len:n_args))
+  Llvm.function_type arg_type (Array.create arg_type ~len:n_args)
 ;;
 
 let int_constant_tag t tag =
@@ -213,6 +211,95 @@ let block_indexes_for_gep t ~field_index =
   |]
 ;;
 
+let build_call t fun_ args ~fun_name ~call_conv =
+  let call = Llvm.build_call fun_ args fun_name t.builder in
+  Llvm.set_tail_call true call;
+  Llvm.set_instruction_call_conv call_conv call;
+  call
+;;
+
+let codegen_umber_apply_fun t ~n_args =
+  let apply_fun_name = [%string "umber_apply%{n_args#Int}"] in
+  match Llvm.lookup_function apply_fun_name t.module_ with
+  | Some fun_ -> fun_
+  | None ->
+    let original_block = Llvm.insertion_block t.builder in
+    let apply_fun_type = block_function_type t ~n_args:(n_args + 1) in
+    let apply_fun_value = Llvm.define_function apply_fun_name apply_fun_type t.module_ in
+    Llvm.set_function_call_conv tailcc apply_fun_value;
+    Llvm.set_linkage Link_once_odr apply_fun_value;
+    let params = Llvm.params apply_fun_value in
+    let calling_fun = params.(0) in
+    let arg_values = Array.subo params ~pos:1 in
+    (* If the pointer is on the heap, do a closure call. Otherwise, do a regular
+       function call. *)
+    let is_on_heap_fun =
+      Llvm.declare_function
+        "umber_gc_is_on_heap"
+        (Llvm.function_type (Llvm.i1_type t.context) [| block_pointer_type t |])
+        t.module_
+    in
+    let entry_block = Llvm.entry_block apply_fun_value in
+    Llvm.position_at_end entry_block t.builder;
+    let closure_call_block = Llvm.append_block t.context "closure_call" apply_fun_value in
+    let regular_call_block = Llvm.append_block t.context "regular_call" apply_fun_value in
+    let phi_block = Llvm.append_block t.context "call_phi" apply_fun_value in
+    let is_on_heap_call =
+      Llvm.build_call is_on_heap_fun [| calling_fun |] "is_on_heap" t.builder
+    in
+    ignore_value
+      (Llvm.build_cond_br is_on_heap_call closure_call_block regular_call_block t.builder);
+    Llvm.position_at_end closure_call_block t.builder;
+    let closure_call =
+      (* Get first value from env and call it, passing env in as the first argument. *)
+      let closure_env = calling_fun in
+      let calling_fun =
+        let gep =
+          Llvm.build_gep
+            closure_env
+            (block_indexes_for_gep t ~field_index:(Mir.Block_index.of_int 0))
+            "closure_gep"
+            t.builder
+        in
+        let load_i64 = Llvm.build_load gep "closure_gep_raw" t.builder in
+        Llvm.build_inttoptr
+          load_i64
+          (Llvm.pointer_type (block_function_type t ~n_args:(n_args + 1)))
+          "closure_fun"
+          t.builder
+      in
+      build_call
+        t
+        calling_fun
+        (Array.append [| closure_env |] arg_values)
+        ~fun_name:"closure_call"
+        ~call_conv:tailcc
+    in
+    ignore_value (Llvm.build_br phi_block t.builder);
+    Llvm.position_at_end regular_call_block t.builder;
+    let regular_call =
+      let fun_value =
+        Llvm.build_bitcast
+          calling_fun
+          (Llvm.pointer_type (block_function_type t ~n_args))
+          "calling_fun"
+          t.builder
+      in
+      build_call t fun_value arg_values ~fun_name:"regular_call" ~call_conv:tailcc
+    in
+    ignore_value (Llvm.build_br phi_block t.builder);
+    Llvm.position_at_end phi_block t.builder;
+    let phi =
+      Llvm.build_phi
+        [ closure_call, closure_call_block; regular_call, regular_call_block ]
+        "call_phi"
+        t.builder
+    in
+    ignore_value (Llvm.build_ret phi t.builder);
+    Llvm.position_at_end original_block t.builder;
+    apply_fun_value
+;;
+
 let rec codegen_expr t expr =
   match (expr : Mir.Expr.t) with
   | Primitive lit ->
@@ -227,7 +314,30 @@ let rec codegen_expr t expr =
   | Let (name, expr, body) ->
     Value_table.add t.values name (codegen_expr t expr);
     codegen_expr t body
-  | Fun_call (fun_name, args) -> codegen_fun_call t fun_name args
+  | Fun_call (fun_name, args) ->
+    (* IDEA: first check if this is a closure or regular function call by checking if the
+       pointer is on the heap.
+       - If it's a regular function call, just do it.
+       - If it's an closure call, find the environment and pass it in.
+       Some trickiness around indirect calls (either functions or closures): we have to assume
+       the calling convention is something: go with tailcc.
+       FIXME: Make sure external cc functions are wrapped with tailcc wrappers when put into
+       values. *)
+    let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
+    let fun_value = Value_table.find t.values fun_name in
+    let fun_name = Mir_name.to_string fun_name in
+    (match Llvm.classify_value fun_value with
+     | Function ->
+       let call_conv = Llvm.function_call_conv fun_value in
+       build_call t fun_value args ~fun_name ~call_conv
+     | _ ->
+       let n_args = Array.length args in
+       build_call
+         t
+         (codegen_umber_apply_fun t ~n_args)
+         (Array.append [| fun_value |] args)
+         ~fun_name
+         ~call_conv:tailcc)
   | Make_block { tag; fields } ->
     (match Nonempty.of_list fields with
      | None -> codegen_constant_tag t tag
@@ -245,20 +355,6 @@ let rec codegen_expr t expr =
     let load_i64 = Llvm.build_load gep "block_field_raw" t.builder in
     Llvm.build_inttoptr load_i64 (block_pointer_type t) "block_field" t.builder
   | Cond_assign { vars; conds; body; if_none_matched } ->
-    (* Problem: How do we assign multiple values conditionally? Phi nodes only
-         accept one value. We can't use multiple phi blocks because you lose the
-         predecessor information after the first one.
-         Some possible approaches:
-         1. Duplicate the conditions and re-check them to do each phi. This obviously
-            sucks.
-         2. Put the variables in a vector or array in the phi. Unclear what LLVM will do
-            with this (stack allocation?) and whether that's better or worse than other
-            options.
-         3. Use `select` instead of `phi`. This means we always do all of the GEPs, etc.
-            for each match arm. Maybe this is fine since they will always be simple/not
-            side-effecting, so it might not cause (much) duplicated work.
-            
-        For now I've gone with (2). *)
     let start_block = Llvm.insertion_block t.builder in
     let current_fun = Llvm.block_parent start_block in
     let num_vars = List.length vars in
@@ -371,101 +467,6 @@ let rec codegen_expr t expr =
     in
     associate_conds conds
 
-and codegen_fun_call t fun_name args =
-  (* IDEA: first check if this is a closure or regular function call by checking if the
-     pointer is on the heap.
-     - If it's a regular function call, just do it.
-     - If it's an closure call, find the environment and pass it in.
-     Some trickiness around indirect calls (either functions or closures): we have to assume
-     the calling convention is something: go with tailcc.
-     FIXME: Make sure external cc functions are wrapped with tailcc wrappers when put into
-     values. *)
-  (* TODO: Consider putting this into a "umber_applyN" function to avoid generating too
-     much code *)
-  let arg_values = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
-  let build_regular_call fun_value ~name ~call_conv =
-    let call = Llvm.build_call fun_value arg_values name t.builder in
-    Llvm.set_instruction_call_conv call_conv call;
-    call
-  in
-  let call =
-    let fun_value = Value_table.find t.values fun_name in
-    match Llvm.classify_value fun_value with
-    | Function ->
-      build_regular_call
-        fun_value
-        ~name:(Mir_name.to_string fun_name)
-        ~call_conv:(Llvm.function_call_conv fun_value)
-    | _ ->
-      (* If the pointer is on the heap, do a closure call. Otherwise, do a regular
-         function call. *)
-      let is_on_heap_fun =
-        Llvm.declare_function
-          "umber_gc_is_on_heap"
-          (Llvm.function_type (Llvm.i1_type t.context) [| block_pointer_type t |])
-          t.module_
-      in
-      let starting_block = Llvm.insertion_block t.builder in
-      let current_fun = Llvm.block_parent starting_block in
-      let closure_call_block = Llvm.append_block t.context "closure_call" current_fun in
-      let regular_call_block = Llvm.append_block t.context "regular_call" current_fun in
-      let phi_block = Llvm.append_block t.context "call_phi" current_fun in
-      let is_on_heap_call =
-        Llvm.build_call is_on_heap_fun [| fun_value |] "is_on_heap" t.builder
-      in
-      ignore_value
-        (Llvm.build_cond_br
-           is_on_heap_call
-           closure_call_block
-           regular_call_block
-           t.builder);
-      Llvm.position_at_end closure_call_block t.builder;
-      let closure_call =
-        (* Get first value from env and call it, passing env in as the first argument. *)
-        let closure_env = fun_value in
-        let fun_value =
-          let gep =
-            Llvm.build_gep
-              closure_env
-              (block_indexes_for_gep t ~field_index:(Mir.Block_index.of_int 0))
-              "closure_gep"
-              t.builder
-          in
-          let load_i64 = Llvm.build_load gep "closure_gep_raw" t.builder in
-          Llvm.build_inttoptr
-            load_i64
-            (fun_pointer_type t ~n_args:(Nonempty.length args + 1))
-            "closure_fun"
-            t.builder
-        in
-        Llvm.build_call
-          fun_value
-          (Array.append [| closure_env |] arg_values)
-          "closure_call"
-          t.builder
-      in
-      ignore_value (Llvm.build_br phi_block t.builder);
-      Llvm.position_at_end regular_call_block t.builder;
-      let regular_call =
-        let fun_value =
-          Llvm.build_bitcast
-            fun_value
-            (fun_pointer_type t ~n_args:(Nonempty.length args))
-            "regular_call_bitcast"
-            t.builder
-        in
-        build_regular_call fun_value ~name:"regular_call" ~call_conv:tailcc
-      in
-      ignore_value (Llvm.build_br phi_block t.builder);
-      Llvm.position_at_end phi_block t.builder;
-      Llvm.build_phi
-        [ closure_call, closure_call_block; regular_call, regular_call_block ]
-        (Mir_name.to_string fun_name)
-        t.builder
-  in
-  Llvm.set_tail_call true call;
-  call
-
 and codegen_cond t cond =
   let make_icmp value value' = Llvm.build_icmp Eq value value' "equals" t.builder in
   match cond with
@@ -556,25 +557,18 @@ let preprocess_stmt t stmt =
     in
     Value_table.add t.values name global_value
   | Fun_def { fun_name; args; closed_over = _; body = _ } ->
-    let type_ = block_pointer_type t in
-    let fun_type =
-      Llvm.function_type type_ (Array.create type_ ~len:(Nonempty.length args))
-    in
+    let fun_type = block_function_type t ~n_args:(Nonempty.length args) in
     let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
     Llvm.set_function_call_conv tailcc fun_;
     Value_table.add t.values fun_name fun_
   | Extern_decl { name; arity } ->
-    let type_ = block_pointer_type t in
     let name_str = Mir_name.to_string name in
     let value =
       if arity = 0
-      then Llvm.declare_global type_ name_str t.module_
+      then Llvm.declare_global (block_pointer_type t) name_str t.module_
       else (
         let fun_ =
-          Llvm.declare_function
-            name_str
-            (Llvm.function_type type_ (Array.create type_ ~len:arity))
-            t.module_
+          Llvm.declare_function name_str (block_function_type t ~n_args:arity) t.module_
         in
         let call_conv =
           if Mir_name.is_extern_name name then Llvm.CallConv.c else tailcc
