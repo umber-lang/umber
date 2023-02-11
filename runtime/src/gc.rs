@@ -1,3 +1,4 @@
+use core::ffi::c_void;
 use core::{panic, ptr};
 
 const DEFAULT_HEAP_SIZE: usize = 256 * 1000;
@@ -41,4 +42,14 @@ impl Gc {
             result
         }
     }
+
+    pub unsafe fn is_on_heap(&self, x: *const c_void) -> bool {
+        ((x as usize) >= (self.heap as usize))
+            && ((x as usize) < (self.heap.add(self.heap_capacity) as usize))
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn umber_gc_is_on_heap(x: *const c_void) -> bool {
+    Gc::get().is_on_heap(x)
 }
