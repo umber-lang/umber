@@ -465,11 +465,9 @@ entry:
 
 define tailcc %umber_block* @Std.Prelude.Operators..(%umber_block* %Std.Prelude.Operators.f, %umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x) {
 entry:
-  %Std.Prelude.Operators.f1 = bitcast %umber_block* %Std.Prelude.Operators.f to %umber_block* (%umber_block*)*
-  %Std.Prelude.Operators.g2 = bitcast %umber_block* %Std.Prelude.Operators.g to %umber_block* (%umber_block*)*
-  %fun_call = tail call %umber_block* %Std.Prelude.Operators.g2(%umber_block* %Std.Prelude.Operators.x)
-  %fun_call3 = tail call %umber_block* %Std.Prelude.Operators.f1(%umber_block* %fun_call)
-  ret %umber_block* %fun_call3
+  %Std.Prelude.Operators.g1 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x)
+  %Std.Prelude.Operators.f2 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f, %umber_block* %Std.Prelude.Operators.g1)
+  ret %umber_block* %Std.Prelude.Operators.f2
 }
 
 declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
@@ -563,9 +561,8 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
 
 define tailcc %umber_block* @"Std.Prelude.Operators.|>"(%umber_block* %Std.Prelude.Operators.x.1, %umber_block* %Std.Prelude.Operators.f.1) {
 entry:
-  %Std.Prelude.Operators.f.11 = bitcast %umber_block* %Std.Prelude.Operators.f.1 to %umber_block* (%umber_block*)*
-  %fun_call = tail call %umber_block* %Std.Prelude.Operators.f.11(%umber_block* %Std.Prelude.Operators.x.1)
-  ret %umber_block* %fun_call
+  %Std.Prelude.Operators.f.11 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f.1, %umber_block* %Std.Prelude.Operators.x.1)
+  ret %umber_block* %Std.Prelude.Operators.f.11
 }
 
 define tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %"*lambda_arg", %umber_block* %Std.Prelude.Operators.x.2) {
@@ -582,6 +579,30 @@ declare %umber_block* @umber_print_int(%umber_block*)
 declare %umber_block* @umber_print_bool(%umber_block*)
 
 declare noalias i8* @malloc(i32)
+
+define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+entry:
+  %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
+  br i1 %is_on_heap, label %closure_call, label %regular_call
+
+closure_call:                                     ; preds = %entry
+  %closure_gep = getelementptr %umber_block, %umber_block* %0, i32 0, i32 1, i32 0
+  %closure_gep_raw = load i64, i64* %closure_gep, align 8
+  %closure_fun = inttoptr i64 %closure_gep_raw to %umber_block* (%umber_block*, %umber_block*)*
+  %closure_call1 = tail call tailcc %umber_block* %closure_fun(%umber_block* %0, %umber_block* %1)
+  br label %call_phi
+
+regular_call:                                     ; preds = %entry
+  %calling_fun = bitcast %umber_block* %0 to %umber_block* (%umber_block*)*
+  %regular_call2 = tail call tailcc %umber_block* %calling_fun(%umber_block* %1)
+  br label %call_phi
+
+call_phi:                                         ; preds = %regular_call, %closure_call
+  %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
+  ret %umber_block* %call_phi3
+}
+
+declare i1 @umber_gc_is_on_heap(%umber_block*)
 
 |}
 (*$*)
