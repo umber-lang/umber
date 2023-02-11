@@ -211,8 +211,8 @@ let block_indexes_for_gep t ~field_index =
   |]
 ;;
 
-let build_call t fun_ args ~fun_name ~call_conv =
-  let call = Llvm.build_call fun_ args fun_name t.builder in
+let build_call ?(name = "fun_call") t fun_ args ~call_conv =
+  let call = Llvm.build_call fun_ args name t.builder in
   Llvm.set_tail_call true call;
   Llvm.set_instruction_call_conv call_conv call;
   call
@@ -272,7 +272,7 @@ let codegen_umber_apply_fun t ~n_args =
         t
         calling_fun
         (Array.append [| closure_env |] arg_values)
-        ~fun_name:"closure_call"
+        ~name:"closure_call"
         ~call_conv:tailcc
     in
     ignore_value (Llvm.build_br phi_block t.builder);
@@ -285,7 +285,7 @@ let codegen_umber_apply_fun t ~n_args =
           "calling_fun"
           t.builder
       in
-      build_call t fun_value arg_values ~fun_name:"regular_call" ~call_conv:tailcc
+      build_call t fun_value arg_values ~name:"regular_call" ~call_conv:tailcc
     in
     ignore_value (Llvm.build_br phi_block t.builder);
     Llvm.position_at_end phi_block t.builder;
@@ -325,18 +325,16 @@ let rec codegen_expr t expr =
        values. *)
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     let fun_value = Value_table.find t.values fun_name in
-    let fun_name = Mir_name.to_string fun_name in
     (match Llvm.classify_value fun_value with
      | Function ->
        let call_conv = Llvm.function_call_conv fun_value in
-       build_call t fun_value args ~fun_name ~call_conv
+       build_call t fun_value args ~call_conv
      | _ ->
        let n_args = Array.length args in
        build_call
          t
          (codegen_umber_apply_fun t ~n_args)
          (Array.append [| fun_value |] args)
-         ~fun_name
          ~call_conv:tailcc)
   | Make_block { tag; fields } ->
     (match Nonempty.of_list fields with

@@ -465,9 +465,9 @@ entry:
 
 define tailcc %umber_block* @Std.Prelude.Operators..(%umber_block* %Std.Prelude.Operators.f, %umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x) {
 entry:
-  %Std.Prelude.Operators.g1 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x)
-  %Std.Prelude.Operators.f2 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f, %umber_block* %Std.Prelude.Operators.g1)
-  ret %umber_block* %Std.Prelude.Operators.f2
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x)
+  %fun_call1 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f, %umber_block* %fun_call)
+  ret %umber_block* %fun_call1
 }
 
 declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
@@ -561,8 +561,8 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
 
 define tailcc %umber_block* @"Std.Prelude.Operators.|>"(%umber_block* %Std.Prelude.Operators.x.1, %umber_block* %Std.Prelude.Operators.f.1) {
 entry:
-  %Std.Prelude.Operators.f.11 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f.1, %umber_block* %Std.Prelude.Operators.x.1)
-  ret %umber_block* %Std.Prelude.Operators.f.11
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f.1, %umber_block* %Std.Prelude.Operators.x.1)
+  ret %umber_block* %fun_call
 }
 
 define tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %"*lambda_arg", %umber_block* %Std.Prelude.Operators.x.2) {
