@@ -600,6 +600,13 @@ let compile_entry_module ~source_filenames ~entry_file =
   let fun_type = main_function_type context in
   let main_fun = Llvm.define_function "main" fun_type module_ in
   Llvm.position_at_end (Llvm.entry_block main_fun) builder;
+  let gc_init_fun =
+    Llvm.declare_function
+      "umber_gc_init"
+      (Llvm.function_type (Llvm.void_type context) [||])
+      module_
+  in
+  ignore_value (Llvm.build_call gc_init_fun [||] "" builder);
   List.iter source_filenames ~f:(fun source_filename ->
     let fun_ =
       Llvm.declare_function (main_function_name ~source_filename) fun_type module_
