@@ -1,14 +1,6 @@
 open! Import
 open Names
 
-module Cnstr_tag : sig
-  type t
-
-  val of_int : int -> t
-  val to_int : t -> int
-  val default : t
-end
-
 module Block_index : sig
   type t [@@deriving sexp]
 
@@ -48,7 +40,6 @@ module Expr : sig
   module Fun_def : sig
     type nonrec t =
       { fun_name : Mir_name.t
-      ; closed_over : Mir_name.Set.t
       ; args : Mir_name.t Nonempty.t
       ; body : t
       }

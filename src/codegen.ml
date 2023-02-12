@@ -48,15 +48,6 @@ type t =
 
 let to_string t = Llvm.string_of_llmodule t.module_
 let print t ~to_:file = Llvm.print_module file t.module_
-
-module Tag = struct
-  (* let no_scan = 0x8000 *)
-  let int = Mir.Cnstr_tag.of_int 0x8001
-  let char = Mir.Cnstr_tag.of_int 0x8002
-  let float = Mir.Cnstr_tag.of_int 0x8003
-  let string = Mir.Cnstr_tag.of_int 0x8004
-end
-
 let block_tag_type = Llvm.i16_type
 let block_index_type = Llvm.i16_type
 
@@ -105,7 +96,7 @@ let block_function_type t ~n_args =
 
 let int_constant_tag t tag =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
-  let int63_value = Mir.Cnstr_tag.to_int tag |> Int64.of_int in
+  let int63_value = Cnstr_tag.to_int tag |> Int64.of_int in
   let int64_value = Int64.shift_left int63_value 1 |> Int64.( + ) Int64.one in
   let is_signed = false in
   Llvm.const_of_int64 (Llvm.i64_type t.context) int64_value is_signed
@@ -116,7 +107,7 @@ let codegen_constant_tag t tag =
 ;;
 
 let int_non_constant_tag t tag =
-  Llvm.const_int (Llvm.i16_type t.context) (Mir.Cnstr_tag.to_int tag)
+  Llvm.const_int (Llvm.i16_type t.context) (Cnstr_tag.to_int tag)
 ;;
 
 let codegen_block_len t len = Llvm.const_int (block_index_type t.context) len
@@ -147,13 +138,19 @@ let codegen_literal t literal =
     | Int i ->
       let type_ = Llvm.i64_type t.context in
       let name = Int.to_string i in
-      constant_block t ~tag:Tag.int ~len:1 ~type_:"int" ~name (Llvm.const_int type_ i)
+      constant_block
+        t
+        ~tag:Cnstr_tag.int
+        ~len:1
+        ~type_:"int"
+        ~name
+        (Llvm.const_int type_ i)
     | Float x ->
       let type_ = Llvm.double_type t.context in
       let name = Float.to_string x in
       constant_block
         t
-        ~tag:Tag.float
+        ~tag:Cnstr_tag.float
         ~len:1
         ~type_:"float"
         ~name
@@ -162,7 +159,13 @@ let codegen_literal t literal =
       let type_ = Llvm.i64_type t.context in
       let name = Uchar.to_string c in
       let c = Uchar.to_int c in
-      constant_block t ~tag:Tag.char ~len:1 ~type_:"char" ~name (Llvm.const_int type_ c)
+      constant_block
+        t
+        ~tag:Cnstr_tag.char
+        ~len:1
+        ~type_:"char"
+        ~name
+        (Llvm.const_int type_ c)
     | String s ->
       let s = Ustring.to_string s in
       let n_chars = String.length s in
@@ -180,7 +183,7 @@ let codegen_literal t literal =
           Llvm.const_int (Llvm.i8_type t.context) byte)
       in
       let value = Llvm.const_array (Llvm.i8_type t.context) packed_char_array in
-      constant_block t ~tag:Tag.string ~len:n_words ~type_:"string" ~name value)
+      constant_block t ~tag:Cnstr_tag.string ~len:n_words ~type_:"string" ~name value)
 ;;
 
 let get_block_tag t value =
@@ -554,7 +557,7 @@ let preprocess_stmt t stmt =
         t.module_
     in
     Value_table.add t.values name global_value
-  | Fun_def { fun_name; args; closed_over = _; body = _ } ->
+  | Fun_def { fun_name; args; body = _ } ->
     let fun_type = block_function_type t ~n_args:(Nonempty.length args) in
     let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
     Llvm.set_function_call_conv tailcc fun_;
@@ -589,9 +592,7 @@ let codegen_stmt t stmt =
       Llvm.set_global_constant true global_value;
       Llvm.set_initializer expr_value global_value)
     else ignore_value (Llvm.build_store expr_value global_value t.main_function_builder)
-  | Fun_def { fun_name; closed_over; args; body } ->
-    if not (Set.is_empty closed_over)
-    then raise_s [%message "TODO: closures" (closed_over : Mir_name.Set.t)];
+  | Fun_def { fun_name; args; body } ->
     let fun_ = Value_table.find t.values fun_name in
     let fun_params = Llvm.params fun_ in
     Nonempty.iteri args ~f:(fun i arg_name ->

@@ -18,34 +18,6 @@ module Cnstr = struct
   include Comparable.Make (T)
 end
 
-module Cnstr_tag : sig
-  (** Constructor tags are represented as follows:
-      - For constant constructors (i.e. constructors with no arguments), the tag is given
-        inline as a 64-bit integer where the least significant bit is always set to 1.
-        This is identical to the OCaml representation.
-      - For non-constant constructors (i.e. those with arguments), the tag is given in a
-        block header as the first 16 bits. In that case, as with any block, the pointer to
-        the block will have its least signficiant bit set to 0. *)
-
-  (* TODO: what about putting constructor tags in the pointer sometimes? On 64-bit
-       platforms we should have 3 free bits. This could be especially helpful for
-       implementing unboxed options or similar types. *)
-
-  type t [@@deriving compare, equal, hash, sexp]
-
-  include Comparable.S with type t := t
-
-  val of_int : int -> t
-  val to_int : t -> int
-  val default : t
-end = struct
-  include Int
-
-  let of_int t = t
-  let to_int t = t
-  let default = 0
-end
-
 module Block_index : sig
   type t [@@deriving sexp]
 
@@ -64,6 +36,7 @@ module Constant_names : sig
   val match_ : Value_name.t
   val lambda_arg : Value_name.t
   val underscore : Value_name.t
+  val closure_env : Value_name.t
   val synthetic_arg : int -> Value_name.t
   val mem : Value_name.t -> bool
 end = struct
@@ -74,9 +47,11 @@ end = struct
   let match_ = Value_name.of_string_unchecked "match"
   let lambda_arg = Value_name.of_string_unchecked "*lambda_arg"
   let underscore = Value_name.of_string_unchecked "_"
+  let closure_env = Value_name.of_string_unchecked "*closure_env"
 
   let constant_names_table =
-    Value_name.Hash_set.of_list [ binding; fun_; match_; lambda_arg; underscore ]
+    Value_name.Hash_set.of_list
+      [ binding; fun_; match_; lambda_arg; underscore; closure_env ]
   ;;
 
   let synthetic_arg i =
@@ -211,9 +186,9 @@ module Context : sig
   val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
   val peek_value_name : t -> Value_name.Qualified.t -> Mir_name.t option
 
-  type find_observer := Value_name.Qualified.t -> Mir_name.t -> unit
+  type find_override := Value_name.t -> Mir_name.t -> Mir_name.t option
 
-  val with_find_observer : t -> f:(find_observer -> find_observer) -> t
+  val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
   val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
   val find_cnstr_info_from_decl : t -> Type.Decl.decl -> Cnstr_info.t option
@@ -230,7 +205,7 @@ end = struct
     { names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t
     ; name_bindings : Name_bindings.t
     ; name_table : Mir_name.Name_table.t
-    ; find_observer : Value_name.Qualified.t -> Mir_name.t -> unit
+    ; find_override : Value_name.t -> Mir_name.t -> Mir_name.t option
     }
 
   let sexp_of_t t =
@@ -254,12 +229,14 @@ end = struct
     { t with names = Map.set t.names ~key:name ~data:(mir_name, extern_info) }, mir_name
   ;;
 
+  let add_local_qualified_name t name = add t name ~extern_name:None ~extern_info:Local
+
   let add_value_name t name =
     if Constant_names.mem name
-    then add t ([], name) ~extern_name:None ~extern_info:Local
+    then add_local_qualified_name t ([], name)
     else (
       let path = Name_bindings.(current_path t.name_bindings |> Path.to_module_path) in
-      add t (path, name) ~extern_name:None ~extern_info:Local)
+      add_local_qualified_name t (path, name))
   ;;
 
   let find { names; _ } name = Map.find names name
@@ -278,11 +255,15 @@ end = struct
       find t name
   ;;
 
-  let find_value_name t name =
+  let find_value_name t name : Mir_name.t * Extern_info.t =
     match peek_value_name_internal t name with
     | Some ((name', _) as entry) ->
-      t.find_observer name name';
-      entry
+      (match name with
+       | _ :: _, _ -> entry
+       | [], name ->
+         (match t.find_override name name' with
+          | Some name_override -> name_override, Local
+          | None -> entry))
     | None ->
       compiler_bug
         [%message
@@ -302,14 +283,22 @@ end = struct
     name
   ;;
 
-  let with_find_observer t ~f = { t with find_observer = f t.find_observer }
+  let with_find_override t ~f =
+    { t with
+      find_override =
+        (fun name name' ->
+          match t.find_override name name' with
+          | Some _ as name -> name
+          | None -> f name name')
+    }
+  ;;
 
   let create ~names:name_bindings ~name_table =
     let t =
       { names = Value_name.Qualified.Map.empty
       ; name_bindings
       ; name_table
-      ; find_observer = (fun _ _ -> ())
+      ; find_override = (fun _ _ -> None)
       }
     in
     let current_path =
@@ -640,7 +629,6 @@ module Expr = struct
   module Fun_def = struct
     type nonrec t =
       { fun_name : Mir_name.t
-      ; closed_over : Mir_name.Set.t [@sexp.omit_nil]
       ; args : Mir_name.t Nonempty.t
       ; body : t
       }
@@ -738,6 +726,7 @@ module Expr = struct
       { rec_ : bool
       ; names_bound : Mir_name.Set.t
       }
+    [@@deriving sexp_of]
   end
 
   let add_let_bindings ~bindings ~body =
@@ -848,8 +837,8 @@ module Expr = struct
   let of_typed_expr
     ~just_bound:outer_just_bound
     ~ctx:outer_ctx
-    ~add_fun_def
-    ~add_extern_decl
+    ~(add_fun_def : Fun_def.t -> unit)
+    ~(add_extern_decl : Extern_decl.t -> unit)
     outer_expr
     outer_type
     =
@@ -861,7 +850,7 @@ module Expr = struct
         (match extern_info with
          | Local -> Name name
          | External { arity } ->
-           add_extern_decl { Extern_decl.name; arity };
+           add_extern_decl { name; arity };
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
       | Fun_call (fun_, args_and_types), body_type ->
@@ -898,7 +887,7 @@ module Expr = struct
         (* TODO: Still need to try and coalesce lambdas/other function expressions for
            function definitions which are partially applied. See example in
            test/ast/TypeChecking.expected. *)
-        Name (add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound)
+        add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound
       | Match (expr, input_type, arms), output_type ->
         let input_expr = of_typed_expr ~ctx expr input_type in
         if is_atomic input_expr
@@ -970,17 +959,11 @@ module Expr = struct
                in
                (ctx, bindings), arg_name)
       in
-      let fun_name =
-        match just_bound with
-        | Some { names_bound; _ } when Set.length names_bound = 1 ->
-          Set.choose_exn names_bound
-        | Some _ | None -> snd (Context.add_value_name ctx Constant_names.fun_)
-      in
-      let closed_over = ref Mir_name.Set.empty in
+      let closed_over = ref Mir_name.Map.empty in
       let ctx =
         let from_which_context name mir_name =
           let in_context ctx =
-            Context.peek_value_name ctx name
+            Context.peek_value_name ctx ([], name)
             |> Option.value_map ~default:false ~f:(Mir_name.equal mir_name)
           in
           if in_context outer_ctx
@@ -989,13 +972,27 @@ module Expr = struct
           then `Closed_over_from_parent
           else `Newly_bound
         in
+        (* FIXME: May need to have the expression body find a different name if it's
+           closed over: don't want to duplicate names. *)
         (* Determine if names looked up were closed over from the parent context. *)
-        Context.with_find_observer ctx ~f:(fun parent_observer name unique_name ->
+        Context.with_find_override ctx ~f:(fun name unique_name ->
           match from_which_context name unique_name with
-          | `Newly_bound | `From_outer_stmts -> ()
+          | `Newly_bound | `From_outer_stmts -> None
           | `Closed_over_from_parent ->
-            parent_observer name unique_name;
-            closed_over := Set.add !closed_over unique_name)
+            (match Map.find !closed_over unique_name with
+             | Some _ as new_name -> new_name
+             | None ->
+               (* FIXME: a little sad how we re-derive the unique name and state when we
+                  just wanted to increment an integer in it. *)
+               let (_ : Context.t), new_name = Context.add_value_name ctx name in
+               (* FIXME: cleanup *)
+               print_s
+                 [%message
+                   "created new name"
+                     ~old_name:(unique_name : Mir_name.t)
+                     (new_name : Mir_name.t)];
+               closed_over := Map.set !closed_over ~key:unique_name ~data:new_name;
+               Some new_name))
       in
       let body = of_typed_expr ~ctx body body_type in
       let body = add_let_bindings ~bindings ~body in
@@ -1003,11 +1000,56 @@ module Expr = struct
         match just_bound with
         | Some { rec_ = true; names_bound } ->
           (* Don't close over recursively bound arguments *)
-          Set.diff !closed_over names_bound
+          Set.fold names_bound ~init:!closed_over ~f:Map.remove
         | None | Some { rec_ = false; _ } -> !closed_over
       in
-      add_fun_def { Fun_def.fun_name; closed_over; args; body };
-      fun_name
+      (* FIXME: I think assigning a fresh name will break recursive calls: we
+         need the names to match up. Let's get this working consistently.
+         
+         Some issues:
+         - When creating closures, the bindings go to closures, not the function itself
+           we need to call. We also need to modify the call to pass in the closure env.
+         - Even when not creating closures, if we change the fun_name to not be the same
+           as what we bound, recursive calls will not reference the fun_name, which is
+           what they should reference.
+           
+         We can detect recursive calls using the mechanism for detecting cloed-over
+         variables. For recursive calls, we need to assign different names than what are
+         bound, and these need to become the fun_name correctly. *)
+      let fun_name =
+        match just_bound with
+        | Some { names_bound; _ }
+          when Set.length names_bound = 1 && Map.is_empty closed_over ->
+          Set.choose_exn names_bound
+        | Some _ | None -> snd (Context.add_value_name ctx Constant_names.fun_)
+      in
+      let args, body, fun_or_closure =
+        if Map.is_empty closed_over
+        then args, body, Name fun_name
+        else (
+          (* FIXME: Might have to change how some of the names are determined: can't
+             re-use them, might have to do some renames when processing the body. *)
+          let (_ : Context.t), closure_env_name =
+            Context.add_value_name ctx Constant_names.closure_env
+          in
+          let closure_env = Name closure_env_name in
+          let args = Nonempty.cons closure_env_name args in
+          let (_ : int), body =
+            Map.fold closed_over ~init:(1, body) ~f:(fun ~key:_ ~data:name (i, body) ->
+              i + 1, Let (name, Get_block_field (Block_index.of_int i, closure_env), body))
+          in
+          let closure =
+            Make_block
+              { tag = Cnstr_tag.closure
+              ; fields =
+                  Name fun_name
+                  :: List.map (Map.keys closed_over) ~f:(fun name -> Name name)
+              }
+          in
+          args, body, closure)
+      in
+      add_fun_def { fun_name; args; body };
+      fun_or_closure
     and make_block ~ctx ~tag ~fields ~field_types =
       let fields = List.map2_exn fields field_types ~f:(of_typed_expr ~ctx) in
       Make_block { tag; fields }
@@ -1210,7 +1252,6 @@ let of_typed_module =
               in
               Fun_def
                 { fun_name = name
-                ; closed_over = Mir_name.Set.empty
                 ; args = arg_names |> Nonempty.of_list_exn
                 ; body =
                     Make_block
