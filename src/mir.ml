@@ -37,8 +37,8 @@ module Constant_names : sig
   val lambda_arg : Value_name.t
   val underscore : Value_name.t
   val closure_env : Value_name.t
-  val synthetic_arg : int -> Value_name.t
   val mem : Value_name.t -> bool
+  val synthetic_arg : int -> Value_name.t
 end = struct
   (* NOTE: none of these can be valid value names a user could enter. *)
 
@@ -626,6 +626,31 @@ module Expr = struct
     | Use_bindings of t list
   [@@deriving sexp_of]
 
+  (* FIXME: remove if I don't end up using it *)
+  (* let rec map t ~f =
+    match (f t : _ Map_action.t) with
+    | Halt t -> t
+    | Retry t -> map t ~f
+    | Defer t ->
+      (match t with
+       | Name _ | Primitive _ -> t
+       | Let (name, t, t') -> Let (name, map t ~f, map t' ~f)
+       | Fun_call (fun_name, args) -> Fun_call (fun_name, Nonempty.map args ~f:(map ~f))
+       | Make_block { tag; fields } ->
+         Make_block { tag; fields = List.map fields ~f:(map ~f) }
+       | Get_block_field (index, t) -> Get_block_field (index, map t ~f)
+       | Cond_assign { vars; conds; body; if_none_matched } ->
+         Cond_assign
+           { vars
+           ; conds = Nonempty.map conds ~f:(Tuple2.map_snd ~f:(List.map ~f:(map ~f)))
+           ; body = map body ~f
+           ; if_none_matched =
+               (match if_none_matched with
+                | Otherwise t -> Otherwise (map t ~f)
+                | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map ~f)))
+           })
+  ;; *)
+
   module Fun_def = struct
     type nonrec t =
       { fun_name : Mir_name.t
@@ -723,9 +748,8 @@ module Expr = struct
 
   module Just_bound = struct
     type t =
-      { rec_ : bool
-      ; names_bound : Mir_name.Set.t
-      }
+      | Rec of Mir_name.t
+      | Nonrec of Mir_name.Set.t
     [@@deriving sexp_of]
   end
 
@@ -740,11 +764,16 @@ module Expr = struct
 
   let rec check_rec_binding_expr expr =
     match (expr : _ Typed.Expr.t) with
-    | Lambda _ | Tuple _ | Record_literal _ -> ()
+    | Lambda _ -> ()
     | Let { body; bindings = _; rec_ = _ } -> check_rec_binding_expr body
     | Match (_, _, arms) ->
       Nonempty.iter arms ~f:(fun (_, expr) -> check_rec_binding_expr expr)
-    | Name _ | Fun_call _ | Record_update _ | Record_field_access _ ->
+    | Name _
+    | Tuple _
+    | Record_literal _
+    | Fun_call _
+    | Record_update _
+    | Record_field_access _ ->
       (* TODO: Consider relaxing this to allow more kinds of expressions e.g. function
          calls which don't mention the recursive names.
          See: https://v2.ocaml.org/manual/letrecvalues.html *)
@@ -752,12 +781,23 @@ module Expr = struct
         Mir_error
         ~msg:
           [%message
-            "This kind of expression is not allowed on the right-hand side of a \
-             recursive let binding"
+            "Recursive let bindings can only be used to define functions"
               (expr : _ Typed.Expr.t)]
     | Literal _ ->
       compiler_bug
         [%message "Impossible expr in recursive binding" (expr : _ Typed.Expr.t)]
+  ;;
+
+  let check_rec_binding_pattern pat =
+    match (pat : Typed.Pattern.t) with
+    | Catch_all _ -> ()
+    | _ ->
+      Compilation_error.raise
+        Mir_error
+        ~msg:
+          [%message
+            "Only variables are allowed as the left-hand side of recursive let bindings"
+              (pat : Typed.Pattern.t)]
   ;;
 
   let generate_let_bindings
@@ -780,16 +820,24 @@ module Expr = struct
             let ctx, name = Context.add_value_name ctx_for_body name in
             ctx, Set.add names_bound name)
         in
-        ctx_for_body, (binding, names_bound))
+        ctx_for_body, (binding, pattern, names_bound))
     in
     let ctx = if rec_ then ctx_for_body else ctx in
     (* TODO: Warn about let bindings which bind no names and are pure. *)
     Nonempty.fold
       bindings
       ~init:(ctx_for_body, init)
-      ~f:(fun (ctx_for_body, acc) (binding, names_bound) ->
+      ~f:(fun (ctx_for_body, acc) (binding, pattern, names_bound) ->
       let pat, typ, expr = extract_binding binding in
-      if rec_ then check_rec_binding_expr expr;
+      let just_bound : Just_bound.t =
+        if rec_
+        then (
+          check_rec_binding_expr expr;
+          check_rec_binding_pattern pattern;
+          assert_or_compiler_bug ~here:[%here] (Set.length names_bound = 1);
+          Rec (Set.choose_exn names_bound))
+        else Nonrec names_bound
+      in
       (* TODO: support unions in let bindings. For the non-rec case we should
          just be able to convert to a match *)
       let pat' =
@@ -805,9 +853,7 @@ module Expr = struct
             "The pattern in this let binding is not exhaustive"
               ~pattern:(pat : Typed.Pattern.t)
               (missing_cases : Simple_pattern.t list)];
-      let acc, mir_expr =
-        process_expr acc ~just_bound:{ Just_bound.rec_; names_bound } ~ctx expr typ
-      in
+      let acc, mir_expr = process_expr acc ~just_bound ~ctx expr typ in
       let add_name ctx name = ctx, Context.find_value_name_assert_local ctx name in
       let binding_name, add_binding_name =
         match pat' with
@@ -982,46 +1028,69 @@ module Expr = struct
             (match Map.find !closed_over unique_name with
              | Some _ as new_name -> new_name
              | None ->
-               (* FIXME: a little sad how we re-derive the unique name and state when we
-                  just wanted to increment an integer in it. *)
                let (_ : Context.t), new_name = Context.add_value_name ctx name in
-               (* FIXME: cleanup *)
-               print_s
-                 [%message
-                   "created new name"
-                     ~old_name:(unique_name : Mir_name.t)
-                     (new_name : Mir_name.t)];
                closed_over := Map.set !closed_over ~key:unique_name ~data:new_name;
                Some new_name))
       in
       let body = of_typed_expr ~ctx body body_type in
       let body = add_let_bindings ~bindings ~body in
-      let closed_over =
-        match just_bound with
-        | Some { rec_ = true; names_bound } ->
-          (* Don't close over recursively bound arguments *)
-          Set.fold names_bound ~init:!closed_over ~f:Map.remove
-        | None | Some { rec_ = false; _ } -> !closed_over
-      in
+      (* TODO: Consider having closures share an environment instead of closing over other
+         mutually recursive closures. *)
+      let closed_over = !closed_over in
       (* FIXME: I think assigning a fresh name will break recursive calls: we
          need the names to match up. Let's get this working consistently.
          
          Some issues:
          - When creating closures, the bindings go to closures, not the function itself
            we need to call. We also need to modify the call to pass in the closure env.
+           - Modifying the call is tricky! Somehow we need to get a message that this
+             variable is a recursive call to a closure. Or maybe we fix up the mir after
+             the fact?
+             FIXME: recursive calls to closures need to be fixed up to call the function,
+             because the closure is not in scope. What happens if a recursive use is not
+             a call, but passing the function somewhere else? Then it needs to be use the
+             closure env. Actually, calling the closure env would be ok, since that is
+             allowed.
          - Even when not creating closures, if we change the fun_name to not be the same
            as what we bound, recursive calls will not reference the fun_name, which is
            what they should reference.
            
          We can detect recursive calls using the mechanism for detecting cloed-over
          variables. For recursive calls, we need to assign different names than what are
-         bound, and these need to become the fun_name correctly. *)
+         bound, and these need to become the fun_name correctly. 
+         
+        FIXME: Recursive calls to other bound variables won't work if they are closures
+        since they aren't in scope (only the functions are). Maybe this is one reason to
+        have recursive function groups all share the same closure environment...
+        - it also won't work if they get renamed unless we map the names in the body
+          
+        To summarize, in the body of recursive functions:
+        - References to the recursively bound names (this or other functions) must match
+          the assigned function names: We should come up with these names up-front to make
+          this workable.
+        - In the case of closures, closures actually require the closure environments of
+          all other recursively bound functions, since they could call them or pass them
+          to other functions. So yeah, the closure environment has to contain multiple
+          function pointers. Once that is the case, calls to recursively bound functions
+          should be mapped to calls to an index into the environment (to specify which
+          function it is that's being called).
+          FIXME: Can I implement this without the gross inline header thing? What do other
+          languages do? Just not allow mutually recursive closures?
+
+          IDEA: Let closures close over each other and themselves. This is fine?
+        *)
+      (* TODO: Have recursive closures not close over themselves. *)
       let fun_name =
-        match just_bound with
-        | Some { names_bound; _ }
-          when Set.length names_bound = 1 && Map.is_empty closed_over ->
-          Set.choose_exn names_bound
-        | Some _ | None -> snd (Context.add_value_name ctx Constant_names.fun_)
+        (* If we are a closure, [fun_name] can't be the same as the name we bind, since we
+           aren't returning [Name fun_name] and relying on the assignment getting elided. *)
+        if not (Map.is_empty closed_over)
+        then snd (Context.add_value_name ctx Constant_names.fun_)
+        else (
+          match just_bound with
+          | Some (Rec name) -> name
+          | Some (Nonrec names_bound) when Set.length names_bound = 1 ->
+            Set.choose_exn names_bound
+          | Some (Nonrec _) | None -> snd (Context.add_value_name ctx Constant_names.fun_))
       in
       let args, body, fun_or_closure =
         if Map.is_empty closed_over

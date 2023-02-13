@@ -1,19 +1,27 @@
 ((Extern_decl ((name umber_lt) (arity 2)))
  (Extern_decl ((name umber_int_add) (arity 2)))
  (Fun_def
-  ((fun_name Closures.loop)
-   (closed_over (Closures.count_by Closures.end_after))
-   (args (Closures.current))
+  ((fun_name *fun) (args (*closure_env Closures.current))
    (body
-    (Let match
-     (Fun_call umber_lt ((Name Closures.current) (Name Closures.end_after)))
-     (Cond_assign (conds (((Constant_tag_equals (Name match) 1) ())))
-      (body
-       (Fun_call Closures.loop
-        ((Fun_call umber_int_add
-          ((Name Closures.current) (Name Closures.count_by))))))
-      (if_none_matched (Otherwise (Name Closures.current))))))))
+    (Let Closures.end_after.1 (Get_block_field 3 (Name *closure_env))
+     (Let Closures.count_by.1 (Get_block_field 2 (Name *closure_env))
+      (Let Closures.loop.1 (Get_block_field 1 (Name *closure_env))
+       (Let match
+        (Fun_call umber_lt
+         ((Name Closures.current) (Name Closures.end_after.1)))
+        (Cond_assign (conds (((Constant_tag_equals (Name match) 1) ())))
+         (body
+          (Fun_call Closures.loop.1
+           ((Fun_call umber_int_add
+             ((Name Closures.current) (Name Closures.count_by.1))))))
+         (if_none_matched (Otherwise (Name Closures.current)))))))))))
  (Fun_def
   ((fun_name Closures.count_up)
    (args (Closures.start_at Closures.count_by Closures.end_after))
-   (body (Fun_call Closures.loop ((Name Closures.start_at)))))))
+   (body
+    (Let Closures.loop
+     (Make_block (tag 12289)
+      (fields
+       ((Name *fun) (Name Closures.loop) (Name Closures.count_by)
+        (Name Closures.end_after))))
+     (Fun_call Closures.loop ((Name Closures.start_at))))))))

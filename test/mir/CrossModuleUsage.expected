@@ -1,6 +1,6 @@
 ("Compilation error"
  ((kind Mir_error)
   (msg
-   ("This kind of expression is not allowed on the right-hand side of a recursive let binding"
+   ("Recursive let bindings can only be used to define functions"
     (expr (Name b))))
   (filename CrossModuleUsage.um)))
