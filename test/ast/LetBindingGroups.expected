@@ -79,8 +79,16 @@
             (Let
              ((rec_ true)
               (bindings
-               ((((Catch_all (go_left)) (Var a)) (Name go_right))
-                (((Catch_all (go_right)) (Var a)) (Name go_left))))
-              (body (Name go_left)))))))
+               ((((Catch_all (go_left))
+                  (Function ((Type_app Int ())) (Var a)))
+                 (Lambda ((Catch_all (x)))
+                  (Fun_call (Name go_right) (((Name x) (Type_app Int ()))))))
+                (((Catch_all (go_right))
+                  (Function ((Type_app Int ())) (Var a)))
+                 (Lambda ((Catch_all (x)))
+                  (Fun_call (Name go_left) (((Name x) (Type_app Int ()))))))))
+              (body
+               (Fun_call (Name go_left)
+                (((Literal (Int 17)) (Type_app Int ()))))))))))
          (body (Name bottom_again))))
        (Var a))))))))

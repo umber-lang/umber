@@ -14,8 +14,8 @@ let _ =
 # This allows for mutual recursion between local let bindings in expressions
 let bottom =
 	let bottom_again =
-		let go_left = go_right
-		and go_right = go_left in
-		go_left
+		let go_left x = go_right x
+		and go_right x = go_left x in
+		go_left 17
 	in
 	bottom_again

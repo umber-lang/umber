@@ -70,14 +70,19 @@ LET
 EQUALS
 LET
 (LOWER_NAME go_left)
+(LOWER_NAME x)
 EQUALS
 (LOWER_NAME go_right)
+(LOWER_NAME x)
 AND
 (LOWER_NAME go_right)
+(LOWER_NAME x)
 EQUALS
 (LOWER_NAME go_left)
+(LOWER_NAME x)
 IN
 (LOWER_NAME go_left)
+(INT 17)
 IN
 (LOWER_NAME bottom_again)
 EOF
