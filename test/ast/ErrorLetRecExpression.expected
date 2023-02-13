@@ -1,0 +1,5 @@
+(ErrorLetRecExpression ()
+ ((Let (rec_ true)
+   (bindings
+    (((Catch_all (a)) ((Name b) (Var a)))
+     ((Catch_all (b)) ((Name a) (Var a))))))))

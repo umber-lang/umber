@@ -1,0 +1,6 @@
+("Compilation error"
+ ((kind Mir_error)
+  (msg
+   ("Recursive let bindings can only be used to define functions"
+    (expr (Name b))))
+  (filename ErrorLetRecExpression.um)))
