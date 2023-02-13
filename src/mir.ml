@@ -680,8 +680,10 @@ module Expr = struct
     let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
       match (pat : Simple_pattern.t) with
       | Catch_all None ->
-        (* TODO: warn about unused expressions. NOTE: we can only elide the bound expression
-           as we are currently assuming purity. Later we should check for effects. *)
+        (* FIXME: Don't elide unused expressions, since they may have side effects. This
+           can happen if there is a [Catch_all None] pattern at toplevel.
+           Once there's a proper effect system and we can tell if an expression is pure,
+           we can instead elide the expressions and emit a warning about it being unused. *)
         ctx, acc
       | Catch_all (Some name) ->
         let ctx, name = add_name ctx name in
@@ -1019,46 +1021,6 @@ module Expr = struct
                in
                (ctx, bindings), arg_name)
       in
-      (* FIXME: Problem: two cases:
-         - Regular recursive function: use [fun_name] as the recursive binding, don't
-           close over it though.
-         - Recursive closure: use [*closure_env] as the recursive binding, and also don't
-           close over it. Alternatively, map calls to the recursive binding to calls to
-           [fun_name *closure_env]
-         Except we don't know at the point of calls whether we are closure yet. This
-         suggests a post-hoc mapping approach.
-         - Also for recursive functions, this applies to other arguments too. 
-         
-         Recursive functions:
-
-         {[
-           let a = ...
-           and b = ...
-           in
-           a, b
-         ]}
-         becomes
-         {[
-           Fun_def a using b
-           Fun_def b using a
-           a, b
-         ]}
-         (names unchanged, no closing over anything)
-         and if a closes over x and b closes over y, it becomes
-         {[
-           Fun_def *fun.0 using *closure_env for b and x (and with a = *closure_env)
-           Fun_def *fun.1 using *closure_env for a and y (and with b = *closure_env)
-           Value_def a = closure of *fun.0, b, x
-           Value_def b = closure of *fun.1, a, y
-           a, b
-         ]}
-
-         So we don't know if we are going to close over other arguments until we know if
-         we are a closure, but we aren't guaranteed to know that in time.
-         Maybe we start by assuming we won't close over recursively bound arguments, then
-         map the names over if it turns out we do. We can also map calls like this.
-         *)
-      (* FIXME: clean up this mess *)
       let recursively_bound_names =
         match just_bound with
         | Some (Rec { this_name; other_names }) -> Set.add other_names this_name
@@ -1097,54 +1059,9 @@ module Expr = struct
       let body = add_let_bindings ~bindings ~body in
       (* TODO: Consider having closures share an environment instead of closing over other
          mutually recursive closures. *)
-      (* FIXME: I think assigning a fresh name will break recursive calls: we
-         need the names to match up. Let's get this working consistently.
-         
-         Some issues:
-         - When creating closures, the bindings go to closures, not the function itself
-           we need to call. We also need to modify the call to pass in the closure env.
-           - Modifying the call is tricky! Somehow we need to get a message that this
-             variable is a recursive call to a closure. Or maybe we fix up the mir after
-             the fact?
-             FIXME: recursive calls to closures need to be fixed up to call the function,
-             because the closure is not in scope. What happens if a recursive use is not
-             a call, but passing the function somewhere else? Then it needs to be use the
-             closure env. Actually, calling the closure env would be ok, since that is
-             allowed.
-         - Even when not creating closures, if we change the fun_name to not be the same
-           as what we bound, recursive calls will not reference the fun_name, which is
-           what they should reference.
-           
-         We can detect recursive calls using the mechanism for detecting cloed-over
-         variables. For recursive calls, we need to assign different names than what are
-         bound, and these need to become the fun_name correctly. 
-         
-        FIXME: Recursive calls to other bound variables won't work if they are closures
-        since they aren't in scope (only the functions are). Maybe this is one reason to
-        have recursive function groups all share the same closure environment...
-        - it also won't work if they get renamed unless we map the names in the body
-          
-        To summarize, in the body of recursive functions:
-        - References to the recursively bound names (this or other functions) must match
-          the assigned function names: We should come up with these names up-front to make
-          this workable.
-        - In the case of closures, closures actually require the closure environments of
-          all other recursively bound functions, since they could call them or pass them
-          to other functions. So yeah, the closure environment has to contain multiple
-          function pointers. Once that is the case, calls to recursively bound functions
-          should be mapped to calls to an index into the environment (to specify which
-          function it is that's being called).
-          FIXME: Can I implement this without the gross inline header thing? What do other
-          languages do? Just not allow mutually recursive closures?
-
-          IDEA: Let closures close over each other and themselves. This is fine?
-        *)
-      (* FIXME: Have recursive functions not close over themselves. This means every
-         recursive function has to be a closure, which sucks. *)
       let fun_name =
         (* If we are a closure, [fun_name] can't be the same as the name we bind, since we
            aren't returning [Name fun_name] and relying on the assignment getting elided. *)
-        (* FIXME: cleanup *)
         match just_bound with
         | Some (Rec { this_name; _ }) when Map.is_empty !closed_over -> this_name
         | Some (Nonrec { this_pattern_names }) when Set.length this_pattern_names = 1 ->
@@ -1175,8 +1092,6 @@ module Expr = struct
                 | expr -> Defer expr)
           in
           let closed_over = !closed_over in
-          (* FIXME: Might have to change how some of the names are determined: can't
-             re-use them, might have to do some renames when processing the body. *)
           let args = Nonempty.cons closure_env_name args in
           let (_ : int), body =
             Map.fold closed_over ~init:(1, body) ~f:(fun ~key:_ ~data:name (i, body) ->

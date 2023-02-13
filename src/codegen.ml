@@ -327,18 +327,23 @@ let rec codegen_expr t expr =
        FIXME: Make sure external cc functions are wrapped with tailcc wrappers when put into
        values. *)
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
+    let build_umber_apply_fun_call fun_value =
+      let n_args = Array.length args in
+      build_call
+        t
+        (codegen_umber_apply_fun t ~n_args)
+        (Array.append [| fun_value |] args)
+        ~call_conv:tailcc
+    in
     let fun_value = Value_table.find t.values fun_name in
     (match Llvm.classify_value fun_value with
      | Function ->
        let call_conv = Llvm.function_call_conv fun_value in
        build_call t fun_value args ~call_conv
-     | _ ->
-       let n_args = Array.length args in
-       build_call
-         t
-         (codegen_umber_apply_fun t ~n_args)
-         (Array.append [| fun_value |] args)
-         ~call_conv:tailcc)
+     | GlobalVariable ->
+       build_umber_apply_fun_call
+         (Llvm.build_load fun_value (Llvm.value_name fun_value) t.builder)
+     | _ -> build_umber_apply_fun_call fun_value)
   | Make_block { tag; fields } ->
     (match Nonempty.of_list fields with
      | None -> codegen_constant_tag t tag
