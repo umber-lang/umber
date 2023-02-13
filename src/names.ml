@@ -144,6 +144,7 @@ module type Name_qualified = sig
     type name = t
     type t = Module_path.t * name [@@deriving compare, equal, hash, sexp]
 
+    include Stringable.S with type t := t
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
@@ -192,8 +193,28 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
           Queue.to_array q |> Ustring.of_array_unchecked
         ;;
 
+        let split_dots s =
+          let rec loop i j acc s =
+            if Int.( >= ) j (String.length s)
+            then List.rev (String.subo s ~pos:i :: acc)
+            else if Char.equal s.[j] '.'
+            then
+              if Int.equal i j
+              then
+                (* Multiple '.'s in a row. This is ok, seen in e.g.
+                   `Std.Prelude.Operators..` This is only allowed in the name itself, so
+                   we can just take the rest of the string *)
+                List.rev (String.subo s ~pos:i :: acc)
+              else (
+                let substring = String.sub s ~pos:i ~len:(j - i) in
+                loop (j + 1) (j + 1) (substring :: acc) s)
+            else loop i (j + 1) acc s
+          in
+          loop 0 0 [] s
+        ;;
+
         let of_string s =
-          match String.split s ~on:'.' |> List.split_last with
+          match split_dots s |> List.split_last with
           | Some (path, name) ->
             List.map ~f:Module_name.of_string_unchecked path, of_string_unchecked name
           | None -> failwithf "Bad qualified name: '%s'" s ()
@@ -299,11 +320,11 @@ module Mir_name : sig
 
   val create_value_name : Name_table.t -> Value_name.Qualified.t -> t
   val create_extern_name : Extern_name.t -> t
+  val copy_name : Name_table.t -> t -> t
   val extern_name : t -> Extern_name.t option
   val is_extern_name : t -> bool
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
-  val map_parts : t -> f:(Ustring.t -> int -> int) -> t
 end = struct
   module Name_table = struct
     type t = int Value_name.Qualified.Table.t [@@deriving sexp_of]
@@ -314,13 +335,16 @@ end = struct
   module Unique_name = struct
     module T = struct
       module U = struct
-        type t = Ustring.t * int [@@deriving compare, equal, hash]
+        type t = Value_name.Qualified.t * int [@@deriving compare, equal, hash]
 
-        let to_string (ustr, id) =
-          if id = 0 then Ustring.to_string ustr else [%string "%{ustr#Ustring}.%{id#Int}"]
+        let to_string (value_name, id) =
+          if id = 0
+          then Value_name.Qualified.to_string value_name
+          else [%string "%{value_name#Value_name.Qualified}.%{id#Int}"]
         ;;
 
-        let to_ustring (ustr, id) =
+        let to_ustring (value_name, id) =
+          let ustr = Value_name.Qualified.to_ustring value_name in
           if id = 0 then ustr else Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
         ;;
 
@@ -333,7 +357,7 @@ end = struct
               else str, 0
             | None -> str, 0
           in
-          Ustring.of_string_exn name, id
+          Value_name.Qualified.of_string name, id
         ;;
       end
 
@@ -345,15 +369,10 @@ end = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
-    let create_value_name name_table value_name =
+    let create name_table value_name =
       let id = Option.value (Hashtbl.find name_table value_name) ~default:0 in
       Hashtbl.set name_table ~key:value_name ~data:(id + 1);
-      Value_name.Qualified.to_ustring value_name, id
-    ;;
-
-    let map_parts (ustr, id) ~f =
-      let id = f ustr id in
-      ustr, id
+      value_name, id
     ;;
   end
 
@@ -385,11 +404,17 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let create_value_name name_table ustr =
-    Internal (Unique_name.create_value_name name_table ustr)
+  let create_value_name name_table value_name =
+    Internal (Unique_name.create name_table value_name)
   ;;
 
   let create_extern_name name = External name
+
+  let copy_name name_table t =
+    match t with
+    | Internal (value_name, _) -> create_value_name name_table value_name
+    | External _ -> t
+  ;;
 
   let extern_name = function
     | Internal _ -> None
@@ -399,11 +424,5 @@ end = struct
   let is_extern_name = function
     | Internal _ -> false
     | External _ -> true
-  ;;
-
-  let map_parts t ~f =
-    match t with
-    | Internal name -> Internal (Unique_name.map_parts name ~f)
-    | External _ as t -> t
   ;;
 end

@@ -1,6 +1,7 @@
 open Import
 open Names
 
+(* TODO: Unify this with [Compilation_error]. *)
 exception Mir_error of Sexp.t [@@deriving sexp]
 
 let mir_error msg = raise (Mir_error msg)
@@ -173,6 +174,7 @@ module Context : sig
 
   val create : names:Name_bindings.t -> name_table:Mir_name.Name_table.t -> t
   val add_value_name : t -> Value_name.t -> t * Mir_name.t
+  val copy_name : t -> Mir_name.t -> Mir_name.t
 
   module Extern_info : sig
     type t =
@@ -239,6 +241,7 @@ end = struct
       add_local_qualified_name t (path, name))
   ;;
 
+  let copy_name t name = Mir_name.copy_name t.name_table name
   let find { names; _ } name = Map.find names name
 
   let peek_value_name_internal t name =
@@ -626,8 +629,7 @@ module Expr = struct
     | Use_bindings of t list
   [@@deriving sexp_of]
 
-  (* FIXME: remove if I don't end up using it *)
-  (* let rec map t ~f =
+  let rec map t ~f =
     match (f t : _ Map_action.t) with
     | Halt t -> t
     | Retry t -> map t ~f
@@ -649,7 +651,7 @@ module Expr = struct
                 | Otherwise t -> Otherwise (map t ~f)
                 | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map ~f)))
            })
-  ;; *)
+  ;;
 
   module Fun_def = struct
     type nonrec t =
@@ -748,8 +750,11 @@ module Expr = struct
 
   module Just_bound = struct
     type t =
-      | Rec of Mir_name.t
-      | Nonrec of Mir_name.Set.t
+      | Rec of
+          { this_name : Mir_name.t
+          ; other_names : Mir_name.Set.t
+          }
+      | Nonrec of { this_pattern_names : Mir_name.Set.t }
     [@@deriving sexp_of]
   end
 
@@ -820,23 +825,32 @@ module Expr = struct
             let ctx, name = Context.add_value_name ctx_for_body name in
             ctx, Set.add names_bound name)
         in
-        ctx_for_body, (binding, pattern, names_bound))
+        ctx_for_body, (binding, names_bound))
+    in
+    let all_names_bound =
+      lazy
+        (Nonempty.fold
+           bindings
+           ~init:Mir_name.Set.empty
+           ~f:(fun all_names_bound (_, names_bound) ->
+           Set.union all_names_bound names_bound))
     in
     let ctx = if rec_ then ctx_for_body else ctx in
     (* TODO: Warn about let bindings which bind no names and are pure. *)
     Nonempty.fold
       bindings
       ~init:(ctx_for_body, init)
-      ~f:(fun (ctx_for_body, acc) (binding, pattern, names_bound) ->
+      ~f:(fun (ctx_for_body, acc) (binding, names_bound) ->
       let pat, typ, expr = extract_binding binding in
       let just_bound : Just_bound.t =
         if rec_
         then (
           check_rec_binding_expr expr;
-          check_rec_binding_pattern pattern;
+          check_rec_binding_pattern pat;
           assert_or_compiler_bug ~here:[%here] (Set.length names_bound = 1);
-          Rec (Set.choose_exn names_bound))
-        else Nonrec names_bound
+          let this_name = Set.choose_exn names_bound in
+          Rec { this_name; other_names = Set.remove (force all_names_bound) this_name })
+        else Nonrec { this_pattern_names = names_bound }
       in
       (* TODO: support unions in let bindings. For the non-rec case we should
          just be able to convert to a match *)
@@ -1005,7 +1019,60 @@ module Expr = struct
                in
                (ctx, bindings), arg_name)
       in
+      (* FIXME: Problem: two cases:
+         - Regular recursive function: use [fun_name] as the recursive binding, don't
+           close over it though.
+         - Recursive closure: use [*closure_env] as the recursive binding, and also don't
+           close over it. Alternatively, map calls to the recursive binding to calls to
+           [fun_name *closure_env]
+         Except we don't know at the point of calls whether we are closure yet. This
+         suggests a post-hoc mapping approach.
+         - Also for recursive functions, this applies to other arguments too. 
+         
+         Recursive functions:
+
+         {[
+           let a = ...
+           and b = ...
+           in
+           a, b
+         ]}
+         becomes
+         {[
+           Fun_def a using b
+           Fun_def b using a
+           a, b
+         ]}
+         (names unchanged, no closing over anything)
+         and if a closes over x and b closes over y, it becomes
+         {[
+           Fun_def *fun.0 using *closure_env for b and x (and with a = *closure_env)
+           Fun_def *fun.1 using *closure_env for a and y (and with b = *closure_env)
+           Value_def a = closure of *fun.0, b, x
+           Value_def b = closure of *fun.1, a, y
+           a, b
+         ]}
+
+         So we don't know if we are going to close over other arguments until we know if
+         we are a closure, but we aren't guaranteed to know that in time.
+         Maybe we start by assuming we won't close over recursively bound arguments, then
+         map the names over if it turns out we do. We can also map calls like this.
+         *)
+      (* FIXME: clean up this mess *)
+      let recursively_bound_names =
+        match just_bound with
+        | Some (Rec { this_name; other_names }) -> Set.add other_names this_name
+        | Some (Nonrec _) | None -> Mir_name.Set.empty
+      in
       let closed_over = ref Mir_name.Map.empty in
+      let close_over_name mir_name =
+        match Map.find !closed_over mir_name with
+        | Some name -> name
+        | None ->
+          let new_name = Context.copy_name ctx mir_name in
+          closed_over := Map.set !closed_over ~key:mir_name ~data:new_name;
+          new_name
+      in
       let ctx =
         let from_which_context name mir_name =
           let in_context ctx =
@@ -1014,29 +1081,22 @@ module Expr = struct
           in
           if in_context outer_ctx
           then `From_outer_stmts
+          else if Set.mem recursively_bound_names mir_name
+          then `Recursively_bound
           else if in_context parent_ctx
           then `Closed_over_from_parent
           else `Newly_bound
         in
-        (* FIXME: May need to have the expression body find a different name if it's
-           closed over: don't want to duplicate names. *)
         (* Determine if names looked up were closed over from the parent context. *)
-        Context.with_find_override ctx ~f:(fun name unique_name ->
-          match from_which_context name unique_name with
-          | `Newly_bound | `From_outer_stmts -> None
-          | `Closed_over_from_parent ->
-            (match Map.find !closed_over unique_name with
-             | Some _ as new_name -> new_name
-             | None ->
-               let (_ : Context.t), new_name = Context.add_value_name ctx name in
-               closed_over := Map.set !closed_over ~key:unique_name ~data:new_name;
-               Some new_name))
+        Context.with_find_override ctx ~f:(fun name mir_name ->
+          match from_which_context name mir_name with
+          | `Newly_bound | `Recursively_bound | `From_outer_stmts -> None
+          | `Closed_over_from_parent -> Some (close_over_name mir_name))
       in
       let body = of_typed_expr ~ctx body body_type in
       let body = add_let_bindings ~bindings ~body in
       (* TODO: Consider having closures share an environment instead of closing over other
          mutually recursive closures. *)
-      let closed_over = !closed_over in
       (* FIXME: I think assigning a fresh name will break recursive calls: we
          need the names to match up. Let's get this working consistently.
          
@@ -1079,29 +1139,44 @@ module Expr = struct
 
           IDEA: Let closures close over each other and themselves. This is fine?
         *)
-      (* TODO: Have recursive closures not close over themselves. *)
+      (* FIXME: Have recursive functions not close over themselves. This means every
+         recursive function has to be a closure, which sucks. *)
       let fun_name =
         (* If we are a closure, [fun_name] can't be the same as the name we bind, since we
            aren't returning [Name fun_name] and relying on the assignment getting elided. *)
-        if not (Map.is_empty closed_over)
-        then snd (Context.add_value_name ctx Constant_names.fun_)
-        else (
-          match just_bound with
-          | Some (Rec name) -> name
-          | Some (Nonrec names_bound) when Set.length names_bound = 1 ->
-            Set.choose_exn names_bound
-          | Some (Nonrec _) | None -> snd (Context.add_value_name ctx Constant_names.fun_))
+        (* FIXME: cleanup *)
+        match just_bound with
+        | Some (Rec { this_name; _ }) when Map.is_empty !closed_over -> this_name
+        | Some (Nonrec { this_pattern_names }) when Set.length this_pattern_names = 1 ->
+          Set.choose_exn this_pattern_names
+        | Some (Rec _ | Nonrec _) | None ->
+          snd (Context.add_value_name ctx Constant_names.fun_)
       in
-      let args, body, fun_or_closure =
-        if Map.is_empty closed_over
-        then args, body, Name fun_name
+      let (fun_def : Fun_def.t), fun_or_closure =
+        if Map.is_empty !closed_over
+        then { fun_name; args; body }, Name fun_name
         else (
-          (* FIXME: Might have to change how some of the names are determined: can't
-             re-use them, might have to do some renames when processing the body. *)
           let (_ : Context.t), closure_env_name =
             Context.add_value_name ctx Constant_names.closure_env
           in
           let closure_env = Name closure_env_name in
+          let body =
+            match just_bound with
+            | Some (Nonrec _) | None -> body
+            | Some (Rec { this_name; other_names }) ->
+              (* Fix up the body of closures so they close over other recursively bound
+                 closures, and refer to themselves with a direct function call passing in
+                 the closure environment. *)
+              map body ~f:(function
+                | Fun_call (name, args) when Mir_name.equal name this_name ->
+                  Halt (Fun_call (fun_name, Nonempty.cons closure_env args))
+                | Name name when Set.mem other_names name ->
+                  Halt (Name (close_over_name name))
+                | expr -> Defer expr)
+          in
+          let closed_over = !closed_over in
+          (* FIXME: Might have to change how some of the names are determined: can't
+             re-use them, might have to do some renames when processing the body. *)
           let args = Nonempty.cons closure_env_name args in
           let (_ : int), body =
             Map.fold closed_over ~init:(1, body) ~f:(fun ~key:_ ~data:name (i, body) ->
@@ -1115,9 +1190,9 @@ module Expr = struct
                   :: List.map (Map.keys closed_over) ~f:(fun name -> Name name)
               }
           in
-          args, body, closure)
+          { fun_name; args; body }, closure)
       in
-      add_fun_def { fun_name; args; body };
+      add_fun_def fun_def;
       fun_or_closure
     and make_block ~ctx ~tag ~fields ~field_types =
       let fields = List.map2_exn fields field_types ~f:(of_typed_expr ~ctx) in

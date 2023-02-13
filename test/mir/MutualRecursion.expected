@@ -2,37 +2,32 @@
  (Value_def MutualRecursion.f (Name Std.Prelude.List.Nil))
  (Extern_decl ((name umber_int_add) (arity 2)))
  (Fun_def
-  ((fun_name *fun)
-   (args (*closure_env MutualRecursion.acc MutualRecursion.forest))
+  ((fun_name MutualRecursion.loop)
+   (args (MutualRecursion.acc MutualRecursion.forest))
+   (body
+    (Cond_assign
+     (conds (((Constant_tag_equals (Name MutualRecursion.forest) 0) ())))
+     (body (Name MutualRecursion.acc))
+     (if_none_matched
+      (Otherwise
+       (Let MutualRecursion.trees
+        (Get_block_field 1 (Name MutualRecursion.forest))
+        (Let MutualRecursion.tree
+         (Get_block_field 0 (Name MutualRecursion.forest))
+         (Fun_call MutualRecursion.loop
+          ((Fun_call umber_int_add
+            ((Name MutualRecursion.acc)
+             (Fun_call MutualRecursion.sum_tree
+              ((Name MutualRecursion.tree)))))
+           (Name MutualRecursion.trees)))))))))))
+ (Fun_def
+  ((fun_name *fun) (args (*closure_env MutualRecursion.forest.1))
    (body
     (Let MutualRecursion.loop.1 (Get_block_field 1 (Name *closure_env))
-     (Cond_assign
-      (conds (((Constant_tag_equals (Name MutualRecursion.forest) 0) ())))
-      (body (Name MutualRecursion.acc))
-      (if_none_matched
-       (Otherwise
-        (Let MutualRecursion.trees
-         (Get_block_field 1 (Name MutualRecursion.forest))
-         (Let MutualRecursion.tree
-          (Get_block_field 0 (Name MutualRecursion.forest))
-          (Fun_call MutualRecursion.loop.1
-           ((Fun_call umber_int_add
-             ((Name MutualRecursion.acc)
-              (Fun_call MutualRecursion.sum_tree
-               ((Name MutualRecursion.tree)))))
-            (Name MutualRecursion.trees))))))))))))
- (Fun_def
-  ((fun_name *fun.1) (args (*closure_env.1 MutualRecursion.forest.1))
-   (body
-    (Let MutualRecursion.loop.2 (Get_block_field 1 (Name *closure_env.1))
-     (Fun_call MutualRecursion.loop.2
+     (Fun_call MutualRecursion.loop.1
       ((Primitive (Int 0)) (Name MutualRecursion.forest.1)))))))
  (Value_def MutualRecursion.sum_forest
-  (Let MutualRecursion.loop
-   (Make_block (tag 12289)
-    (fields ((Name *fun) (Name MutualRecursion.loop))))
-   (Make_block (tag 12289)
-    (fields ((Name *fun.1) (Name MutualRecursion.loop))))))
+  (Make_block (tag 12289) (fields ((Name *fun) (Name MutualRecursion.loop)))))
  (Fun_def
   ((fun_name MutualRecursion.sum_tree) (args (MutualRecursion.))
    (body

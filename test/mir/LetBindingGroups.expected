@@ -39,22 +39,12 @@
     ((Fun_call umber_eq ((Primitive (Int 1)) (Primitive (Int 2))))
      (Fun_call umber_eq ((Primitive (Int 3)) (Primitive (Int 4))))))))
  (Fun_def
-  ((fun_name *fun) (args (*closure_env LetBindingGroups.x))
-   (body
-    (Let LetBindingGroups.go_right.1 (Get_block_field 1 (Name *closure_env))
-     (Fun_call LetBindingGroups.go_right.1 ((Name LetBindingGroups.x)))))))
+  ((fun_name LetBindingGroups.go_left) (args (LetBindingGroups.x))
+   (body (Fun_call LetBindingGroups.go_right ((Name LetBindingGroups.x))))))
  (Fun_def
-  ((fun_name *fun.1) (args (*closure_env.1 LetBindingGroups.x.1))
-   (body
-    (Let LetBindingGroups.go_left.1 (Get_block_field 1 (Name *closure_env.1))
-     (Fun_call LetBindingGroups.go_left.1 ((Name LetBindingGroups.x.1)))))))
+  ((fun_name LetBindingGroups.go_right) (args (LetBindingGroups.x.1))
+   (body (Fun_call LetBindingGroups.go_left ((Name LetBindingGroups.x.1))))))
  (Value_def LetBindingGroups.bottom
   (Let LetBindingGroups.bottom_again
-   (Let LetBindingGroups.go_left
-    (Make_block (tag 12289)
-     (fields ((Name *fun) (Name LetBindingGroups.go_right))))
-    (Let LetBindingGroups.go_right
-     (Make_block (tag 12289)
-      (fields ((Name *fun.1) (Name LetBindingGroups.go_left))))
-     (Fun_call LetBindingGroups.go_left ((Primitive (Int 17))))))
+   (Fun_call LetBindingGroups.go_left ((Primitive (Int 17))))
    (Name LetBindingGroups.bottom_again))))
