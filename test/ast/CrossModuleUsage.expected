@@ -7,8 +7,12 @@
    (A ()
     ((Let (rec_ true)
       (bindings
-       (((Catch_all (a)) ((Name b) (Var a)))
-        ((Catch_all (b)) ((Name a) (Var a))))))
+       (((Catch_all (a))
+         ((Lambda ((Tuple ())) (Fun_call (Name b) (((Tuple ()) (Tuple ())))))
+          (Function ((Tuple ())) (Var a))))
+        ((Catch_all (b))
+         ((Lambda ((Tuple ())) (Fun_call (Name a) (((Tuple ()) (Tuple ())))))
+          (Function ((Tuple ())) (Var a)))))))
      (Let (rec_ false)
       (bindings
        (((Catch_all (print))

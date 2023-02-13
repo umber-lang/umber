@@ -1,10 +1,8 @@
 let source = "everything depends on me"
 
 module A = {
-  # FIXME: make these functions, since this isn't allowed as written.
-  # We can write a separate test to show this isn't allowed.
-  let a = b
-  let b = a
+  let a () = b ()
+  let b () = a ()
 
   let print = Std.Prelude.print
   let print_source () = print source

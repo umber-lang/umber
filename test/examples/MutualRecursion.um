@@ -4,10 +4,6 @@
 val f : Forest a
 let f = Nil
 
-# NOTE: Leaving off the `forest` argument is not allowed in OCaml with the error:
-# > This kind of expression is not allowed as right-hand side of `let rec'
-# It works if the `forest` argument to `sum_forest` is written explicitly.
-# (`let rec` can only be followed by a function definition, a constructor, or the `lazy` keyword.)
 let sum_forest =
   let loop acc forest = match forest
     # TODO: syntactic sugar for lists and other sequences
