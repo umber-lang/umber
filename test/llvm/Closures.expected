@@ -1,0 +1,94 @@
+; ModuleID = './examples/Closures.um'
+source_filename = "./examples/Closures.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+define i32 @"umber_main:./examples/Closures.um"() {
+entry:
+  ret i32 0
+}
+
+declare %umber_block* @umber_lt(%umber_block*, %umber_block*)
+
+declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"*fun"(%umber_block* %"*closure_env", %umber_block* %Closures.current) {
+entry:
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"*closure_env", i32 0, i32 1, i32 2
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"*closure_env", i32 0, i32 1, i32 1
+  %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
+  %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
+  %fun_call = tail call %umber_block* @umber_lt(%umber_block* %Closures.current, %umber_block* %block_field)
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  %fun_call4 = tail call %umber_block* @umber_int_add(%umber_block* %Closures.current, %umber_block* %block_field3)
+  %fun_call5 = tail call tailcc %umber_block* @"*fun"(%umber_block* %"*closure_env", %umber_block* %fun_call4)
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %fun_call6 = ptrtoint %umber_block* %fun_call to i64
+  %equals = icmp eq i64 %fun_call6, 3
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge7 = phi %umber_block* [ %fun_call5, %cond_binding_merge ], [ %Closures.current, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge7
+}
+
+define tailcc %umber_block* @Closures.count_up(%umber_block* %Closures.start_at, %umber_block* %Closures.count_by, %umber_block* %Closures.end_after) {
+entry:
+  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 4))
+  %box = bitcast i8* %malloccall to i64*
+  %box1 = bitcast i64* %box to i16*
+  store i16 12289, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i32 1
+  store i16 3, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"*fun" to %umber_block*), %umber_block** %box4, align 8
+  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
+  store %umber_block* %Closures.count_by, %umber_block** %box5, align 8
+  %box6 = getelementptr %umber_block*, %umber_block** %box3, i32 3
+  store %umber_block* %Closures.end_after, %umber_block** %box6, align 8
+  %box7 = bitcast %umber_block** %box3 to %umber_block*
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %box7, %umber_block* %Closures.start_at)
+  ret %umber_block* %fun_call
+}
+
+declare noalias i8* @malloc(i32)
+
+define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+entry:
+  %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
+  br i1 %is_on_heap, label %closure_call, label %regular_call
+
+closure_call:                                     ; preds = %entry
+  %closure_gep = getelementptr %umber_block, %umber_block* %0, i32 0, i32 1, i32 0
+  %closure_gep_raw = load i64, i64* %closure_gep, align 8
+  %closure_fun = inttoptr i64 %closure_gep_raw to %umber_block* (%umber_block*, %umber_block*)*
+  %closure_call1 = tail call tailcc %umber_block* %closure_fun(%umber_block* %0, %umber_block* %1)
+  br label %call_phi
+
+regular_call:                                     ; preds = %entry
+  %calling_fun = bitcast %umber_block* %0 to %umber_block* (%umber_block*)*
+  %regular_call2 = tail call tailcc %umber_block* %calling_fun(%umber_block* %1)
+  br label %call_phi
+
+call_phi:                                         ; preds = %regular_call, %closure_call
+  %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
+  ret %umber_block* %call_phi3
+}
+
+declare i1 @umber_gc_is_on_heap(%umber_block*)
+

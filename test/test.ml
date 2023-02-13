@@ -19,10 +19,8 @@ let should_make_mir test =
 
 (* TODO: Implement closures and enable these tests for LLVM codegen. *)
 let no_llvm_tests =
-  [ "AsPattern"
-  ; "Closures"
+  [ "AsPattern" (* "and" conditions *)
   ; "MutualRecursion"
-  ; "TypeChecking" (* closures *)
   ; "CrossModuleUsage"
   ; "LetBindingGroups" (* TODO: check why these are broken *)
   ]
