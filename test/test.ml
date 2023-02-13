@@ -18,17 +18,15 @@ let should_make_mir test =
 ;;
 
 (* TODO: Implement closures and enable these tests for LLVM codegen. *)
-let no_llvm_tests =
-  [ "AsPattern" (* "and" conditions *)
-  ; "LetBindingGroups" (* TODO: check why this is broken *)
-  ]
-;;
+let no_llvm_tests = [ "AsPattern" (* "and" conditions *) ]
 
 let should_make_llvm test =
   should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
 ;;
 
-let no_exe_tests = []
+let no_exe_tests =
+  [ "LetBindingGroups" (* TODO: use umber_apply for external functions *) ]
+;;
 
 let should_make_exe test =
   should_make_llvm test && not (List.mem ~equal:String.equal no_exe_tests test)

@@ -1,0 +1,83 @@
+; ModuleID = './examples/LetBindingGroups.um'
+source_filename = "./examples/LetBindingGroups.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+%umber_block1 = type { %umber_header, [1 x i64] }
+
+@LetBindingGroups.a = constant %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*)
+@LetBindingGroups.b = global %umber_block* null
+@Std.Prelude.List.Nil = external global %umber_block*
+@_ = global %umber_block* null
+@LetBindingGroups.bottom = global %umber_block* null
+@int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
+@int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
+@int.8 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 8 }
+@int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
+@int.6 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 6 }
+@string.721651713 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"a\00\00\00\00\00\00\06" }
+@string.156427255 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"list\00\00\00\03" }
+@string.415265556 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"of\00\00\00\00\00\05" }
+@string.606624195 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"words\00\00\02" }
+@int.3 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
+@int.4 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 4 }
+@int.17 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 17 }
+
+define i32 @"umber_main:./examples/LetBindingGroups.um"() {
+entry:
+  %LetBindingGroups.a = load %umber_block*, %umber_block** @LetBindingGroups.a, align 8
+  %fun_call = tail call %umber_block* @umber_int_add(%umber_block* %LetBindingGroups.a, %umber_block* bitcast (%umber_block1* @int.6 to %umber_block*))
+  store %umber_block* %fun_call, %umber_block** @LetBindingGroups.b, align 8
+  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %fun_call1 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.606624195 to %umber_block*), %umber_block* %Std.Prelude.List.Nil)
+  %fun_call2 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.415265556 to %umber_block*), %umber_block* %fun_call1)
+  %fun_call3 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.156427255 to %umber_block*), %umber_block* %fun_call2)
+  %fun_call4 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.721651713 to %umber_block*), %umber_block* %fun_call3)
+  %fun_call5 = tail call %umber_block* @umber_eq(%umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
+  %fun_call6 = tail call %umber_block* @umber_eq(%umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.4 to %umber_block*))
+  %fun_call7 = tail call tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block* %fun_call5, %umber_block* %fun_call6)
+  store %umber_block* %fun_call7, %umber_block** @_, align 8
+  %fun_call8 = tail call tailcc %umber_block* @LetBindingGroups.go_left(%umber_block* bitcast (%umber_block1* @int.17 to %umber_block*))
+  store %umber_block* %fun_call8, %umber_block** @LetBindingGroups.bottom, align 8
+  ret i32 0
+}
+
+declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
+
+declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
+
+declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
+
+declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @LetBindingGroups.fun(%umber_block* %LetBindingGroups.n) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_pow(%umber_block* %LetBindingGroups.n, %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
+  %fun_call1 = tail call %umber_block* @umber_int_sub(%umber_block* %fun_call, %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
+  %fun_call2 = tail call %umber_block* @umber_int_add(%umber_block* %fun_call1, %umber_block* %LetBindingGroups.n)
+  %fun_call3 = tail call %umber_block* @umber_int_sub(%umber_block* %LetBindingGroups.n, %umber_block* bitcast (%umber_block1* @int.8 to %umber_block*))
+  %fun_call4 = tail call %umber_block* @umber_int_mul(%umber_block* %LetBindingGroups.n, %umber_block* %fun_call3)
+  %fun_call5 = tail call %umber_block* @umber_int_mul(%umber_block* %fun_call4, %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
+  %fun_call6 = tail call %umber_block* @umber_int_add(%umber_block* %fun_call2, %umber_block* %fun_call5)
+  ret %umber_block* %fun_call6
+}
+
+declare tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block*, %umber_block*)
+
+declare tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block*, %umber_block*)
+
+declare %umber_block* @umber_eq(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @LetBindingGroups.go_left(%umber_block* %LetBindingGroups.x) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @LetBindingGroups.go_right(%umber_block* %LetBindingGroups.x)
+  ret %umber_block* %fun_call
+}
+
+define tailcc %umber_block* @LetBindingGroups.go_right(%umber_block* %LetBindingGroups.x.1) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @LetBindingGroups.go_left(%umber_block* %LetBindingGroups.x.1)
+  ret %umber_block* %fun_call
+}
+
