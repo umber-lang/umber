@@ -26,8 +26,11 @@
     (Let MutualRecursion.loop.1 (Get_block_field 1 (Name *closure_env))
      (Fun_call MutualRecursion.loop.1
       ((Primitive (Int 0)) (Name MutualRecursion.forest.1)))))))
- (Value_def MutualRecursion.sum_forest
+ (Value_def MutualRecursion.sum_forest.1
   (Make_block (tag 12289) (fields ((Name *fun) (Name MutualRecursion.loop)))))
+ (Fun_def
+  ((fun_name MutualRecursion.sum_forest) (args (arg0))
+   (body (Fun_call MutualRecursion.sum_forest.1 ((Name arg0))))))
  (Fun_def
   ((fun_name MutualRecursion.sum_tree) (args (MutualRecursion.))
    (body
@@ -45,12 +48,12 @@
             ((Name MutualRecursion.forest.2)))))))))))))
  (Value_def MutualRecursion.Nil (Make_block (tag 0)))
  (Fun_def
-  ((fun_name MutualRecursion.Cons) (args (arg0 arg1))
-   (body (Make_block (tag 0) (fields ((Name arg0) (Name arg1)))))))
+  ((fun_name MutualRecursion.Cons) (args (arg0.1 arg1))
+   (body (Make_block (tag 0) (fields ((Name arg0.1) (Name arg1)))))))
  (Value_def MutualRecursion.Leaf (Make_block (tag 0)))
  (Fun_def
-  ((fun_name MutualRecursion.Node) (args (arg0.1 arg1.1))
-   (body (Make_block (tag 0) (fields ((Name arg0.1) (Name arg1.1)))))))
+  ((fun_name MutualRecursion.Node) (args (arg0.2 arg1.1))
+   (body (Make_block (tag 0) (fields ((Name arg0.2) (Name arg1.1)))))))
  (Extern_decl ((name umber_eq) (arity 2)))
  (Extern_decl ((name umber_int_sub) (arity 2)))
  (Fun_def

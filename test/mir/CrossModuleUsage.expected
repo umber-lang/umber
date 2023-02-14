@@ -7,7 +7,10 @@
   ((fun_name CrossModuleUsage.A.b) (args (*lambda_arg.1))
    (body (Fun_call CrossModuleUsage.A.a ((Make_block (tag 0)))))))
  (Extern_decl ((name umber_print_endline) (arity 1)))
- (Value_def CrossModuleUsage.A.print (Name umber_print_endline))
+ (Value_def CrossModuleUsage.A.print.1 (Name umber_print_endline))
+ (Fun_def
+  ((fun_name CrossModuleUsage.A.print) (args (arg0))
+   (body (Fun_call CrossModuleUsage.A.print.1 ((Name arg0))))))
  (Fun_def
   ((fun_name CrossModuleUsage.A.print_source) (args (*lambda_arg.2))
    (body

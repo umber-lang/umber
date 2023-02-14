@@ -439,7 +439,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 
 @Std.Prelude.List.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
-@"Std.Prelude.Operators.::" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons to %umber_block*)
+@"Std.Prelude.Operators.::.1" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons to %umber_block*)
 
 define i32 @"umber_main:Std/Prelude.um"() {
 entry:
@@ -477,6 +477,13 @@ declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
 declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
 
 declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %arg0.1, %umber_block* %arg1.1) {
+entry:
+  %"Std.Prelude.Operators.::.1" = load %umber_block*, %umber_block** @"Std.Prelude.Operators.::.1", align 8
+  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %"Std.Prelude.Operators.::.1", %umber_block* %arg0.1, %umber_block* %arg1.1)
+  ret %umber_block* %fun_call
+}
 
 define tailcc %umber_block* @Std.Prelude.Operators.not(%umber_block* %Std.Prelude.Operators.) {
 entry:
@@ -603,6 +610,28 @@ call_phi:                                         ; preds = %regular_call, %clos
 }
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
+
+define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+entry:
+  %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
+  br i1 %is_on_heap, label %closure_call, label %regular_call
+
+closure_call:                                     ; preds = %entry
+  %closure_gep = getelementptr %umber_block, %umber_block* %0, i32 0, i32 1, i32 0
+  %closure_gep_raw = load i64, i64* %closure_gep, align 8
+  %closure_fun = inttoptr i64 %closure_gep_raw to %umber_block* (%umber_block*, %umber_block*, %umber_block*)*
+  %closure_call1 = tail call tailcc %umber_block* %closure_fun(%umber_block* %0, %umber_block* %1, %umber_block* %2)
+  br label %call_phi
+
+regular_call:                                     ; preds = %entry
+  %calling_fun = bitcast %umber_block* %0 to %umber_block* (%umber_block*, %umber_block*)*
+  %regular_call2 = tail call tailcc %umber_block* %calling_fun(%umber_block* %1, %umber_block* %2)
+  br label %call_phi
+
+call_phi:                                         ; preds = %regular_call, %closure_call
+  %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
+  ret %umber_block* %call_phi3
+}
 
 |}
 (*$*)

@@ -16,6 +16,8 @@ let of_list_exn : 'a list -> 'a t = function
   | [] -> failwith "Nonempty.of_list_exn: empty list"
 ;;
 
+let init n ~f = of_list_exn (List.init n ~f)
+
 let cons x = function
   | y :: ys -> x :: y :: ys
 ;;

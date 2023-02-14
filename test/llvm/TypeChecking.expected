@@ -6,7 +6,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 %umber_block1 = type { %umber_header, [1 x i64] }
 
-@TypeChecking.id_for_chars = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @TypeChecking.id to %umber_block*)
+@TypeChecking.id_for_chars.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @TypeChecking.id to %umber_block*)
 @"*binding" = global %umber_block* null
 @TypeChecking.id_alias = global %umber_block* null
 @TypeChecking.five = global %umber_block* null
@@ -53,6 +53,13 @@ entry:
 define tailcc %umber_block* @TypeChecking.id_for_floats(%umber_block* %TypeChecking.x.2) {
 entry:
   ret %umber_block* %TypeChecking.x.2
+}
+
+define tailcc %umber_block* @TypeChecking.id_for_chars(%umber_block* %arg0) {
+entry:
+  %TypeChecking.id_for_chars.1 = load %umber_block*, %umber_block** @TypeChecking.id_for_chars.1, align 8
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %TypeChecking.id_for_chars.1, %umber_block* %arg0)
+  ret %umber_block* %fun_call
 }
 
 define tailcc %umber_block* @TypeChecking.id_for_bools(%umber_block* %TypeChecking.x.3) {
@@ -142,8 +149,6 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   ret %umber_block* %cond_otherwise_merge3
 }
 
-declare noalias i8* @malloc(i32)
-
 define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
@@ -167,4 +172,6 @@ call_phi:                                         ; preds = %regular_call, %clos
 }
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
+
+declare noalias i8* @malloc(i32)
 

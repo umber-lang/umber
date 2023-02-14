@@ -14,6 +14,7 @@ val hd : 'a t -> 'a
 val tl : 'a t -> 'a list
 val of_list : 'a list -> 'a t option
 val of_list_exn : 'a list -> 'a t
+val init : int -> f:(int -> 'a) -> 'a t
 val rev : 'a t -> 'a t
 val append : 'a t -> 'a t -> 'a t
 val append_list : 'a t -> 'a list -> 'a t

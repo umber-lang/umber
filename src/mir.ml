@@ -881,7 +881,7 @@ module Expr = struct
         make_atomic
           ~ctx:ctx_for_body
           ~default:acc
-          ~add_let:(add_let acc)
+          ~add_let:(fun name mir_expr -> add_let acc name mir_expr typ)
           ~binding_name
           ~add_name:add_binding_name
           mir_expr
@@ -892,7 +892,7 @@ module Expr = struct
         mir_expr
         typ
         ~init:acc
-        ~add_let
+        ~add_let:(fun acc name mir_expr -> add_let acc name mir_expr typ)
         ~add_name)
   ;;
 
@@ -972,7 +972,8 @@ module Expr = struct
             ~ctx
             ~rec_
             ~init:[]
-            ~add_let:(fun bindings name mir_expr -> (name, mir_expr) :: bindings)
+            ~add_let:(fun bindings name mir_expr (_ : Type.Scheme.t) ->
+              (name, mir_expr) :: bindings)
             ~extract_binding:(fun ((pat, typ), expr) -> pat, typ, expr)
             ~process_expr:(fun bindings ~just_bound ~ctx expr typ ->
               bindings, of_typed_expr ~just_bound ~ctx expr typ)
@@ -1196,6 +1197,7 @@ module Expr = struct
             (* Bindings must be sorted by their names to match up with [vars] above. This
                relies on the [Value_name.t]s and [Mir_name.t]s having the same ordering
                due to the former being a prefix of the latter. *)
+            (* TODO: This ordering is fragile. Come up with a more reliable approach. *)
             List.sort bindings ~compare:[%compare: Mir_name.t * _] |> List.map ~f:snd
           in
           match cond with
@@ -1254,6 +1256,7 @@ type t = Stmt.t list [@@deriving sexp_of]
 let of_typed_module =
   let handle_let_bindings
     ~ctx
+    ~names
     ~stmts
     ~rec_
     ~extern_decls
@@ -1273,12 +1276,40 @@ let of_typed_module =
       in
       !stmts, expr
     in
-    let add_let stmts name mir_expr =
-      match (mir_expr : Expr.t) with
+    let add_let (stmts : Stmt.t list) name mir_expr typ =
+      let rec follow_let_bindings expr =
+        match (expr : Expr.t) with
+        | Let (_, _, body) -> follow_let_bindings body
+        | Name _
+        | Primitive _
+        | Fun_call _
+        | Make_block _
+        | Get_block_field _
+        | Cond_assign _ -> expr
+      in
+      match follow_let_bindings mir_expr with
       | Name name' when Mir_name.(name = name') ->
         (* Don't make a Value_def in the case where all we did is make a Fun_def *)
         stmts
-      | _ -> Stmt.Value_def (name, mir_expr) :: stmts
+      | _ ->
+        let arity = arity_of_type ~names typ in
+        if arity > 0
+        then (
+          (* For function types, we need to ensure the final definition is also a function.
+             Create one which just forwards the call to the expression. Importantly, the
+             name used for the function must be the original name, which should be a
+             proper name from the source (its id should be 0). This lets code in other
+             files link with it properly.  *)
+          let name' = Context.copy_name ctx name in
+          let args =
+            Nonempty.init arity ~f:(fun i ->
+              snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
+          in
+          let body : Expr.t =
+            Fun_call (name', Nonempty.map args ~f:(fun arg -> Expr.Name arg))
+          in
+          Fun_def { fun_name = name; args; body } :: Value_def (name', mir_expr) :: stmts)
+        else Value_def (name, mir_expr) :: stmts
     in
     Expr.generate_let_bindings
       bindings
@@ -1323,7 +1354,7 @@ let of_typed_module =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.node with
       | Let { rec_; bindings } ->
-        handle_let_bindings ~ctx ~stmts ~rec_ ~extern_decls bindings
+        handle_let_bindings ~ctx ~names ~stmts ~rec_ ~extern_decls bindings
       | Module (module_name, _sigs, defs) ->
         Context.with_module ctx module_name ~f:(fun ctx ->
           loop ~ctx ~names ~stmts ~extern_decls defs)
