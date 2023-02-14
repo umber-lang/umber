@@ -283,8 +283,9 @@ module Expr = struct
       let used_a_bound_name = ref false in
       let f_name name name_entry =
         f_name name name_entry;
-        (* FIXME: phys_equal is questionable, is there a better way? Or is that not the problem?
-           Could regular equality work? If not, could assign an id to name entries. *)
+        (* FIXME: phys_equal is questionable, is there a better way? Or is that not the
+           problem? Could regular equality work? If not, could assign an id to name
+           entries. *)
         match name with
         | [], name ->
           if Option.exists

@@ -204,7 +204,6 @@ type_non_fun:
     { Type.Expr.Type_app (
         Type_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
 
-(* FIXME: try using flexible *)
 (* Writing this out like this instead of just using 
    `separated_nonempty(COMMA, type_non_fun)` prevents conflicts for some reason. *)
 type_fun_args:

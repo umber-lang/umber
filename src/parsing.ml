@@ -251,30 +251,18 @@ let parse ?print_tokens_to lexbuf =
     Option.iter print_tokens_to ~f:(fun print_tokens_to -> lex ~print_tokens_to lexbuf)
   in
   let last_prod = ref None in
-  (* FIXME: Cleanup *)
-  let debug_s = ignore in
   let rec parse ?print_tokens_to last_token lexbuf checkpoint =
     match checkpoint with
     | I.InputNeeded _env ->
       let token = Lexer.read lexbuf in
-      debug_s [%message "Reading token" (token : token)];
       Option.iter print_tokens_to ~f:(fun out -> sexp_of_token token |> fprint_s ~out);
       let start_pos, end_pos = Sedlexing.lexing_positions lexbuf in
       let checkpoint = I.offer checkpoint (token, start_pos, end_pos) in
       parse ?print_tokens_to token lexbuf checkpoint
     | I.Shifting _ ->
-      debug_s [%message "Shifting"];
       let checkpoint = I.resume checkpoint in
       parse ?print_tokens_to last_token lexbuf checkpoint
     | I.AboutToReduce (_, prod) ->
-      let prod_sexp =
-        let (X symbol) = I.lhs prod in
-        let empty_sexp _ = Sexp.List [] in
-        match symbol with
-        | T terminal -> sexp_of_terminal empty_sexp terminal
-        | N nonterminal -> sexp_of_nonterminal empty_sexp nonterminal
-      in
-      debug_s [%message "Reducing" ~production:(prod_sexp : Sexp.t)];
       last_prod := Some prod;
       let checkpoint = I.resume checkpoint in
       parse ?print_tokens_to last_token lexbuf checkpoint

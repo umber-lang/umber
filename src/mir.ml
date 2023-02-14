@@ -680,7 +680,7 @@ module Expr = struct
     let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
       match (pat : Simple_pattern.t) with
       | Catch_all None ->
-        (* FIXME: Don't elide unused expressions, since they may have side effects. This
+        (* TODO: Don't elide unused expressions, since they may have side effects. This
            can happen if there is a [Catch_all None] pattern at toplevel.
            Once there's a proper effect system and we can tell if an expression is pure,
            we can instead elide the expressions and emit a warning about it being unused. *)

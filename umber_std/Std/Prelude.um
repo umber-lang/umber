@@ -88,7 +88,6 @@ module : {
 # TODO: randomness
 
 module Operators = {
-  # FIXME: There's a lexer bug when the extra #s under this are removed
   # TODO: Consider removing these fixity declarations and copying them from the sig
   # This requires a way to specify fixity in a let binding. (Also consider that there's 
   # currently there's no way to put fixity declarations inside nested expressions).

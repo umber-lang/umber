@@ -25,7 +25,10 @@ let should_make_llvm test =
 ;;
 
 let no_exe_tests =
-  [ "LetBindingGroups" (* TODO: use umber_apply for external functions *) ]
+  [ "LetBindingGroups"
+    (* FIXME: use umber_apply for external functions.
+       I did this but now this seems to loop forever. *)
+  ]
 ;;
 
 let should_make_exe test =
