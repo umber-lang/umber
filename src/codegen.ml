@@ -311,7 +311,11 @@ let rec codegen_expr t expr =
   | Name name ->
     let value = Value_table.find t.values name in
     (match Llvm.classify_value value with
-     | Function -> Llvm.const_bitcast value (block_pointer_type t)
+     | Function ->
+       (* FIXME: Need handling for when external cc functions are referenced by name.
+          Since we assume the calling convention for unknown functions is tailcc, we need
+          to wrap these in a new function to forward the call from tailc to cc. *)
+       Llvm.const_bitcast value (block_pointer_type t)
      | GlobalVariable -> Llvm.build_load value (Llvm.value_name value) t.builder
      | _ -> value)
   | Let (name, expr, body) ->
