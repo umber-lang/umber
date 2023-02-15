@@ -24,12 +24,7 @@ let should_make_llvm test =
   should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
 ;;
 
-let no_exe_tests =
-  [ "LetBindingGroups"
-    (* FIXME: use umber_apply for external functions.
-       I did this but now this seems to loop forever. *)
-  ]
-;;
+let no_exe_tests = []
 
 let should_make_exe test =
   should_make_llvm test && not (List.mem ~equal:String.equal no_exe_tests test)
