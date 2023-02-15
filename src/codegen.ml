@@ -506,7 +506,8 @@ and codegen_cond t cond =
     make_icmp (ptr_to_int t (codegen_expr t expr)) (int_constant_tag t tag)
   | Non_constant_tag_equals (expr, tag) ->
     make_icmp (get_block_tag t (codegen_expr t expr)) (int_non_constant_tag t tag)
-  | And _ -> failwith "TODO: And conditions"
+  | And (cond1, cond2) ->
+    Llvm.build_and (codegen_cond t cond1) (codegen_cond t cond2) "cond_and" t.builder
 
 and box t ~tag ~fields =
   (* TODO: Use GC instead of leaking memory. For now, let's just try to plug in a
