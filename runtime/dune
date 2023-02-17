@@ -13,3 +13,11 @@
   (progn
    (system "cargo build")
    (copy target/debug/libruntime.a libruntime.a))))
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files src/*.rs)
+  (file Cargo.toml))
+ (action
+  (system "cargo test")))

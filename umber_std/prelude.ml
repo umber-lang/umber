@@ -46,6 +46,7 @@ let names = {|
                   (^ (Imported Std.Prelude.Operators.^))
                   (!= (Imported Std.Prelude.Operators.!=))
                   (&& (Imported Std.Prelude.Operators.&&))
+                  (++ (Imported Std.Prelude.Operators.++))
                   (:: (Imported Std.Prelude.Operators.::))
                   (<= (Imported Std.Prelude.Operators.<=))
                   (== (Imported Std.Prelude.Operators.==))
@@ -178,6 +179,14 @@ let names = {|
                               ((Type_app Bool ()) (Type_app Bool ()))
                               (Type_app Bool ()))))
                            (fixity (Left 3)))))
+                        (++
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app String ()) (Type_app String ()))
+                              (Type_app String ()))))
+                           (fixity (Left 5)))))
                         (::
                          (Local
                           ((typ
@@ -237,6 +246,7 @@ let names = {|
                  (^ (Imported Std.Prelude.Operators.^))
                  (!= (Imported Std.Prelude.Operators.!=))
                  (&& (Imported Std.Prelude.Operators.&&))
+                 (++ (Imported Std.Prelude.Operators.++))
                  (:: (Imported Std.Prelude.Operators.::))
                  (<= (Imported Std.Prelude.Operators.<=))
                  (== (Imported Std.Prelude.Operators.==))
@@ -374,6 +384,15 @@ let names = {|
                             (Function ((Type_app Bool ()) (Type_app Bool ()))
                              (Type_app Bool ()))))
                           (fixity (Left 3)))))
+                       (++
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app String ()) (Type_app String ()))
+                             (Type_app String ()))))
+                          (type_source Extern_declared) (fixity (Left 5))
+                          (extern_name umber_string_append))))
                        (::
                         (Local
                          ((typ
@@ -576,6 +595,8 @@ define tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %"*lambda_a
 entry:
   ret %umber_block* %Std.Prelude.Operators.x.2
 }
+
+declare %umber_block* @umber_string_append(%umber_block*, %umber_block*)
 
 declare %umber_block* @umber_int_sqrt(%umber_block*)
 

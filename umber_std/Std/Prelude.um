@@ -43,6 +43,8 @@ module : {
     val (|>) (infixl 0) : a, (a -> b) -> b
 
     val (;) (infixl 0) : () => (), a -> a
+
+    val (++) (infixl 5) : String, String -> String
   }
 
   import Operators with *
@@ -122,6 +124,8 @@ module Operators = {
 
   val (;) (infixl 0) : () => (), a -> a
   let (;) () x = x
+
+  extern (++) (infixl 5) : String, String -> String = "umber_string_append"
 }
 
 import Operators with *
