@@ -26,4 +26,24 @@
             (Fun_call AsPattern.iter_pairs
              ((Name AsPattern.f)
               (Fun_call Std.Prelude.Operators.::
-               ((Name AsPattern.b) (Name AsPattern.rest)))))))))))))))))
+               ((Name AsPattern.b) (Name AsPattern.rest))))))))))))))))
+ (Extern_decl ((name umber_print_endline) (arity 1)))
+ (Extern_decl ((name umber_string_append) (arity 2)))
+ (Fun_def
+  ((fun_name *fun) (args (AsPattern.a.1 AsPattern.b.1))
+   (body
+    (Fun_call umber_print_endline
+     ((Fun_call umber_string_append
+       ((Name AsPattern.a.1) (Name AsPattern.b.1))))))))
+ (Extern_decl ((name Std.Prelude.List.Nil) (arity 0)))
+ (Value_def *binding
+  (Fun_call AsPattern.iter_pairs
+   ((Name *fun)
+    (Make_block (tag 0)
+     (fields
+      ((Primitive (String foo))
+       (Make_block (tag 0)
+        (fields
+         ((Primitive (String bar))
+          (Make_block (tag 0)
+           (fields ((Primitive (String baz)) (Name Std.Prelude.List.Nil))))))))))))))

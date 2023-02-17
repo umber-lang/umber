@@ -6,3 +6,5 @@ let iter_pairs f lst =
   | Cons a (Cons b (_ as rest)) ->
     f a b;
     iter_pairs f (b :: rest)
+
+let () = iter_pairs (\a b -> print (a ++ b)) (Cons "foo" (Cons "bar" (Cons "baz" Nil)))
