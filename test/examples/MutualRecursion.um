@@ -13,9 +13,6 @@ let sum_forest =
     | Nil -> acc
     | Cons tree trees -> loop (acc + sum_tree tree) trees
   in
-  # FIXME: This function closes over `loop`, which isn't quite right. The closure check
-  # should exclude variables which will be hoisted to toplevel (locally defined
-  # functions)
   \forest -> loop 0 forest
 
 let sum_tree = match

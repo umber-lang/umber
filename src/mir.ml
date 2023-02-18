@@ -904,6 +904,13 @@ module Expr = struct
     outer_expr
     outer_type
     =
+    let add_fun_def, is_local_fun_def =
+      let local_fun_defs = Mir_name.Hash_set.create () in
+      ( (fun (fun_def : Fun_def.t) ->
+          Hash_set.add local_fun_defs fun_def.fun_name;
+          add_fun_def fun_def)
+      , Hash_set.mem local_fun_defs )
+    in
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match (expr : Type.Scheme.t Typed.Expr.t), (expr_type : Type.Scheme.t) with
       | Literal lit, _ -> Primitive lit
@@ -1042,8 +1049,8 @@ module Expr = struct
             Context.peek_value_name ctx ([], name)
             |> Option.value_map ~default:false ~f:(Mir_name.equal mir_name)
           in
-          if in_context outer_ctx
-          then `From_outer_stmts
+          if in_context outer_ctx || is_local_fun_def mir_name
+          then `From_toplevel
           else if Set.mem recursively_bound_names mir_name
           then `Recursively_bound
           else if in_context parent_ctx
@@ -1053,7 +1060,7 @@ module Expr = struct
         (* Determine if names looked up were closed over from the parent context. *)
         Context.with_find_override ctx ~f:(fun name mir_name ->
           match from_which_context name mir_name with
-          | `Newly_bound | `Recursively_bound | `From_outer_stmts -> None
+          | `Newly_bound | `Recursively_bound | `From_toplevel -> None
           | `Closed_over_from_parent -> Some (close_over_name mir_name))
       in
       let body = of_typed_expr ~ctx body body_type in
