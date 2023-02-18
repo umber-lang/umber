@@ -1,11 +1,6 @@
 open Import
 open Names
 
-(* TODO: Unify this with [Compilation_error]. *)
-exception Mir_error of Sexp.t [@@deriving sexp]
-
-let mir_error msg = raise (Mir_error msg)
-
 module Cnstr = struct
   (* TODO: decide what to do with records *)
   module T = struct
@@ -471,7 +466,7 @@ end = struct
     | [ arg ] -> arg
     | _ :: _ :: _ ->
       let msg = [%string "Pattern unions in %{label} are not supported"] in
-      mir_error [%message msg (pattern : Typed.Pattern.t)]
+      Compilation_error.raise Mir_error ~msg:[%message msg (pattern : Typed.Pattern.t)]
   ;;
 
   module Coverage = struct
@@ -867,11 +862,13 @@ module Expr = struct
       in
       if not (List.is_empty missing_cases)
       then
-        mir_error
-          [%message
-            "The pattern in this let binding is not exhaustive"
-              ~pattern:(pat : Typed.Pattern.t)
-              (missing_cases : Simple_pattern.t list)];
+        Compilation_error.raise
+          Mir_error
+          ~msg:
+            [%message
+              "The pattern in this let binding is not exhaustive"
+                ~pattern:(pat : Typed.Pattern.t)
+                (missing_cases : Simple_pattern.t list)];
       let acc, mir_expr = process_expr acc ~just_bound ~ctx expr typ in
       let add_name ctx name = ctx, Context.find_value_name_assert_local ctx name in
       let binding_name, add_binding_name =
@@ -1142,10 +1139,12 @@ module Expr = struct
            | [] ->
              compiler_bug [%message "Pattern coverage/condition checking is out of sync"]
            | missing_cases ->
-             mir_error
-               [%message
-                 "This pattern match is not exhaustive"
-                   (missing_cases : Simple_pattern.t list)])
+             Compilation_error.raise
+               Mir_error
+               ~msg:
+                 [%message
+                   "This pattern match is not exhaustive"
+                     (missing_cases : Simple_pattern.t list)])
         | (pattern, output_expr) :: arms ->
           loop_one_arm ~pattern ~output_expr ~coverage:(Some coverage) arms
       in
@@ -1379,5 +1378,4 @@ let of_typed_module =
     match loop ~ctx ~names ~stmts:[] ~fun_decls defs with
     | (_ : Context.t), stmts -> Ok (List.rev stmts)
     | exception Compilation_error.Compilation_error error -> Error error
-    | exception Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)
 ;;
