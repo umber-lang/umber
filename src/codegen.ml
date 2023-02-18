@@ -501,13 +501,19 @@ and codegen_cond t cond =
     Llvm.build_and (codegen_cond t cond1) (codegen_cond t cond2) "cond_and" t.builder
 
 and box t ~tag ~fields =
-  (* TODO: Use GC instead of leaking memory. For now, let's just try to plug in a
-     conservative GC e.g. Boehm. *)
   let block_field_num = Nonempty.length fields in
   let heap_pointer =
-    Llvm.build_array_malloc
-      (Llvm.i64_type t.context)
-      (Llvm.const_int (Llvm.i32_type t.context) (block_field_num + 1))
+    let alloc_fun =
+      Llvm.declare_function
+        "umber_gc_alloc"
+        (Llvm.function_type
+           (Llvm.pointer_type (Llvm.i64_type t.context))
+           [| Llvm.i64_type t.context |])
+        t.module_
+    in
+    Llvm.build_call
+      alloc_fun
+      [| Llvm.const_int (Llvm.i64_type t.context) (8 * (block_field_num + 1)) |]
       "box"
       t.builder
   in

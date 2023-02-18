@@ -467,8 +467,7 @@ entry:
 
 define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %arg0, %umber_block* %arg1) {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -696,7 +695,7 @@ entry:
 
 declare %umber_block* @umber_print_bool(%umber_block*)
 
-declare noalias i8* @malloc(i32)
+declare i64* @umber_gc_alloc(i64)
 
 define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:

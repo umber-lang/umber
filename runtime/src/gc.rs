@@ -33,12 +33,12 @@ impl Gc {
         }
     }
 
-    pub unsafe fn alloc(&mut self, nbytes: usize) -> *mut u8 {
-        if self.next_free + nbytes >= self.heap_capacity {
+    pub unsafe fn alloc(&mut self, n_bytes: usize) -> *mut u8 {
+        if self.next_free + n_bytes >= self.heap_capacity {
             panic!("Out of memory (the \"garbage collection\" part of the garbage collector is not implemented yet)")
         } else {
             let result = self.heap.add(self.next_free);
-            self.next_free += nbytes;
+            self.next_free += n_bytes;
             result
         }
     }
@@ -52,4 +52,9 @@ impl Gc {
 #[no_mangle]
 pub unsafe extern "C" fn umber_gc_is_on_heap(x: *const c_void) -> bool {
     Gc::get().is_on_heap(x)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn umber_gc_alloc(n_bytes: usize) -> *mut u8 {
+    Gc::get().alloc(n_bytes)
 }

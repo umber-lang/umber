@@ -19,8 +19,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 define i32 @"umber_main:./examples/AsPattern.um"() {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -43,43 +42,40 @@ entry:
   %block_field10 = inttoptr i64 %block_field_raw9 to %umber_block*
   store %umber_block* %block_field10, %umber_block** @AsPattern.two, align 8
   %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
-  %malloccall11 = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
-  %box12 = bitcast i8* %malloccall11 to i64*
-  %box13 = bitcast i64* %box12 to i16*
-  store i16 0, i16* %box13, align 2
-  %box14 = getelementptr i16, i16* %box13, i32 1
-  store i16 2, i16* %box14, align 2
-  %box15 = bitcast i64* %box12 to %umber_block**
-  %box16 = getelementptr %umber_block*, %umber_block** %box15, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.927989409 to %umber_block*), %umber_block** %box16, align 8
-  %box17 = getelementptr %umber_block*, %umber_block** %box15, i32 2
-  store %umber_block* %Std.Prelude.List.Nil, %umber_block** %box17, align 8
-  %box18 = bitcast %umber_block** %box15 to %umber_block*
-  %malloccall19 = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
-  %box20 = bitcast i8* %malloccall19 to i64*
-  %box21 = bitcast i64* %box20 to i16*
-  store i16 0, i16* %box21, align 2
-  %box22 = getelementptr i16, i16* %box21, i32 1
-  store i16 2, i16* %box22, align 2
-  %box23 = bitcast i64* %box20 to %umber_block**
-  %box24 = getelementptr %umber_block*, %umber_block** %box23, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.993717661 to %umber_block*), %umber_block** %box24, align 8
-  %box25 = getelementptr %umber_block*, %umber_block** %box23, i32 2
-  store %umber_block* %box18, %umber_block** %box25, align 8
-  %box26 = bitcast %umber_block** %box23 to %umber_block*
-  %malloccall27 = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
-  %box28 = bitcast i8* %malloccall27 to i64*
-  %box29 = bitcast i64* %box28 to i16*
-  store i16 0, i16* %box29, align 2
-  %box30 = getelementptr i16, i16* %box29, i32 1
-  store i16 2, i16* %box30, align 2
-  %box31 = bitcast i64* %box28 to %umber_block**
-  %box32 = getelementptr %umber_block*, %umber_block** %box31, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.763646369 to %umber_block*), %umber_block** %box32, align 8
-  %box33 = getelementptr %umber_block*, %umber_block** %box31, i32 2
-  store %umber_block* %box26, %umber_block** %box33, align 8
-  %box34 = bitcast %umber_block** %box31 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"*fun" to %umber_block*), %umber_block* %box34)
+  %box11 = call i64* @umber_gc_alloc(i64 24)
+  %box12 = bitcast i64* %box11 to i16*
+  store i16 0, i16* %box12, align 2
+  %box13 = getelementptr i16, i16* %box12, i32 1
+  store i16 2, i16* %box13, align 2
+  %box14 = bitcast i64* %box11 to %umber_block**
+  %box15 = getelementptr %umber_block*, %umber_block** %box14, i32 1
+  store %umber_block* bitcast (%umber_block1* @string.927989409 to %umber_block*), %umber_block** %box15, align 8
+  %box16 = getelementptr %umber_block*, %umber_block** %box14, i32 2
+  store %umber_block* %Std.Prelude.List.Nil, %umber_block** %box16, align 8
+  %box17 = bitcast %umber_block** %box14 to %umber_block*
+  %box18 = call i64* @umber_gc_alloc(i64 24)
+  %box19 = bitcast i64* %box18 to i16*
+  store i16 0, i16* %box19, align 2
+  %box20 = getelementptr i16, i16* %box19, i32 1
+  store i16 2, i16* %box20, align 2
+  %box21 = bitcast i64* %box18 to %umber_block**
+  %box22 = getelementptr %umber_block*, %umber_block** %box21, i32 1
+  store %umber_block* bitcast (%umber_block1* @string.993717661 to %umber_block*), %umber_block** %box22, align 8
+  %box23 = getelementptr %umber_block*, %umber_block** %box21, i32 2
+  store %umber_block* %box17, %umber_block** %box23, align 8
+  %box24 = bitcast %umber_block** %box21 to %umber_block*
+  %box25 = call i64* @umber_gc_alloc(i64 24)
+  %box26 = bitcast i64* %box25 to i16*
+  store i16 0, i16* %box26, align 2
+  %box27 = getelementptr i16, i16* %box26, i32 1
+  store i16 2, i16* %box27, align 2
+  %box28 = bitcast i64* %box25 to %umber_block**
+  %box29 = getelementptr %umber_block*, %umber_block** %box28, i32 1
+  store %umber_block* bitcast (%umber_block1* @string.763646369 to %umber_block*), %umber_block** %box29, align 8
+  %box30 = getelementptr %umber_block*, %umber_block** %box28, i32 2
+  store %umber_block* %box24, %umber_block** %box30, align 8
+  %box31 = bitcast %umber_block** %box28 to %umber_block*
+  %fun_call = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"*fun" to %umber_block*), %umber_block* %box31)
   store %umber_block* %fun_call, %umber_block** @"*binding", align 8
   ret i32 0
 }
@@ -156,7 +152,7 @@ entry:
   ret %umber_block* %fun_call1
 }
 
-declare noalias i8* @malloc(i32)
+declare i64* @umber_gc_alloc(i64)
 
 define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:

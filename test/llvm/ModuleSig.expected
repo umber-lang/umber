@@ -30,8 +30,7 @@ entry:
 
 define tailcc %umber_block* @ModuleSig.Range.between(%umber_block* %ModuleSig.Range.lo, %umber_block* %ModuleSig.Range.hi) {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -69,5 +68,5 @@ declare tailcc %umber_block* @Std.Prelude.print_bool(%umber_block*)
 
 declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
-declare noalias i8* @malloc(i32)
+declare i64* @umber_gc_alloc(i64)
 

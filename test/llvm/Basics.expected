@@ -43,8 +43,7 @@ cond_otherwise:                                   ; preds = %cond
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
   %cond_otherwise_merge2 = phi %umber_block* [ bitcast (%umber_block1* @float.1. to %umber_block*), %cond_binding_merge ], [ bitcast (%umber_block1* @float.2.5 to %umber_block*), %cond_otherwise ]
   store %umber_block* %cond_otherwise_merge2, %umber_block** @_, align 8
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 4))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 32)
   %box3 = bitcast i64* %box to i16*
   store i16 0, i16* %box3, align 2
   %box4 = getelementptr i16, i16* %box3, i32 1
@@ -63,8 +62,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
 
 define tailcc %umber_block* @Basics.Regular(%umber_block* %arg0) {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 2))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 16)
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -78,8 +76,7 @@ entry:
 
 define tailcc %umber_block* @Basics.Expanded(%umber_block* %arg0.1) {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 2))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 16)
   %box1 = bitcast i64* %box to i16*
   store i16 1, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -93,8 +90,7 @@ entry:
 
 define tailcc %umber_block* @Basics.Point3(%umber_block* %arg0.2, %umber_block* %arg1, %umber_block* %arg2) {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 4))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 32)
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -110,5 +106,5 @@ entry:
   ret %umber_block* %box7
 }
 
-declare noalias i8* @malloc(i32)
+declare i64* @umber_gc_alloc(i64)
 

@@ -14,8 +14,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 define i32 @"umber_main:./examples/TypeChecking.um"() {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
   store i16 0, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -107,8 +106,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
 
 define tailcc %umber_block* @TypeChecking.if_(%umber_block* %TypeChecking.then_, %umber_block* %TypeChecking.else_) {
 entry:
-  %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 4))
-  %box = bitcast i8* %malloccall to i64*
+  %box = call i64* @umber_gc_alloc(i64 32)
   %box1 = bitcast i64* %box to i16*
   store i16 12289, i16* %box1, align 2
   %box2 = getelementptr i16, i16* %box1, i32 1
@@ -173,5 +171,5 @@ call_phi:                                         ; preds = %regular_call, %clos
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
 
-declare noalias i8* @malloc(i32)
+declare i64* @umber_gc_alloc(i64)
 
