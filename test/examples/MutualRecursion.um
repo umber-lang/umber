@@ -4,9 +4,6 @@
 val f : Forest a
 let f = Nil
 
-# FIXME: Why does this module generate functions/values for Nil and Cons?
-# It should be using the ones from the Prelude, not defining its own.
-
 let sum_forest =
   let loop acc forest = match forest
     # TODO: syntactic sugar for lists and other sequences
