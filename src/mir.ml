@@ -154,7 +154,7 @@ module Extern_decl = struct
     { name : Mir_name.t
     ; arity : int
     }
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 end
 
 (* TODO: This doesn't handle polymorphic types particularly smartly. Should think about

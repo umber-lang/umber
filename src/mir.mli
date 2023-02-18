@@ -52,7 +52,7 @@ module Extern_decl : sig
     { name : Mir_name.t
     ; arity : int
     }
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 end
 
 module Stmt : sig

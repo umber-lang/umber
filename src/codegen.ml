@@ -329,7 +329,8 @@ let rec codegen_expr t expr =
        Some trickiness around indirect calls (either functions or closures): we have to assume
        the calling convention is something: go with tailcc.
        FIXME: Make sure external cc functions are wrapped with tailcc wrappers when put into
-       values. *)
+       values. (Or just always, in general. Maybe change the semantics of extern
+       declarations to actually create a function with that name.) *)
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     let build_umber_apply_fun_call fun_value =
       let n_args = Array.length args in

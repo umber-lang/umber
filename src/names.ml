@@ -306,11 +306,10 @@ end = struct
 end
 
 module Mir_name : sig
-  type t [@@deriving compare, equal, hash, sexp]
+  type t [@@deriving compare, equal, hash, sexp_of]
 
-  include Stringable.S with type t := t
-  include Comparable.S with type t := t
-  include Hashable.S with type t := t
+  include Comparable.S_plain with type t := t
+  include Hashable.S_plain with type t := t
 
   module Name_table : sig
     type t [@@deriving sexp_of]
@@ -348,6 +347,7 @@ end = struct
           if id = 0 then ustr else Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
         ;;
 
+        (* TODO: I don't think this is actually used. We should probably remove it. *)
         let of_string str =
           let name, id =
             match String.rsplit2 str ~on:'.' with
@@ -377,32 +377,23 @@ end = struct
   end
 
   module T = struct
-    module U = struct
-      type t =
-        | Internal of Unique_name.t
-        | External of Extern_name.t
-      [@@deriving compare, equal, hash]
+    type t =
+      | Internal of Unique_name.t
+      | External of Extern_name.t
+    [@@deriving compare, equal, hash]
 
-      let to_ustring = function
-        | Internal name -> Unique_name.to_ustring name
-        | External name -> Extern_name.to_ustring name
-      ;;
+    let to_ustring = function
+      | Internal name -> Unique_name.to_ustring name
+      | External name -> Extern_name.to_ustring name
+    ;;
 
-      let to_string t = to_ustring t |> Ustring.to_string
-
-      let of_string str =
-        try Internal (Unique_name.of_string str) with
-        | _ -> External (Extern_name.of_string_exn str)
-      ;;
-    end
-
-    include U
-    include Sexpable.Of_stringable (U)
+    let to_string t = to_ustring t |> Ustring.to_string
+    let sexp_of_t t : Sexp.t = Atom (to_string t)
   end
 
   include T
-  include Comparable.Make (T)
-  include Hashable.Make (T)
+  include Comparable.Make_plain (T)
+  include Hashable.Make_plain (T)
 
   let create_value_name name_table value_name =
     Internal (Unique_name.create name_table value_name)
