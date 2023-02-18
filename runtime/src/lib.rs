@@ -21,6 +21,7 @@ mod no_std_setup {
 pub use no_std_setup::*;
 
 mod block;
+mod float;
 mod gc;
 mod int;
 mod io;

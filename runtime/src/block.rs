@@ -171,6 +171,10 @@ impl Block {
         unsafe { Self::new(KnownTag::Int, [mem::transmute(x)]) }
     }
 
+    pub fn new_float(x: f64) -> BlockPtr {
+        unsafe { Self::new(KnownTag::Float, [mem::transmute(x)]) }
+    }
+
     fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
         let len: u16 = fields.len().try_into().unwrap();
         unsafe {

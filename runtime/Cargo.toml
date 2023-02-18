@@ -16,3 +16,4 @@ panic = "abort"
 [dependencies]
 libc = { version = "0.2.103", default-features = false }
 libc-print = "0.1.20"
+libm = "0.2.6"
