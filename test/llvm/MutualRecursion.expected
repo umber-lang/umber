@@ -11,9 +11,11 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @MutualRecursion.sum_forest.1 = global %umber_block* null
 @MutualRecursion.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @MutualRecursion.Leaf = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@"*binding" = global %umber_block* null
 @MutualRecursion.number = global %umber_block* null
 @int.0 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 0 }
 @int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
+@int.17 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 17 }
 @int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
 
 define i32 @"umber_main:./examples/MutualRecursion.um"() {
@@ -32,8 +34,58 @@ entry:
   store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @MutualRecursion.loop to %umber_block*), %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
   store %umber_block* %box6, %umber_block** @MutualRecursion.sum_forest.1, align 8
-  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
-  store %umber_block* %fun_call, %umber_block** @MutualRecursion.number, align 8
+  %MutualRecursion.Leaf = load %umber_block*, %umber_block** @MutualRecursion.Leaf, align 8
+  %Std.Prelude.List.Nil7 = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %box8 = call i64* @umber_gc_alloc(i64 24)
+  %box9 = bitcast i64* %box8 to i16*
+  store i16 0, i16* %box9, align 2
+  %box10 = getelementptr i16, i16* %box9, i32 1
+  store i16 2, i16* %box10, align 2
+  %box11 = bitcast i64* %box8 to %umber_block**
+  %box12 = getelementptr %umber_block*, %umber_block** %box11, i32 1
+  store %umber_block* bitcast (%umber_block1* @int.17 to %umber_block*), %umber_block** %box12, align 8
+  %box13 = getelementptr %umber_block*, %umber_block** %box11, i32 2
+  store %umber_block* %Std.Prelude.List.Nil7, %umber_block** %box13, align 8
+  %box14 = bitcast %umber_block** %box11 to %umber_block*
+  %Std.Prelude.List.Nil15 = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %box16 = call i64* @umber_gc_alloc(i64 24)
+  %box17 = bitcast i64* %box16 to i16*
+  store i16 0, i16* %box17, align 2
+  %box18 = getelementptr i16, i16* %box17, i32 1
+  store i16 2, i16* %box18, align 2
+  %box19 = bitcast i64* %box16 to %umber_block**
+  %box20 = getelementptr %umber_block*, %umber_block** %box19, i32 1
+  store %umber_block* %box14, %umber_block** %box20, align 8
+  %box21 = getelementptr %umber_block*, %umber_block** %box19, i32 2
+  store %umber_block* %Std.Prelude.List.Nil15, %umber_block** %box21, align 8
+  %box22 = bitcast %umber_block** %box19 to %umber_block*
+  %box23 = call i64* @umber_gc_alloc(i64 24)
+  %box24 = bitcast i64* %box23 to i16*
+  store i16 0, i16* %box24, align 2
+  %box25 = getelementptr i16, i16* %box24, i32 1
+  store i16 2, i16* %box25, align 2
+  %box26 = bitcast i64* %box23 to %umber_block**
+  %box27 = getelementptr %umber_block*, %umber_block** %box26, i32 1
+  store %umber_block* %MutualRecursion.Leaf, %umber_block** %box27, align 8
+  %box28 = getelementptr %umber_block*, %umber_block** %box26, i32 2
+  store %umber_block* %box22, %umber_block** %box28, align 8
+  %box29 = bitcast %umber_block** %box26 to %umber_block*
+  %box30 = call i64* @umber_gc_alloc(i64 24)
+  %box31 = bitcast i64* %box30 to i16*
+  store i16 0, i16* %box31, align 2
+  %box32 = getelementptr i16, i16* %box31, i32 1
+  store i16 2, i16* %box32, align 2
+  %box33 = bitcast i64* %box30 to %umber_block**
+  %box34 = getelementptr %umber_block*, %umber_block** %box33, i32 1
+  store %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block** %box34, align 8
+  %box35 = getelementptr %umber_block*, %umber_block** %box33, i32 2
+  store %umber_block* %box29, %umber_block** %box35, align 8
+  %box36 = bitcast %umber_block** %box33 to %umber_block*
+  %fun_call = tail call tailcc %umber_block* @MutualRecursion.sum_tree(%umber_block* %box36)
+  %fun_call37 = tail call tailcc %umber_block* @Std.Prelude.print_int(%umber_block* %fun_call)
+  store %umber_block* %fun_call37, %umber_block** @"*binding", align 8
+  %fun_call38 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
+  store %umber_block* %fun_call38, %umber_block** @MutualRecursion.number, align 8
   ret i32 0
 }
 
@@ -149,6 +201,8 @@ entry:
   %box6 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box6
 }
+
+declare tailcc %umber_block* @Std.Prelude.print_int(%umber_block*)
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block*, %umber_block*)
 

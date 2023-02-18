@@ -54,6 +54,22 @@
  (Fun_def
   ((fun_name MutualRecursion.Node) (args (arg0.2 arg1.1))
    (body (Make_block (tag 0) (fields ((Name arg0.2) (Name arg1.1)))))))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Value_def *binding
+  (Let MutualRecursion.tree.1
+   (Make_block (tag 0)
+    (fields
+     ((Primitive (Int 1))
+      (Make_block (tag 0)
+       (fields
+        ((Name MutualRecursion.Leaf)
+         (Make_block (tag 0)
+          (fields
+           ((Make_block (tag 0)
+             (fields ((Primitive (Int 17)) (Name Std.Prelude.List.Nil))))
+            (Name Std.Prelude.List.Nil))))))))))
+   (Fun_call Std.Prelude.print_int
+    ((Fun_call MutualRecursion.sum_tree ((Name MutualRecursion.tree.1)))))))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_def

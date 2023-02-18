@@ -63,6 +63,40 @@
   (Common_def
    (Type_decl Tree
     ((a) (Variants ((Leaf ()) (Node ((Var a) (Type_app Forest ((Var a))))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Tuple ())
+      ((Let
+        ((rec_ false)
+         (bindings
+          ((((Catch_all (tree))
+             (Type_app MutualRecursion.Tree ((Type_app Int ()))))
+            (Fun_call (Name Node)
+             (((Literal (Int 1)) (Type_app Int ()))
+              ((Fun_call (Name Cons)
+                (((Name Leaf)
+                  (Type_app MutualRecursion.Tree ((Type_app Int ()))))
+                 ((Fun_call (Name Cons)
+                   (((Fun_call (Name Node)
+                      (((Literal (Int 17)) (Type_app Int ()))
+                       ((Name Nil)
+                        (Type_app Std.Prelude.List.List
+                         ((Type_app MutualRecursion.Tree ((Var a))))))))
+                     (Type_app MutualRecursion.Tree ((Type_app Int ()))))
+                    ((Name Nil)
+                     (Type_app Std.Prelude.List.List
+                      ((Type_app MutualRecursion.Tree ((Type_app Int ()))))))))
+                  (Type_app Std.Prelude.List.List
+                   ((Type_app MutualRecursion.Tree ((Type_app Int ()))))))))
+               (Type_app Std.Prelude.List.List
+                ((Type_app MutualRecursion.Tree ((Type_app Int ())))))))))))
+         (body
+          (Fun_call (Name print_int)
+           (((Fun_call (Name sum_tree)
+              (((Name tree)
+                (Type_app MutualRecursion.Tree ((Type_app Int ()))))))
+             (Type_app Int ())))))))
+       (Tuple ()))))))
   (Let (rec_ true)
    (bindings
     (((Catch_all (even))
