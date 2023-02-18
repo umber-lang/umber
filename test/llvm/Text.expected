@@ -12,6 +12,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Text.hello = constant %umber_block* bitcast (%umber_block2* @string.774705101 to %umber_block*)
 @Text.spacing = constant %umber_block* bitcast (%umber_block3* @string.398489461 to %umber_block*)
 @Text.dec_code_exclam = constant %umber_block* bitcast (%umber_block1* @string.229771883 to %umber_block*)
+@_ = global %umber_block* null
 @"*binding" = global %umber_block* null
 @Text.a = global %umber_block* null
 @Text.b = global %umber_block* null
@@ -20,12 +21,16 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @string.774705101 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"hello world!\00\00\00\03" }
 @string.398489461 = constant %umber_block3 { %umber_header { i16 -32764, i16 3, i32 0 }, [24 x i8] c"line 1\0D\0A\09 line 2\00\00\00\00\00\00\00\07" }
 @string.229771883 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"!\00\00\00\00\00\00\06" }
+@string.125514899 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"hello\0A\00\01" }
+@string.593386469 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\08world!\00" }
 @string.0 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\00\00\00\00\00\00\00\07" }
 @char.b = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 98 }
 @string.986077178 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA\00" }
 
 define i32 @"umber_main:./examples/Text.um"() {
 entry:
+  %fun_call = tail call %umber_block* @umber_string_append(%umber_block* bitcast (%umber_block1* @string.125514899 to %umber_block*), %umber_block* bitcast (%umber_block1* @string.593386469 to %umber_block*))
+  store %umber_block* %fun_call, %umber_block** @_, align 8
   %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
   %box = bitcast i8* %malloccall to i64*
   %box1 = bitcast i64* %box to i16*
@@ -51,6 +56,8 @@ entry:
   store %umber_block* %block_field10, %umber_block** @Text.b, align 8
   ret i32 0
 }
+
+declare %umber_block* @umber_string_append(%umber_block*, %umber_block*)
 
 declare noalias i8* @malloc(i32)
 
