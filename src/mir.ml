@@ -986,7 +986,11 @@ module Expr = struct
               bindings, of_typed_expr ~just_bound ~ctx expr typ)
             bindings
         in
-        let body = of_typed_expr ~ctx body body_type in
+        let body =
+          (* Pass through [just_bound] so it can apply through intermediate local let
+             bindings in expressions. *)
+          of_typed_expr ?just_bound ~ctx body body_type
+        in
         add_let_bindings ~bindings ~body
       | Tuple fields, Tuple field_types ->
         make_block ~ctx ~tag:Cnstr_tag.default ~fields ~field_types
@@ -1300,6 +1304,8 @@ let of_typed_module =
       match follow_let_bindings mir_expr with
       | Name name' when Mir_name.(name = name') ->
         (* Don't make a Value_def in the case where all we did is make a Fun_def *)
+        (* FIXME: Isn't this going to elide some let bindings? We'd have to promote them
+           to [Value_def]s too.  *)
         stmts
       | _ ->
         let arity = arity_of_type ~names typ in
