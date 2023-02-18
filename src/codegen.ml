@@ -311,26 +311,13 @@ let rec codegen_expr t expr =
   | Name name ->
     let value = Value_table.find t.values name in
     (match Llvm.classify_value value with
-     | Function ->
-       (* FIXME: Need handling for when external cc functions are referenced by name.
-          Since we assume the calling convention for unknown functions is tailcc, we need
-          to wrap these in a new function to forward the call from tailc to cc. *)
-       Llvm.const_bitcast value (block_pointer_type t)
+     | Function -> Llvm.const_bitcast value (block_pointer_type t)
      | GlobalVariable -> Llvm.build_load value (Llvm.value_name value) t.builder
      | _ -> value)
   | Let (name, expr, body) ->
     Value_table.add t.values name (codegen_expr t expr);
     codegen_expr t body
   | Fun_call (fun_name, args) ->
-    (* IDEA: first check if this is a closure or regular function call by checking if the
-       pointer is on the heap.
-       - If it's a regular function call, just do it.
-       - If it's an closure call, find the environment and pass it in.
-       Some trickiness around indirect calls (either functions or closures): we have to assume
-       the calling convention is something: go with tailcc.
-       FIXME: Make sure external cc functions are wrapped with tailcc wrappers when put into
-       values. (Or just always, in general. Maybe change the semantics of extern
-       declarations to actually create a function with that name.) *)
     let args = Array.of_list_map ~f:(codegen_expr t) (Nonempty.to_list args) in
     let build_umber_apply_fun_call fun_value =
       let n_args = Array.length args in
@@ -343,9 +330,12 @@ let rec codegen_expr t expr =
     let fun_value = Value_table.find t.values fun_name in
     (match Llvm.classify_value fun_value with
      | Function ->
+       (* If this is a direct function call to a known function, just call the function. *)
        let call_conv = Llvm.function_call_conv fun_value in
        build_call t fun_value args ~call_conv
      | GlobalVariable ->
+       (* If this is a call through a pointer, use [umber_applyN] to do the logic of
+         checking if the pointer is to a function or closure. *)
        build_umber_apply_fun_call
          (Llvm.build_load fun_value (Llvm.value_name fun_value) t.builder)
      | _ -> build_umber_apply_fun_call fun_value)
