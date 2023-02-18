@@ -3,9 +3,9 @@
  (Value_def Text.spacing (Primitive (String  "line 1\r\
                                             \n\t line 2")))
  (Value_def Text.dec_code_exclam (Primitive (String !)))
- (Extern_decl ((name umber_string_append) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
  (Value_def _
-  (Fun_call umber_string_append
+  (Fun_call Std.Prelude.Operators.++
    ((Primitive (String "hello\n")) (Primitive (String "\bworld!")))))
  (Value_def *binding
   (Let Text.empty (Primitive (String ""))

@@ -27,37 +27,37 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 define i32 @"umber_main:./examples/LetBindingGroups.um"() {
 entry:
   %LetBindingGroups.a = load %umber_block*, %umber_block** @LetBindingGroups.a, align 8
-  %fun_call = tail call %umber_block* @umber_int_add(%umber_block* %LetBindingGroups.a, %umber_block* bitcast (%umber_block1* @int.6 to %umber_block*))
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %LetBindingGroups.a, %umber_block* bitcast (%umber_block1* @int.6 to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @LetBindingGroups.b, align 8
   %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
   %fun_call1 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.606624195 to %umber_block*), %umber_block* %Std.Prelude.List.Nil)
   %fun_call2 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.415265556 to %umber_block*), %umber_block* %fun_call1)
   %fun_call3 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.156427255 to %umber_block*), %umber_block* %fun_call2)
   %fun_call4 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block1* @string.721651713 to %umber_block*), %umber_block* %fun_call3)
-  %fun_call5 = tail call %umber_block* @umber_eq(%umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
-  %fun_call6 = tail call %umber_block* @umber_eq(%umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.4 to %umber_block*))
+  %fun_call5 = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
+  %fun_call6 = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.4 to %umber_block*))
   %fun_call7 = tail call tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block* %fun_call5, %umber_block* %fun_call6)
   store %umber_block* %fun_call7, %umber_block** @_, align 8
   ret i32 0
 }
 
-declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block*, %umber_block*)
 
-declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block*, %umber_block*)
 
-declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.^"(%umber_block*, %umber_block*)
 
-declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @LetBindingGroups.fun(%umber_block* %LetBindingGroups.n) {
 entry:
-  %fun_call = tail call %umber_block* @umber_int_pow(%umber_block* %LetBindingGroups.n, %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
-  %fun_call1 = tail call %umber_block* @umber_int_sub(%umber_block* %fun_call, %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
-  %fun_call2 = tail call %umber_block* @umber_int_add(%umber_block* %fun_call1, %umber_block* %LetBindingGroups.n)
-  %fun_call3 = tail call %umber_block* @umber_int_sub(%umber_block* %LetBindingGroups.n, %umber_block* bitcast (%umber_block1* @int.8 to %umber_block*))
-  %fun_call4 = tail call %umber_block* @umber_int_mul(%umber_block* %LetBindingGroups.n, %umber_block* %fun_call3)
-  %fun_call5 = tail call %umber_block* @umber_int_mul(%umber_block* %fun_call4, %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
-  %fun_call6 = tail call %umber_block* @umber_int_add(%umber_block* %fun_call2, %umber_block* %fun_call5)
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.^"(%umber_block* %LetBindingGroups.n, %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
+  %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %fun_call, %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
+  %fun_call2 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %fun_call1, %umber_block* %LetBindingGroups.n)
+  %fun_call3 = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %LetBindingGroups.n, %umber_block* bitcast (%umber_block1* @int.8 to %umber_block*))
+  %fun_call4 = tail call tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %LetBindingGroups.n, %umber_block* %fun_call3)
+  %fun_call5 = tail call tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %fun_call4, %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
+  %fun_call6 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %fun_call2, %umber_block* %fun_call5)
   ret %umber_block* %fun_call6
 }
 
@@ -65,7 +65,7 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block*, %umber_b
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block*, %umber_block*)
 
-declare %umber_block* @umber_eq(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @LetBindingGroups.go_left(%umber_block* %LetBindingGroups.x) {
 entry:

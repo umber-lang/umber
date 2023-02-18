@@ -10,9 +10,9 @@ entry:
   ret i32 0
 }
 
-declare %umber_block* @umber_lt(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.<"(%umber_block*, %umber_block*)
 
-declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @"*fun"(%umber_block* %"*closure_env", %umber_block* %Closures.current) {
 entry:
@@ -22,11 +22,11 @@ entry:
   %block_field_gep1 = getelementptr %umber_block, %umber_block* %"*closure_env", i32 0, i32 1, i32 1
   %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
-  %fun_call = tail call %umber_block* @umber_lt(%umber_block* %Closures.current, %umber_block* %block_field)
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.<"(%umber_block* %Closures.current, %umber_block* %block_field)
   br label %cond
 
 cond_binding_merge:                               ; preds = %cond_binding
-  %fun_call4 = tail call %umber_block* @umber_int_add(%umber_block* %Closures.current, %umber_block* %block_field3)
+  %fun_call4 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %Closures.current, %umber_block* %block_field3)
   %fun_call5 = tail call tailcc %umber_block* @"*fun"(%umber_block* %"*closure_env", %umber_block* %fun_call4)
   br label %cond_otherwise_merge
 

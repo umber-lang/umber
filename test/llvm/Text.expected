@@ -29,7 +29,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 define i32 @"umber_main:./examples/Text.um"() {
 entry:
-  %fun_call = tail call %umber_block* @umber_string_append(%umber_block* bitcast (%umber_block1* @string.125514899 to %umber_block*), %umber_block* bitcast (%umber_block1* @string.593386469 to %umber_block*))
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block1* @string.125514899 to %umber_block*), %umber_block* bitcast (%umber_block1* @string.593386469 to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @_, align 8
   %malloccall = tail call i8* @malloc(i32 mul (i32 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i32), i32 3))
   %box = bitcast i8* %malloccall to i64*
@@ -57,7 +57,7 @@ entry:
   ret i32 0
 }
 
-declare %umber_block* @umber_string_append(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block*, %umber_block*)
 
 declare noalias i8* @malloc(i32)
 

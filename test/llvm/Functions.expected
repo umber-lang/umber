@@ -31,11 +31,11 @@ entry:
   ret %umber_block* %Functions.x
 }
 
-declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @Functions.sqr(%umber_block* %Functions.x.1) {
 entry:
-  %fun_call = tail call %umber_block* @umber_int_mul(%umber_block* %Functions.x.1, %umber_block* %Functions.x.1)
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %Functions.x.1, %umber_block* %Functions.x.1)
   ret %umber_block* %fun_call
 }
 

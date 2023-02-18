@@ -3,11 +3,12 @@
  (Value_def Functions.zero (Primitive (Float 0)))
  (Value_def Functions.still_zero_wow
   (Fun_call Functions.id ((Name Functions.zero))))
- (Extern_decl ((name umber_int_mul) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_def
   ((fun_name Functions.sqr) (args (Functions.x.1))
    (body
-    (Fun_call umber_int_mul ((Name Functions.x.1) (Name Functions.x.1))))))
+    (Fun_call Std.Prelude.Operators.*
+     ((Name Functions.x.1) (Name Functions.x.1))))))
  (Fun_def
   ((fun_name Functions.lots_of_args)
    (args (Functions.a Functions.b Functions.c Functions.d Functions.e))

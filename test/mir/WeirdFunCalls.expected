@@ -1,26 +1,26 @@
-((Extern_decl ((name umber_print_endline) (arity 1)))
+((Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Value_def *binding
-  (Fun_call umber_print_endline ((Primitive (String plain)))))
+  (Fun_call Std.Prelude.print ((Primitive (String plain)))))
  (Fun_def
   ((fun_name *fun) (args (*lambda_arg.1))
-   (body (Fun_call umber_print_endline ((Primitive (String "fun call")))))))
+   (body (Fun_call Std.Prelude.print ((Primitive (String "fun call")))))))
  (Fun_def
   ((fun_name WeirdFunCalls.fun_call) (args (*lambda_arg)) (body (Name *fun))))
  (Value_def *binding.1
   (Let *fun.1 (Fun_call WeirdFunCalls.fun_call ((Make_block (tag 0))))
    (Fun_call *fun.1 ((Make_block (tag 0))))))
- (Extern_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_def
   ((fun_name WeirdFunCalls.print_twice) (args (WeirdFunCalls.msg))
    (body
     (Fun_call "Std.Prelude.Operators.;"
-     ((Fun_call umber_print_endline ((Name WeirdFunCalls.msg)))
-      (Fun_call umber_print_endline ((Name WeirdFunCalls.msg))))))))
+     ((Fun_call Std.Prelude.print ((Name WeirdFunCalls.msg)))
+      (Fun_call Std.Prelude.print ((Name WeirdFunCalls.msg))))))))
  (Value_def WeirdFunCalls.if_
   (Let *fun.2
    (Cond_assign (conds (((Constant_tag_equals (Make_block (tag 1)) 1) ())))
     (body (Name WeirdFunCalls.print_twice))
-    (if_none_matched (Otherwise (Name umber_print_endline))))
+    (if_none_matched (Otherwise (Name Std.Prelude.print))))
    (Fun_call *fun.2 ((Primitive (String if))))))
  (Value_def *binding.2
-  (Fun_call umber_print_endline ((Primitive (String let))))))
+  (Fun_call Std.Prelude.print ((Primitive (String let))))))

@@ -1,30 +1,31 @@
 ((Value_def LetBindingGroups.a (Primitive (Int 1)))
- (Extern_decl ((name umber_int_add) (arity 2)))
- (Extern_decl ((name umber_int_sub) (arity 2)))
- (Extern_decl ((name umber_int_pow) (arity 2)))
- (Extern_decl ((name umber_int_mul) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.^) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_def
   ((fun_name LetBindingGroups.fun) (args (LetBindingGroups.n))
    (body
-    (Fun_call umber_int_add
-     ((Fun_call umber_int_add
-       ((Fun_call umber_int_sub
-         ((Fun_call umber_int_pow
+    (Fun_call Std.Prelude.Operators.+
+     ((Fun_call Std.Prelude.Operators.+
+       ((Fun_call Std.Prelude.Operators.-
+         ((Fun_call Std.Prelude.Operators.^
            ((Name LetBindingGroups.n) (Primitive (Int 2))))
           (Primitive (Int 2))))
         (Name LetBindingGroups.n)))
-      (Fun_call umber_int_mul
-       ((Fun_call umber_int_mul
+      (Fun_call Std.Prelude.Operators.*
+       ((Fun_call Std.Prelude.Operators.*
          ((Name LetBindingGroups.n)
-          (Fun_call umber_int_sub
+          (Fun_call Std.Prelude.Operators.-
            ((Name LetBindingGroups.n) (Primitive (Int 8))))))
         (Primitive (Int 5)))))))))
  (Value_def LetBindingGroups.b
-  (Fun_call umber_int_add ((Name LetBindingGroups.a) (Primitive (Int 6)))))
- (Extern_decl ((name Std.Prelude.Operators.::) (arity 2)))
- (Extern_decl ((name Std.Prelude.List.Nil) (arity 0)))
- (Extern_decl ((name Std.Prelude.Operators.||) (arity 2)))
- (Extern_decl ((name umber_eq) (arity 2)))
+  (Fun_call Std.Prelude.Operators.+
+   ((Name LetBindingGroups.a) (Primitive (Int 6)))))
+ (Fun_decl ((name Std.Prelude.Operators.::) (arity 2)))
+ (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
+ (Fun_decl ((name Std.Prelude.Operators.||) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Value_def _
   (Let LetBindingGroups.list
    (Fun_call Std.Prelude.Operators.::
@@ -36,8 +37,10 @@
          (Fun_call Std.Prelude.Operators.::
           ((Primitive (String words)) (Name Std.Prelude.List.Nil)))))))))
    (Fun_call Std.Prelude.Operators.||
-    ((Fun_call umber_eq ((Primitive (Int 1)) (Primitive (Int 2))))
-     (Fun_call umber_eq ((Primitive (Int 3)) (Primitive (Int 4))))))))
+    ((Fun_call Std.Prelude.Operators.==
+      ((Primitive (Int 1)) (Primitive (Int 2))))
+     (Fun_call Std.Prelude.Operators.==
+      ((Primitive (Int 3)) (Primitive (Int 4))))))))
  (Fun_def
   ((fun_name LetBindingGroups.go_left) (args (LetBindingGroups.x))
    (body (Fun_call LetBindingGroups.go_right ((Name LetBindingGroups.x))))))

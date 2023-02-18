@@ -1,5 +1,5 @@
-((Extern_decl ((name umber_int_mul) (arity 2)))
- (Extern_decl ((name umber_int_sub) (arity 2)))
+((Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_def
   ((fun_name Classics.fact) (args (Classics.))
    (body
@@ -11,11 +11,12 @@
      (if_none_matched
       (Otherwise
        (Let Classics.n (Name Classics.)
-        (Fun_call umber_int_mul
+        (Fun_call Std.Prelude.Operators.*
          ((Name Classics.n)
           (Fun_call Classics.fact
-           ((Fun_call umber_int_sub ((Name Classics.n) (Primitive (Int 1)))))))))))))))
- (Extern_decl ((name umber_int_add) (arity 2)))
+           ((Fun_call Std.Prelude.Operators.-
+             ((Name Classics.n) (Primitive (Int 1)))))))))))))))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
  (Fun_def
   ((fun_name Classics.fib) (args (Classics.n.1))
    (body
@@ -27,20 +28,20 @@
      (if_none_matched
       (Otherwise
        (Let Classics.n.2 (Name Classics.n.1)
-        (Fun_call umber_int_add
+        (Fun_call Std.Prelude.Operators.+
          ((Fun_call Classics.fib
-           ((Fun_call umber_int_sub
+           ((Fun_call Std.Prelude.Operators.-
              ((Name Classics.n.2) (Primitive (Int 1))))))
           (Fun_call Classics.fib
-           ((Fun_call umber_int_sub
+           ((Fun_call Std.Prelude.Operators.-
              ((Name Classics.n.2) (Primitive (Int 2)))))))))))))))
- (Extern_decl ((name "Std.Prelude.Operators.;") (arity 2)))
- (Extern_decl ((name umber_print_endline) (arity 1)))
- (Extern_decl ((name umber_print_int) (arity 1)))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
  (Value_def *binding
   (Fun_call "Std.Prelude.Operators.;"
    ((Fun_call "Std.Prelude.Operators.;"
-     ((Fun_call umber_print_endline ((Primitive (String "5! is:"))))
-      (Fun_call umber_print_int
+     ((Fun_call Std.Prelude.print ((Primitive (String "5! is:"))))
+      (Fun_call Std.Prelude.print_int
        ((Fun_call Classics.fact ((Primitive (Int 5))))))))
-    (Fun_call umber_print_endline ((Primitive (String ""))))))))
+    (Fun_call Std.Prelude.print ((Primitive (String ""))))))))

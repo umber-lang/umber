@@ -145,14 +145,14 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   ret %umber_block* %cond_otherwise_merge25
 }
 
-declare %umber_block* @umber_print_endline(%umber_block*)
+declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
-declare %umber_block* @umber_string_append(%umber_block*, %umber_block*)
+declare tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @"*fun"(%umber_block* %AsPattern.a.1, %umber_block* %AsPattern.b.1) {
 entry:
-  %fun_call = tail call %umber_block* @umber_string_append(%umber_block* %AsPattern.a.1, %umber_block* %AsPattern.b.1)
-  %fun_call1 = tail call %umber_block* @umber_print_endline(%umber_block* %fun_call)
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* %AsPattern.a.1, %umber_block* %AsPattern.b.1)
+  %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call)
   ret %umber_block* %fun_call1
 }
 
