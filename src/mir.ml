@@ -197,7 +197,12 @@ module Context : sig
   val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
   val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
-  val find_cnstr_info_from_decl : t -> Type.Decl.decl -> Cnstr_info.t option
+
+  val find_cnstr_info_from_decl
+    :  t
+    -> Type.Decl.decl
+    -> follow_aliases:bool
+    -> Cnstr_info.t option
 end = struct
   module Extern_info = struct
     type t =
@@ -354,13 +359,13 @@ end = struct
       let decl =
         snd (Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name)
       in
-      find_cnstr_info_from_decl t decl
+      find_cnstr_info_from_decl t decl ~follow_aliases:true
     | Tuple args -> Some (Cnstr_info.of_tuple args)
     | Function _ | Partial_function _ | Var _ -> cnstr_info_lookup_failed type_
 
-  and find_cnstr_info_from_decl t decl =
+  and find_cnstr_info_from_decl t decl ~follow_aliases =
     match (decl : Type.Decl.decl) with
-    | Alias alias -> find_cnstr_info_internal t alias
+    | Alias alias -> if follow_aliases then find_cnstr_info_internal t alias else None
     | Variants variants -> Some (Cnstr_info.of_variants variants)
     | Abstract | Record _ -> None
   ;;
@@ -1303,7 +1308,7 @@ let of_typed_module =
              Create one which just forwards the call to the expression. Importantly, the
              name used for the function must be the original name, which should be a
              proper name from the source (its id should be 0). This lets code in other
-             files link with it properly.  *)
+             files link with it properly. *)
           let name' = Context.copy_name ctx name in
           let args =
             Nonempty.init arity ~f:(fun i ->
@@ -1325,7 +1330,7 @@ let of_typed_module =
       ~process_expr
   in
   let generate_variant_constructor_values ~ctx ~stmts decl =
-    match Context.find_cnstr_info_from_decl ctx decl with
+    match Context.find_cnstr_info_from_decl ctx decl ~follow_aliases:false with
     | None -> ctx, stmts
     | Some cnstr_info ->
       Cnstr_info.fold cnstr_info ~init:(ctx, stmts) ~f:(fun (ctx, stmts) cnstr tag args ->
