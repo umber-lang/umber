@@ -1291,21 +1291,9 @@ let of_typed_module =
       !stmts, expr
     in
     let add_let (stmts : Stmt.t list) name mir_expr typ =
-      let rec follow_let_bindings expr =
-        match (expr : Expr.t) with
-        | Let (_, _, body) -> follow_let_bindings body
-        | Name _
-        | Primitive _
-        | Fun_call _
-        | Make_block _
-        | Get_block_field _
-        | Cond_assign _ -> expr
-      in
-      match follow_let_bindings mir_expr with
+      match (mir_expr : Expr.t) with
       | Name name' when Mir_name.(name = name') ->
         (* Don't make a Value_def in the case where all we did is make a Fun_def *)
-        (* FIXME: Isn't this going to elide some let bindings? We'd have to promote them
-           to [Value_def]s too.  *)
         stmts
       | _ ->
         let arity = arity_of_type ~names typ in
