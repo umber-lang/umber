@@ -17,7 +17,7 @@ impl BlockPtr {
         value & BLOCK_PTR_MASK == 0
     }
 
-    pub fn classify<'a>(&'a self) -> Value<'a> {
+    pub fn classify(&self) -> Value {
         if self.is_block() {
             unsafe {
                 match KnownTag::try_from((*self.block.as_ptr()).tag) {
@@ -64,6 +64,61 @@ impl BlockPtr {
 
     pub fn as_str(&self) -> &str {
         unsafe { self.as_block().as_ref().as_str() }
+    }
+
+    pub fn new_int(x: i64) -> BlockPtr {
+        unsafe { Self::new(KnownTag::Int, [mem::transmute(x)]) }
+    }
+
+    pub fn new_float(x: f64) -> BlockPtr {
+        unsafe { Self::new(KnownTag::Float, [mem::transmute(x)]) }
+    }
+
+    fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
+        let len: u16 = fields.len().try_into().unwrap();
+        unsafe {
+            Self::new_internal(tag, len, |block| {
+                copy_nonoverlapping(fields.as_ptr(), block.add(1) as *mut BlockPtr, len as usize)
+            })
+        }
+    }
+
+    unsafe fn new_internal(tag: KnownTag, len: u16, f: impl FnOnce(*mut Block)) -> BlockPtr {
+        let n_bytes = 8 * (len + 1) as usize;
+        unsafe {
+            let block = Gc::get().alloc(n_bytes) as *mut Block;
+            (*block).tag = tag as u16;
+            (*block).len = len;
+            f(block);
+            BlockPtr {
+                block: NonNull::new_unchecked(block),
+            }
+        }
+    }
+
+    unsafe fn new_string_internal(str_len: usize, f: impl FnOnce(*mut u8)) -> BlockPtr {
+        let n_words: u16 = ((str_len / 8) + 1).try_into().unwrap();
+        let n_bytes = 8 * (n_words as usize);
+        unsafe {
+            Self::new_internal(KnownTag::String, n_words, |block| {
+                let fields = block.add(1) as *mut u8;
+                f(fields);
+                for i in str_len..(n_bytes - 1) {
+                    *fields.add(i) = 0
+                }
+                *fields.add(n_bytes - 1) = 7 - (str_len % 8) as u8;
+            })
+        }
+    }
+
+    // Currently only used in tests
+    #[cfg(test)]
+    fn new_string(str: &str) -> BlockPtr {
+        unsafe {
+            Self::new_string_internal(str.len(), |fields| {
+                copy_nonoverlapping(str.as_ptr(), fields, str.len())
+            })
+        }
     }
 }
 
@@ -166,68 +221,13 @@ impl Block {
             str::from_utf8_unchecked(bytes)
         }
     }
-
-    pub fn new_int(x: i64) -> BlockPtr {
-        unsafe { Self::new(KnownTag::Int, [mem::transmute(x)]) }
-    }
-
-    pub fn new_float(x: f64) -> BlockPtr {
-        unsafe { Self::new(KnownTag::Float, [mem::transmute(x)]) }
-    }
-
-    fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
-        let len: u16 = fields.len().try_into().unwrap();
-        unsafe {
-            Self::new_internal(tag, len, |block| {
-                copy_nonoverlapping(fields.as_ptr(), block.add(1) as *mut BlockPtr, len as usize)
-            })
-        }
-    }
-
-    unsafe fn new_internal(tag: KnownTag, len: u16, f: impl FnOnce(*mut Self)) -> BlockPtr {
-        let n_bytes = 8 * (len + 1) as usize;
-        unsafe {
-            let block = Gc::get().alloc(n_bytes) as *mut Self;
-            (*block).tag = tag as u16;
-            (*block).len = len;
-            f(block);
-            BlockPtr {
-                block: NonNull::new_unchecked(block),
-            }
-        }
-    }
-
-    unsafe fn new_string_internal(str_len: usize, f: impl FnOnce(*mut u8)) -> BlockPtr {
-        let n_words: u16 = ((str_len / 8) + 1).try_into().unwrap();
-        let n_bytes = 8 * (n_words as usize);
-        unsafe {
-            Self::new_internal(KnownTag::String, n_words, |block| {
-                let fields = block.add(1) as *mut u8;
-                f(fields);
-                for i in str_len..(n_bytes - 1) {
-                    *fields.add(i) = 0
-                }
-                *fields.add(n_bytes - 1) = 7 - (str_len % 8) as u8;
-            })
-        }
-    }
-
-    // Currently only used in tests
-    #[cfg(test)]
-    fn new_string(str: &str) -> BlockPtr {
-        unsafe {
-            Self::new_string_internal(str.len(), |fields| {
-                copy_nonoverlapping(str.as_ptr(), fields, str.len())
-            })
-        }
-    }
 }
 
 #[no_mangle]
 pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     let (x, y) = (x.as_str(), y.as_str());
     unsafe {
-        Block::new_string_internal(x.len() + y.len(), |fields| {
+        BlockPtr::new_string_internal(x.len() + y.len(), |fields| {
             copy_nonoverlapping(x.as_ptr(), fields, x.len());
             copy_nonoverlapping(y.as_ptr(), fields.add(x.len()), y.len());
         })
@@ -258,20 +258,20 @@ impl From<bool> for ConstantCnstr {
 mod test {
     use crate::gc::umber_gc_init;
 
-    use super::{umber_string_append, Block};
+    use super::{umber_string_append, BlockPtr};
 
     #[test]
     fn string_creation() {
         unsafe { umber_gc_init() };
-        assert_eq!(Block::new_string("hello world").as_str(), "hello world");
-        assert_eq!(Block::new_string("").as_str(), "")
+        assert_eq!(BlockPtr::new_string("hello world").as_str(), "hello world");
+        assert_eq!(BlockPtr::new_string("").as_str(), "")
     }
 
     #[test]
     fn string_appending() {
         unsafe { umber_gc_init() };
         assert_eq!(
-            umber_string_append(Block::new_string("foo"), Block::new_string("bar")).as_str(),
+            umber_string_append(BlockPtr::new_string("foo"), BlockPtr::new_string("bar")).as_str(),
             "foobar"
         )
     }

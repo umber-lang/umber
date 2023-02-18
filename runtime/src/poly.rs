@@ -23,17 +23,17 @@ impl PartialOrd for BlockPtr {
         match (self.classify(), other.classify()) {
             (Value::Int(x), Value::Int(y)) => Some(x.cmp(&y)),
             (Value::Float(x), Value::Float(y)) => x.partial_cmp(&y),
-            (Value::String(x), Value::String(y)) => Some(x.cmp(&y)),
+            (Value::String(x), Value::String(y)) => Some(x.cmp(y)),
             (Value::ConstantCnstr(x), Value::ConstantCnstr(y)) => Some(x.cmp(&y)),
             (Value::OtherBlock(x), Value::OtherBlock(y)) => unsafe {
                 for (x, y) in core::iter::zip((*x.as_ptr()).fields(), (*y.as_ptr()).fields()) {
-                    match x.partial_cmp(&y) {
+                    match x.partial_cmp(y) {
                         None => return None,
                         ordering @ Some(Ordering::Less | Ordering::Greater) => return ordering,
                         Some(Ordering::Equal) => continue,
                     }
                 }
-                return Some((*x.as_ptr()).len.cmp(&(*y.as_ptr()).len));
+                Some((*x.as_ptr()).len.cmp(&(*y.as_ptr()).len))
             },
             _ => None,
         }
