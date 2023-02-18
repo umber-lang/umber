@@ -3,4 +3,4 @@
   (Common_def
    (Extern plus ((Left 6))
     (Function ((Type_app MyInt ()) (Type_app MyInt ())) (Type_app MyInt ()))
-    %int_add))))
+    umber_int_add))))

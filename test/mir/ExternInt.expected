@@ -1,1 +1,1 @@
-((Extern_decl ((name %int_add) (arity 2))))
+((Extern_decl ((name ExternInt.plus) (extern_name umber_int_add) (arity 2))))

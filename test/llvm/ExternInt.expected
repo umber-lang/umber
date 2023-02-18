@@ -10,5 +10,11 @@ entry:
   ret i32 0
 }
 
-declare %umber_block* @"%int_add"(%umber_block*, %umber_block*)
+define tailcc %umber_block* @ExternInt.plus(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_add(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
 

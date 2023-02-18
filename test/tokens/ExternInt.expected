@@ -16,5 +16,5 @@ COMMA
 ARROW
 (UPPER_NAME MyInt)
 EQUALS
-(STRING %int_add)
+(STRING umber_int_add)
 EOF
