@@ -559,6 +559,41 @@ and box t ~tag ~fields =
 ;;
 
 let preprocess_stmt t stmt =
+  let process_decl ~name ~arity ~extern_name =
+    let name_str = Mir_name.to_string name in
+    let value =
+      if arity = 0
+      then Llvm.declare_global (block_pointer_type t) name_str t.module_
+      else (
+        let fun_type = block_function_type t ~n_args:arity in
+        let fun_ =
+          match extern_name with
+          | None ->
+            (* This is an Umber function, just declare it. *)
+            Llvm.declare_function name_str fun_type t.module_
+          | Some extern_name ->
+            (* This is an external C function. We need to wrap it with an Umber function
+               to maintain the invariant that all function values must have the tailcc
+               calling convention.  *)
+            let fun_ = Llvm.define_function name_str fun_type t.module_ in
+            Llvm.position_at_end (Llvm.entry_block fun_) t.builder;
+            let external_fun =
+              Llvm.declare_function
+                (Extern_name.to_ustring extern_name |> Ustring.to_string)
+                fun_type
+                t.module_
+            in
+            let call =
+              build_call t external_fun (Llvm.params fun_) ~call_conv:Llvm.CallConv.c
+            in
+            ignore_value (Llvm.build_ret call t.builder);
+            fun_
+        in
+        Llvm.set_function_call_conv tailcc fun_;
+        fun_)
+    in
+    Value_table.add t.values name value
+  in
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, _) ->
     let global_value =
@@ -573,22 +608,9 @@ let preprocess_stmt t stmt =
     let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
     Llvm.set_function_call_conv tailcc fun_;
     Value_table.add t.values fun_name fun_
-  | Extern_decl { name; arity } ->
-    let name_str = Mir_name.to_string name in
-    let value =
-      if arity = 0
-      then Llvm.declare_global (block_pointer_type t) name_str t.module_
-      else (
-        let fun_ =
-          Llvm.declare_function name_str (block_function_type t ~n_args:arity) t.module_
-        in
-        let call_conv =
-          if Mir_name.is_extern_name name then Llvm.CallConv.c else tailcc
-        in
-        Llvm.set_function_call_conv call_conv fun_;
-        fun_)
-    in
-    Value_table.add t.values name value
+  | Fun_decl { name; arity } -> process_decl ~name ~arity ~extern_name:None
+  | Extern_decl { name; extern_name; arity } ->
+    process_decl ~name ~arity ~extern_name:(Some extern_name)
 ;;
 
 let codegen_stmt t stmt =
@@ -615,7 +637,7 @@ let codegen_stmt t stmt =
     let return_value = codegen_expr t body in
     ignore_value (Llvm.build_ret return_value t.builder);
     Llvm_analysis.assert_valid_function fun_
-  | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
+  | Fun_decl _ | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
 ;;
 
 let main_function_name ~source_filename = [%string "umber_main:%{source_filename}"]

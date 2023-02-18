@@ -258,9 +258,9 @@ let names = {|
                   (Local
                    ((typ
                      (Scheme
-                      (Function ((Type_app Int ())) (Type_app Float ()))))
+                      (Function ((Type_app Float ())) (Type_app Float ()))))
                     (type_source Extern_declared)
-                    (extern_name umber_int_sqrt))))
+                    (extern_name umber_float_sqrt))))
                  (print
                   (Local
                    ((typ
@@ -489,11 +489,35 @@ entry:
   ret %umber_block* %fun_call1
 }
 
+define tailcc %umber_block* @"Std.Prelude.Operators.^"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_pow(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
 declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_mul(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
 
 declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
 
+define tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_add(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
 declare %umber_block* @umber_int_add(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_sub(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
 
 declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
 
@@ -527,15 +551,51 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   ret %umber_block* %cond_otherwise_merge2
 }
 
+define tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_eq(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
 declare %umber_block* @umber_eq(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.!="(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_neq(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
 
 declare %umber_block* @umber_neq(%umber_block*, %umber_block*)
 
+define tailcc %umber_block* @"Std.Prelude.Operators.<"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_lt(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
 declare %umber_block* @umber_lt(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.<="(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_lte(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
 
 declare %umber_block* @umber_lte(%umber_block*, %umber_block*)
 
+define tailcc %umber_block* @"Std.Prelude.Operators.>"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_gt(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
 declare %umber_block* @umber_gt(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.>="(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_gte(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
 
 declare %umber_block* @umber_gte(%umber_block*, %umber_block*)
 
@@ -596,13 +656,43 @@ entry:
   ret %umber_block* %Std.Prelude.Operators.x.2
 }
 
+define tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_string_append(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
 declare %umber_block* @umber_string_append(%umber_block*, %umber_block*)
 
-declare %umber_block* @umber_int_sqrt(%umber_block*)
+define tailcc %umber_block* @Std.Prelude.sqrt(%umber_block* %0) {
+entry:
+  %fun_call = tail call %umber_block* @umber_float_sqrt(%umber_block* %0)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_float_sqrt(%umber_block*)
+
+define tailcc %umber_block* @Std.Prelude.print(%umber_block* %0) {
+entry:
+  %fun_call = tail call %umber_block* @umber_print_endline(%umber_block* %0)
+  ret %umber_block* %fun_call
+}
 
 declare %umber_block* @umber_print_endline(%umber_block*)
 
+define tailcc %umber_block* @Std.Prelude.print_int(%umber_block* %0) {
+entry:
+  %fun_call = tail call %umber_block* @umber_print_int(%umber_block* %0)
+  ret %umber_block* %fun_call
+}
+
 declare %umber_block* @umber_print_int(%umber_block*)
+
+define tailcc %umber_block* @Std.Prelude.print_bool(%umber_block* %0) {
+entry:
+  %fun_call = tail call %umber_block* @umber_print_bool(%umber_block* %0)
+  ret %umber_block* %fun_call
+}
 
 declare %umber_block* @umber_print_bool(%umber_block*)
 

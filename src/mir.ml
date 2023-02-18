@@ -149,9 +149,18 @@ end = struct
   ;;
 end
 
+module Fun_decl = struct
+  type t =
+    { name : Mir_name.t
+    ; arity : int
+    }
+  [@@deriving sexp_of]
+end
+
 module Extern_decl = struct
   type t =
     { name : Mir_name.t
+    ; extern_name : Extern_name.t
     ; arity : int
     }
   [@@deriving sexp_of]
@@ -222,23 +231,17 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
-  let add t name ~extern_name ~extern_info =
-    let mir_name =
-      match extern_name with
-      | None -> Mir_name.create_value_name t.name_table name
-      | Some extern_name -> Mir_name.create_extern_name extern_name
-    in
+  let add t name ~extern_info =
+    let mir_name = Mir_name.create_value_name t.name_table name in
     { t with names = Map.set t.names ~key:name ~data:(mir_name, extern_info) }, mir_name
   ;;
 
-  let add_local_qualified_name t name = add t name ~extern_name:None ~extern_info:Local
-
   let add_value_name t name =
     if Constant_names.mem name
-    then add_local_qualified_name t ([], name)
+    then add t ([], name) ~extern_info:Local
     else (
       let path = Name_bindings.(current_path t.name_bindings |> Path.to_module_path) in
-      add_local_qualified_name t (path, name))
+      add t (path, name) ~extern_info:Local)
   ;;
 
   let copy_name t name = Mir_name.copy_name t.name_table name
@@ -343,7 +346,7 @@ end = struct
              | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
              | _ -> fallback_to_external ())
         in
-        fst (add t name ~extern_name ~extern_info)))
+        fst (add t name ~extern_info)))
   ;;
 
   let cnstr_info_lookup_failed type_ =
@@ -900,7 +903,7 @@ module Expr = struct
     ~just_bound:outer_just_bound
     ~ctx:outer_ctx
     ~(add_fun_def : Fun_def.t -> unit)
-    ~(add_extern_decl : Extern_decl.t -> unit)
+    ~(add_fun_decl : Fun_decl.t -> unit)
     outer_expr
     outer_type
     =
@@ -912,7 +915,7 @@ module Expr = struct
         (match extern_info with
          | Local -> Name name
          | External { arity } ->
-           add_extern_decl { name; arity };
+           add_fun_decl { name; arity };
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
       | Fun_call (fun_, args_and_types), body_type ->
@@ -1247,6 +1250,7 @@ module Stmt = struct
   type t =
     | Value_def of Mir_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
+    | Fun_decl of Fun_decl.t
     | Extern_decl of Extern_decl.t
   [@@deriving sexp_of, variants]
 end
@@ -1259,20 +1263,20 @@ let of_typed_module =
     ~names
     ~stmts
     ~rec_
-    ~extern_decls
+    ~fun_decls
     (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t Nonempty.t)
     =
-    let process_expr stmts ~just_bound ~ctx expr typ =
+    let process_expr (stmts : Stmt.t list) ~just_bound ~ctx expr typ =
       let stmts = ref stmts in
-      let add_fun_def fun_def = stmts := Stmt.Fun_def fun_def :: !stmts in
-      let add_extern_decl (extern_decl : Extern_decl.t) =
-        if not (Hash_set.mem extern_decls extern_decl.name)
+      let add_fun_def fun_def = stmts := Fun_def fun_def :: !stmts in
+      let add_fun_decl (fun_decl : Fun_decl.t) =
+        if not (Hash_set.mem fun_decls fun_decl.name)
         then (
-          Hash_set.add extern_decls extern_decl.name;
-          stmts := Stmt.Extern_decl extern_decl :: !stmts)
+          Hash_set.add fun_decls fun_decl.name;
+          stmts := Fun_decl fun_decl :: !stmts)
       in
       let expr =
-        Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def ~add_extern_decl expr typ
+        Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def ~add_fun_decl expr typ
       in
       !stmts, expr
     in
@@ -1350,34 +1354,29 @@ let of_typed_module =
           in
           outer_ctx, stmt :: stmts)
   in
-  let rec loop ~ctx ~names ~stmts ~extern_decls (defs : Typed.Module.def Node.t list) =
+  let rec loop ~ctx ~names ~stmts ~fun_decls (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       match def.node with
       | Let { rec_; bindings } ->
-        handle_let_bindings ~ctx ~names ~stmts ~rec_ ~extern_decls bindings
+        handle_let_bindings ~ctx ~names ~stmts ~rec_ ~fun_decls bindings
       | Module (module_name, _sigs, defs) ->
         Context.with_module ctx module_name ~f:(fun ctx ->
-          loop ~ctx ~names ~stmts ~extern_decls defs)
+          loop ~ctx ~names ~stmts ~fun_decls defs)
       | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
-      (* TODO: Should probably preserve extern declarations *)
       | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
         generate_variant_constructor_values ~ctx ~stmts decl
-      | Common_def
-          (Extern ((_ : Value_name.t), (_ : Fixity.t option), type_, extern_name)) ->
+      | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
+        let ctx, name = Context.add_value_name ctx value_name in
         ( ctx
-        , Extern_decl
-            { name = Mir_name.create_extern_name extern_name
-            ; arity = arity_of_type ~names type_
-            }
-          :: stmts )
+        , Extern_decl { name; extern_name; arity = arity_of_type ~names type_ } :: stmts )
       | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _) ->
         ctx, stmts)
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     let names = Name_bindings.into_module names module_name ~place:`Def in
     let ctx = Context.create ~names ~name_table:(Mir_name.Name_table.create ()) in
-    let extern_decls = Mir_name.Hash_set.create () in
-    match loop ~ctx ~names ~stmts:[] ~extern_decls defs with
+    let fun_decls = Mir_name.Hash_set.create () in
+    match loop ~ctx ~names ~stmts:[] ~fun_decls defs with
     | (_ : Context.t), stmts -> Ok (List.rev stmts)
     | exception Compilation_error.Compilation_error error -> Error error
     | exception Mir_error msg -> Error (Compilation_error.create Mir_error ~msg)

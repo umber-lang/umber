@@ -318,10 +318,7 @@ module Mir_name : sig
   end
 
   val create_value_name : Name_table.t -> Value_name.Qualified.t -> t
-  val create_extern_name : Extern_name.t -> t
   val copy_name : Name_table.t -> t -> t
-  val extern_name : t -> Extern_name.t option
-  val is_extern_name : t -> bool
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
 end = struct
@@ -331,89 +328,48 @@ end = struct
     let create () = Value_name.Qualified.Table.create ()
   end
 
-  module Unique_name = struct
-    module T = struct
-      module U = struct
-        type t = Value_name.Qualified.t * int [@@deriving compare, equal, hash]
+  module T = struct
+    module U = struct
+      type t = Value_name.Qualified.t * int [@@deriving compare, equal, hash]
 
-        let to_string (value_name, id) =
-          if id = 0
-          then Value_name.Qualified.to_string value_name
-          else [%string "%{value_name#Value_name.Qualified}.%{id#Int}"]
-        ;;
+      let to_string (value_name, id) =
+        if id = 0
+        then Value_name.Qualified.to_string value_name
+        else [%string "%{value_name#Value_name.Qualified}.%{id#Int}"]
+      ;;
 
-        let to_ustring (value_name, id) =
-          let ustr = Value_name.Qualified.to_ustring value_name in
-          if id = 0 then ustr else Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
-        ;;
+      let to_ustring (value_name, id) =
+        let ustr = Value_name.Qualified.to_ustring value_name in
+        if id = 0 then ustr else Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
+      ;;
 
-        (* TODO: I don't think this is actually used. We should probably remove it. *)
-        let of_string str =
-          let name, id =
-            match String.rsplit2 str ~on:'.' with
-            | Some (name, id) ->
-              if (not (String.is_empty id)) && String.for_all ~f:Char.is_digit id
-              then name, Int.of_string id
-              else str, 0
-            | None -> str, 0
-          in
-          Value_name.Qualified.of_string name, id
-        ;;
-      end
-
-      include U
-      include Sexpable.Of_stringable (U)
+      (* TODO: I don't think this is actually used. We should probably remove it. *)
+      let of_string str =
+        let name, id =
+          match String.rsplit2 str ~on:'.' with
+          | Some (name, id) ->
+            if (not (String.is_empty id)) && String.for_all ~f:Char.is_digit id
+            then name, Int.of_string id
+            else str, 0
+          | None -> str, 0
+        in
+        Value_name.Qualified.of_string name, id
+      ;;
     end
 
-    include T
-    include Comparable.Make (T)
-    include Hashable.Make (T)
-
-    let create name_table value_name =
-      let id = Option.value (Hashtbl.find name_table value_name) ~default:0 in
-      Hashtbl.set name_table ~key:value_name ~data:(id + 1);
-      value_name, id
-    ;;
-  end
-
-  module T = struct
-    type t =
-      | Internal of Unique_name.t
-      | External of Extern_name.t
-    [@@deriving compare, equal, hash]
-
-    let to_ustring = function
-      | Internal name -> Unique_name.to_ustring name
-      | External name -> Extern_name.to_ustring name
-    ;;
-
-    let to_string t = to_ustring t |> Ustring.to_string
-    let sexp_of_t t : Sexp.t = Atom (to_string t)
+    include U
+    include Sexpable.Of_stringable (U)
   end
 
   include T
-  include Comparable.Make_plain (T)
-  include Hashable.Make_plain (T)
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let create_value_name name_table value_name =
-    Internal (Unique_name.create name_table value_name)
+    let id = Option.value (Hashtbl.find name_table value_name) ~default:0 in
+    Hashtbl.set name_table ~key:value_name ~data:(id + 1);
+    value_name, id
   ;;
 
-  let create_extern_name name = External name
-
-  let copy_name name_table t =
-    match t with
-    | Internal (value_name, _) -> create_value_name name_table value_name
-    | External _ -> t
-  ;;
-
-  let extern_name = function
-    | Internal _ -> None
-    | External name -> Some name
-  ;;
-
-  let is_extern_name = function
-    | Internal _ -> false
-    | External _ -> true
-  ;;
+  let copy_name name_table (value_name, _) = create_value_name name_table value_name
 end
