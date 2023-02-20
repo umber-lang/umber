@@ -608,7 +608,10 @@ let add_to_types ?(err_msg = "Type name clash") types name decl =
 let add_type_decl ({ current_path; _ } as t) type_name decl =
   let f bindings =
     if not (Type.Decl.no_free_params decl)
-    then raise (Name_error (Ustring.of_string_exn "Free params in type decl"));
+    then
+      Compilation_error.raise
+        Type_error
+        ~msg:[%message "Free parameters in type declaration" (decl : Type.Decl.t)];
     let decl = absolutify_type_decl t decl in
     { bindings with
       types =
