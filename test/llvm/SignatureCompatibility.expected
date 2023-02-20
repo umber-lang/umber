@@ -1,0 +1,47 @@
+; ModuleID = './examples/SignatureCompatibility.um'
+source_filename = "./examples/SignatureCompatibility.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+define i32 @"umber_main:./examples/SignatureCompatibility.um"() {
+entry:
+  ret i32 0
+}
+
+define tailcc %umber_block* @SignatureCompatibility.id(%umber_block* %SignatureCompatibility.x) {
+entry:
+  ret %umber_block* %SignatureCompatibility.x
+}
+
+define tailcc %umber_block* @SignatureCompatibility.Bar(%umber_block* %arg0) {
+entry:
+  %box = call i64* @umber_gc_alloc(i64 16)
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i32 1
+  store i16 1, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
+  store %umber_block* %arg0, %umber_block** %box4, align 8
+  %box5 = bitcast %umber_block** %box3 to %umber_block*
+  ret %umber_block* %box5
+}
+
+define tailcc %umber_block* @SignatureCompatibility.Baz(%umber_block* %arg0.1) {
+entry:
+  %box = call i64* @umber_gc_alloc(i64 16)
+  %box1 = bitcast i64* %box to i16*
+  store i16 1, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i32 1
+  store i16 1, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
+  store %umber_block* %arg0.1, %umber_block** %box4, align 8
+  %box5 = bitcast %umber_block** %box3 to %umber_block*
+  ret %umber_block* %box5
+}
+
+declare i64* @umber_gc_alloc(i64)
+

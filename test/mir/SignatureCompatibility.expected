@@ -1,0 +1,9 @@
+((Fun_def
+  ((fun_name SignatureCompatibility.id) (args (SignatureCompatibility.x))
+   (body (Name SignatureCompatibility.x))))
+ (Fun_def
+  ((fun_name SignatureCompatibility.Bar) (args (arg0))
+   (body (Make_block (tag 0) (fields ((Name arg0)))))))
+ (Fun_def
+  ((fun_name SignatureCompatibility.Baz) (args (arg0.1))
+   (body (Make_block (tag 1) (fields ((Name arg0.1))))))))

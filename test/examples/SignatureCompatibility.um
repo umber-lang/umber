@@ -1,0 +1,14 @@
+module : {
+    val id : b -> b
+
+    type Foo a b = Bar a | Baz b
+    type alias Tuple a b = (a, b)
+}
+
+val id : a -> a
+let id x = x
+
+type Foo b a = Bar b | Baz a
+
+# FIXME: This shouldn't be allowed
+type alias Tuple a a = (a, a)

@@ -572,6 +572,34 @@
  (action (no-infer (diff output/Option.expected output/Option.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/SignatureCompatibility.expected
+    tokens/SignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/SignatureCompatibility.expected ast/SignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/SignatureCompatibility.expected mir/SignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/SignatureCompatibility.expected
+    llvm/SignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/SignatureCompatibility.expected
+    output/SignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Text.expected tokens/Text.out))))
 
 (rule (alias runtest) (deps test.dummy)
