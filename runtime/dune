@@ -12,6 +12,7 @@
  (action
   (progn
    (system "cargo build")
+   (system "cargo clippy")
    (copy target/debug/libruntime.a libruntime.a))))
 
 (rule
