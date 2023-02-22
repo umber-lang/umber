@@ -20,6 +20,9 @@ type t =
   }
 [@@deriving sexp_of]
 
+(* FIXME: Kill all exceptions besides compiler_bug, etc. and collect up errors in monads
+   instead. We might have to do some marking of "poison" nodes to avoid reporting errors
+   multiple times. But as a first pass, just reporting all errors seems ok. *)
 exception Compilation_error of t [@@deriving sexp_of]
 
 let create ?filename ?span ?exn ~msg kind = { kind; msg; filename; span; exn }
