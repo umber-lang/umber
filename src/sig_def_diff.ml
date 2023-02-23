@@ -28,7 +28,6 @@ let is_empty { name_diff; type_diff; module_diff } =
   && Sequence.is_empty module_diff
 ;;
 
-(* FIXME: cleanup*)
 module By_kind = struct
   type 'a t =
     { sig_ : 'a
@@ -36,30 +35,11 @@ module By_kind = struct
     }
   [@@deriving sexp_of]
 
-  (* let get t kind =
-    match kind with
-    | `Sig -> t.sig_
-    | `Def -> t.def
-  ;; *)
-
   let set t kind new_ =
     match kind with
     | `Sig -> { t with sig_ = new_ }
     | `Def -> { t with def = new_ }
   ;;
-
-  (* let map t ~f = { sig_ = f t.sig_; def = f t.def }
-
-  let map1 t kind ~f =
-    match kind with
-    | `Sig -> { t with sig_ = f t.sig_ }
-    | `Def -> { t with def = f t.def }
-  ;;
-
-  let other = function
-    | `Sig -> `Def
-    | `Def -> `Sig
-  ;; *)
 end
 
 exception Compatibility_error
@@ -83,16 +63,6 @@ let check_type_schemes =
     Type.Expr.map expr ~var:Fn.id ~pf:Nothing.unreachable_code ~f:(function
       | Var v -> Map.find_exn params v
       | typ -> Defer typ)
-  in *)
-    (* FIXME: Should we map params to other expressions or just map aliases in-place and
-     use param_matching ~param_table for mapping params to type variables/integers. *)
-    (* let extend_params params ~param_list ~args =
-    match
-      List.fold2 param_list args ~init:params ~f:(fun params param arg ->
-        Map.set params ~key:param ~data:arg)
-    with
-    | Ok params -> params
-    | Unequal_lengths -> raise Compatibility_error
   in *)
     let substitute_alias ~params ~args alias =
       let args_by_parm = List.zip_exn params args in
@@ -119,8 +89,6 @@ let check_type_schemes =
       (match Hashtbl.find param_table def_param with
        | None -> Hashtbl.set param_table ~key:def_param ~data:sig_scheme
        | Some def_scheme ->
-         (* FIXME: Make sure this doesn't infinite-loop. We want to express scheme
-            equality, expanding aliases. *)
          check_type_schemes
            ~names
            ~param_matching:`None
@@ -191,13 +159,6 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
     | Some sig_extern_name, Some def_extern_name ->
       Extern_name.equal sig_extern_name def_extern_name
   in
-  (* FIXME: The behavior we want is subtyping on variables: variables in the def may get
-     mapped to concrete types. Similar to unification, but type variables in the def can't
-     get unified with each other, since that would change the type. So something like some
-     kind of fold2 would help.
-     
-     Probably the easiest way to write this is with mutable param maps and then raise
-     exceptions if there are conflicts. *)
   no_errors (fun () ->
     check_type_schemes
       ~names
@@ -211,29 +172,6 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
 
 (* TODO: test/look at this for correctness, there are probably bugs here *)
 let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, def_type) =
-  (* FIXME: I think this has a bug where it will say these are not compatible:
-     ```
-       module :
-         val id : b -> b
-       val id : a -> a
-       let id x = x
-     ``` 
-     Since it uses the same env for each, the names have to match up, which seems wrong.
-     Should write a test to demonstrate this, then fix it. *)
-  (* FIXME: This shouldn't be able to come up with constraints between different type
-     parameters e.g. that they're equal.
-     
-     Proper idea: For types to be compatible, they must be the same, modulo Abstract and
-     type parameter renamingn (the important thing is the position of the parameters).
-     Meaning if you replace the type parameters in one with the other they should then be
-     equal.
-     
-     So, we should just come up with the renaming by zipping over the parameter lists,
-     then we're good. def -> sig renaming must work 
-     
-     Actually not quite: For val definitions we allow types to be more general in the def
-     than in the sig, but not in type declarations. *)
-  (* FIXME: Should put in type param mappings instead of unifying *)
   no_errors (fun () ->
     let types = Type_bindings.create () in
     let params = Type.Param.Env_to_vars.create () in
@@ -244,8 +182,6 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
     match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
     | Abstract, _ -> ()
     | Alias sig_scheme, Alias def_scheme ->
-      (* FIXME: Instead of trying to map def params to sig types, we want to map def
-         params to sig *params* only. *)
       check_type_schemes
         ~names
         ~param_matching:`Strict
