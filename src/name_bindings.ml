@@ -394,9 +394,7 @@ let find =
     | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
   in
   fun ?at_path ?defs_only t input ~f ~to_ustring ->
-    try loop ?at_path ?defs_only t input ~f ~to_ustring with
-    | Compilation_error.Compilation_error { kind = Name_error; _ } ->
-      name_error ~msg:"Failed to find name" (to_ustring input)
+    loop ?at_path ?defs_only t input ~f ~to_ustring
 ;;
 
 let rec find_entry' t name =

@@ -196,7 +196,7 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
         let split_dots s =
           let rec loop i j acc s =
             if Int.( >= ) j (String.length s)
-            then List.rev (String.subo s ~pos:i :: acc)
+            then List.rev acc, String.subo s ~pos:i
             else if Char.equal s.[j] '.'
             then
               if Int.equal i j
@@ -204,20 +204,23 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
                 (* Multiple '.'s in a row. This is ok, seen in e.g.
                    `Std.Prelude.Operators..` This is only allowed in the name itself, so
                    we can just take the rest of the string *)
-                List.rev (String.subo s ~pos:i :: acc)
+                List.rev acc, String.subo s ~pos:i
               else (
                 let substring = String.sub s ~pos:i ~len:(j - i) in
-                loop (j + 1) (j + 1) (substring :: acc) s)
+                match Module_name.of_ustring (Ustring.of_string_exn substring) with
+                | Error _ ->
+                  (* This is not a module name, so it must be the last name in the path. *)
+                  List.rev acc, String.subo s ~pos:i
+                | Ok module_name -> loop (j + 1) (j + 1) (module_name :: acc) s)
             else loop i (j + 1) acc s
           in
           loop 0 0 [] s
         ;;
 
         let of_string s =
-          match split_dots s |> List.split_last with
-          | Some (path, name) ->
-            List.map ~f:Module_name.of_string_unchecked path, of_string_unchecked name
-          | None -> failwithf "Bad qualified name: '%s'" s ()
+          let path, name = split_dots s in
+          if String.is_empty name then failwithf "Bad qualified name: '%s'" s ();
+          path, of_string_unchecked name
         ;;
       end
 
