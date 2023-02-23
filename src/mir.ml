@@ -1326,7 +1326,7 @@ let of_typed_module =
       ~rec_
       ~init:stmts
       ~add_let
-      ~extract_binding:(fun { Node.node = pat, (expr, typ); _ } -> pat, typ, expr)
+      ~extract_binding:(Node.with_value ~f:(fun (pat, (expr, typ)) -> pat, typ, expr))
       ~process_expr
   in
   let generate_variant_constructor_values ~ctx ~stmts decl =
@@ -1361,21 +1361,22 @@ let of_typed_module =
   in
   let rec loop ~ctx ~names ~stmts ~fun_decls (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
-      match def.node with
-      | Let { rec_; bindings } ->
-        handle_let_bindings ~ctx ~names ~stmts ~rec_ ~fun_decls bindings
-      | Module (module_name, _sigs, defs) ->
-        Context.with_module ctx module_name ~f:(fun ctx ->
-          loop ~ctx ~names ~stmts ~fun_decls defs)
-      | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
-      | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
-        generate_variant_constructor_values ~ctx ~stmts decl
-      | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
-        let ctx, name = Context.add_value_name ctx value_name in
-        ( ctx
-        , Extern_decl { name; extern_name; arity = arity_of_type ~names type_ } :: stmts )
-      | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _) ->
-        ctx, stmts)
+      Node.with_value def ~f:(function
+        | Let { rec_; bindings } ->
+          handle_let_bindings ~ctx ~names ~stmts ~rec_ ~fun_decls bindings
+        | Module (module_name, _sigs, defs) ->
+          Context.with_module ctx module_name ~f:(fun ctx ->
+            loop ~ctx ~names ~stmts ~fun_decls defs)
+        | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
+        | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
+          generate_variant_constructor_values ~ctx ~stmts decl
+        | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
+          let ctx, name = Context.add_value_name ctx value_name in
+          ( ctx
+          , Extern_decl { name; extern_name; arity = arity_of_type ~names type_ } :: stmts
+          )
+        | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
+          -> ctx, stmts))
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     let names = Name_bindings.into_module names module_name ~place:`Def in

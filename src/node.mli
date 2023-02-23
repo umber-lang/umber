@@ -1,0 +1,10 @@
+open! Import
+
+type 'a t [@@deriving compare, sexp, equal, hash]
+
+val create : 'a -> Span.t -> 'a t
+val span : _ t -> Span.t
+val dummy_span : 'a -> 'a t
+val with_value : 'a t -> f:('a -> 'b) -> 'b
+val map : 'a t -> f:('a -> 'b) -> 'b t
+val fold_map : 'acc -> 'a t -> f:('acc -> 'a -> 'acc * 'b) -> 'acc * 'b t

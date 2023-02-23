@@ -3,4 +3,4 @@
   (msg
    ("Cyclic type alias" (name ErrorCyclicTypeAlias.A)
     (decl (() (Alias (Type_app ErrorCyclicTypeAlias.B ()))))))
-  (filename ErrorCyclicTypeAlias.um)))
+  (filename ErrorCyclicTypeAlias.um) (span 1:1-1:17)))

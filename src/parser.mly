@@ -324,7 +324,7 @@ prog:
   | def1 = list(stmt); sig_ = file_module_sig; def2 = list(stmt); EOF
     { Module_name.empty, sig_, def1 @ def2 }
 
-%inline with_loc(X): node = X { { Node.node ; span = Span.of_loc $loc } }
+%inline with_loc(X): value = X { Node.create value (Span.of_loc $loc) }
 
 %inline type_annot(X): a = separated_pair(X, colon, type_expr) { a }
 %inline type_annot_non_fun(X): a = separated_pair(X, colon, type_non_fun) { a }
