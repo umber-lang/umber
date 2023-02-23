@@ -1,0 +1,10 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ((name_diff ())
+    (type_diff
+     ((Tuple
+       (Incompatible ((a b) (Alias (Tuple ((Var a) (Var b)))))
+        ((a a) (Alias (Tuple ((Var a) (Var a)))))))))
+    (module_diff ())))
+  (filename ErrorSignatureCompatibility.um)))

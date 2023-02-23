@@ -373,6 +373,36 @@
     output/ErrorPolymorphicRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorSignatureCompatibility.expected
+    tokens/ErrorSignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorSignatureCompatibility.expected
+    ast/ErrorSignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorSignatureCompatibility.expected
+    mir/ErrorSignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorSignatureCompatibility.expected
+    llvm/ErrorSignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorSignatureCompatibility.expected
+    output/ErrorSignatureCompatibility.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -570,34 +600,6 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff output/Option.expected output/Option.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action
-  (no-infer
-   (diff tokens/SignatureCompatibility.expected
-    tokens/SignatureCompatibility.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action
-  (no-infer
-   (diff ast/SignatureCompatibility.expected ast/SignatureCompatibility.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action
-  (no-infer
-   (diff mir/SignatureCompatibility.expected mir/SignatureCompatibility.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action
-  (no-infer
-   (diff llvm/SignatureCompatibility.expected
-    llvm/SignatureCompatibility.out))))
-
-(rule (alias runtest) (deps test.dummy)
- (action
-  (no-infer
-   (diff output/SignatureCompatibility.expected
-    output/SignatureCompatibility.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Text.expected tokens/Text.out))))

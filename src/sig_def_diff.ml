@@ -28,30 +28,19 @@ let is_empty { name_diff; type_diff; module_diff } =
   && Sequence.is_empty module_diff
 ;;
 
-let no_type_errors f =
-  match f () with
-  | () -> true
-  | exception Type_bindings.Type_error _ -> false
-;;
-
-let for_all2 xs ys ~f =
-  match List.for_all2 xs ys ~f with
-  | Ok b -> b
-  | Unequal_lengths -> false
-;;
-
 (* FIXME: cleanup*)
-(* module By_kind = struct
+module By_kind = struct
   type 'a t =
     { sig_ : 'a
     ; def : 'a
     }
+  [@@deriving sexp_of]
 
-  let get t kind =
+  (* let get t kind =
     match kind with
     | `Sig -> t.sig_
     | `Def -> t.def
-  ;;
+  ;; *)
 
   let set t kind new_ =
     match kind with
@@ -59,7 +48,7 @@ let for_all2 xs ys ~f =
     | `Def -> { t with def = new_ }
   ;;
 
-  let map t ~f = { sig_ = f t.sig_; def = f t.def }
+  (* let map t ~f = { sig_ = f t.sig_; def = f t.def }
 
   let map1 t kind ~f =
     match kind with
@@ -70,8 +59,22 @@ let for_all2 xs ys ~f =
   let other = function
     | `Sig -> `Def
     | `Def -> `Sig
-  ;;
-end *)
+  ;; *)
+end
+
+exception Compatibility_error
+
+let no_errors f =
+  match f () with
+  | () -> true
+  | exception Compatibility_error -> false
+;;
+
+let iter2 xs ys ~f =
+  match List.iter2 xs ys ~f with
+  | Ok x -> x
+  | Unequal_lengths -> raise Compatibility_error
+;;
 
 (* FIXME: This is wrong because it will allow something like:
    `module : { val plus_one : a -> a } let plus_one x = x + 1`.
@@ -98,95 +101,102 @@ end *)
      them. One way to do this is instantiating each type, then generalizing them again,
      then checking equality (via unification). 
 *)
-(* let rec check_type_schemes ~names ~param_map ~schemes =
-  (* FIXME: Do we need to absolutify type app names in aliases? Likely yes? *)
-  (* let map_alias param_map expr =
+
+let check_type_schemes =
+  let rec check_type_schemes ~names ~param_matching ~param_table ~schemes =
+    (* FIXME: Do we need to absolutify type app names in aliases? Likely yes? *)
+    (* let map_alias param_matching ~param_table expr =
     Type.Expr.map expr ~var:Fn.id ~pf:Nothing.unreachable_code ~f:(function
       | Var v -> Map.find_exn params v
       | typ -> Defer typ)
   in *)
-  (* FIXME: Should we map params to other expressions or just map aliases in-place and
-     use param_map for mapping params to type variables/integers. *)
-  let extend_params params ~param_list ~args =
+    (* FIXME: Should we map params to other expressions or just map aliases in-place and
+     use param_matching ~param_table for mapping params to type variables/integers. *)
+    (* let extend_params params ~param_list ~args =
     match
       List.fold2 param_list args ~init:params ~f:(fun params param arg ->
         Map.set params ~key:param ~data:arg)
     with
     | Ok params -> params
-    | Unequal_lengths ->
-      (* TODO: Check if it's actually possible to reach this case or we should raise a
-         [compiler_bug]. I think this should probably be regular type-checking's
-         responsibility. *)
-      raise
-        (Error
-           [%message
-             "Wrong number of arguments for type constructor application"
-               (param_list : Type.Param.t list)
-               (args : Type.Scheme.t list)])
+    | Unequal_lengths -> raise Compatibility_error
+  in *)
+    let substitute_alias ~params ~args alias =
+      let args_by_parm = List.zip_exn params args in
+      Type.Expr.map alias ~var:Fn.id ~pf:Fn.id ~f:(function
+        | Var var -> Halt (List.Assoc.find_exn args_by_parm var ~equal:Type.Param.equal)
+        | expr -> Defer expr)
+    in
+    let check_type_app ~name ~args ~kind ~on_non_alias =
+      match Name_bindings.find_absolute_type_decl names name with
+      | params, Alias alias ->
+        let alias = substitute_alias ~params ~args alias in
+        check_type_schemes
+          ~names
+          ~param_matching
+          ~param_table
+          ~schemes:(By_kind.set schemes kind alias)
+      | decl -> on_non_alias decl
+    in
+    match (schemes : Type.Scheme.t By_kind.t), param_matching with
+    | { sig_ = Var sig_param; def = Var def_param }, `None ->
+      if not (Type.Param.equal sig_param def_param) then raise Compatibility_error
+    | { sig_ = sig_scheme; def = Var def_param }, `Lenient
+    | { sig_ = Var _ as sig_scheme; def = Var def_param }, `Strict ->
+      (match Hashtbl.find param_table def_param with
+       | None -> Hashtbl.set param_table ~key:def_param ~data:sig_scheme
+       | Some def_scheme ->
+         (* FIXME: Make sure this doesn't infinite-loop. We want to express scheme
+            equality, expanding aliases. *)
+         check_type_schemes
+           ~names
+           ~param_matching:`None
+           ~param_table
+           ~schemes:{ sig_ = sig_scheme; def = def_scheme })
+    | { sig_ = Type_app (name1, args1); def = Type_app (name2, args2) }, _ ->
+      check_type_app ~name:name1 ~args:args1 ~kind:`Sig ~on_non_alias:(fun decl1 ->
+        check_type_app ~name:name2 ~args:args2 ~kind:`Def ~on_non_alias:(fun decl2 ->
+          if not (phys_equal decl1 decl2) then raise Compatibility_error;
+          iter2 args1 args2 ~f:(fun sig_ def ->
+            check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def })))
+    | { sig_ = Type_app (name, args); def = Tuple _ | Function _ | Partial_function _ }, _
+    | { sig_ = Type_app (name, args); def = Var _ }, `None ->
+      check_type_app ~name ~args ~kind:`Sig ~on_non_alias:(fun _ ->
+        raise Compatibility_error)
+    | ( { sig_ = Var _ | Tuple _ | Function _ | Partial_function _
+        ; def = Type_app (name, args)
+        }
+      , _ ) ->
+      check_type_app ~name ~args ~kind:`Def ~on_non_alias:(fun _ ->
+        raise Compatibility_error)
+    | { sig_ = Function (args1, res1); def = Function (args2, res2) }, _ ->
+      iter2 (Nonempty.to_list args1) (Nonempty.to_list args2) ~f:(fun sig_ def ->
+        check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def });
+      check_type_schemes
+        ~names
+        ~param_matching
+        ~param_table
+        ~schemes:{ sig_ = res1; def = res2 }
+    | { sig_ = Tuple args1; def = Tuple args2 }, _ ->
+      iter2 args1 args2 ~f:(fun sig_ def ->
+        check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def })
+    | ( ( { sig_ = Var _; def = Tuple _ | Function _ }
+        | { sig_ = Tuple _; def = Function _ }
+        | { sig_ = Function _; def = Tuple _ } )
+      , _ )
+    | { sig_ = Type_app _ | Tuple _ | Function _; def = Var _ }, `Strict
+    | { sig_ = Tuple _ | Function _; def = Var _ }, `None -> raise Compatibility_error
+    | ({ sig_ = Partial_function _; def = _ } | { sig_ = _; def = Partial_function _ }), _
+      -> .
   in
-  let check_type_app ~name ~args ~kind ~on_non_alias =
-    match Name_bindings.find_absolute_type_decl names name with
-    | param_list, Alias alias ->
-      let param_map = By_kind.map1 param_map kind ~f:(extend_params ~param_list ~args) in
-      check_type_schemes ~names ~param_map ~schemes:(By_kind.set schemes kind alias)
-    | decl -> on_non_alias decl
-  in
-  match (schemes : Type.Scheme.t By_kind.t) with
-  | { sig_ = Var sig_param; def = Var def_param } ->
-    let { By_kind.sig_ = sig_map; def = def_map } = param_map in
-    (match Map.find sig_map sig_param, Map.find def_map def_param with
-     | None, None ->
-       (* FIXME: This ref approach is not compatible with extending the environment for
-          aliases. Maybe we just do the map in place for those. *)
-       param_map
-         := { sig_ = Map.set sig_map (Var def_param)
-            ; def = Map.set def_map (Var sig_param)
-            }
-     | None, Some def_expr -> ()
-     | _, None -> ()
-     | Some sig_, Some def -> check_type_schemes ~names ~param_map ~schemes:{ sig_; def })
-  | { sig_ = Var _; def = _ } | { sig_ = _; def = Var _ } -> failwith "TODO: var"
-  | { sig_ = Type_app (name1, args1); def = Type_app (name2, args2) } ->
-    check_type_app ~name:name1 ~args:args1 ~kind:`Sig ~on_non_alias:(fun decl1 ->
-      check_type_app ~name:name2 ~args:args2 ~kind:`Def ~on_non_alias:(fun decl2 ->
-        phys_equal decl1 decl2
-        && for_all2 args1 args2 ~f:(fun sig_ def ->
-             compatible_type_schemes ~names ~param_map ~schemes:{ sig_; def })))
-  | { sig_ = Type_app (name, args); def = Tuple _ | Function _ | Partial_function _ } ->
-    (* FIXME: We definitely have to use the arguments here! *)
-    check_type_app ~name ~args ~kind:`Sig ~on_non_alias:(const false)
-  | { sig_ = Tuple _ | Function _ | Partial_function _; def = Type_app (name, args) } ->
-    check_type_app ~name ~args ~kind:`Def ~on_non_alias:(const false)
-  | { sig_ = Function (args1, res1); def = Function (args2, res2) } ->
-    for_all2 (Nonempty.to_list args1) (Nonempty.to_list args2) ~f:(fun sig_ def ->
-      compatible_type_schemes ~names ~param_map ~schemes:{ sig_; def })
-    && compatible_type_schemes ~names ~param_map ~schemes:{ sig_ = res1; def = res2 }
-  | { sig_ = Tuple args1; def = Tuple args2 } ->
-    for_all2 args1 args2 ~f:(fun sig_ def ->
-      compatible_type_schemes ~names ~param_map ~schemes:{ sig_; def })
-  (* FIXME: Type_app could have an alias in it, which could be a function *)
-  | { sig_ = Tuple _; def = Function _ } | { sig_ = Function _; def = Tuple _ } -> false
-  | { sig_ = Partial_function _; def = _ } | { sig_ = _; def = Partial_function _ } -> .
-;; *)
+  fun ~names ~param_matching ~schemes ->
+    check_type_schemes
+      ~names
+      ~param_matching
+      ~param_table:(Type.Param.Table.create ())
+      ~schemes
+;;
 
 let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
-  let compatible_type_schemes ~names sig_scheme def_scheme =
-    no_type_errors (fun () ->
-      (* Combine information in the sig/def types by instantiating and unifying them. *)
-      let types = Type_bindings.create () in
-      let sig_expr = Type.Scheme.instantiate sig_scheme in
-      let def_expr = Type.Scheme.instantiate def_scheme in
-      Type_bindings.unify ~names ~types sig_expr def_expr;
-      (* If we generalize the sig type again it should be "equal" to the original sig
-         type. We can test this equality by unifying the two sig types. *)
-      (* FIXME: Is unification really good enough for this "equality"? I think it can come
-         up with constraints between type parameters in the same type, resulting in
-         something less general. *)
-      let generalized_sig_expr =
-        Type_bindings.generalize types sig_expr |> Type.Scheme.instantiate
-      in
-      Type_bindings.unify ~names ~types sig_expr generalized_sig_expr)
-  in
   let get_scheme entry =
     option_or_default (Name_bindings.Name_entry.scheme entry) ~f:(fun () ->
       compiler_bug
@@ -214,32 +224,19 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
      
      Probably the easiest way to write this is with mutable param maps and then raise
      exceptions if there are conflicts. *)
-  compatible_type_schemes ~names (get_scheme sig_entry) (get_scheme def_entry)
-  && compatible_fixities sig_entry def_entry
-  && compatible_extern_names sig_entry def_entry
+  no_errors (fun () ->
+    check_type_schemes
+      ~names
+      ~param_matching:`Lenient
+      ~schemes:{ sig_ = get_scheme sig_entry; def = get_scheme def_entry };
+    if not
+         (compatible_fixities sig_entry def_entry
+         && compatible_extern_names sig_entry def_entry)
+    then raise Compatibility_error)
 ;;
 
 (* TODO: test/look at this for correctness, there are probably bugs here *)
 let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, def_type) =
-  let compatible_type_schemes ~names ~types ~params sig_scheme def_scheme =
-    no_type_errors (fun () ->
-      (* FIXME: Find less of a brute-force way of doing this. I think a direct map on the
-         type param names could work. I also think the unification "equality" might not
-         actually work. *)
-      (* Check equality modulo type param renaming, and type aliases, etc. by
-         instantiating each type, generalizing them again, then instantiating them again
-         to unify. *)
-      let canonicalize_type_params type_ =
-        Type.Scheme.instantiate ~params type_
-        |> Type_bindings.generalize types
-        |> Type.Scheme.instantiate ~params
-      in
-      Type_bindings.unify
-        ~names
-        ~types
-        (canonicalize_type_params sig_scheme)
-        (canonicalize_type_params def_scheme))
-  in
   (* FIXME: I think this has a bug where it will say these are not compatible:
      ```
        module :
@@ -262,29 +259,33 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
      
      Actually not quite: For val definitions we allow types to be more general in the def
      than in the sig, but not in type declarations. *)
-  let types = Type_bindings.create () in
-  let params = Type.Param.Env_to_vars.create () in
-  match
-    List.iter2 sig_params def_params ~f:(fun sig_param def_param ->
+  (* FIXME: Should put in type param mappings instead of unifying *)
+  no_errors (fun () ->
+    let types = Type_bindings.create () in
+    let params = Type.Param.Env_to_vars.create () in
+    iter2 sig_params def_params ~f:(fun sig_param def_param ->
       let sig_var = Type.Param.Env_to_vars.find_or_add params sig_param in
       let def_var = Type.Param.Env_to_vars.find_or_add params def_param in
-      Type_bindings.unify ~names ~types (Var sig_var) (Var def_var))
-  with
-  | Unequal_lengths -> false
-  | Ok () ->
-    (match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
-     | Abstract, _ -> true
-     | Alias sig_scheme, Alias def_scheme ->
-       compatible_type_schemes ~names ~types ~params sig_scheme def_scheme
-     | Variants cnstrs1, Variants cnstrs2 ->
-       for_all2 cnstrs1 cnstrs2 ~f:(fun (cnstr1, args1) (cnstr2, args2) ->
-         Cnstr_name.equal cnstr1 cnstr2
-         && for_all2 args1 args2 ~f:(compatible_type_schemes ~names ~types ~params))
-     | Record _, Record _ -> failwith "TODO: record types in compatibiltiy checks"
-     (* FIXME: Should be following aliases *)
-     | Record _, (Abstract | Alias _ | Variants _)
-     | Variants _, (Abstract | Alias _ | Record _)
-     | Alias _, (Abstract | Variants _ | Record _) -> false)
+      Type_bindings.unify ~names ~types (Var sig_var) (Var def_var));
+    match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
+    | Abstract, _ -> ()
+    | Alias sig_scheme, Alias def_scheme ->
+      (* FIXME: Instead of trying to map def params to sig types, we want to map def
+         params to sig *params* only. *)
+      check_type_schemes
+        ~names
+        ~param_matching:`Strict
+        ~schemes:{ sig_ = sig_scheme; def = def_scheme }
+    | Variants cnstrs1, Variants cnstrs2 ->
+      iter2 cnstrs1 cnstrs2 ~f:(fun (cnstr1, args1) (cnstr2, args2) ->
+        if not (Cnstr_name.equal cnstr1 cnstr2) then raise Compatibility_error;
+        iter2 args1 args2 ~f:(fun sig_ def ->
+          check_type_schemes ~names ~param_matching:`Strict ~schemes:{ sig_; def }))
+    | Record _, Record _ -> failwith "TODO: record types in compatibiltiy checks"
+    (* FIXME: Should be following aliases, maybe use check_type_app *)
+    | Record _, (Abstract | Alias _ | Variants _)
+    | Variants _, (Abstract | Alias _ | Record _)
+    | Alias _, (Abstract | Variants _ | Record _) -> raise Compatibility_error)
 ;;
 
 (* TODO: Maybe we should get rid of [filter] and just have constructor names show up in
