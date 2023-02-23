@@ -1,3 +1,3 @@
 ("Compilation error"
- ((kind Name_error) (msg "Duplicate name in pattern: dup")
+ ((kind Name_error) (msg ("Duplicate name in pattern" dup))
   (filename ErrorDuplicateNameAsPattern.um)))
