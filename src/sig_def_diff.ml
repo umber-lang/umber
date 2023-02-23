@@ -76,32 +76,6 @@ let iter2 xs ys ~f =
   | Unequal_lengths -> raise Compatibility_error
 ;;
 
-(* FIXME: This is wrong because it will allow something like:
-   `module : { val plus_one : a -> a } let plus_one x = x + 1`.
-   The issue is in using unification to treat them symmetrically.
-     
-   We want different handling for vars in type declarations/value declarations.
-   In values, the signature must be a supertype, so it can be less general or more
-   abstract. But in types, we want the declarations to match exactly. (The type in the
-   def can't be more general than the one in the sig.) I think we just need different
-   handling around Var.
-   
-   In the type def case, we want to map between the params. In the val case, we want to
-   try "instantiating" each type param in the sig to what the def says.*)
-(* FIXME: This needs some different logic to unification but will share some too. Try to
-   extract out the common part. 
-   
-   Hmmm, maybe I can do something dumb to avoid having to rewrite this. How about:
-   instantiate the sig and def types, then unify them, then generalize each one.
-
-   - In the val case, we want the generalized sig case to be equal to the generalized
-     val case? This can't be quite right as there's no asymmetry.
-   - In the type decl case, we want them to just be equal modulo type param renaming. We
-     should just assign each type param a canonical name based on position as we compare
-     them. One way to do this is instantiating each type, then generalizing them again,
-     then checking equality (via unification). 
-*)
-
 let check_type_schemes =
   let rec check_type_schemes ~names ~param_matching ~param_table ~schemes =
     (* FIXME: Do we need to absolutify type app names in aliases? Likely yes? *)

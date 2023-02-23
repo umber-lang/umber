@@ -1,7 +1,11 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ((name_diff ())
+   ((name_diff
+     ((plus_one
+       (Incompatible ((typ (Scheme (Function ((Var a)) (Var a)))))
+        ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ()))))
+         (type_source Let_inferred))))))
     (type_diff
      ((Tuple
        (Incompatible ((a b) (Alias (Tuple ((Var a) (Var b)))))

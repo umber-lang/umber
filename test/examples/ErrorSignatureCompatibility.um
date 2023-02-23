@@ -3,6 +3,8 @@ module : {
 
     type Foo a b = Bar a | Baz b
     type alias Tuple a b = (a, b)
+
+    val plus_one : a -> a
 }
 
 val id : a -> a
@@ -10,5 +12,6 @@ let id x = x
 
 type Foo b a = Bar b | Baz a
 
-# FIXME: This shouldn't be allowed
 type alias Tuple a a = (a, a)
+
+let plus_one x = x + 1
