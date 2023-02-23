@@ -23,6 +23,10 @@ module : {
     val (+) (infixl 6) : Int, Int -> Int
     val (-) (infixl 6) : Int, Int -> Int
 
+    val (*.) (infixl 7) : Float, Float -> Float
+    val (+.) (infixl 6) : Float, Float -> Float
+    val (-.) (infixl 6) : Float, Float -> Float
+
     val (::) (infixr 5) : a, List a -> List a
     
     # TODO: add trait bounds to these - this is just temporary
@@ -100,6 +104,10 @@ module Operators = {
   extern (*) (infixl 7) : Int, Int -> Int = "umber_int_mul"
   extern (+) (infixl 6) : Int, Int -> Int = "umber_int_add"
   extern (-) (infixl 6) : Int, Int -> Int = "umber_int_sub"
+
+  extern (*.) (infixl 7) : Float, Float -> Float = "umber_float_mul"
+  extern (+.) (infixl 6) : Float, Float -> Float = "umber_float_add"
+  extern (-.) (infixl 6) : Float, Float -> Float = "umber_float_sub"
 
   val (::) (infixr 5) : a, List a -> List a
   let (::) = List.Cons

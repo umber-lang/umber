@@ -46,7 +46,10 @@ let names = {|
                   (^ (Imported Std.Prelude.Operators.^))
                   (!= (Imported Std.Prelude.Operators.!=))
                   (&& (Imported Std.Prelude.Operators.&&))
+                  (*. (Imported Std.Prelude.Operators.*.))
                   (++ (Imported Std.Prelude.Operators.++))
+                  (+. (Imported Std.Prelude.Operators.+.))
+                  (-. (Imported Std.Prelude.Operators.-.))
                   (:: (Imported Std.Prelude.Operators.::))
                   (<= (Imported Std.Prelude.Operators.<=))
                   (== (Imported Std.Prelude.Operators.==))
@@ -179,6 +182,14 @@ let names = {|
                               ((Type_app Bool ()) (Type_app Bool ()))
                               (Type_app Bool ()))))
                            (fixity (Left 3)))))
+                        (*.
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Type_app Float ()))))
+                           (fixity (Left 7)))))
                         (++
                          (Local
                           ((typ
@@ -187,6 +198,22 @@ let names = {|
                               ((Type_app String ()) (Type_app String ()))
                               (Type_app String ()))))
                            (fixity (Left 5)))))
+                        (+.
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Type_app Float ()))))
+                           (fixity (Left 6)))))
+                        (-.
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Type_app Float ()))))
+                           (fixity (Left 6)))))
                         (::
                          (Local
                           ((typ
@@ -246,7 +273,10 @@ let names = {|
                  (^ (Imported Std.Prelude.Operators.^))
                  (!= (Imported Std.Prelude.Operators.!=))
                  (&& (Imported Std.Prelude.Operators.&&))
+                 (*. (Imported Std.Prelude.Operators.*.))
                  (++ (Imported Std.Prelude.Operators.++))
+                 (+. (Imported Std.Prelude.Operators.+.))
+                 (-. (Imported Std.Prelude.Operators.-.))
                  (:: (Imported Std.Prelude.Operators.::))
                  (<= (Imported Std.Prelude.Operators.<=))
                  (== (Imported Std.Prelude.Operators.==))
@@ -384,6 +414,15 @@ let names = {|
                             (Function ((Type_app Bool ()) (Type_app Bool ()))
                              (Type_app Bool ()))))
                           (fixity (Left 3)))))
+                       (*.
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Float ()) (Type_app Float ()))
+                             (Type_app Float ()))))
+                          (type_source Extern_declared) (fixity (Left 7))
+                          (extern_name umber_float_mul))))
                        (++
                         (Local
                          ((typ
@@ -393,6 +432,24 @@ let names = {|
                              (Type_app String ()))))
                           (type_source Extern_declared) (fixity (Left 5))
                           (extern_name umber_string_append))))
+                       (+.
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Float ()) (Type_app Float ()))
+                             (Type_app Float ()))))
+                          (type_source Extern_declared) (fixity (Left 6))
+                          (extern_name umber_float_add))))
+                       (-.
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Float ()) (Type_app Float ()))
+                             (Type_app Float ()))))
+                          (type_source Extern_declared) (fixity (Left 6))
+                          (extern_name umber_float_sub))))
                        (::
                         (Local
                          ((typ
@@ -519,6 +576,30 @@ entry:
 }
 
 declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.*."(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_float_mul(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_float_mul(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.+."(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_float_add(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_float_add(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @Std.Prelude.Operators.-.(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_float_sub(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_float_sub(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %arg0.1, %umber_block* %arg1.1) {
 entry:
