@@ -24,16 +24,16 @@ let rec fold pat ~init ~f =
   | None -> init
   | Some pat ->
     (match pat with
-    | Constant _ | Catch_all _ -> init
-    | As (pat, _) | Type_annotation (pat, _) -> fold pat ~init ~f
-    | Cnstr_appl (_, fields) | Tuple fields ->
-      List.fold fields ~init ~f:(fun init -> fold ~init ~f)
-    | Record fields ->
-      Nonempty.fold fields ~init ~f:(fun init (_, pat) ->
-        Option.fold pat ~init ~f:(fun init -> fold ~init ~f))
-    | Union (pat1, pat2) ->
-      let init = fold pat1 ~init ~f in
-      fold pat2 ~init ~f)
+     | Constant _ | Catch_all _ -> init
+     | As (pat, _) | Type_annotation (pat, _) -> fold pat ~init ~f
+     | Cnstr_appl (_, fields) | Tuple fields ->
+       List.fold fields ~init ~f:(fun init -> fold ~init ~f)
+     | Record fields ->
+       Nonempty.fold fields ~init ~f:(fun init (_, pat) ->
+         Option.fold pat ~init ~f:(fun init -> fold ~init ~f))
+     | Union (pat1, pat2) ->
+       let init = fold pat1 ~init ~f in
+       fold pat2 ~init ~f)
 ;;
 
 (* TODO: consider abstracting this. It would help out with the verbosity of type errors
@@ -49,8 +49,8 @@ module Names = struct
     match Map.add pat_names ~key:name ~data:name_entry with
     | `Ok pat_names -> pat_names
     | `Duplicate ->
-      Name_bindings.name_error_msg
-        "Duplicate name in pattern"
+      Name_bindings.name_error
+        ~msg:"Duplicate name in pattern"
         (Value_name.to_ustring name)
   ;;
 

@@ -554,7 +554,7 @@ module Module = struct
             match Name_bindings.Name_entry.type_source entry with
             | Placeholder -> entry'
             | Let_inferred | Val_declared | Extern_declared ->
-              Name_bindings.name_error_msg "Duplicate name" (Value_name.to_ustring name)))
+              Name_bindings.name_error ~msg:"Duplicate name" (Value_name.to_ustring name)))
       | Module (module_name, sigs, defs) ->
         gather_name_placeholders ~names module_name sigs defs
       | Common_def common -> f_common names common
@@ -815,7 +815,6 @@ module Module = struct
     | exn ->
       let kind : Compilation_error.Kind.t =
         match exn with
-        | Name_bindings.Name_error _ -> Name_error
         | Type_bindings.Type_error _ -> Type_error
         | _ -> Other
       in
@@ -833,7 +832,6 @@ module Module = struct
           in
           List
             [ Atom (Ustring.to_string msg); List [ List [ map_type t1; map_type t2 ] ] ]
-        | Name_bindings.Name_error msg -> Atom (Ustring.to_string msg)
         | _ -> sexp_of_exn exn
       in
       Error (Compilation_error.create ~msg ~exn kind)

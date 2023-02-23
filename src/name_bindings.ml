@@ -173,21 +173,22 @@ type sigs_or_defs =
   | Defs of defs
 [@@deriving sexp_of]
 
-exception Name_error of Ustring.t [@@deriving sexp]
-
-let name_error_msg str ustr =
-  let str = str ^ ": " in
-  raise (Name_error Ustring.(of_string_exn str ^ ustr))
+let name_error ~msg ustr =
+  Compilation_error.raise Name_error ~msg:[%message msg ~_:(ustr : Ustring.t)]
 ;;
 
-let name_error_path path = raise (Name_error (Module_path.to_ustring path))
+let name_error_path path =
+  name_error ~msg:"Couldn't find path" (Module_path.to_ustring path)
+;;
 
 let or_name_clash msg ustr = function
   | `Ok value -> value
-  | `Duplicate -> name_error_msg msg ustr
+  | `Duplicate -> name_error ~msg ustr
 ;;
 
-let or_name_error_path x path = option_or_default x ~f:(fun () -> name_error_path path)
+let or_name_error_path x path =
+  Option.value_or_thunk x ~default:(fun () -> name_error_path path)
+;;
 
 let empty_bindings =
   { names = Value_name.Map.empty
@@ -303,7 +304,7 @@ let core =
 ;;
 
 let merge_no_shadow t1 t2 =
-  let err to_ustring ~key:name = name_error_msg "Name clash" (to_ustring name) in
+  let err to_ustring ~key:name = name_error ~msg:"Name clash" (to_ustring name) in
   { names = Map.merge_skewed t1.names t2.names ~combine:(err Value_name.to_ustring)
   ; types = Map.merge_skewed t1.types t2.types ~combine:(err Type_name.to_ustring)
   ; modules = Map.merge_skewed t1.modules t2.modules ~combine:(err Module_name.to_ustring)
@@ -377,7 +378,7 @@ let find =
             or_name_error_path (resolve_path ~defs_only t full_path) at_path
           in
           option_or_default (f full_path name bindings) ~f:(fun () ->
-            raise (Name_error (to_ustring input))))
+            name_error ~msg:"Couldn't find name" (to_ustring input)))
         else check_parent t at_path input ~f ~to_ustring
       in
       (match bindings_at_current with
@@ -390,9 +391,12 @@ let find =
     (* Recursively check the parent *)
     match List.drop_last current_path with
     | Some parent_path -> loop t ~at_path:parent_path input ~f ~to_ustring
-    | None -> raise (Name_error (to_ustring input))
+    | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
   in
-  loop
+  fun ?at_path ?defs_only t input ~f ~to_ustring ->
+    try loop ?at_path ?defs_only t input ~f ~to_ustring with
+    | Compilation_error.Compilation_error { kind = Name_error; _ } ->
+      name_error ~msg:"Failed to find name" (to_ustring input)
 ;;
 
 let rec find_entry' t name =
@@ -580,8 +584,8 @@ let add_val_or_extern
             (* TODO: consider allowing this use case
                e.g. importing from another module, and then giving that import a new,
                compatible type declaration *)
-            name_error_msg
-              "Duplicate val for imported item"
+            name_error
+              ~msg:"Duplicate val for imported item"
               Ustring.(
                 Value_name.to_ustring name
                 ^ of_string_exn " vs "
@@ -602,7 +606,7 @@ let absolutify_type_decl t = Type.Decl.map_exprs ~f:(absolutify_type_expr t)
 let add_to_types ?(err_msg = "Type name clash") types name decl =
   Map.update types name ~f:(function
     | None | Some None -> decl
-    | Some _ -> name_error_msg err_msg (Type_name.to_ustring name))
+    | Some _ -> name_error ~msg:err_msg (Type_name.to_ustring name))
 ;;
 
 let add_type_decl ({ current_path; _ } as t) type_name decl =
@@ -665,8 +669,8 @@ let set_inferred_scheme t name scheme =
             (* TODO: Think about the exact semantics of this. I think we want to disallow
                shadowing/name clashes between imported and local names, but I'm not sure
                if here is the best place to do it. *)
-            name_error_msg
-              "Name clash between imported and local binding"
+            name_error
+              ~msg:"Name clash between imported and local binding"
               (Value_name.to_ustring name))
     }
   in
@@ -680,7 +684,7 @@ let add_name_placeholder t name =
         Map.update bindings.names name ~f:(function
           | None -> Local Name_entry.placeholder
           | Some (Local { Name_entry.type_source = Let_inferred; _ } as entry) -> entry
-          | _ -> name_error_msg "Duplicate name" (Value_name.to_ustring name))
+          | _ -> name_error ~msg:"Duplicate name" (Value_name.to_ustring name))
     }
   in
   update_current t ~f:{ f }

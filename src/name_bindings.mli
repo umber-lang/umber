@@ -34,9 +34,7 @@ end
 
 type t [@@deriving sexp]
 
-exception Name_error of Ustring.t [@@deriving sexp]
-
-val name_error_msg : string -> Ustring.t -> 'a
+val name_error : msg:string -> Ustring.t -> 'a
 
 (* Handling of default values *)
 val empty : t

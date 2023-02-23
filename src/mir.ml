@@ -253,7 +253,7 @@ end = struct
     | _ ->
       let name =
         try Name_bindings.absolutify_value_name t.name_bindings name with
-        | Name_bindings.Name_error _ ->
+        | Compilation_error.Compilation_error { kind = Name_error; _ } ->
           (* This is a name for a variable local to an expression (these aren't in the
              name bindings). *)
           Name_bindings.(current_path t.name_bindings |> Path.to_module_path), snd name
