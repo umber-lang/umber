@@ -30,6 +30,7 @@ let fold_map acc t ~f =
     acc, { t with value })
 ;;
 
+let set t value = { t with value }
 let dummy_span value = { value; span = Span.dummy }
 let sexp_of_t sexp_of_value { value; _ } = sexp_of_value value
 let t_of_sexp node_of_sexp = dummy_span << node_of_sexp

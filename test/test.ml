@@ -39,7 +39,8 @@ let print_compilation_error ~out ~filename (error : Compilation_error.t) =
     ~out
     [%sexp
       "Compilation error"
-      , ({ error with filename = Some filename; exn } : Compilation_error.t)]
+      , ({ error with filename = Some filename; exn; backtrace = None }
+          : Compilation_error.t)]
 ;;
 
 type target = Umberboot.Target.t * Umberboot.File_or_stdout.t

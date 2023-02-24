@@ -229,23 +229,25 @@ module Expr = struct
           if rec_
           then (
             let names, bindings =
-              Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
-                let names, (pat_names, (pat, pat_type)) =
-                  Pattern.of_untyped_into ~names ~types pat
-                in
-                names, ((pat, (pat_type, pat_names)), expr))
+              Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
+                Node.fold_map names binding ~f:(fun names (pat, expr) ->
+                  let names, (pat_names, (pat, pat_type)) =
+                    Pattern.of_untyped_into ~names ~types pat
+                  in
+                  names, ((pat, (pat_type, pat_names)), expr)))
             in
             type_recursive_let_bindings ~names ~types ~f_name bindings)
           else (
             (* Process bindings in order without any recursion *)
             let names, bindings =
-              Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
-                let names, (pat_names, (pat, pat_type)) =
-                  Pattern.of_untyped_into ~names ~types pat
-                in
-                let expr, expr_type = of_untyped ~names ~types ~f_name expr in
-                Type_bindings.unify ~names ~types pat_type expr_type;
-                names, ((pat, (pat_type, pat_names)), expr))
+              Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
+                Node.fold_map names binding ~f:(fun names (pat, expr) ->
+                  let names, (pat_names, (pat, pat_type)) =
+                    Pattern.of_untyped_into ~names ~types pat
+                  in
+                  let expr, expr_type = of_untyped ~names ~types ~f_name expr in
+                  Type_bindings.unify ~names ~types pat_type expr_type;
+                  names, ((pat, (pat_type, pat_names)), expr)))
             in
             names, false, bindings)
         in
@@ -274,11 +276,12 @@ module Expr = struct
         Nonempty.fold
           bindings
           ~init:Pattern.Names.empty
-          ~f:(fun all_bound_names ((_, (_, pat_names)), _) ->
-          let all_bound_names =
-            Pattern.Names.merge all_bound_names pat_names ~combine:(fun ~key:_ v _ -> v)
-          in
-          all_bound_names)
+          ~f:(fun all_bound_names binding ->
+          Node.with_value binding ~f:(fun ((_, (_, pat_names)), _) ->
+            let all_bound_names =
+              Pattern.Names.merge all_bound_names pat_names ~combine:(fun ~key:_ v _ -> v)
+            in
+            all_bound_names))
       in
       let used_a_bound_name = ref false in
       let f_name name name_entry =
@@ -294,10 +297,11 @@ module Expr = struct
         | _ :: _, _ -> ()
       in
       let bindings =
-        Nonempty.map bindings ~f:(fun (((_, (pat_type, _)) as pat), expr) ->
-          let expr, expr_type = of_untyped expr ~f_name ~names ~types in
-          Type_bindings.unify ~names ~types pat_type expr_type;
-          pat, expr)
+        Nonempty.map bindings ~f:(fun binding ->
+          Node.map binding ~f:(fun (((_, (pat_type, _)) as pat), expr) ->
+            let expr, expr_type = of_untyped expr ~f_name ~names ~types in
+            Type_bindings.unify ~names ~types pat_type expr_type;
+            pat, expr))
       in
       let rec_ = !used_a_bound_name in
       names, rec_, bindings
@@ -317,8 +321,9 @@ module Expr = struct
       (match expr with
        | Let { rec_; bindings; body } ->
          let bindings =
-           Nonempty.map bindings ~f:(fun ((pat, typ), expr) ->
-             (pat, f_type typ), map ~f ~f_type expr)
+           Nonempty.map bindings ~f:(fun binding ->
+             Node.map binding ~f:(fun ((pat, typ), expr) ->
+               (pat, f_type typ), map ~f ~f_type expr))
          in
          let body = map ~f ~f_type body in
          Let { rec_; bindings; body }
@@ -356,9 +361,12 @@ module Expr = struct
         (function
          | Let { rec_; bindings; body } ->
            let bindings =
-             Nonempty.map bindings ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
-               let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
-               (pat, scheme), generalize_let_bindings ~names ~types expr)
+             Nonempty.map bindings ~f:(fun binding ->
+               Node.map binding ~f:(fun ((pat, (pat_type, pat_names)), expr) ->
+                 let names, scheme =
+                   Pattern.generalize ~names ~types pat_names pat_type
+                 in
+                 (pat, scheme), generalize_let_bindings ~names ~types expr))
            in
            let body = generalize_let_bindings ~names ~types body in
            `Halt (Let { rec_; bindings; body })
@@ -612,6 +620,8 @@ module Module = struct
     loop ~names aliases_seen alias
   ;;
 
+  (* TODO: We should make this a record type, it would a lot of this code way easier to
+     read. *)
   type intermediate_def =
     (Pattern.t * (Type.t * Pattern.Names.t), Untyped.Expr.t) Module.def
 
@@ -679,7 +689,7 @@ module Module = struct
       This is done by topologically sorting the strongly-connected components of the call
       graph (dependencies between bindings). *)
   let extract_binding_groups ~names (defs : intermediate_def Node.t list)
-    : _ * (_ Call_graph.Binding.t Nonempty.t * Name_bindings.Path.t) Sequence.t
+    : _ * (_ Node.t Call_graph.Binding.t Nonempty.t * Name_bindings.Path.t) Sequence.t
     =
     let rec gather_bindings_in_defs ~names defs acc =
       List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
@@ -693,8 +703,10 @@ module Module = struct
                 let current_path = Name_bindings.current_path names in
                 let bound_names = Map.key_set pat_names in
                 let used_names = Untyped.Expr.names_used ~names expr in
-                let span = Node.span binding in
-                ( { Call_graph.Binding.bound_names; used_names; info = pat, expr, span }
+                ( { Call_graph.Binding.bound_names
+                  ; used_names
+                  ; info = Node.set binding (pat, expr)
+                  }
                 , current_path )
                 :: bindings)) )
         | Module (module_name, sigs, defs) ->
@@ -702,9 +714,8 @@ module Module = struct
           let other_defs', bindings =
             gather_bindings_in_defs ~names defs ([], bindings)
           in
-          ( Node.map def ~f:(const (Module (module_name, sigs, other_defs'))) :: other_defs
-          , bindings )
-        | Common_def _ as node -> Node.map def ~f:(const node) :: other_defs, bindings
+          Node.set def (Module (module_name, sigs, other_defs')) :: other_defs, bindings
+        | Common_def _ as node -> Node.set def node :: other_defs, bindings
         | Trait _ | Impl _ -> failwith "TODO: traits/impls")
     in
     let other_defs, bindings = gather_bindings_in_defs ~names defs ([], []) in
@@ -716,36 +727,30 @@ module Module = struct
   ;;
 
   let type_binding_group ~names ~types bindings =
+    (* TODO: The spans should be kept as consistent with the original source as possible
+       in order to report accurate errors. It's better that they match the original source
+       location of the code than they actually make sense for the AST itself. *)
     (* Order bindings in the group by span, then take the first span to represent the
        whole group. This is done to get a consistent ordering among bindings. *)
-    let get_span { Call_graph.Binding.info = _, _, span; _ } = span in
     let bindings =
-      Nonempty.sort bindings ~compare:(Comparable.lift [%compare: Span.t] ~f:get_span)
+      Nonempty.map bindings ~f:Call_graph.Binding.info
+      |> Nonempty.sort ~compare:(Comparable.lift [%compare: Span.t] ~f:Node.span)
     in
-    let span = get_span (Nonempty.hd bindings) in
-    let bindings, spans =
-      Nonempty.fold_right
-        bindings
-        ~init:([], [])
-        ~f:(fun { info = pat, expr, span; _ } (bindings, spans) ->
-        (pat, expr) :: bindings, span :: spans)
-    in
-    let bindings = Nonempty.of_list_exn bindings in
-    let spans = Nonempty.of_list_exn spans in
+    let representative_span = Node.span (Nonempty.hd bindings) in
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings ~names ~types bindings
     in
-    Nonempty.fold_map
-      (Nonempty.zip_exn bindings spans)
-      ~init:names
-      ~f:(fun names (((pat, (pat_type, pat_names)), expr), span) ->
-      let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
-      (* Generalize local let bindings just after the parent binding *)
-      (* TODO: Look into the concept of type variable scope - parent variables are
+    (* FIXME: Do we need to use the bindings from before? *)
+    Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
+      Node.fold_map names binding ~f:(fun names ((pat, (pat_type, pat_names)), expr) ->
+        let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
+        (* Generalize local let bindings just after the parent binding *)
+        (* TODO: Look into the concept of type variable scope - parent variables are
          getting generalized here as well, which is probably wrong *)
-      let expr = Expr.generalize_let_bindings ~names ~types expr in
-      names, Node.create (pat, (expr, scheme)) span)
-    |> Tuple2.map_snd ~f:(fun bindings -> Node.create (Let { rec_; bindings }) span)
+        let expr = Expr.generalize_let_bindings ~names ~types expr in
+        names, (pat, (expr, scheme))))
+    |> Tuple2.map_snd ~f:(fun bindings ->
+         Node.create (Let { rec_; bindings }) representative_span)
   ;;
 
   (** Reintegrate the re-ordered binding groups from [extract_binding_groups] back into
@@ -792,10 +797,10 @@ module Module = struct
       let names, binding_groups =
         Sequence.to_list binding_groups
         |> List.fold_map ~init:names ~f:(fun names (bindings, path) ->
-             (* TODO: check if this is resolving paths correctly.
-              I think it will resolve in the parent, not the current module, which is
-              surely wrong.
-              - It also doesn't handle sigs/defs properly - it needs to know the original bindings_path *)
+             (* FIXME: check if this is resolving paths correctly.
+                I think it will resolve in the parent, not the current module, which is
+                surely wrong. It also doesn't handle sigs/defs properly - it needs to know
+                the original bindings_path *)
              Name_bindings.with_path names path ~f:(fun names ->
                let names, def = type_binding_group ~names ~types bindings in
                names, (def, path)))
@@ -815,7 +820,8 @@ module Module = struct
       Sig_def_diff.create ~names module_name |> Sig_def_diff.raise_if_nonempty;
       Ok (names, (module_name, sigs, defs))
     with
-    | Compilation_error.Compilation_error error -> Error error
+    | Compilation_error.Compilation_error error ->
+      Error { error with backtrace = Some (Backtrace.Exn.most_recent ()) }
     | exn ->
       let kind : Compilation_error.Kind.t =
         match exn with

@@ -365,6 +365,8 @@ let with_path t path ~f =
 
 let find =
   let rec loop ?at_path ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
+    (* FIXME: cleanup *)
+    (* print_s [%message "find loop" ~input:(to_ustring input : Ustring.t)]; *)
     (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
     let at_path = Option.value at_path ~default:(Path.to_module_path t.current_path) in
     let bindings_at_current = resolve_path_exn ~defs_only t at_path in

@@ -821,16 +821,17 @@ module Expr = struct
     =
     let ctx_for_body, bindings =
       Nonempty.fold_map bindings ~init:ctx ~f:(fun ctx_for_body binding ->
-        let pattern, _, _ = extract_binding binding in
-        let ctx_for_body, names_bound =
-          Pattern.Names.fold
-            pattern
-            ~init:(ctx_for_body, Mir_name.Set.empty)
-            ~f:(fun (ctx_for_body, names_bound) name ->
-            let ctx, name = Context.add_value_name ctx_for_body name in
-            ctx, Set.add names_bound name)
-        in
-        ctx_for_body, (binding, names_bound))
+        Node.with_value binding ~f:(fun binding ->
+          let pattern, _, _ = extract_binding binding in
+          let ctx_for_body, names_bound =
+            Pattern.Names.fold
+              pattern
+              ~init:(ctx_for_body, Mir_name.Set.empty)
+              ~f:(fun (ctx_for_body, names_bound) name ->
+              let ctx, name = Context.add_value_name ctx_for_body name in
+              ctx, Set.add names_bound name)
+          in
+          ctx_for_body, (binding, names_bound)))
     in
     let all_names_bound =
       lazy
@@ -1326,7 +1327,7 @@ let of_typed_module =
       ~rec_
       ~init:stmts
       ~add_let
-      ~extract_binding:(Node.with_value ~f:(fun (pat, (expr, typ)) -> pat, typ, expr))
+      ~extract_binding:(fun (pat, (expr, typ)) -> pat, typ, expr)
       ~process_expr
   in
   let generate_variant_constructor_values ~ctx ~stmts decl =
@@ -1382,7 +1383,7 @@ let of_typed_module =
     let names = Name_bindings.into_module names module_name ~place:`Def in
     let ctx = Context.create ~names ~name_table:(Mir_name.Name_table.create ()) in
     let fun_decls = Mir_name.Hash_set.create () in
-    match loop ~ctx ~names ~stmts:[] ~fun_decls defs with
-    | (_ : Context.t), stmts -> Ok (List.rev stmts)
-    | exception Compilation_error.Compilation_error error -> Error error
+    Compilation_error.try_with' (fun () ->
+      let (_ : Context.t), stmts = loop ~ctx ~names ~stmts:[] ~fun_decls defs in
+      List.rev stmts)
 ;;

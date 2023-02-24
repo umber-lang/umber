@@ -178,7 +178,7 @@ expr:
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
-  | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding_); IN; body = expr
+  | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding); IN; body = expr
     { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
 

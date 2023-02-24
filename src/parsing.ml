@@ -137,8 +137,6 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_separated_nonempty_list_PIPE_match_branch_
       : (Umber__Untyped.Pattern.t * Untyped.Expr.t) list nonterminal
   | N_separated_nonempty_list_PERIOD_UPPER_NAME_ : Ustring.t list nonterminal
-  | N_separated_nonempty_list_AND_let_binding__
-      : (Umber__Untyped.Pattern.t * Untyped.Expr.t) list nonterminal
   | N_separated_nonempty_list_AND_let_binding_
       : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Node.t list nonterminal
   | N_qualified_val_name_ : (Ustring.t list * Ustring.t) nonterminal

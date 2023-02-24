@@ -9,7 +9,7 @@ module Binding : sig
     ; used_names : Value_name.Qualified.Set.t
     ; info : 'a
     }
-  [@@deriving sexp]
+  [@@deriving fields, sexp]
 end
 
 type 'a t

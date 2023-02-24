@@ -1,10 +1,11 @@
 module : {
-    val id : b -> b
+  val id : b -> b
 
-    type Foo a b = Bar a | Baz b
-    type alias Tuple a b = (a, b)
+  type Foo a b = Bar a | Baz b
+  type alias Tuple a b = (a, b)
 
-    val plus_one : a -> a
+  val plus_one : a -> a
+  val plus_one' : Int -> Int
 }
 
 val id : a -> a
@@ -15,3 +16,18 @@ type Foo b a = Bar b | Baz a
 type alias Tuple a a = (a, a)
 
 let plus_one x = x + 1
+
+module A : {
+  type Int
+  type alias Float = String
+
+  val plus_one : Int -> Int
+  val double : Float -> Float
+} = {
+  type Int = Float
+
+  let plus_one x = x +. 1.0
+  let double s = s ++ s
+}
+
+let plus_one' = A.plus_one

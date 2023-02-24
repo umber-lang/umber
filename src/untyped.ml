@@ -59,13 +59,14 @@ module Expr = struct
           loop ~names used (add_locals locals pat) branch)
       | Let { rec_; bindings; body } ->
         let new_locals =
-          Nonempty.fold bindings ~init:locals ~f:(fun locals (pat, _) ->
-            add_locals locals pat)
+          Nonempty.fold bindings ~init:locals ~f:(fun locals binding ->
+            Node.with_value binding ~f:(fun (pat, _) -> add_locals locals pat))
         in
         let binding_locals = if rec_ then new_locals else locals in
         let used =
-          Nonempty.fold bindings ~init:used ~f:(fun used (_, expr) ->
-            loop ~names used binding_locals expr)
+          Nonempty.fold bindings ~init:used ~f:(fun used binding ->
+            Node.with_value binding ~f:(fun (_, expr) ->
+              loop ~names used binding_locals expr))
         in
         loop ~names used new_locals body
       | Tuple items | Seq_literal items ->

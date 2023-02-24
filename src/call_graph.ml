@@ -7,7 +7,7 @@ module Binding = struct
     ; used_names : Value_name.Qualified.Set.t
     ; info : 'a
     }
-  [@@deriving sexp]
+  [@@deriving fields, sexp]
 end
 
 module Binding_id = Unique_id.Int ()
