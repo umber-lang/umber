@@ -5,6 +5,14 @@
      ((plus_one
        (Incompatible ((typ (Scheme (Function ((Var a)) (Var a)))))
         ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ()))))
+         (type_source Let_inferred))))
+      (plus_one'
+       (Incompatible
+        ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ())))))
+        ((typ
+          (Scheme
+           (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
+            (Type_app ErrorSignatureCompatibility.A.Int ()))))
          (type_source Let_inferred))))))
     (type_diff
      ((Tuple

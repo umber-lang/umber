@@ -223,10 +223,11 @@ let do_simple_diff
 ;;
 
 let create ~names module_name =
-  let rec loop names bindings1 bindings2 =
+  let rec loop names bindings1 bindings2 ~parent_module_name =
+    let inner_names = Name_bindings.into_module names parent_module_name ~place:`Def in
     { name_diff =
         do_simple_diff
-          names
+          inner_names
           (Sigs_or_defs.value_names bindings1, bindings1)
           (Sigs_or_defs.value_names bindings2, bindings2)
           ~filter:(not << Value_name.is_cnstr_name)
@@ -234,14 +235,14 @@ let create ~names module_name =
           ~find:Sigs_or_defs.find_entry
     ; type_diff =
         do_simple_diff
-          names
+          inner_names
           (Sigs_or_defs.type_names bindings1, bindings1)
           (Sigs_or_defs.type_names bindings2, bindings2)
           ~compatible:compatible_type_decls
           ~find:Sigs_or_defs.find_type_decl
-    ; module_diff = do_module_diff names bindings1 bindings2
+    ; module_diff = do_module_diff names bindings1 bindings2 ~parent_module_name
     }
-  and do_module_diff names bindings1 bindings2 =
+  and do_module_diff names bindings1 bindings2 ~parent_module_name =
     Set.union (Sigs_or_defs.module_names bindings1) (Sigs_or_defs.module_names bindings2)
     |> Set.to_sequence
     |> Sequence.filter_map ~f:(fun module_name ->
@@ -252,16 +253,23 @@ let create ~names module_name =
          | None, Some _ -> None
          | Some _, None -> Some (module_name, Missing_module)
          | Some bindings1, Some bindings2 ->
-           let module_diff = loop names bindings1 bindings2 in
+           (* FIXME: Need to go into a submodule to check things at the right scope. *)
+           let names = Name_bindings.into_module names parent_module_name ~place:`Def in
+           let module_diff =
+             loop names bindings1 bindings2 ~parent_module_name:module_name
+           in
            if is_empty module_diff
            then None
            else Some (module_name, Module_diff module_diff)
          | None, None -> compiler_bug [%message "Both sig and def module missing"])
   in
+  (* FIXME: Maybe we just start with do_module_diff and this is a bit cleaner? *)
   let sigs, defs = Name_bindings.find_sigs_and_defs names [] module_name in
   match sigs with
-  | Some sigs -> loop names sigs defs
-  | None -> empty
+  | Some sigs -> loop names sigs defs ~parent_module_name:module_name
+  | None ->
+    (* FIXME: Bug: not doing diffs on def child modules if there's no sig *)
+    empty
 ;;
 
 let raise_if_nonempty t =
