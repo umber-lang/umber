@@ -466,64 +466,62 @@ module Module = struct
     ;;
   end
 
-  let copy_some_sigs_to_defs sigs defs =
-    let empty_sig_map = Nested_map.create Sig_data.empty in
-    (* Copy type and module declarations to defs if they were left out *)
+  (* Copy type and module declarations to defs if they were left out *)
+  let rec copy_some_sigs_to_defs sigs defs =
     let rec gather_decls ~sig_map sigs =
       List.fold sigs ~init:sig_map ~f:(fun sig_map sig_ ->
         Node.with_value sig_ ~f:(function
           | Common_sig common ->
             (match common with
              | Type_decl (type_name, _) ->
-               let def = Node.map sig_ ~f:(const (Common_def common)) in
+               let def = Node.set sig_ (Common_def common) in
                Nested_map.map sig_map ~f:(Sig_data.add_type_decl ~type_name ~def)
              | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
              | Val _
              | Extern _
              (* We could consider handling imports bringing in type declarations to copy
-              over, but the cost-benefit of this feature isn't clear right now. *)
+                over, but the cost-benefit of this feature isn't clear right now. *)
              | Import _
              | Import_with _
              | Import_without _ -> sig_map)
           | Module_sig (module_name, sigs) ->
             Nested_map.with_module sig_map module_name ~f:(fun sig_map ->
-              gather_decls ~sig_map:(Option.value sig_map ~default:empty_sig_map) sigs)))
+              gather_decls
+                ~sig_map:
+                  (Option.value sig_map ~default:(Nested_map.create Sig_data.empty))
+                sigs)))
     in
     let rec copy_to_defs ~sig_map defs =
       (* We want to add missing information from the sig to the def e.g. type declarations.
          This is done by removing matching entries from [sig_map] when found, then adding
          the remaining ones at the end. *)
       let sig_map, defs =
-        List.fold_map
-          defs
-          ~init:sig_map
-          ~f:
-            (Node.fold_map ~f:(fun sig_map def ->
-               match def with
-               | Common_def common ->
-                 (match common with
-                  | Type_decl (type_name, _) ->
-                    ( Nested_map.map
-                        sig_map
-                        ~f:(Fn.flip Sig_data.remove_type_decl type_name)
-                    , def )
-                  | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-                  | Val _ | Extern _ | Import _ | Import_with _ | Import_without _ ->
-                    sig_map, def)
-               | Module (module_name, sigs, defs) ->
-                 (match Nested_map.find_module sig_map module_name with
-                  | Some child_map ->
-                    if List.is_empty sigs
-                    then
-                      ( Nested_map.remove_module sig_map module_name
-                      , Module (module_name, [], copy_to_defs ~sig_map:child_map defs) )
-                    else
-                      (* Don't copy inherited sigs from the parent over (at least for now)
-                      because it's complicated *)
-                      sig_map, def
-                  | None -> sig_map, def)
-               | Trait _ -> failwith "TODO: copy trait_sigs to defs, without overriding"
-               | Let _ | Impl _ -> sig_map, def))
+        List.fold_map defs ~init:sig_map ~f:(fun sig_map defs ->
+          Node.fold_map sig_map defs ~f:(fun sig_map def ->
+            match def with
+            | Common_def common ->
+              (match common with
+               | Type_decl (type_name, _) ->
+                 ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_type_decl type_name)
+                 , def )
+               | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
+               | Val _ | Extern _ | Import _ | Import_with _ | Import_without _ ->
+                 sig_map, def)
+            | Module (module_name, sigs, defs) ->
+              (match Nested_map.find_module sig_map module_name with
+               | Some child_map ->
+                 if List.is_empty sigs
+                 then
+                   ( Nested_map.remove_module sig_map module_name
+                   , Module (module_name, [], copy_to_defs ~sig_map:child_map defs) )
+                 else
+                   (* Don't copy inherited sigs from the parent over (at least for now)
+                      because it's complicated. *)
+                   sig_map, Module (module_name, sigs, copy_some_sigs_to_defs sigs defs)
+               | None ->
+                 sig_map, Module (module_name, sigs, copy_some_sigs_to_defs sigs defs))
+            | Trait _ -> failwith "TODO: copy trait_sigs to defs, without overriding"
+            | Let _ | Impl _ -> sig_map, def))
       in
       let defs =
         Sig_data.fold_defs (Nested_map.current sig_map) ~init:defs ~f:(fun defs def ->
@@ -538,7 +536,9 @@ module Module = struct
         | [] -> defs
         | defs' -> Node.dummy_span (Module (module_name, [], defs')) :: defs)
     in
-    copy_to_defs ~sig_map:(gather_decls ~sig_map:empty_sig_map sigs) defs
+    copy_to_defs
+      ~sig_map:(gather_decls ~sig_map:(Nested_map.create Sig_data.empty) sigs)
+      defs
   ;;
 
   (** Gather placeholders for all declared names and types.
@@ -806,7 +806,19 @@ module Module = struct
                names, (def, path)))
       in
       let path = Name_bindings.current_path names in
-      names, reintegrate_binding_groups path other_defs binding_groups)
+      let defs = reintegrate_binding_groups path other_defs binding_groups in
+      let rec check_def_modules ~names defs =
+        List.iter defs ~f:(fun def ->
+          Node.with_value def ~f:(function
+            | Module (module_name, _, defs) ->
+              check_def_modules
+                ~names:(Name_bindings.into_module names module_name ~place:`Def)
+                defs;
+              Sig_def_diff.check ~names module_name
+            | Common_def _ | Let _ | Trait _ | Impl _ -> ()))
+      in
+      check_def_modules ~names defs;
+      names, defs)
   ;;
 
   let of_untyped ~names ~types (module_name, sigs, defs) =
@@ -817,11 +829,11 @@ module Module = struct
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
       (* TODO: should check every [Val] has a corresponding [Let]. *)
-      Sig_def_diff.create ~names module_name |> Sig_def_diff.raise_if_nonempty;
+      Sig_def_diff.check ~names module_name;
       Ok (names, (module_name, sigs, defs))
     with
     | Compilation_error.Compilation_error error ->
-      Error { error with backtrace = Some (Backtrace.Exn.most_recent ()) }
+      Error { error with backtraces = Backtrace.Exn.most_recent () :: error.backtraces }
     | exn ->
       let kind : Compilation_error.Kind.t =
         match exn with

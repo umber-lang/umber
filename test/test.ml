@@ -39,7 +39,7 @@ let print_compilation_error ~out ~filename (error : Compilation_error.t) =
     ~out
     [%sexp
       "Compilation error"
-      , ({ error with filename = Some filename; exn; backtrace = None }
+      , ({ error with filename = Some filename; exn; backtraces = [] }
           : Compilation_error.t)]
 ;;
 

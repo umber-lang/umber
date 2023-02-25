@@ -1,22 +1,16 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ((name_diff
-     ((plus_one
-       (Incompatible ((typ (Scheme (Function ((Var a)) (Var a)))))
-        ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ()))))
-         (type_source Let_inferred))))
-      (plus_one'
-       (Incompatible
-        ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ())))))
-        ((typ
-          (Scheme
-           (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
-            (Type_app ErrorSignatureCompatibility.A.Int ()))))
-         (type_source Let_inferred))))))
-    (type_diff
-     ((Tuple
-       (Incompatible ((a b) (Alias (Tuple ((Var a) (Var b)))))
-        ((a a) (Alias (Tuple ((Var a) (Var a)))))))))
-    (module_diff ())))
-  (filename ErrorSignatureCompatibility.um)))
+   ("The signature of this module does not match its definition"
+    (module_name A)
+    ((name_diff
+      ((plus_one
+        (Incompatible
+         ((typ
+           (Scheme
+            (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
+             (Type_app ErrorSignatureCompatibility.A.Int ())))))
+         ((typ (Scheme (Function ((Type_app Float ())) (Type_app Float ()))))
+          (type_source Let_inferred))))))
+     (type_diff ()) (module_diff ()))))
+  (filename ErrorSignatureCompatibility.um) (span 21:1-32:2)))

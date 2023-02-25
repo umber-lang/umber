@@ -1,25 +1,17 @@
-(ErrorSubmoduleSignatures ()
- ((Module
-   (Village
-    ((Common_sig (Type_decl Goose (() Abstract)))
-     (Common_sig (Type_decl Dog (() Abstract)))
-     (Common_sig
-      (Val honk () (() (Function ((Type_app Goose ())) (Type_app Goose ())))))
-     (Common_sig
-      (Val bark () (() (Function ((Type_app Dog ())) (Type_app Dog ()))))))
-    ((Common_def
-      (Type_decl Dog
-       (() (Variants ((Corgie ()) (GoldenRetriever ()) (Samoyed ()))))))
-     (Let (rec_ false)
-      (bindings
-       (((Catch_all (honk))
-         ((Lambda ((Catch_all (goose))) (Name goose))
-          (Function ((Var a)) (Var a)))))))
-     (Let (rec_ false)
-      (bindings
-       (((Catch_all (bark))
-         ((Lambda ((Catch_all (dog)))
-           (Fun_call (Name ++)
-            (((Name dog) (Type_app String ()))
-             ((Literal (String " says woof!")) (Type_app String ())))))
-          (Function ((Type_app String ())) (Type_app String ()))))))))))))
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("The signature of this module does not match its definition"
+    (module_name Village)
+    ((name_diff
+      ((bark
+        (Incompatible
+         ((typ
+           (Scheme
+            (Function ((Type_app ErrorSubmoduleSignatures.Village.Dog ()))
+             (Type_app ErrorSubmoduleSignatures.Village.Dog ())))))
+         ((typ
+           (Scheme (Function ((Type_app String ())) (Type_app String ()))))
+          (type_source Let_inferred))))))
+     (type_diff ()) (module_diff ()))))
+  (filename ErrorSubmoduleSignatures.um) (span 1:1-13:2)))

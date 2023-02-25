@@ -253,7 +253,6 @@ let create ~names module_name =
          | None, Some _ -> None
          | Some _, None -> Some (module_name, Missing_module)
          | Some bindings1, Some bindings2 ->
-           (* FIXME: Need to go into a submodule to check things at the right scope. *)
            let names = Name_bindings.into_module names parent_module_name ~place:`Def in
            let module_diff =
              loop names bindings1 bindings2 ~parent_module_name:module_name
@@ -267,11 +266,19 @@ let create ~names module_name =
   let sigs, defs = Name_bindings.find_sigs_and_defs names [] module_name in
   match sigs with
   | Some sigs -> loop names sigs defs ~parent_module_name:module_name
-  | None ->
-    (* FIXME: Bug: not doing diffs on def child modules if there's no sig *)
-    empty
+  | None -> empty
 ;;
 
-let raise_if_nonempty t =
-  if not (is_empty t) then Compilation_error.raise ~msg:(sexp_of_t t) Type_error
+let raise_if_nonempty t ~module_name =
+  if not (is_empty t)
+  then
+    Compilation_error.raise
+      Type_error
+      ~msg:
+        [%message
+          "The signature of this module does not match its definition"
+            (module_name : Module_name.t)
+            ~_:(t : t)]
 ;;
+
+let check ~names module_name = create ~names module_name |> raise_if_nonempty ~module_name

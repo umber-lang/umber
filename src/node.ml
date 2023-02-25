@@ -19,6 +19,7 @@ let with_value { value; span } ~f =
              (match error.span with
               | Some _ -> error.span
               | None -> Some span)
+         ; backtraces = Backtrace.Exn.most_recent () :: error.backtraces
          })
 ;;
 

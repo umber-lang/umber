@@ -17,27 +17,27 @@ type t =
   ; filename : Filename.t option [@sexp.option]
   ; span : Span.t option [@sexp.option]
   ; exn : Exn.t option [@sexp.option]
-  ; backtrace : Backtrace.t option [@sexp.option]
+  ; backtraces : Backtrace.t list [@sexp.list]
   }
 [@@deriving sexp_of]
 
 exception Compilation_error of t [@@deriving sexp_of]
 
 let create ?filename ?span ?exn ~msg kind =
-  { kind; msg; filename; span; exn; backtrace = None }
+  { kind; msg; filename; span; exn; backtraces = [] }
 ;;
 
 let try_with ?filename ?span kind ~msg f =
   try Ok (f ()) with
-  | exn -> Error { kind; msg; filename; span; exn = Some exn; backtrace = None }
+  | exn -> Error { kind; msg; filename; span; exn = Some exn; backtraces = [] }
 ;;
 
 let try_with' f =
   try Ok (f ()) with
   | Compilation_error error ->
-    Error { error with backtrace = Some (Backtrace.Exn.most_recent ()) }
+    Error { error with backtraces = Backtrace.Exn.most_recent () :: error.backtraces }
 ;;
 
 let raise ?filename ?span ?exn ~msg kind =
-  raise (Compilation_error { kind; msg; filename; span; exn; backtrace = None })
+  raise (Compilation_error { kind; msg; filename; span; exn; backtraces = [] })
 ;;

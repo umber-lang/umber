@@ -18,6 +18,7 @@ type alias Tuple a a = (a, a)
 
 let plus_one x = x + 1
 
+# FIXME: maybe move this somewhere else so we can actually see all the errors
 module A : {
   type Int
   type alias Float = String
@@ -25,7 +26,7 @@ module A : {
   val plus_one : Int -> Int
   val double : Float -> Float
 } = {
-  type Int = Float
+  type Int = Float  # NOTE: This is actually `String` due to the type alias above
 
   let plus_one x = x +. 1.0
   let double s = s ++ s
