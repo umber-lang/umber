@@ -403,6 +403,36 @@
     output/ErrorSignatureCompatibility.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorSubmoduleSignatures.expected
+    tokens/ErrorSubmoduleSignatures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorSubmoduleSignatures.expected
+    ast/ErrorSubmoduleSignatures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorSubmoduleSignatures.expected
+    mir/ErrorSubmoduleSignatures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorSubmoduleSignatures.expected
+    llvm/ErrorSubmoduleSignatures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorSubmoduleSignatures.expected
+    output/ErrorSubmoduleSignatures.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
 
 (rule (alias runtest) (deps test.dummy)

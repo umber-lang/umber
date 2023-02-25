@@ -1,0 +1,13 @@
+module Village : {
+  type Goose
+  type Dog
+
+  val honk : Goose -> Goose
+  val bark : Dog -> Dog
+} = {
+  type Dog = Corgie | GoldenRetriever | Samoyed
+
+  let honk goose = goose
+
+  let bark dog = dog ++ " says woof!"
+}

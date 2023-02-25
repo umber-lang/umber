@@ -1,0 +1,31 @@
+; ModuleID = './examples/ErrorSubmoduleSignatures.um'
+source_filename = "./examples/ErrorSubmoduleSignatures.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+%umber_block2 = type { %umber_header, [2 x i64] }
+
+@ErrorSubmoduleSignatures.Village.Corgie = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@ErrorSubmoduleSignatures.Village.GoldenRetriever = constant %umber_block* inttoptr (i64 3 to %umber_block*)
+@ErrorSubmoduleSignatures.Village.Samoyed = constant %umber_block* inttoptr (i64 5 to %umber_block*)
+@string.25894598 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c" says woof!\00\00\00\00\04" }
+
+define i32 @"umber_main:./examples/ErrorSubmoduleSignatures.um"() {
+entry:
+  ret i32 0
+}
+
+define tailcc %umber_block* @ErrorSubmoduleSignatures.Village.honk(%umber_block* %ErrorSubmoduleSignatures.Village.goose) {
+entry:
+  ret %umber_block* %ErrorSubmoduleSignatures.Village.goose
+}
+
+declare tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @ErrorSubmoduleSignatures.Village.bark(%umber_block* %ErrorSubmoduleSignatures.Village.dog) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* %ErrorSubmoduleSignatures.Village.dog, %umber_block* bitcast (%umber_block2* @string.25894598 to %umber_block*))
+  ret %umber_block* %fun_call
+}
+
