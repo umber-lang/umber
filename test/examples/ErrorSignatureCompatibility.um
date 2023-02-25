@@ -7,6 +7,7 @@ module : {
   val plus_one : a -> a
   val plus_one' : Int -> Int
   val double : String -> String
+  val double' : String -> String
 }
 
 val id : a -> a
@@ -18,19 +19,21 @@ type alias Tuple a a = (a, a)
 
 let plus_one x = x + 1
 
-# FIXME: maybe move this somewhere else so we can actually see all the errors
 module A : {
   type Int
   type alias Float = String
 
   val plus_one : Int -> Int
   val double : Float -> Float
+  val double_int : Int -> Int
 } = {
-  type Int = Float  # NOTE: This is actually `String` due to the type alias above
+  type alias Int = Float  # NOTE: This is actually `String` due to the type alias above
 
-  let plus_one x = x +. 1.0
+  let plus_one x = x
   let double s = s ++ s
+  let double_int = double
 }
 
 let plus_one' = A.plus_one
 let double = A.double
+let double' = A.double_int

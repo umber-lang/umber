@@ -191,8 +191,9 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
         if not (Cnstr_name.equal cnstr1 cnstr2) then raise Compatibility_error;
         iter2 args1 args2 ~f:(fun sig_ def ->
           check_type_schemes ~names ~param_matching:`Strict ~schemes:{ sig_; def }))
-    | Record _, Record _ -> failwith "TODO: record types in compatibiltiy checks"
-    (* FIXME: Should be following aliases, maybe use check_type_app *)
+    | Record _, Record _ -> failwith "TODO: record types in compatibility checks"
+    (* Records, variants and (in definitions) abstract type declarations always introduce
+       new types, so they are never compatible with aliases. *)
     | Record _, (Abstract | Alias _ | Variants _)
     | Variants _, (Abstract | Alias _ | Record _)
     | Alias _, (Abstract | Variants _ | Record _) -> raise Compatibility_error)
