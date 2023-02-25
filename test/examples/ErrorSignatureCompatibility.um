@@ -6,6 +6,7 @@ module : {
 
   val plus_one : a -> a
   val plus_one' : Int -> Int
+  val double : String -> String
 }
 
 val id : a -> a
@@ -31,3 +32,4 @@ module A : {
 }
 
 let plus_one' = A.plus_one
+let double = A.double
