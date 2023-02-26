@@ -224,7 +224,7 @@ let do_simple_diff
 ;;
 
 let create ~names module_name =
-  let rec loop names bindings1 bindings2 ~parent_module_name =
+  let rec loop ~names ~parent_module_name bindings1 bindings2 =
     let inner_names = Name_bindings.into_module names parent_module_name ~place:`Def in
     { name_diff =
         do_simple_diff
@@ -241,9 +241,9 @@ let create ~names module_name =
           (Sigs_or_defs.type_names bindings2, bindings2)
           ~compatible:compatible_type_decls
           ~find:Sigs_or_defs.find_type_decl
-    ; module_diff = do_module_diff names bindings1 bindings2 ~parent_module_name
+    ; module_diff = do_module_diff ~names ~inner_names bindings1 bindings2
     }
-  and do_module_diff names bindings1 bindings2 ~parent_module_name =
+  and do_module_diff ~names ~inner_names bindings1 bindings2 =
     Set.union (Sigs_or_defs.module_names bindings1) (Sigs_or_defs.module_names bindings2)
     |> Set.to_sequence
     |> Sequence.filter_map ~f:(fun module_name ->
@@ -254,19 +254,17 @@ let create ~names module_name =
          | None, Some _ -> None
          | Some _, None -> Some (module_name, Missing_module)
          | Some bindings1, Some bindings2 ->
-           let names = Name_bindings.into_module names parent_module_name ~place:`Def in
            let module_diff =
-             loop names bindings1 bindings2 ~parent_module_name:module_name
+             loop ~names:inner_names ~parent_module_name:module_name bindings1 bindings2
            in
            if is_empty module_diff
            then None
            else Some (module_name, Module_diff module_diff)
          | None, None -> compiler_bug [%message "Both sig and def module missing"])
   in
-  (* FIXME: Maybe we just start with do_module_diff and this is a bit cleaner? *)
   let sigs, defs = Name_bindings.find_sigs_and_defs names [] module_name in
   match sigs with
-  | Some sigs -> loop names sigs defs ~parent_module_name:module_name
+  | Some sigs -> loop ~names ~parent_module_name:module_name sigs defs
   | None -> empty
 ;;
 
