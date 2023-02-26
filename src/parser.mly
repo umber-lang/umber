@@ -18,7 +18,6 @@
 %token WITHOUT
 %token AS
 %token TYPE
-%token ALIAS
 %token VAL
 %token EXTERN
 %token INFIX
@@ -280,9 +279,6 @@ stmt_common:
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
-  | TYPE; ALIAS; name = UPPER_NAME; params = type_params; EQUALS; e = type_expr
-    { Module.Type_decl (
-        Type_name.of_ustring_unchecked name, (params, Type.Decl.Alias e)) }
   | import = import_stmt { import }
 
 stmt_sig_:

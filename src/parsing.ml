@@ -49,7 +49,6 @@ type token = Parser.token =
   | AS
   | ARROW
   | AND
-  | ALIAS
 [@@deriving sexp]
 
 let fprint_s sexp ~out =
@@ -111,7 +110,6 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_AS : unit terminal
   | T_ARROW : unit terminal
   | T_AND : unit terminal
-  | T_ALIAS : unit terminal
 [@@deriving sexp_of]
 
 type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =

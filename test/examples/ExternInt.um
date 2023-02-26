@@ -1,3 +1,3 @@
-type alias MyInt = Int
+type MyInt = Int
 
 extern plus (infixl 6) : MyInt, MyInt -> MyInt = "umber_int_add"

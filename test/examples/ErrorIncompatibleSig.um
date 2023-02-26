@@ -1,5 +1,5 @@
 module : {
-  type alias T = Int
+  type T = Int
   type Weather = | Rainy | Sunny
 
   val missing_function : T -> T
@@ -18,7 +18,7 @@ module : {
   }
 }
 
-type alias T = String
+type T = String
 type Weather = | Rainy
 
 module A = {

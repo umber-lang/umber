@@ -2,7 +2,7 @@ module : {
   val id : b -> b
 
   type Foo a b = | Bar a | Baz b
-  type alias Tuple a b = (a, b)
+  type Tuple a b = (a, b)
 
   val plus_one : a -> a
   val plus_one' : Int -> Int
@@ -15,19 +15,19 @@ let id x = x
 
 type Foo b a = | Bar b | Baz a
 
-type alias Tuple a a = (a, a)
+type Tuple a a = (a, a)
 
 let plus_one x = x + 1
 
 module A : {
   type Int
-  type alias Float = String
+  type Float = String
 
   val plus_one : Int -> Int
   val double : Float -> Float
   val double_int : Int -> Int
 } = {
-  type alias Int = Float  # NOTE: This is actually `String` due to the type alias above
+  type Int = Float  # NOTE: This is actually `String` due to the type above
 
   let plus_one x = x
   let double s = s ++ s

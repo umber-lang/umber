@@ -16,7 +16,7 @@ let sum_tree = match
   | Leaf -> 0
   | Node x forest -> x + sum_forest forest
 
-type alias Forest a = List (Tree a)
+type Forest a = List (Tree a)
 type Tree a =
   | Leaf
   | Node a (Forest a)

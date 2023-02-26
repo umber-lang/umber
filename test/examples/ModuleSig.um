@@ -4,7 +4,7 @@ module Range : {
   val between : Int, Int -> Range
   val elem : Int, Range -> Bool
 } = {
-  type alias Range = (Int, Int)
+  type Range = (Int, Int)
 
   let between lo hi = (lo, hi)
   let elem x (lo, hi) = lo <= x && x <= hi

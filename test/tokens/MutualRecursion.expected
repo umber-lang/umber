@@ -59,7 +59,6 @@ ARROW
 (LOWER_NAME sum_forest)
 (LOWER_NAME forest)
 TYPE
-ALIAS
 (UPPER_NAME Forest)
 (LOWER_NAME a)
 EQUALS

@@ -35,7 +35,7 @@ let value opt default = match opt
   | None -> default
 
 # Type aliases
-type alias MyInt = Int
-type alias Pair x y = (x, y)
+type MyInt = Int
+type Pair x y = (x, y)
 
 # TODO: Subtyping on variants/row polymorphism for record types

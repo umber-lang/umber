@@ -1,4 +1,4 @@
-type alias A = B
-type alias B = A
+type A = B
+type B = A
 
-# This should also be an error: `type alias Cycle = Cycle`
+# This should also be an error: `type Cycle = Cycle`
