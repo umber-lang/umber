@@ -5,7 +5,7 @@ module Village : {
   val honk : Goose -> Goose
   val bark : Dog -> Dog
 } = {
-  type Dog = Corgie | GoldenRetriever | Samoyed
+  type Dog = | Corgie | GoldenRetriever | Samoyed
 
   let honk goose = goose
 

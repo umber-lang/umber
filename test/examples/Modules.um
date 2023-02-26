@@ -16,7 +16,7 @@ module A : {
   } = {
     module D = { let wow x = x }
 
-    type Bacon = Delicious
+    type Bacon = | Delicious
   }
 }
 

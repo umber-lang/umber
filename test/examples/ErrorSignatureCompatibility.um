@@ -1,7 +1,7 @@
 module : {
   val id : b -> b
 
-  type Foo a b = Bar a | Baz b
+  type Foo a b = | Bar a | Baz b
   type alias Tuple a b = (a, b)
 
   val plus_one : a -> a
@@ -13,7 +13,7 @@ module : {
 val id : a -> a
 let id x = x
 
-type Foo b a = Bar b | Baz a
+type Foo b a = | Bar b | Baz a
 
 type alias Tuple a a = (a, a)
 

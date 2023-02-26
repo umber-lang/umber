@@ -2,7 +2,7 @@
 let n = 1 : Int
 
 # Simple variant types and pattern matching
-type Direction = North | South | East | West
+type Direction = | North | South | East | West
 
 let north_is_north = match North | North -> True | _ -> False
 

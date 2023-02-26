@@ -124,8 +124,6 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_type_fun_args
       : (Type.Param.t, Core.never_returns) Type.Expr.t Nonempty.t nonterminal
   | N_type_expr : (Type.Param.t, Core.never_returns) Type.Expr.t nonterminal
-  | N_type_decl_variants
-      : (Parser_scope.Cnstr_name.t * Type.Scheme.Table.key list) list nonterminal
   | N_type_decl : Type.Decl.decl nonterminal
   | N_type_cnstr_decl
       : (Parser_scope.Cnstr_name.t * Type.Scheme.Table.key list) nonterminal
@@ -155,7 +153,6 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
       : Type.Scheme.Bounded.t Pattern.t option nonterminal
   | N_option_preceded_EQUALS_expr__ : Untyped.Expr.t option nonterminal
   | N_option_parens_fixity__ : Fixity.t option nonterminal
-  | N_option_PIPE_ : unit option nonterminal
   | N_operator : (Ustring.t list * Ustring.t) nonterminal
   | N_op_section : Untyped.Expr.t nonterminal
   | N_nonempty_list_type_term_
@@ -166,6 +163,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_match_branches : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Nonempty.t nonterminal
   | N_match_branch : (Umber__Untyped.Pattern.t * Untyped.Expr.t) nonterminal
   | N_loption_trait_bound_ : Trait_bound.t nonterminal
+  | N_loption_separated_nonempty_list_PIPE_type_cnstr_decl__
+      : (Parser_scope.Cnstr_name.t * Type.Scheme.Table.key list) list nonterminal
   | N_loption_preceded_FILE_MODULE_braces_list_stmt_sig____
       : Module.sig_ Node.t list nonterminal
   | N_loption_equals_defs_

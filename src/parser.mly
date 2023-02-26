@@ -231,13 +231,9 @@ type_cnstr_decl:
   | cnstr = UPPER_NAME; args = list(type_term)
     { Cnstr_name.of_ustring_unchecked cnstr, args }
 
-type_decl_variants:
-  | PIPE?; branches = separated_nonempty(PIPE, type_cnstr_decl)
-    { Nonempty.to_list branches }
-
 type_decl:
-  | PIPE { Type.Decl.Variants [] }
-  | variants = type_decl_variants { Type.Decl.Variants variants }
+  | expr = type_expr { Type.Decl.Alias expr }
+  | PIPE; variants = separated_list(PIPE, type_cnstr_decl) { Type.Decl.Variants variants }
   | record = type_record { record }
 
 %inline type_params:
