@@ -122,16 +122,6 @@ impl BlockPtr {
     }
 }
 
-// Blocks consist of this one-word header followed by their fields inline.
-// Rust's dynamically-sized types don't let us do this without fat pointers getting
-// involved, and we want to store the block length inline, so we just manage the pointers
-// ourselves.
-#[repr(C, align(8))]
-pub struct Block {
-    pub tag: u16,
-    pub len: u16,
-}
-
 // This must be kept in sync with the same definitions in codegen.ml.
 #[repr(u16)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -162,6 +152,16 @@ pub enum Value<'a> {
     String(&'a str),
     ConstantCnstr(ConstantCnstr),
     OtherBlock(NonNull<Block>),
+}
+
+// Blocks consist of this one-word header followed by their fields inline.
+// Rust's dynamically-sized types don't let us do this without fat pointers getting
+// involved, and we want to store the block length inline, so we just manage the pointers
+// ourselves.
+#[repr(C, align(8))]
+pub struct Block {
+    tag: u16,
+    pub len: u16,
 }
 
 impl Block {
