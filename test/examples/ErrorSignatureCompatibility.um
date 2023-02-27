@@ -3,11 +3,17 @@ module : {
 
   type Foo a b = | Bar a | Baz b
   type Tuple a b = (a, b)
-
+  
   val plus_one : a -> a
   val plus_one' : Int -> Int
   val double : String -> String
   val double' : String -> String
+
+  module A : {
+    type Number =
+      | Int Int
+      | Float Float
+  }
 }
 
 val id : a -> a
@@ -22,6 +28,10 @@ let plus_one x = x + 1
 module A : {
   type Int
   type Float = String
+
+  type Number =
+    | Int Int
+    | Float Float
 
   val plus_one : Int -> Int
   val double : Float -> Float
