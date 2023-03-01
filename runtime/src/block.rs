@@ -2,6 +2,9 @@ use crate::gc::Gc;
 use core::ptr::{copy_nonoverlapping, NonNull};
 use core::{mem, slice, str};
 
+// A `BlockPtr` is either a 63-bit integer `ConstantCnstr` (constant constructor) or a
+// pointer to a block, which is a heap-allocated array of `BlockPtr`, of which the first
+// element is a `BlockHeader`.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union BlockPtr {
@@ -78,10 +81,10 @@ impl BlockPtr {
         unsafe { Self::new(KnownTag::Float, [mem::transmute(x)]) }
     }
 
-    fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
+    pub fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
         let len: u16 = fields.len().try_into().unwrap();
         unsafe {
-            Self::new_internal(tag, len, |block| {
+            Self::new_with_initializer(tag, len, |block| {
                 copy_nonoverlapping(
                     fields.as_ptr(),
                     block.0.as_ptr().add(1) as *mut BlockPtr,
@@ -91,41 +94,18 @@ impl BlockPtr {
         }
     }
 
-    unsafe fn new_internal(tag: KnownTag, len: u16, f: impl FnOnce(Block)) -> BlockPtr {
+    pub unsafe fn new_with_initializer(
+        tag: KnownTag,
+        len: u16,
+        initialize: impl FnOnce(Block),
+    ) -> BlockPtr {
         let n_bytes = 8 * (len + 1) as usize;
-        unsafe {
-            let header = Gc::get().alloc(n_bytes) as *mut BlockHeader;
-            (*header).tag = tag as u16;
-            (*header).len = len;
-            let block = Block(NonNull::new_unchecked(header as *mut BlockPtr));
-            f(block);
-            BlockPtr { block }
-        }
-    }
-
-    unsafe fn new_string_internal(str_len: usize, f: impl FnOnce(*mut u8)) -> BlockPtr {
-        let n_words: u16 = ((str_len / 8) + 1).try_into().unwrap();
-        let n_bytes = 8 * (n_words as usize);
-        unsafe {
-            Self::new_internal(KnownTag::String, n_words, |block| {
-                let fields = block.0.as_ptr().add(1) as *mut u8;
-                f(fields);
-                for i in str_len..(n_bytes - 1) {
-                    *fields.add(i) = 0
-                }
-                *fields.add(n_bytes - 1) = 7 - (str_len % 8) as u8;
-            })
-        }
-    }
-
-    // Currently only used in tests
-    #[cfg(test)]
-    fn new_string(str: &str) -> BlockPtr {
-        unsafe {
-            Self::new_string_internal(str.len(), |fields| {
-                copy_nonoverlapping(str.as_ptr(), fields, str.len())
-            })
-        }
+        let header = Gc::get().alloc(n_bytes) as *mut BlockHeader;
+        (*header).tag = tag as u16;
+        (*header).len = len;
+        let block = Block(NonNull::new_unchecked(header as *mut BlockPtr));
+        initialize(block);
+        BlockPtr { block }
     }
 }
 
@@ -161,10 +141,6 @@ pub enum Value<'a> {
     OtherBlock(Block),
 }
 
-// Blocks consist of this one-word header followed by their fields inline.
-// Rust's dynamically-sized types don't let us do this without fat pointers getting
-// involved, and we want to store the block length inline, so we just manage the pointers
-// ourselves.
 #[repr(C, align(8))]
 #[derive(Copy, Clone)]
 pub struct BlockHeader {
@@ -177,22 +153,26 @@ pub struct BlockHeader {
 pub struct Block(NonNull<BlockPtr>);
 
 impl Block {
+    pub fn as_ptr(self) -> *mut BlockPtr {
+        self.0.as_ptr()
+    }
+
     pub fn header(self) -> BlockHeader {
-        unsafe { *(self.0.as_ptr() as *const BlockHeader) }
+        unsafe { *(self.as_ptr() as *const BlockHeader) }
     }
 
     pub fn fields<'a>(self) -> &'a [BlockPtr] {
-        unsafe { slice::from_raw_parts(self.0.as_ptr().add(1), self.header().len as usize) }
+        unsafe { slice::from_raw_parts(self.as_ptr().add(1), self.header().len as usize) }
     }
 
-    fn get_field(self, index: u16) -> BlockPtr {
-        unsafe { *self.0.as_ptr().add(index as usize + 1) }
+    pub unsafe fn get_field(self, index: u16) -> BlockPtr {
+        *self.as_ptr().add(index as usize + 1)
     }
 
     // These kinds of runtime checks shouldn't be needed if the compiler produced correct
     // code, but is helpful for debugging the compiler.
     // TODO: Put this stuff behind some kind of debug cfg
-    fn expect_tag(self, tag: KnownTag) {
+    pub fn expect_tag(self, tag: KnownTag) {
         if self.header().tag.try_into() != Ok(tag) {
             panic!(
                 "Expected block with tag {:?} but got tag {:?}",
@@ -207,43 +187,9 @@ impl Block {
         unsafe { mem::transmute(self.get_field(0)) }
     }
 
-    // TODO: use
-    // pub fn as_char(&self) -> char {
-    //     self.expect_tag(Tag::Char);
-    //     let u64: u64 = unsafe { mem::transmute(self.first_field()) };
-    //     char::from_u32(u64 as u32).expect("Invalid utf8 char")
-    // }
-
     pub fn as_float(self) -> f64 {
         self.expect_tag(KnownTag::Float);
         unsafe { mem::transmute(self.get_field(0)) }
-    }
-
-    fn string_len(self) -> usize {
-        let last_byte = unsafe {
-            *(self.0.as_ptr() as *const u8).add(8 * (self.header().len as usize + 1) - 1)
-        };
-        (self.header().len as usize) * 8 - (last_byte as usize) - 1
-    }
-
-    pub fn as_str<'a>(self) -> &'a str {
-        self.expect_tag(KnownTag::String);
-        unsafe {
-            let bytes =
-                slice::from_raw_parts(self.0.as_ptr().add(1) as *const u8, self.string_len());
-            str::from_utf8_unchecked(bytes)
-        }
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    let (x, y) = (x.as_str(), y.as_str());
-    unsafe {
-        BlockPtr::new_string_internal(x.len() + y.len(), |fields| {
-            copy_nonoverlapping(x.as_ptr(), fields, x.len());
-            copy_nonoverlapping(y.as_ptr(), fields.add(x.len()), y.len());
-        })
     }
 }
 
@@ -264,28 +210,5 @@ impl ConstantCnstr {
 impl From<bool> for ConstantCnstr {
     fn from(value: bool) -> Self {
         Self::new(value.into())
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::gc::umber_gc_init;
-
-    use super::{umber_string_append, BlockPtr};
-
-    #[test]
-    fn string_creation() {
-        unsafe { umber_gc_init() };
-        assert_eq!(BlockPtr::new_string("hello world").as_str(), "hello world");
-        assert_eq!(BlockPtr::new_string("").as_str(), "")
-    }
-
-    #[test]
-    fn string_appending() {
-        unsafe { umber_gc_init() };
-        assert_eq!(
-            umber_string_append(BlockPtr::new_string("foo"), BlockPtr::new_string("bar")).as_str(),
-            "foobar"
-        )
     }
 }
