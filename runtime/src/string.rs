@@ -19,6 +19,10 @@ impl Block {
 }
 
 impl BlockPtr {
+    pub fn as_str<'a>(self) -> &'a str {
+        self.as_block().as_str()
+    }
+
     unsafe fn new_string_with_initializer(
         str_len: usize,
         initialize: impl FnOnce(*mut u8),

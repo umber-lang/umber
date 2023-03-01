@@ -61,26 +61,6 @@ impl BlockPtr {
         }
     }
 
-    pub fn as_int(self) -> i64 {
-        self.as_block().as_int()
-    }
-
-    pub fn as_float(self) -> f64 {
-        self.as_block().as_float()
-    }
-
-    pub fn as_str<'a>(self) -> &'a str {
-        self.as_block().as_str()
-    }
-
-    pub fn new_int(x: i64) -> BlockPtr {
-        unsafe { Self::new(KnownTag::Int, [mem::transmute(x)]) }
-    }
-
-    pub fn new_float(x: f64) -> BlockPtr {
-        unsafe { Self::new(KnownTag::Float, [mem::transmute(x)]) }
-    }
-
     pub fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
         let len: u16 = fields.len().try_into().unwrap();
         unsafe {
@@ -180,16 +160,6 @@ impl Block {
                 self.header().tag
             )
         }
-    }
-
-    pub fn as_int(self) -> i64 {
-        self.expect_tag(KnownTag::Int);
-        unsafe { mem::transmute(self.get_field(0)) }
-    }
-
-    pub fn as_float(self) -> f64 {
-        self.expect_tag(KnownTag::Float);
-        unsafe { mem::transmute(self.get_field(0)) }
     }
 }
 

@@ -1,4 +1,22 @@
-use crate::block::BlockPtr;
+use crate::block::{Block, BlockPtr, KnownTag};
+use core::mem;
+
+impl Block {
+    pub fn as_int(self) -> i64 {
+        self.expect_tag(KnownTag::Int);
+        unsafe { mem::transmute(self.get_field(0)) }
+    }
+}
+
+impl BlockPtr {
+    pub fn as_int(self) -> i64 {
+        self.as_block().as_int()
+    }
+
+    pub fn new_int(x: i64) -> BlockPtr {
+        unsafe { Self::new(KnownTag::Int, [mem::transmute(x)]) }
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn umber_int_add(x: BlockPtr, y: BlockPtr) -> BlockPtr {
