@@ -40,9 +40,8 @@ pub extern "C" fn umber_int_pow(base: BlockPtr, exp: BlockPtr) -> BlockPtr {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{block::BlockPtr, gc::umber_gc_init};
-
-    use super::umber_int_add;
 
     #[test]
     fn basic_arithmetic() {
@@ -52,8 +51,16 @@ mod test {
             5
         );
         assert_eq!(
-            umber_int_add(BlockPtr::new_int(0), BlockPtr::new_int(1)).as_int(),
-            1
+            umber_int_sub(BlockPtr::new_int(0), BlockPtr::new_int(1)).as_int(),
+            -1
+        );
+        assert_eq!(
+            umber_int_mul(BlockPtr::new_int(5), BlockPtr::new_int(7)).as_int(),
+            35
+        );
+        assert_eq!(
+            umber_int_pow(BlockPtr::new_int(2), BlockPtr::new_int(6)).as_int(),
+            64
         );
     }
 }
