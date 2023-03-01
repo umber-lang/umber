@@ -8,11 +8,10 @@ impl PartialEq for BlockPtr {
             (Value::Float(x), Value::Float(y)) => x == y,
             (Value::String(x), Value::String(y)) => x == y,
             (Value::ConstantCnstr(x), Value::ConstantCnstr(y)) => x == y,
-            (Value::OtherBlock(x), Value::OtherBlock(y)) => unsafe {
-                (*x.as_ptr()).len == (*y.as_ptr()).len
-                    && core::iter::zip((*x.as_ptr()).fields(), (*y.as_ptr()).fields())
-                        .all(|(x, y)| x == y)
-            },
+            (Value::OtherBlock(x), Value::OtherBlock(y)) => {
+                x.header().len == y.header().len
+                    && core::iter::zip(x.fields(), y.fields()).all(|(x, y)| x == y)
+            }
             _ => false,
         }
     }
@@ -25,16 +24,16 @@ impl PartialOrd for BlockPtr {
             (Value::Float(x), Value::Float(y)) => x.partial_cmp(&y),
             (Value::String(x), Value::String(y)) => Some(x.cmp(y)),
             (Value::ConstantCnstr(x), Value::ConstantCnstr(y)) => Some(x.cmp(&y)),
-            (Value::OtherBlock(x), Value::OtherBlock(y)) => unsafe {
-                for (x, y) in core::iter::zip((*x.as_ptr()).fields(), (*y.as_ptr()).fields()) {
+            (Value::OtherBlock(x), Value::OtherBlock(y)) => {
+                for (x, y) in core::iter::zip(x.fields(), y.fields()) {
                     match x.partial_cmp(y) {
                         None => return None,
                         ordering @ Some(Ordering::Less | Ordering::Greater) => return ordering,
                         Some(Ordering::Equal) => continue,
                     }
                 }
-                Some((*x.as_ptr()).len.cmp(&(*y.as_ptr()).len))
-            },
+                Some(x.header().len.cmp(&y.header().len))
+            }
             _ => None,
         }
     }

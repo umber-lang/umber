@@ -21,4 +21,7 @@
   (glob_files src/*.rs)
   (file Cargo.toml))
  (action
-  (system "cargo test")))
+  (setenv
+   MIRIFLAGS
+   "-Zmiri-ignore-leaks"
+   (system "cargo miri test"))))
