@@ -1,4 +1,4 @@
-use crate::block::{BlockPtr, Value};
+use crate::block::{BlockPtr, ConstantCnstr, Value};
 use core::cmp::{Ordering, PartialEq};
 
 impl PartialEq for BlockPtr {
@@ -42,41 +42,31 @@ impl PartialOrd for BlockPtr {
 #[no_mangle]
 pub extern "C" fn umber_eq(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     BlockPtr {
-        constant_cnstr: (x == y).into(),
+        constant_cnstr: ConstantCnstr::new_bool(x == y),
     }
 }
 
 #[no_mangle]
 pub extern "C" fn umber_neq(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    BlockPtr {
-        constant_cnstr: (x != y).into(),
-    }
+    BlockPtr::new_bool(x != y)
 }
 
 #[no_mangle]
 pub extern "C" fn umber_lt(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    BlockPtr {
-        constant_cnstr: (x < y).into(),
-    }
+    BlockPtr::new_bool(x < y)
 }
 
 #[no_mangle]
 pub extern "C" fn umber_lte(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    BlockPtr {
-        constant_cnstr: (x <= y).into(),
-    }
+    BlockPtr::new_bool(x <= y)
 }
 
 #[no_mangle]
 pub extern "C" fn umber_gt(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    BlockPtr {
-        constant_cnstr: (x > y).into(),
-    }
+    BlockPtr::new_bool(x > y)
 }
 
 #[no_mangle]
 pub extern "C" fn umber_gte(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    BlockPtr {
-        constant_cnstr: (x >= y).into(),
-    }
+    BlockPtr::new_bool(x >= y)
 }

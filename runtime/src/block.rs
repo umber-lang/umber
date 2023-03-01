@@ -176,9 +176,3 @@ impl ConstantCnstr {
         self.0 >> 1
     }
 }
-
-impl From<bool> for ConstantCnstr {
-    fn from(value: bool) -> Self {
-        Self::new(value.into())
-    }
-}

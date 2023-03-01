@@ -13,11 +13,7 @@ pub extern "C" fn umber_print_float(x: BlockPtr) {
 
 #[no_mangle]
 pub extern "C" fn umber_print_bool(x: BlockPtr) {
-    let str = if x.as_constant_cnstr().tag() == 0 {
-        "False"
-    } else {
-        "True"
-    };
+    let str = if x.as_bool() { "True" } else { "False" };
     print!("{}", str);
 }
 
