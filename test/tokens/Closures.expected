@@ -24,4 +24,15 @@ ELSE
 IN
 (LOWER_NAME loop)
 (LOWER_NAME start_at)
+LET
+L_PAREN
+R_PAREN
+EQUALS
+(LOWER_NAME print_int)
+L_PAREN
+(LOWER_NAME count_up)
+(INT 0)
+(INT 2)
+(INT 5)
+R_PAREN
 EOF

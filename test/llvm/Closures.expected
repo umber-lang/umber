@@ -4,9 +4,18 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
+%umber_block1 = type { %umber_header, [1 x i64] }
+
+@"*binding" = global %umber_block* null
+@int.0 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 0 }
+@int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
+@int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
 
 define i32 @"umber_main:./examples/Closures.um"() {
 entry:
+  %fun_call = tail call tailcc %umber_block* @Closures.count_up(%umber_block* bitcast (%umber_block1* @int.0 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
+  %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print_int(%umber_block* %fun_call)
+  store %umber_block* %fun_call1, %umber_block** @"*binding", align 8
   ret i32 0
 }
 
@@ -64,6 +73,8 @@ entry:
   %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %box7, %umber_block* %Closures.start_at)
   ret %umber_block* %fun_call
 }
+
+declare tailcc %umber_block* @Std.Prelude.print_int(%umber_block*)
 
 declare i64* @umber_gc_alloc(i64)
 
