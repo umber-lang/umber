@@ -29,5 +29,19 @@
       ((Tuple
         (Incompatible ((a b) (Alias (Tuple ((Var a) (Var b)))))
          ((a a) (Alias (Tuple ((Var a) (Var a)))))))))
-     (module_diff ()))))
+     (module_diff
+      ((A
+        (Module_diff
+         ((name_diff ())
+          (type_diff
+           ((Number
+             (Incompatible
+              (()
+               (Variants
+                ((Int ((Type_app Int ()))) (Float ((Type_app Float ()))))))
+              (()
+               (Variants
+                ((Int ((Type_app ErrorSignatureCompatibility.A.Int ())))
+                 (Float ((Type_app ErrorSignatureCompatibility.A.Float ()))))))))))
+          (module_diff ())))))))))
   (filename ErrorSignatureCompatibility.um)))

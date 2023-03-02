@@ -467,6 +467,11 @@ module Module = struct
   end
 
   (* Copy type and module declarations to defs if they were left out *)
+  (* TODO: A problem with just copying values over from the sigs to the defs textually is
+     that they might refer to different things due to imports. It's also just kind of
+     re-implementing the features of [Name_bindings]. Doing the checks at the lookup stage
+     does seem like a recipe for pain though. Maybe we could do this step *after*
+     resolving imports and absolutifying everything? *)
   let rec copy_some_sigs_to_defs sigs defs =
     let rec gather_decls ~sig_map sigs =
       List.fold sigs ~init:sig_map ~f:(fun sig_map sig_ ->
@@ -510,15 +515,19 @@ module Module = struct
             | Module (module_name, sigs, defs) ->
               (match Nested_map.find_module sig_map module_name with
                | Some child_map ->
+                 let sig_map = Nested_map.remove_module sig_map module_name in
                  if List.is_empty sigs
                  then
-                   ( Nested_map.remove_module sig_map module_name
-                   , Module (module_name, [], copy_to_defs ~sig_map:child_map defs) )
+                   ( sig_map
+                   , Module (module_name, sigs, copy_to_defs ~sig_map:child_map defs) )
                  else
                    (* Don't copy inherited sigs from the parent over (at least for now)
-                      because it's complicated. *)
+                      because it's complicated. However, we do want to copy the local sigs
+                      to its defs here. *)
                    sig_map, Module (module_name, sigs, copy_some_sigs_to_defs sigs defs)
                | None ->
+                 (* If there's no module in the signature, there's nothing to copy from
+                    there. We still want to copy the local sigs to its defs here though. *)
                  sig_map, Module (module_name, sigs, copy_some_sigs_to_defs sigs defs))
             | Trait _ -> failwith "TODO: copy trait_sigs to defs, without overriding"
             | Let _ | Impl _ -> sig_map, def))
