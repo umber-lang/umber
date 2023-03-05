@@ -8,6 +8,7 @@ and common =
   | Val of Value_name.t * Fixity.t option * Type.Scheme.Bounded.t
   | Extern of Value_name.t * Fixity.t option * Type.Scheme.t * Extern_name.t
   | Type_decl of Type_name.t * Type.Decl.t
+  | Effect of Effect_name.t * Type_param_name.t list * sig_ Node.t list option
   (* TODO: [Trait_sig] actually can't appear in defs as it is just parsed as [Trait].
      There should probably be a sig-only type. *)
   | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * sig_ Node.t list

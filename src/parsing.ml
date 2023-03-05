@@ -40,6 +40,7 @@ type token = Parser.token =
   | EQUALS
   | EOF
   | ELSE
+  | EFFECT
   | COMMA
   | COLON_SPACED
   | COLON
@@ -101,6 +102,7 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_EQUALS : unit terminal
   | T_EOF : unit terminal
   | T_ELSE : unit terminal
+  | T_EFFECT : unit terminal
   | T_COMMA : unit terminal
   | T_COLON_SPACED : unit terminal
   | T_COLON : unit terminal
@@ -149,6 +151,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_option_preceded_EQUALS_type_decl__ : Type.Decl.decl option nonterminal
   | N_option_preceded_EQUALS_pattern__
       : Type.Scheme.Bounded.t Pattern.t option nonterminal
+  | N_option_preceded_EQUALS_list_stmt_sig___ : Module.sig_ Node.t list option nonterminal
   | N_option_preceded_EQUALS_expr__ : Untyped.Expr.t option nonterminal
   | N_option_parens_fixity__ : Fixity.t option nonterminal
   | N_operator : (Ustring.t list * Ustring.t) nonterminal

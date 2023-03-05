@@ -1,0 +1,5 @@
+effect Read = {
+  val ask : () -> Int
+}
+
+let read_and_add () = ask () + ask ()

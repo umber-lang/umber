@@ -28,6 +28,7 @@
 %token TRAIT
 %token IMPL
 %token IMPORT
+%token EFFECT
 
 %token EQUALS
 %token PIPE
@@ -279,6 +280,9 @@ stmt_common:
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
+  | EFFECT; name = UPPER_NAME; params = type_params
+    decl = option(preceded(EQUALS, list(stmt_sig)))
+    { Module.Effect (Effect_name.of_ustring_unchecked name, params, decl) }
   | import = import_stmt { import }
 
 stmt_sig_:

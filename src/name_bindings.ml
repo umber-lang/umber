@@ -153,6 +153,13 @@ module Path = struct
   let append t module_name ~place = t @ [ module_name, place ]
 end
 
+module Type_entry = struct
+  type t =
+    | Type_decl of Type.Decl.t
+    | Effect of Effect.t
+  [@@deriving sexp]
+end
+
 type t =
   { current_path : Path.t
   ; toplevel : defs
@@ -163,7 +170,7 @@ and defs = sigs bindings
 
 and 'a bindings =
   { names : (Name_entry.t, Value_name.Qualified.t) Or_imported.t Value_name.Map.t
-  ; types : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option Type_name.Map.t
+  ; types : (Type_entry.t, Type_name.Qualified.t) Or_imported.t option Type_name.Map.t
   ; modules : ('a option * 'a bindings, Module_path.t) Or_imported.t Module_name.Map.t
   }
 [@@deriving sexp]
@@ -285,7 +292,10 @@ let core =
             Intrinsics.all
             ~init:empty_bindings.types
             ~f:(fun types (module Intrinsic) ->
-            Map.set types ~key:Intrinsic.name ~data:(Some (Local Intrinsic.decl)))
+            Map.set
+              types
+              ~key:Intrinsic.name
+              ~data:(Some (Local (Type_decl Intrinsic.decl))))
       ; names =
           List.fold
             Intrinsics.Bool.cnstrs
@@ -427,7 +437,7 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_decl' ?at_path ?defs_only t name =
+let find_type_entry' ?at_path ?defs_only t name =
   let open Option.Let_syntax in
   find
     ?at_path
@@ -474,7 +484,7 @@ let absolutify_path t path =
     ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
 ;;
 
-let absolutify_type_name t ((_, name) as path) = fst (find_type_decl' t path), name
+let absolutify_type_name t ((_, name) as path) = fst (find_type_entry' t path), name
 let absolutify_value_name t name = fst (find_entry' t name)
 
 (* TODO: how do I fill in foreign modules?
@@ -600,6 +610,7 @@ let add_extern t name fixity typ extern_name ~unify =
 ;;
 
 let absolutify_type_decl t = Type.Decl.map_exprs ~f:(absolutify_type_expr t)
+let absolutify_effect t = Effect.map_exprs ~f:(absolutify_type_expr t)
 
 let add_to_types ?(err_msg = "Type name clash") types name decl =
   Map.update types name ~f:(function
@@ -620,7 +631,7 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
         add_to_types
           bindings.types
           type_name
-          (Some (Local decl))
+          (Some (Local (Type_decl decl)))
           ~err_msg:"Duplicate type declarations"
     ; names =
         (match decl with
@@ -643,6 +654,29 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
                   "Variant constructor name clashes with another value"
                   (Cnstr_name.to_ustring cnstr_name))
          | _ -> bindings.names)
+    }
+  in
+  update_current t ~f:{ f }
+;;
+
+let add_effect t effect_name effect =
+  let f bindings =
+    let effect = absolutify_effect t effect in
+    { bindings with
+      types =
+        add_to_types
+          bindings.types
+          (Effect_name.to_type_name effect_name)
+          (Some (Local (Effect effect)))
+          ~err_msg:"Duplicate effect declarations"
+    ; names =
+        Option.fold effect.operations ~init:bindings.names ~f:(fun init operations ->
+          List.fold operations ~init ~f:(fun names { name; args; result } ->
+            let entry = Name_entry.val_declared (Function (args, result)) in
+            Map.add names ~key:name ~data:(Local entry)
+            |> or_name_clash
+                 "Effect operation name clashes with another value"
+                 (Value_name.to_ustring name)))
     }
   in
   update_current t ~f:{ f }
@@ -732,24 +766,24 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let rec find_type_decl ?at_path ?defs_only t type_name =
+let rec find_type_entry ?at_path ?defs_only t type_name =
   resolve_decl_or_import
     ?at_path
     ?defs_only
     t
-    (snd (find_type_decl' ?at_path ?defs_only t type_name))
+    (snd (find_type_entry' ?at_path ?defs_only t type_name))
 
 and resolve_decl_or_import ?at_path ?defs_only t = function
   | Some (Or_imported.Local decl) -> Some decl
   | Some (Imported path_name) ->
     (* TODO: pretty sure this import path should be resolved at the place it's written,
        not the current path - this goes for all imports, unless we absolutify their paths *)
-    find_type_decl ?at_path ?defs_only t path_name
+    find_type_entry ?at_path ?defs_only t path_name
   | None -> None
 ;;
 
-let find_type_decl ?at_path ?(defs_only = false) t type_name =
-  option_or_default (find_type_decl ?at_path ~defs_only t type_name) ~f:(fun () ->
+let find_type_entry ?at_path ?(defs_only = false) t type_name =
+  option_or_default (find_type_entry ?at_path ~defs_only t type_name) ~f:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
@@ -757,17 +791,17 @@ let find_type_decl ?at_path ?(defs_only = false) t type_name =
           (without_std t : t)])
 ;;
 
-let resolve_decl_or_import ?at_path t decl_or_import =
-  option_or_default (resolve_decl_or_import ?at_path t decl_or_import) ~f:(fun () ->
+let resolve_decl_or_import ?at_path t type_entry =
+  option_or_default (resolve_decl_or_import ?at_path t type_entry) ~f:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option)
+          (type_entry : (Type_entry.t, Type_name.Qualified.t) Or_imported.t option)
           (without_std t : t)])
 ;;
 
-let find_absolute_type_decl = find_type_decl ~at_path:[]
-let find_type_decl = find_type_decl ?at_path:None
+let find_absolute_type_entry = find_type_entry ~at_path:[]
+let find_type_entry = find_type_entry ?at_path:None
 let current_path t = t.current_path
 
 let find_sigs_and_defs t path module_name =
@@ -828,7 +862,7 @@ module Sigs_or_defs = struct
   ;;
 
   let find_entry = make_find ~into_bindings:names ~resolve:resolve_name_or_import
-  let find_type_decl = make_find ~into_bindings:types ~resolve:resolve_decl_or_import
+  let find_type_entry = make_find ~into_bindings:types ~resolve:resolve_decl_or_import
 
   let find_module t bindings module_name =
     let open Option.Let_syntax in

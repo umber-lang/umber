@@ -107,6 +107,7 @@ let rec read lexbuf =
   | "trait" -> TRAIT
   | "impl" -> IMPL
   | "import" -> IMPORT
+  | "effect" -> EFFECT
   (* Special symbols *)
   | '=' -> EQUALS
   | '|' -> PIPE

@@ -1376,7 +1376,8 @@ let of_typed_module =
           ( ctx
           , Extern_decl { name; extern_name; arity = arity_of_type ~names type_ } :: stmts
           )
-        | Common_def (Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
+        | Common_def
+            (Effect _ | Val _ | Trait_sig _ | Import _ | Import_with _ | Import_without _)
           -> ctx, stmts))
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->

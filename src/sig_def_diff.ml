@@ -71,15 +71,17 @@ let check_type_schemes =
         | expr -> Defer expr)
     in
     let check_type_app ~name ~args ~kind ~on_non_alias =
-      match Name_bindings.find_absolute_type_decl names name with
-      | params, Alias alias ->
+      match Name_bindings.find_absolute_type_entry names name with
+      | Type_decl (params, Alias alias) ->
         let alias = substitute_alias ~params ~args alias in
         check_type_schemes
           ~names
           ~param_matching
           ~param_table
           ~schemes:(By_kind.set schemes kind alias)
-      | decl -> on_non_alias decl
+      | Type_decl decl -> on_non_alias decl
+      | Effect effect ->
+        compiler_bug [%message "Unexpected effect type" (effect : Effect.t)]
     in
     match (schemes : Type.Scheme.t By_kind.t), param_matching with
     | { sig_ = Var sig_param; def = Var def_param }, `None ->
@@ -239,8 +241,8 @@ let create ~names module_name =
           inner_names
           (Sigs_or_defs.type_names bindings1, bindings1)
           (Sigs_or_defs.type_names bindings2, bindings2)
-          ~compatible:compatible_type_decls
-          ~find:Sigs_or_defs.find_type_decl
+          ~compatible:compatible_type_entries
+          ~find:Sigs_or_defs.find_type_entry
     ; module_diff = do_module_diff ~names ~inner_names bindings1 bindings2
     }
   and do_module_diff ~names ~inner_names bindings1 bindings2 =

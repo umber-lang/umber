@@ -482,6 +482,8 @@ module Module = struct
                let def = Node.set sig_ (Common_def common) in
                Nested_map.map sig_map ~f:(Sig_data.add_type_decl ~type_name ~def)
              | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
+             (* TODO: Implement effect copying from sigs to defs *)
+             | Effect _
              | Val _
              | Extern _
              (* We could consider handling imports bringing in type declarations to copy
@@ -510,8 +512,8 @@ module Module = struct
                  ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_type_decl type_name)
                  , def )
                | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-               | Val _ | Extern _ | Import _ | Import_with _ | Import_without _ ->
-                 sig_map, def)
+               | Effect _ | Val _ | Extern _ | Import _ | Import_with _ | Import_without _
+                 -> sig_map, def)
             | Module (module_name, sigs, defs) ->
               (match Nested_map.find_module sig_map module_name with
                | Some child_map ->
@@ -557,6 +559,13 @@ module Module = struct
       | Val (name, _, _) | Extern (name, _, _, _) ->
         Name_bindings.add_name_placeholder names name
       | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
+      | Effect (effect_name, _, _) ->
+        (* FIXME: This also needs to add name placeholders for the items in the effect...
+           Also need to decide how I want the scoping to work. Does an effect define a
+           namespace? Maybe it does, but puns with the outer one? Or maybe it's simpler if
+           we just have modules be the only namespacing. (Yeah, you can always surround
+           the thing with a module with the same name.)  *)
+        Name_bindings.add_type_placeholder names (Effect_name.to_type_name effect_name)
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
@@ -591,6 +600,9 @@ module Module = struct
       | Import_with (path, imports) -> Name_bindings.import_with names path imports
       | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
+      | Effect (effect_name, params, sigs) ->
+        let effect = Effect.create params sigs in
+        Name_bindings.add_effect names effect_name effect
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ -> names)
   ;;
@@ -650,7 +662,8 @@ module Module = struct
       | Type_decl (name, (_, Alias alias)) ->
         check_cyclic_type_alias ~names name alias;
         names
-      | Type_decl _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ -> names
+      | Type_decl _ | Effect _ | Trait_sig _ | Import _ | Import_with _ | Import_without _
+        -> names
     in
     let rec handle_sigs ~names ~handle_common =
       List.fold ~init:names ~f:(fun names sig_ ->
