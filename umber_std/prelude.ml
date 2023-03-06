@@ -23,10 +23,11 @@ let names = {|
     ((True (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %true))))
      (False (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %false))))))
    (types
-    ((Int ((Local (() Abstract))))
-     (Bool ((Local (() (Variants ((False ()) (True ())))))))
-     (Char ((Local (() Abstract)))) (Float ((Local (() Abstract))))
-     (String ((Local (() Abstract))))))
+    ((Int ((Local (Type_decl (() Abstract)))))
+     (Bool ((Local (Type_decl (() (Variants ((False ()) (True ()))))))))
+     (Char ((Local (Type_decl (() Abstract)))))
+     (Float ((Local (Type_decl (() Abstract)))))
+     (String ((Local (Type_decl (() Abstract)))))))
    (modules
     ((Std
       (Local
@@ -103,12 +104,13 @@ let names = {|
                       (types
                        ((List
                          ((Local
-                           ((a)
-                            (Variants
-                             ((Nil ())
-                              (Cons
-                               ((Var a)
-                                (Type_app Std.Prelude.List.List ((Var a)))))))))))))
+                           (Type_decl
+                            ((a)
+                             (Variants
+                              ((Nil ())
+                               (Cons
+                                ((Var a)
+                                 (Type_app Std.Prelude.List.List ((Var a))))))))))))))
                       (modules ())))))
                   (Operators
                    (Local
@@ -329,12 +331,13 @@ let names = {|
                      (types
                       ((List
                         ((Local
-                          ((a)
-                           (Variants
-                            ((Nil ())
-                             (Cons
-                              ((Var a)
-                               (Type_app Std.Prelude.List.List ((Var a)))))))))))))
+                          (Type_decl
+                           ((a)
+                            (Variants
+                             ((Nil ())
+                              (Cons
+                               ((Var a)
+                                (Type_app Std.Prelude.List.List ((Var a))))))))))))))
                      (modules ())))))
                  (Operators
                   (Local
