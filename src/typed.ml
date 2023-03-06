@@ -559,13 +559,13 @@ module Module = struct
       | Val (name, _, _) | Extern (name, _, _, _) ->
         Name_bindings.add_name_placeholder names name
       | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
-      | Effect (effect_name, _, _) ->
+      | Effect (effect_name, effect) ->
         (* FIXME: This also needs to add name placeholders for the items in the effect...
            Also need to decide how I want the scoping to work. Does an effect define a
            namespace? Maybe it does, but puns with the outer one? Or maybe it's simpler if
            we just have modules be the only namespacing. (Yeah, you can always surround
            the thing with a module with the same name.)  *)
-        Name_bindings.add_type_placeholder names (Effect_name.to_type_name effect_name)
+        Name_bindings.add_effect_placeholder names effect_name effect
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
@@ -600,9 +600,7 @@ module Module = struct
       | Import_with (path, imports) -> Name_bindings.import_with names path imports
       | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
-      | Effect (effect_name, params, sigs) ->
-        let effect = Effect.create params sigs in
-        Name_bindings.add_effect names effect_name effect
+      | Effect (effect_name, effect) -> Name_bindings.add_effect names effect_name effect
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ -> names)
   ;;

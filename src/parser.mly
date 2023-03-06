@@ -280,9 +280,10 @@ stmt_common:
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
-  | EFFECT; name = UPPER_NAME; params = type_params
-    decl = option(preceded(EQUALS, list(stmt_sig)))
-    { Module.Effect (Effect_name.of_ustring_unchecked name, params, decl) }
+  | EFFECT; name = UPPER_NAME; params = type_params;
+    sigs = option(preceded(EQUALS, list(stmt_sig)))
+    { Module.Effect (
+        Effect_name.of_ustring_unchecked name, Untyped.create_effect params sigs) }
   | import = import_stmt { import }
 
 stmt_sig_:

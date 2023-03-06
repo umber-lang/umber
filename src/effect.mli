@@ -16,5 +16,5 @@ type t =
   }
 [@@deriving sexp]
 
-val create : Type_param_name.t list -> Module.sig_ Node.t list option -> t
 val map_exprs : t -> f:(Type.Scheme.t -> Type.Scheme.t) -> t
+val fold_operations : t -> init:'acc -> f:('acc -> Operation.t -> 'acc) -> 'acc

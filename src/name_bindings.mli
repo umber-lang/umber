@@ -50,6 +50,7 @@ val find_fixity : t -> Value_name.Qualified.t -> Fixity.t
 val set_inferred_scheme : t -> Value_name.t -> Type.Scheme.t -> t
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_placeholder : t -> Type_name.t -> t
+val add_effect_placeholder : t -> Effect_name.t -> Effect.t -> t
 
 (** Fold over all the local (non-imported) names bound. *)
 val fold_local_names

@@ -670,13 +670,15 @@ let add_effect t effect_name effect =
           (Some (Local (Effect effect)))
           ~err_msg:"Duplicate effect declarations"
     ; names =
-        Option.fold effect.operations ~init:bindings.names ~f:(fun init operations ->
-          List.fold operations ~init ~f:(fun names { name; args; result } ->
-            let entry = Name_entry.val_declared (Function (args, result)) in
-            Map.add names ~key:name ~data:(Local entry)
-            |> or_name_clash
-                 "Effect operation name clashes with another value"
-                 (Value_name.to_ustring name)))
+        Effect.fold_operations
+          effect
+          ~init:bindings.names
+          ~f:(fun names { name; args; result } ->
+          let entry = Name_entry.val_declared (Function (args, result)) in
+          Map.add names ~key:name ~data:(Local entry)
+          |> or_name_clash
+               "Effect operation name clashes with another value"
+               (Value_name.to_ustring name))
     }
   in
   update_current t ~f:{ f }
@@ -729,6 +731,13 @@ let add_type_placeholder t type_name =
     }
   in
   update_current t ~f:{ f }
+;;
+
+let add_effect_placeholder t effect_name effect =
+  (* TODO: This could be more efficient if it just did all the updates in one go. *)
+  let t = add_type_placeholder t (Effect_name.to_type_name effect_name) in
+  Effect.fold_operations effect ~init:t ~f:(fun t operation ->
+    add_name_placeholder t operation.name)
 ;;
 
 let fold_local_names t ~init ~f =
