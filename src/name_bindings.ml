@@ -802,6 +802,24 @@ let resolve_decl_or_import ?at_path t type_entry =
 
 let find_absolute_type_entry = find_type_entry ~at_path:[]
 let find_type_entry = find_type_entry ?at_path:None
+
+let expect_type_decl ~type_name type_entry =
+  match (type_entry : Type_entry.t) with
+  | Type_decl decl -> decl
+  | Effect _ ->
+    name_error
+      ~msg:"Expected a regular type, not an effect"
+      (Type_name.Qualified.to_ustring type_name)
+;;
+
+let find_absolute_type_decl ?defs_only t type_name =
+  find_absolute_type_entry ?defs_only t type_name |> expect_type_decl ~type_name
+;;
+
+let find_type_decl ?defs_only t type_name =
+  find_type_entry ?defs_only t type_name |> expect_type_decl ~type_name
+;;
+
 let current_path t = t.current_path
 
 let find_sigs_and_defs t path module_name =
@@ -862,7 +880,11 @@ module Sigs_or_defs = struct
   ;;
 
   let find_entry = make_find ~into_bindings:names ~resolve:resolve_name_or_import
-  let find_type_entry = make_find ~into_bindings:types ~resolve:resolve_decl_or_import
+
+  let find_type_decl names t type_name =
+    make_find ~into_bindings:types ~resolve:resolve_decl_or_import names t type_name
+    |> expect_type_decl ~type_name:([], type_name)
+  ;;
 
   let find_module t bindings module_name =
     let open Option.Let_syntax in

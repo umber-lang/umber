@@ -22,13 +22,6 @@ module Name_entry : sig
   val merge : t -> t -> t
 end
 
-module Type_entry : sig
-  type t =
-    | Type_decl of Type.Decl.t
-    | Effect of Effect.t
-  [@@deriving sexp]
-end
-
 module Path : sig
   type t [@@deriving compare, equal, hash, sexp]
 
@@ -74,16 +67,11 @@ val merge_names
 (* FIXME: I'm not sure if we need to expose this functionalit or if ~every callsite is
    going to want "find a decl, if it's an effect then raise". *)
 
-(** Find a type entry (normal type declaration or effect type) given a qualified name. *)
-val find_type_entry : ?defs_only:bool -> t -> Type_name.Qualified.t -> Type_entry.t
+(** Find a type declaration given a qualified name. *)
+val find_type_decl : ?defs_only:bool -> t -> Type_name.Qualified.t -> Type.Decl.t
 
-(** Find a type entry (normal type declaration or effect type) given an absolute qualified
-    name. *)
-val find_absolute_type_entry
-  :  ?defs_only:bool
-  -> t
-  -> Type_name.Qualified.t
-  -> Type_entry.t
+(** Find a type declaration given an absolute qualified name. *)
+val find_absolute_type_decl : ?defs_only:bool -> t -> Type_name.Qualified.t -> Type.Decl.t
 
 (** Convert a qualified type name to one with an absolute module path *)
 val absolutify_type_name : t -> Type_name.Qualified.t -> Type_name.Qualified.t
@@ -145,7 +133,7 @@ module Sigs_or_defs : sig
   val type_names : t -> Type_name.Set.t
   val module_names : t -> Module_name.Set.t
   val find_entry : name_bindings -> t -> Value_name.t -> Name_entry.t
-  val find_type_entry : name_bindings -> t -> Type_name.t -> Type_entry.t
+  val find_type_decl : name_bindings -> t -> Type_name.t -> Type.Decl.t
   val find_module : name_bindings -> t -> Module_name.t -> t option
 end
 
