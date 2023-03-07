@@ -565,6 +565,23 @@ let of_prelude_sexp sexp =
 
 let prelude = lazy (of_prelude_sexp Umber_std.Prelude.names)
 
+let add_name_entry names name scheme new_entry ~unify =
+  Map.update names name ~f:(function
+    | None ->
+      compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
+    | Some (Or_imported.Local existing_entry) ->
+      (* FIXME: We should probably be asserting that the existing entry is a placeholder. *)
+      unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
+      Local (Name_entry.merge existing_entry new_entry)
+    | Some (Imported imported_name) ->
+      name_error
+        ~msg:"Name clashes with imported item"
+        Ustring.(
+          Value_name.to_ustring name
+          ^ of_string_exn " vs "
+          ^ Value_name.Qualified.to_ustring imported_name))
+;;
+
 let add_val_or_extern
   ?extern_name
   t
@@ -577,28 +594,10 @@ let add_val_or_extern
   let f bindings =
     if not (List.is_empty trait_bounds) then failwith "TODO: trait bounds in val";
     let scheme = absolutify_type_expr t type_expr in
-    { bindings with
-      names =
-        Map.update bindings.names name ~f:(function
-          | None ->
-            compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
-          | Some (Local existing_entry) ->
-            unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
-            Local
-              (Name_entry.merge
-                 existing_entry
-                 { type_source; typ = Scheme scheme; fixity; extern_name })
-          | Some (Imported imported_name) ->
-            (* TODO: consider allowing this use case
-               e.g. importing from another module, and then giving that import a new,
-               compatible type declaration *)
-            name_error
-              ~msg:"Duplicate val for imported item"
-              Ustring.(
-                Value_name.to_ustring name
-                ^ of_string_exn " vs "
-                ^ Value_name.Qualified.to_ustring imported_name))
-    }
+    let new_entry : Name_entry.t =
+      { type_source; typ = Scheme scheme; fixity; extern_name }
+    in
+    { bindings with names = add_name_entry bindings.names name scheme new_entry ~unify }
   in
   update_current t ~f:{ f }
 ;;
@@ -649,6 +648,12 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
                   | Some args -> Function (args, result_type)
                   | None -> result_type)
              in
+             (* FIXME: Name clashes should actually be expected here since we should be
+                adding placeholder values for constructors, but aren't. Granted,
+                placeholders are pretty hacky. We could also look at trying to get rid of
+                them. Ah, the problem is * imports of submodules need to know the set of
+                names to import. An alternative could be representing * imports as an
+                extra place to check rather than as entries themselves. *)
              Map.add names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry)
              |> or_name_clash
                   "Variant constructor name clashes with another value"
@@ -659,11 +664,13 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
   update_current t ~f:{ f }
 ;;
 
-let add_effect t effect_name effect =
+let add_effect t effect_name effect ~unify =
   let f bindings =
     let effect = absolutify_effect t effect in
     { bindings with
       types =
+        (* TODO: We could reasonably support effects and types being in separate
+           namespaces, like we do for types and modules. *)
         add_to_types
           bindings.types
           (Effect_name.to_type_name effect_name)
@@ -674,11 +681,9 @@ let add_effect t effect_name effect =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let entry = Name_entry.val_declared (Function (args, result)) in
-          Map.add names ~key:name ~data:(Local entry)
-          |> or_name_clash
-               "Effect operation name clashes with another value"
-               (Value_name.to_ustring name))
+          let scheme : Type.Scheme.t = Function (args, result) in
+          let new_entry = Name_entry.val_declared scheme in
+          add_name_entry names name scheme new_entry ~unify)
     }
   in
   update_current t ~f:{ f }

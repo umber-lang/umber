@@ -594,13 +594,18 @@ module Module = struct
   (* TODO: figure out import shadowing semantics - basically, probably ban shadowing *)
 
   (** Gather all imported names and local type/trait declarations. *)
-  let gather_imports_and_type_decls ~names sigs defs =
+  let gather_imports_and_type_decls ~names ~types sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Import module_name -> Name_bindings.import names module_name
       | Import_with (path, imports) -> Name_bindings.import_with names path imports
       | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
-      | Effect (effect_name, effect) -> Name_bindings.add_effect names effect_name effect
+      | Effect (effect_name, effect) ->
+        (* FIXME: I think we actually want to be adding placehdolders with the rest of
+           them in the previous step in type-checking? This is also just broken for type
+           declarations with variants I think. *)
+        let unify = Type_bindings.unify ~names ~types in
+        Name_bindings.add_effect names effect_name effect ~unify
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ -> names)
   ;;
@@ -845,7 +850,7 @@ module Module = struct
     try
       let defs = copy_some_sigs_to_defs sigs defs in
       let names = gather_name_placeholders ~names module_name sigs defs in
-      let names = gather_imports_and_type_decls ~names module_name sigs defs in
+      let names = gather_imports_and_type_decls ~names ~types module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
       (* TODO: should check every [Val] has a corresponding [Let]. *)

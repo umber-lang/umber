@@ -123,7 +123,7 @@ val add_extern
   -> t
 
 val add_type_decl : t -> Type_name.t -> Type.Decl.t -> t
-val add_effect : t -> Effect_name.t -> Effect.t -> t
+val add_effect : t -> Effect_name.t -> Effect.t -> unify:(Type.t -> Type.t -> unit) -> t
 
 module Sigs_or_defs : sig
   type name_bindings = t

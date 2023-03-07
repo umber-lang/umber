@@ -1,5 +1,6 @@
 effect Read = {
-  val ask : () -> Int
+  # TODO: Remove this hack by either rethinking the trait bound syntax or fixing the parser
+  val ask : () => () -> Int
 }
 
 let read_and_add () = ask () + ask ()

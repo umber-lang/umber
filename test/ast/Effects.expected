@@ -1,0 +1,14 @@
+(Effects ()
+ ((Common_def
+   (Effect Read
+    ((params ())
+     (operations
+      ((((name ask) (args ((Tuple ()))) (result (Type_app Int ())))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all (read_and_add))
+      ((Lambda ((Tuple ()))
+        (Fun_call (Name +)
+         (((Fun_call (Name ask) (((Tuple ()) (Tuple ())))) (Type_app Int ()))
+          ((Fun_call (Name ask) (((Tuple ()) (Tuple ())))) (Type_app Int ())))))
+       (Function ((Tuple ())) (Type_app Int ())))))))))

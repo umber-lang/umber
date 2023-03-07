@@ -81,6 +81,21 @@
    (diff output/CrossModuleUsage.expected output/CrossModuleUsage.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Effects.expected tokens/Effects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Effects.expected ast/Effects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/Effects.expected mir/Effects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff llvm/Effects.expected llvm/Effects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Effects.expected output/Effects.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Empty.expected tokens/Empty.out))))
 
 (rule (alias runtest) (deps test.dummy)

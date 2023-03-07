@@ -151,8 +151,9 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_option_preceded_EQUALS_type_decl__ : Type.Decl.decl option nonterminal
   | N_option_preceded_EQUALS_pattern__
       : Type.Scheme.Bounded.t Pattern.t option nonterminal
-  | N_option_preceded_EQUALS_list_stmt_sig___ : Module.sig_ Node.t list option nonterminal
   | N_option_preceded_EQUALS_expr__ : Untyped.Expr.t option nonterminal
+  | N_option_preceded_EQUALS_braces_list_stmt_sig____
+      : Module.sig_ Node.t list option nonterminal
   | N_option_parens_fixity__ : Fixity.t option nonterminal
   | N_operator : (Ustring.t list * Ustring.t) nonterminal
   | N_op_section : Untyped.Expr.t nonterminal
@@ -222,6 +223,14 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_either_COLON_COLON_SPACED_ : unit nonterminal
 [@@deriving sexp_of]
 
+let sexp_of_production prod =
+  let (X symbol) = I.lhs prod in
+  let empty_sexp _ = Sexp.List [] in
+  match symbol with
+  | T terminal -> sexp_of_terminal empty_sexp terminal
+  | N nonterminal -> sexp_of_nonterminal empty_sexp nonterminal
+;;
+
 let handle_syntax_error f =
   try Ok (f ()) with
   | Lexer.Syntax_error (pos, msg) ->
@@ -269,15 +278,7 @@ let parse ?print_tokens_to lexbuf =
       let state = I.current_state_number env in
       let prod_msg =
         match !last_prod with
-        | Some prod ->
-          let (X symbol) = I.lhs prod in
-          let empty_sexp _ = Sexp.List [] in
-          let str =
-            match symbol with
-            | T terminal -> sexp_of_terminal empty_sexp terminal
-            | N nonterminal -> sexp_of_nonterminal empty_sexp nonterminal
-          in
-          sprintf ". (Last production: %s)" (Sexp.to_string str)
+        | Some prod -> sprintf !". (Last production: %{sexp: production})" prod
         | None -> ""
       in
       Lexer.syntax_error ~msg:(sprintf "Parser error in state %d%s" state prod_msg) lexbuf
