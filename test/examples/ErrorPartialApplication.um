@@ -1,0 +1,18 @@
+# TODO: Because of how function types are implemented in the type-checker right now,
+# at generalization time `apply_arg` gets a type `(Int -> a) -> a`. Because there is no
+# auto-currying, this is not compatible with a function like `bar : Int, Int -> Int`.
+# We could potentially support more polymorphism for partial application by allowing
+# generalizaed partial function types e.g. `apply_arg : (Int, .. -> a) -> a`. This would
+# have to create a closure over the applied arguments.
+
+# FIXME: I think we are probably not handling closure allocation for regular partial
+# application correctly.
+
+let apply_arg f = f 1
+
+let foo x = x * 2
+let bar x y = x + y
+
+let _ = apply_arg foo
+let _ = apply_arg bar
+let _ = (apply_arg bar) 7
