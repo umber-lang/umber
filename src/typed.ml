@@ -28,7 +28,8 @@ module Pattern = struct
         (* TODO: inferring unqualified name given type information *)
         let arg_types, body_type =
           match Name_bindings.find_cnstr_type names cnstr with
-          | Function (arg_types, body_type) -> Nonempty.to_list arg_types, body_type
+          | Function (arg_types, _effect, body_type) ->
+            Nonempty.to_list arg_types, body_type
           | body_type -> [], body_type
         in
         (match
@@ -160,16 +161,23 @@ module Expr = struct
 
   let of_untyped, type_recursive_let_bindings =
     let rec of_untyped ~names ~types ~f_name expr =
+      let no_effects = { Type.Expr.effects = Effect_name.Map.empty; effect_var = None } in
       match (expr : Untyped.Expr.t) with
-      | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit)
+      | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit), no_effects
       | Name name ->
         let name_entry = Name_bindings.find_entry names name in
         f_name name name_entry;
-        Name name, Name_bindings.Name_entry.typ name_entry
+        Name name, Name_bindings.Name_entry.typ name_entry, no_effects
       | Qualified (path, expr) ->
         of_untyped ~names:(Name_bindings.import_all names path) ~types ~f_name expr
       | Fun_call (fun_, args) ->
-        let fun_, fun_type = of_untyped ~names ~types ~f_name fun_ in
+        let call_effects =
+          { Type.Expr.effects = Effect_name.Map.empty
+          ; effect_var = Some (Type.Var_id.create ())
+          }
+        in
+        let fun_, fun_type, fun_effects = of_untyped ~names ~types ~f_name fun_ in
+        let all_effects = Type.Expr.combine_effects call_effects fun_effects in
         let args =
           Nonempty.map args ~f:(fun arg ->
             let arg, arg_type = of_untyped ~names ~types ~f_name arg in
@@ -181,8 +189,8 @@ module Expr = struct
           ~names
           ~types
           fun_type
-          (Partial_function (arg_types, result_var));
-        Fun_call (fun_, args), Var result_var
+          (Partial_function (arg_types, call_effects, result_var));
+        Fun_call (fun_, args), Var result_var, call_effects
       | Op_tree tree ->
         of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
       | Lambda (args, body) ->

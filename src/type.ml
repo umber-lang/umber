@@ -60,9 +60,15 @@ module Expr = struct
     | Var of 'v
     | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
     | Tuple of ('v, 'pf) t list
-    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) t
-    | Partial_function of ('v, 'pf) t Nonempty.t * 'pf
-  [@@deriving compare, equal, hash, sexp, variants]
+    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * ('v, 'pf) t
+    | Partial_function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * 'pf
+    | Partial_effect of ('v, 'pf) t * ('pf, 'pf) effect_row
+
+  and ('v, 'pf) effect_row =
+    { effects : ('v, 'pf) t list Effect_name.Map.t
+    ; effect_var : 'v
+    }
+  [@@deriving compare, equal, sexp]
 
   let rec map ?(f = Map_action.defer) typ ~var ~pf =
     match f typ with
@@ -117,6 +123,18 @@ module Expr = struct
       | Var var -> if f var then Stop true else Continue false
       | _ -> Continue false)
     |> Fold_action.id
+  ;;
+
+  (* FIXME: Idea: sequenced actions add effects to the environment. Conceptually, there
+     are a set of effects. Complicating this is effect polymorphism. Calls to function
+     parameters produce some variable set of effects, represented with effect variables.
+     When combining calls to multiple functions, we want to include both effect variables.
+     We can do this by unifying them. *)
+  let combine_effects
+    { effects = effects1; effect_var = var1 }
+    { effects = effects2; effect_var = var2 }
+    =
+    ()
   ;;
 end
 

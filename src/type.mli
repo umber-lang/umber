@@ -34,13 +34,24 @@ module Param : sig
 end
 
 module Expr : sig
+  (* FIXME: Rename pf to partial (p?) or something *)
   type ('v, 'pf) t =
     | Var of 'v
     | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
     | Tuple of ('v, 'pf) t list
-    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) t
-    | Partial_function of ('v, 'pf) t Nonempty.t * 'pf
-  [@@deriving compare, equal, hash, sexp, variants]
+    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * ('v, 'pf) t
+    | Partial_function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * 'pf
+  (* FIXME: We want partial_effect to only be present while doing type inference, I
+       think. Maybe we don't need to enforce that/maybe it still makes sense? *)
+  (* | Partial_effect of ('v, 'pf) effect_row *)
+
+  and ('v, 'pf) effect_row =
+    { (* TODO: Consider allowing multiple effects with the same name but applied to different
+     types to coexist in the same expression. *)
+      effects : ('v, 'pf) t list Effect_name.Map.t
+    ; effect_var : 'v option
+    }
+  [@@deriving compare, equal, sexp]
 
   val map
     :  ?f:(('v1, 'pf1) t -> (('v1, 'pf1) t, ('v2, 'pf2) t) Map_action.t)
@@ -58,6 +69,11 @@ module Expr : sig
   val fold_vars : ('v, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
   val for_all_vars : ('v, _) t -> f:('v -> bool) -> bool
   val exists_var : ('v, _) t -> f:('v -> bool) -> bool
+
+  val combine_effects
+    :  ('v, 'pf) effect_row
+    -> ('v, 'pf) effect_row
+    -> ('v, 'pf) effect_row
 end
 
 type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
