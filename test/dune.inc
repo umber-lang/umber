@@ -330,6 +330,36 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorPartialApplication.expected
+    tokens/ErrorPartialApplication.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorPartialApplication.expected
+    ast/ErrorPartialApplication.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorPartialApplication.expected
+    mir/ErrorPartialApplication.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorPartialApplication.expected
+    llvm/ErrorPartialApplication.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorPartialApplication.expected
+    output/ErrorPartialApplication.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorPatternUnionNameTypes.expected
     tokens/ErrorPatternUnionNameTypes.out))))
 

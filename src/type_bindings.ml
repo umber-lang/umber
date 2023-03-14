@@ -193,5 +193,25 @@ let generalize types typ =
        | typ -> Defer typ)
 ;;
 
-(* FIXME: add unit test for cyclic type variables. Also consider if we want to implement
-   path compression. *)
+let%expect_test "unification cycles" =
+  let types = create () in
+  let names = Name_bindings.core in
+  print_s [%sexp (types : t)];
+  [%expect {| ((vars ())) |}];
+  let a = Type.fresh_var () in
+  let b = Type.fresh_var () in
+  let c = Type.fresh_var () in
+  let d = Type.fresh_var () in
+  unify ~names ~types a b;
+  print_s [%sexp (types : t)];
+  [%expect {| ((vars ((0 (Var 1))))) |}];
+  unify ~names ~types b c;
+  print_s [%sexp (types : t)];
+  [%expect {| ((vars ((0 (Var 1)) (1 (Var 2))))) |}];
+  unify ~names ~types c d;
+  print_s [%sexp (types : t)];
+  [%expect {| ((vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3))))) |}];
+  unify ~names ~types d a;
+  print_s [%sexp (types : t)];
+  [%expect {| ((vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3))))) |}]
+;;
