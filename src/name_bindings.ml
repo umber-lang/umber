@@ -643,9 +643,10 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
            in
            List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
              let entry =
+              (* TODO: This should have an effect for allocation. *)
                Name_entry.val_declared
                  (match Nonempty.of_list args with
-                  | Some args -> Function (args, result_type)
+                  | Some args -> Function (args, [], result_type)
                   | None -> result_type)
              in
              (* FIXME: Name clashes should actually be expected here since we should be
@@ -681,7 +682,7 @@ let add_effect t effect_name effect ~unify =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let scheme : Type.Scheme.t = Function (args, result) in
+          let scheme : Type.Scheme.t = Function (args, [], result) in
           let new_entry = Name_entry.val_declared scheme in
           add_name_entry names name scheme new_entry ~unify)
     }

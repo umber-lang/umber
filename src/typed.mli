@@ -41,7 +41,9 @@ module Expr : sig
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Expr.t
-    -> (Type.t * Pattern.Names.t) t * Type.t
+    -> (Type.t * Pattern.Names.t) t
+       * Type.t
+       * (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row
 end
 
 module Module : sig

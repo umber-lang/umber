@@ -41,17 +41,19 @@ module Expr : sig
     | Tuple of ('v, 'pf) t list
     | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * ('v, 'pf) t
     | Partial_function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * 'pf
+
   (* FIXME: We want partial_effect to only be present while doing type inference, I
        think. Maybe we don't need to enforce that/maybe it still makes sense? *)
   (* | Partial_effect of ('v, 'pf) effect_row *)
+  and ('v, 'pf) effect_row = ('v, 'pf) effect list
 
-  and ('v, 'pf) effect_row =
-    { (* TODO: Consider allowing multiple effects with the same name but applied to different
-     types to coexist in the same expression. *)
-      effects : ('v, 'pf) t list Effect_name.Map.t
-    ; effect_var : 'v option
-    }
-  [@@deriving compare, equal, sexp]
+  and ('v, 'pf) effect =
+    | Effect of Effect_name.t * ('v, 'pf) t list
+    | Effect_var of 'v
+  [@@deriving hash, compare, equal, sexp]
+
+  val var : 'v -> ('v, _) t
+  val tuple : ('v, 'pf) t list -> ('v, 'pf) t
 
   val map
     :  ?f:(('v1, 'pf1) t -> (('v1, 'pf1) t, ('v2, 'pf2) t) Map_action.t)
@@ -74,6 +76,8 @@ module Expr : sig
     :  ('v, 'pf) effect_row
     -> ('v, 'pf) effect_row
     -> ('v, 'pf) effect_row
+
+  val effect_is_total : _ effect_row -> bool
 end
 
 type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
@@ -82,6 +86,9 @@ val fresh_var : unit -> t
 
 module Scheme : sig
   type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
+
+  type nonrec effect_row = (Param.t, Nothing.t) Expr.effect_row
+  [@@deriving compare, hash, equal, sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t

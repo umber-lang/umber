@@ -211,7 +211,8 @@ type_fun_args:
   | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
 
 %inline type_fun:
-  | args = type_fun_args; ARROW; body = type_non_fun { Type.Expr.Function (args, body) }
+  | args = type_fun_args; ARROW; body = type_non_fun
+    { Type.Expr.Function (args, [], body) }
 
 type_expr:
   | t = type_non_fun { t }

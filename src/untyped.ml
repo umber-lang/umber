@@ -29,8 +29,6 @@ module Expr = struct
     | Type_annotation of t * Type.Scheme.Bounded.t
   [@@deriving sexp, variants]
 
-  (** Get all the external names referenced by an expression. Names local to the
-      expression (e.g. those bound by match expressions or lambdas) are not included. *)
   let names_used ~names =
     let add_locals init = Pattern.Names.fold ~init ~f:Set.add in
     let rec loop ~names used locals = function
@@ -117,7 +115,14 @@ let create_effect_operation sig_ : Effect.Operation.t =
       ~msg:[%message "Fixity declarations are not supported on effect operations"]
   | Common_sig (Val (name, None, type_)) ->
     (match type_ with
-     | [], Function (args, result) ->
+     | [], Function (args, effect_row, result) ->
+       if not (Type.Expr.effect_is_total effect_row)
+       then
+         Compilation_error.raise
+           Other
+           ~msg:
+             [%message
+               "Effect operations can't perform effects" (type_ : Type.Scheme.Bounded.t)];
        (* FIXME: Check for free params. Should be done elsewhere. *)
        { name; args; result }
      | _ :: _, _ -> failwith "TODO: trait bounds on effect operations"

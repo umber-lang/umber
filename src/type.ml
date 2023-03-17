@@ -62,13 +62,18 @@ module Expr = struct
     | Tuple of ('v, 'pf) t list
     | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * ('v, 'pf) t
     | Partial_function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * 'pf
-    | Partial_effect of ('v, 'pf) t * ('pf, 'pf) effect_row
 
-  and ('v, 'pf) effect_row =
-    { effects : ('v, 'pf) t list Effect_name.Map.t
-    ; effect_var : 'v
-    }
-  [@@deriving compare, equal, sexp]
+  (* FIXME: cleanup *)
+  (* | Partial_effect of ('v, 'pf) t * ('pf, 'pf) effect_row *)
+  and ('v, 'pf) effect_row = ('v, 'pf) effect list
+
+  and ('v, 'pf) effect =
+    | Effect of Effect_name.t * ('v, 'pf) t list
+    | Effect_var of 'v
+  [@@deriving hash, compare, equal, sexp]
+
+  let var v = Var v
+  let tuple list = Tuple list
 
   let rec map ?(f = Map_action.defer) typ ~var ~pf =
     match f typ with
@@ -79,12 +84,20 @@ module Expr = struct
        | Var v -> Var (var v)
        | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var ~pf))
        | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf))
-       | Function (args, body) ->
+       | Function (args, effect_row, body) ->
          let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
-         Function (args, map ~f ~var ~pf body)
-       | Partial_function (args, v) ->
+         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf) in
+         Function (args, effect_row, map ~f ~var ~pf body)
+       | Partial_function (args, effect_row, v) ->
          let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
-         Partial_function (args, pf v))
+         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf) in
+         Partial_function (args, effect_row, pf v))
+
+  and map_effect effect ~f ~var ~pf =
+    match effect with
+    | Effect_var v -> Effect_var (var v)
+    | Effect (effect_name, args) ->
+      Effect (effect_name, List.map args ~f:(map ~f ~var ~pf))
   ;;
 
   let rec fold_until typ ~init ~f =
@@ -95,12 +108,12 @@ module Expr = struct
        | Var _ -> continue
        | Type_app (_, fields) | Tuple fields ->
          List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
-       | Function (args, body) ->
+       | Function (args, _, body) ->
          let%bind.Fold_action init =
            Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
          in
          fold_until body ~init ~f
-       | Partial_function (args, _) ->
+       | Partial_function (args, _, _) ->
          Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f))
   ;;
 
@@ -129,13 +142,12 @@ module Expr = struct
      are a set of effects. Complicating this is effect polymorphism. Calls to function
      parameters produce some variable set of effects, represented with effect variables.
      When combining calls to multiple functions, we want to include both effect variables.
-     We can do this by unifying them. *)
-  let combine_effects
-    { effects = effects1; effect_var = var1 }
-    { effects = effects2; effect_var = var2 }
-    =
-    ()
-  ;;
+     We can do this by unifying them.
+     
+     Let's remove effect variables which are unified later. Also want to remove
+     duplicates later. *)
+  let combine_effects effects1 effects2 = effects1 @ effects2
+  let effect_is_total = List.is_empty
 end
 
 type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
@@ -146,6 +158,9 @@ module Scheme = struct
   module T = struct
     (* TODO: add trait constraints to this type here *)
     type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
+
+    type nonrec effect_row = (Param.t, Nothing.t) Expr.effect_row
+    [@@deriving compare, hash, equal, sexp]
   end
 
   include T

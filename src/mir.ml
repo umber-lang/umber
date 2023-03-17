@@ -169,7 +169,7 @@ let rec arity_of_type ~names : Type.Scheme.t -> int = function
     (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
      | Abstract | Variants _ | Record _ -> 0
      | Alias type_ -> arity_of_type ~names type_)
-  | Function (args, _) -> Nonempty.length args
+  | Function (args, _, _) -> Nonempty.length args
   | Partial_function _ -> .
 ;;
 

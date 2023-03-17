@@ -160,37 +160,58 @@ module Expr = struct
   type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp_of]
 
   let of_untyped, type_recursive_let_bindings =
+    let collect_effects f =
+      let effects = ref [] in
+      let (expr : _ t), (typ : _ Type.Expr.t) =
+        f ~add_effects:(fun effects' ->
+          effects := Type.Expr.combine_effects !effects effects')
+      in
+      expr, typ, !effects
+    in
     let rec of_untyped ~names ~types ~f_name expr =
-      let no_effects = { Type.Expr.effects = Effect_name.Map.empty; effect_var = None } in
       match (expr : Untyped.Expr.t) with
-      | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit), no_effects
+      | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit), []
       | Name name ->
         let name_entry = Name_bindings.find_entry names name in
         f_name name name_entry;
-        Name name, Name_bindings.Name_entry.typ name_entry, no_effects
+        Name name, Name_bindings.Name_entry.typ name_entry, []
       | Qualified (path, expr) ->
         of_untyped ~names:(Name_bindings.import_all names path) ~types ~f_name expr
       | Fun_call (fun_, args) ->
-        let call_effects =
-          { Type.Expr.effects = Effect_name.Map.empty
-          ; effect_var = Some (Type.Var_id.create ())
-          }
-        in
-        let fun_, fun_type, fun_effects = of_untyped ~names ~types ~f_name fun_ in
-        let all_effects = Type.Expr.combine_effects call_effects fun_effects in
-        let args =
-          Nonempty.map args ~f:(fun arg ->
-            let arg, arg_type = of_untyped ~names ~types ~f_name arg in
-            arg, (arg_type, Pattern.Names.empty))
-        in
-        let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
-        let result_var = Type.Var_id.create () in
-        Type_bindings.unify
-          ~names
-          ~types
-          fun_type
-          (Partial_function (arg_types, call_effects, result_var));
-        Fun_call (fun_, args), Var result_var, call_effects
+        (* FIXME: IDEA: We want to come up with a type representing all the effects
+           potentially produced by this expression. This is a supertype of effects
+           produced by individual components of the expression:
+           In this case:
+           - The function expression
+           - Each function argument expression
+           - The effects produced by the call itself
+           
+           We get to this supertype by unioning the effects of the subexpressions. We
+           don't want to unify the effect variables because we actually want a supertype.
+           If you have e.g. `if cond then foo else bar` we don't want to force `foo` and
+           `bar` to produce exactly the same effects. Effects have true automatic
+           subtyping like that. *)
+        collect_effects (fun ~add_effects ->
+          let fun_, fun_type, fun_effects = of_untyped ~names ~types ~f_name fun_ in
+          add_effects fun_effects;
+          let args =
+            Nonempty.map args ~f:(fun arg ->
+              let arg, arg_type, arg_effect = of_untyped ~names ~types ~f_name arg in
+              add_effects arg_effect;
+              arg, (arg_type, Pattern.Names.empty))
+          in
+          let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
+          let result_var = Type.Var_id.create () in
+          let call_effects : _ Type.Expr.effect_row =
+            [ Effect_var (Type.Var_id.create ()) ]
+          in
+          add_effects call_effects;
+          Type_bindings.unify
+            ~names
+            ~types
+            fun_type
+            (Partial_function (arg_types, call_effects, result_var));
+          Fun_call (fun_, args), Var result_var)
       | Op_tree tree ->
         of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
       | Lambda (args, body) ->
@@ -200,86 +221,110 @@ module Expr = struct
             names, (arg, arg_type))
         in
         let args, arg_types = Nonempty.unzip args_and_types in
-        let body, body_type = of_untyped ~names ~types ~f_name body in
-        Lambda (args, body), Function (arg_types, body_type)
+        let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
+        Lambda (args, body), Function (arg_types, body_effects, body_type), []
       | If (cond, then_, else_) ->
-        let cond, cond_type = of_untyped ~names ~types ~f_name cond in
-        let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
-        Type_bindings.unify ~names ~types cond_type bool_type;
-        let (then_, then_type), (else_, else_type) =
-          of_untyped ~names ~types ~f_name then_, of_untyped ~names ~types ~f_name else_
-        in
-        Type_bindings.unify ~names ~types then_type else_type;
-        (* TODO: should really be referring to Bool as a primitive of some kind since
+        collect_effects (fun ~add_effects ->
+          let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
+          add_effects cond_effects;
+          let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
+          Type_bindings.unify ~names ~types cond_type bool_type;
+          let (then_, then_type, then_effects), (else_, else_type, else_effects) =
+            of_untyped ~names ~types ~f_name then_, of_untyped ~names ~types ~f_name else_
+          in
+          add_effects then_effects;
+          add_effects else_effects;
+          Type_bindings.unify ~names ~types then_type else_type;
+          (* TODO: should really be referring to Bool as a primitive of some kind since
            otherwise you could shadow it. Could have it be qualified like
            `_Primitives.Bool` *)
-        let cnstr name : Pattern.t = Cnstr_appl (name, []) in
-        ( Match
-            ( cond
-            , (bool_type, Pattern.Names.empty)
-            , [ cnstr Intrinsics.Bool.true_, then_; cnstr Intrinsics.Bool.false_, else_ ]
-            )
-        , then_type )
+          let cnstr name : Pattern.t = Cnstr_appl (name, []) in
+          let match_expr =
+            Match
+              ( cond
+              , (bool_type, Pattern.Names.empty)
+              , [ cnstr Intrinsics.Bool.true_, then_
+                ; cnstr Intrinsics.Bool.false_, else_
+                ] )
+          in
+          match_expr, then_type)
       | Match (expr, branches) ->
-        let expr, expr_type = of_untyped ~names ~types ~f_name expr in
-        let branches, branch_type :: rest =
-          Nonempty.map branches ~f:(fun (pat, branch) ->
-            let names, (_, (pat, pat_typ)) = Pattern.of_untyped_into ~names ~types pat in
-            Type_bindings.unify ~names ~types expr_type pat_typ;
-            let branch, branch_type = of_untyped ~names ~types ~f_name branch in
-            (pat, branch), branch_type)
-          |> Nonempty.unzip
-        in
-        List.iter_pairs (branch_type :: rest) ~f:(Type_bindings.unify ~names ~types);
-        Match (expr, (expr_type, Pattern.Names.empty), branches), branch_type
+        collect_effects (fun ~add_effects ->
+          let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
+          add_effects expr_effects;
+          let branches, branch_type :: rest =
+            Nonempty.map branches ~f:(fun (pat, branch) ->
+              let names, (_, (pat, pat_typ)) =
+                Pattern.of_untyped_into ~names ~types pat
+              in
+              Type_bindings.unify ~names ~types expr_type pat_typ;
+              let branch, branch_type, branch_effects =
+                of_untyped ~names ~types ~f_name branch
+              in
+              add_effects branch_effects;
+              (pat, branch), branch_type)
+            |> Nonempty.unzip
+          in
+          List.iter_pairs (branch_type :: rest) ~f:(Type_bindings.unify ~names ~types);
+          Match (expr, (expr_type, Pattern.Names.empty), branches), branch_type)
       | Let { rec_; bindings; body } ->
-        let names, rec_, bindings =
-          if rec_
-          then (
-            let names, bindings =
-              Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
-                Node.fold_map names binding ~f:(fun names (pat, expr) ->
-                  let names, (pat_names, (pat, pat_type)) =
-                    Pattern.of_untyped_into ~names ~types pat
-                  in
-                  names, ((pat, (pat_type, pat_names)), expr)))
-            in
-            type_recursive_let_bindings ~names ~types ~f_name bindings)
-          else (
-            (* Process bindings in order without any recursion *)
-            let names, bindings =
-              Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
-                Node.fold_map names binding ~f:(fun names (pat, expr) ->
-                  let names, (pat_names, (pat, pat_type)) =
-                    Pattern.of_untyped_into ~names ~types pat
-                  in
-                  let expr, expr_type = of_untyped ~names ~types ~f_name expr in
-                  Type_bindings.unify ~names ~types pat_type expr_type;
-                  names, ((pat, (pat_type, pat_names)), expr)))
-            in
-            names, false, bindings)
-        in
-        let body, body_type = of_untyped ~names ~types ~f_name body in
-        Let { rec_; bindings; body }, body_type
+        collect_effects (fun ~add_effects ->
+          let names, rec_, bindings =
+            if rec_
+            then (
+              let names, bindings =
+                Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
+                  Node.fold_map names binding ~f:(fun names (pat, expr) ->
+                    let names, (pat_names, (pat, pat_type)) =
+                      Pattern.of_untyped_into ~names ~types pat
+                    in
+                    names, ((pat, (pat_type, pat_names)), expr)))
+              in
+              type_recursive_let_bindings ~names ~types ~f_name ~add_effects bindings)
+            else (
+              (* Process bindings in order without any recursion *)
+              let names, bindings =
+                Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
+                  Node.fold_map names binding ~f:(fun names (pat, expr) ->
+                    let names, (pat_names, (pat, pat_type)) =
+                      Pattern.of_untyped_into ~names ~types pat
+                    in
+                    let expr, expr_type, expr_effects =
+                      of_untyped ~names ~types ~f_name expr
+                    in
+                    add_effects expr_effects;
+                    Type_bindings.unify ~names ~types pat_type expr_type;
+                    names, ((pat, (pat_type, pat_names)), expr)))
+              in
+              names, false, bindings)
+          in
+          let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
+          add_effects body_effects;
+          Let { rec_; bindings; body }, body_type)
       | Tuple items ->
-        let items, types =
-          List.map items ~f:(of_untyped ~names ~types ~f_name) |> List.unzip
-        in
-        Tuple items, Tuple types
+        collect_effects (fun ~add_effects ->
+          let items, types =
+            List.map items ~f:(fun item ->
+              let item, type_, effects = of_untyped item ~names ~types ~f_name in
+              add_effects effects;
+              item, type_)
+            |> List.unzip
+          in
+          Tuple items, Tuple types)
       | Seq_literal _items -> failwith "TODO: seq"
       | Record_literal _fields -> failwith "TODO: record1"
       | Record_update (_expr, _fields) -> failwith "TODO: record2"
       | Record_field_access (_record, _name) -> failwith "TODO: record3"
       | Type_annotation (expr, typ) ->
-        let t1 =
+        let annotation_type =
           Type.Scheme.instantiate_bounded
             ~map_name:(Name_bindings.absolutify_type_name names)
             typ
         in
-        let expr, t2 = of_untyped ~names ~types ~f_name expr in
-        Type_bindings.unify ~names ~types t1 t2;
-        expr, t1
-    and type_recursive_let_bindings ~names ~types ~f_name bindings =
+        let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
+        Type_bindings.unify ~names ~types annotation_type expr_type;
+        expr, annotation_type, expr_effects
+    and type_recursive_let_bindings ~names ~types ~f_name ~add_effects bindings =
       let all_bound_names =
         Nonempty.fold
           bindings
@@ -307,7 +352,8 @@ module Expr = struct
       let bindings =
         Nonempty.map bindings ~f:(fun binding ->
           Node.map binding ~f:(fun (((_, (pat_type, _)) as pat), expr) ->
-            let expr, expr_type = of_untyped expr ~f_name ~names ~types in
+            let expr, expr_type, expr_effects = of_untyped expr ~f_name ~names ~types in
+            add_effects expr_effects;
             Type_bindings.unify ~names ~types pat_type expr_type;
             pat, expr))
       in
@@ -316,7 +362,7 @@ module Expr = struct
     in
     let of_untyped ~names ~types expr =
       of_untyped ~names ~types ~f_name:(fun _ _ -> ()) expr
-      |> Tuple2.map_snd ~f:(Type_bindings.substitute types)
+      |> Tuple3.map_snd ~f:(Type_bindings.substitute types)
     in
     of_untyped, type_recursive_let_bindings ~f_name:(fun _ _ -> ())
   ;;
@@ -638,7 +684,7 @@ module Module = struct
                       (decl : Type.Decl.t)])
          | _ -> ());
         List.iter args ~f:(loop ~names aliases_seen)
-      | Function (args, body) ->
+      | Function (args, _effects, body) ->
         Nonempty.iter args ~f:(loop ~names aliases_seen);
         loop ~names aliases_seen body
       | Tuple items -> List.iter items ~f:(loop ~names aliases_seen)
@@ -771,7 +817,15 @@ module Module = struct
     in
     let representative_span = Node.span (Nonempty.hd bindings) in
     let (_ : Name_bindings.t), rec_, bindings =
-      Expr.type_recursive_let_bindings ~names ~types bindings
+      Expr.type_recursive_let_bindings ~names ~types bindings ~add_effects:(fun effects ->
+        if not (Type.Expr.effect_is_total effects)
+        then
+          Compilation_error.raise
+            Other
+            ~msg:
+              [%message
+                "Unhandled effects at toplevel"
+                  (effects : (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row)])
     in
     (* FIXME: Do we need to use the bindings from before? *)
     Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
