@@ -821,14 +821,8 @@ module Module = struct
     let representative_span = Node.span (Nonempty.hd bindings) in
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings ~names ~types bindings ~add_effects:(fun effects ->
-        if not (Type.Expr.effect_is_total effects)
-        then
-          Compilation_error.raise
-            Other
-            ~msg:
-              [%message
-                "Unhandled effects at toplevel"
-                  (effects : (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row)])
+        (* No effects are handled at toplevel, so get rid of any produced effects. *)
+        Type_bindings.make_total types effects)
     in
     (* FIXME: Do we need to use the bindings from before? *)
     Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->

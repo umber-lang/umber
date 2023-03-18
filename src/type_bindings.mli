@@ -4,6 +4,7 @@ val create : unit -> t
 val unify : names:Name_bindings.t -> types:t -> Type.t -> Type.t -> unit
 val substitute : t -> Type.t -> Type.t
 val generalize : t -> Type.t -> Type.Scheme.t
+val make_total : t -> (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row -> unit
 
 exception Type_error of Ustring.t * (Type.t * Type.t) option [@@deriving sexp]
 

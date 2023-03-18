@@ -643,7 +643,7 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
            in
            List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
              let entry =
-              (* TODO: This should have an effect for allocation. *)
+               (* TODO: This should have an effect for allocation. *)
                Name_entry.val_declared
                  (match Nonempty.of_list args with
                   | Some args -> Function (args, [], result_type)
@@ -668,6 +668,9 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
 let add_effect t effect_name effect ~unify =
   let f bindings =
     let effect = absolutify_effect t effect in
+    let effect_row : Type.Scheme.effect_row =
+      [ Effect (effect_name, List.map effect.params ~f:Type.Expr.var) ]
+    in
     { bindings with
       types =
         (* TODO: We could reasonably support effects and types being in separate
@@ -682,7 +685,7 @@ let add_effect t effect_name effect ~unify =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let scheme : Type.Scheme.t = Function (args, [], result) in
+          let scheme : Type.Scheme.t = Function (args, effect_row, result) in
           let new_entry = Name_entry.val_declared scheme in
           add_name_entry names name scheme new_entry ~unify)
     }

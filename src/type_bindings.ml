@@ -49,6 +49,25 @@ let check_effect_is_total effect =
   then raise_s [%message "Effect in partial application is not total"]
 ;;
 
+let unhandled_effects effects =
+  Compilation_error.raise
+    Type_error
+    ~msg:
+      [%message
+        "Unhandled effects"
+          (effects : (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row)]
+;;
+
+let make_total t (effects : _ Type.Expr.effect_row) =
+  List.iter effects ~f:(function
+    | Effect_var id ->
+      Hashtbl.update t.effect_vars id ~f:(function
+        | None -> Type.Expr.total_effect
+        | Some effects ->
+          if Type.Expr.effect_is_total effects then effects else unhandled_effects effects)
+    | Effect _ as effect -> unhandled_effects [ effect ])
+;;
+
 let iter2 xs ys ~f =
   match List.iter2 ~f xs ys with
   | Ok () -> ()
@@ -202,8 +221,6 @@ and combine_partial_functions types typ args effect_row id =
        Halt (Function (args, effect_row, type_sub)))
 ;;
 
-(* FIXME: Need to simplify effects. Generalization is probably a good place to do it. 
-   (Although maybe substitution could work too?)*)
 let generalize types typ =
   let env = Type.Param.Env_of_vars.create () in
   Type.Expr.map
