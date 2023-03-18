@@ -64,22 +64,24 @@ let names = {|
                    (Local
                     ((typ
                       (Scheme
-                       (Function ((Type_app Int ())) (Type_app Float ())))))))
+                       (Function ((Type_app Int ())) () (Type_app Float ())))))))
                   (print
                    (Local
                     ((typ
-                      (Scheme (Function ((Type_app String ())) (Tuple ()))))
+                      (Scheme
+                       (Function ((Type_app String ())) () (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_endline))))
                   (print_int
                    (Local
-                    ((typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
+                    ((typ
+                      (Scheme (Function ((Type_app Int ())) () (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_int))))
                   (print_bool
                    (Local
                     ((typ
-                      (Scheme (Function ((Type_app Bool ())) (Tuple ()))))
+                      (Scheme (Function ((Type_app Bool ())) () (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_bool))))))
                 (types ())
@@ -100,7 +102,7 @@ let names = {|
                              (Function
                               ((Var a)
                                (Type_app Std.Prelude.List.List ((Var a))))
-                              (Type_app Std.Prelude.List.List ((Var a)))))))))))
+                              () (Type_app Std.Prelude.List.List ((Var a)))))))))))
                       (types
                        ((List
                          ((Local
@@ -121,67 +123,71 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
-                              (Type_app Int ()))))
+                              () (Type_app Int ()))))
                            (fixity (Left 7)))))
                         (+
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
-                              (Type_app Int ()))))
+                              () (Type_app Int ()))))
                            (fixity (Left 6)))))
                         (-
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
-                              (Type_app Int ()))))
+                              () (Type_app Int ()))))
                            (fixity (Left 6)))))
                         (.
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Function ((Var b)) (Var c))
-                               (Function ((Var a)) (Var b)) (Var a))
-                              (Var c))))
+                              ((Function ((Var b)) () (Var c))
+                               (Function ((Var a)) () (Var b)) (Var a))
+                              () (Var c))))
                            (fixity (Right 9)))))
                         (";"
                          (Local
                           ((typ
-                            (Scheme (Function ((Tuple ()) (Var a)) (Var a))))
+                            (Scheme
+                             (Function ((Tuple ()) (Var a)) () (Var a))))
                            (fixity (Left 0)))))
                         (<
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                             (Function ((Var a) (Var a)) ()
+                              (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (>
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                             (Function ((Var a) (Var a)) ()
+                              (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (^
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Type_app Int ()) (Type_app Int ()))
-                              (Type_app Int ()))))
+                              () (Type_app Int ()))))
                            (fixity (Right 8)))))
                         (!=
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                             (Function ((Var a) (Var a)) ()
+                              (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (&&
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Bool ()) (Type_app Bool ()))
+                              ((Type_app Bool ()) (Type_app Bool ())) ()
                               (Type_app Bool ()))))
                            (fixity (Left 3)))))
                         (*.
@@ -189,7 +195,7 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Float ()) (Type_app Float ()))
+                              ((Type_app Float ()) (Type_app Float ())) ()
                               (Type_app Float ()))))
                            (fixity (Left 7)))))
                         (++
@@ -197,7 +203,7 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app String ()) (Type_app String ()))
+                              ((Type_app String ()) (Type_app String ())) ()
                               (Type_app String ()))))
                            (fixity (Left 5)))))
                         (+.
@@ -205,7 +211,7 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Float ()) (Type_app Float ()))
+                              ((Type_app Float ()) (Type_app Float ())) ()
                               (Type_app Float ()))))
                            (fixity (Left 6)))))
                         (-.
@@ -213,7 +219,7 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Float ()) (Type_app Float ()))
+                              ((Type_app Float ()) (Type_app Float ())) ()
                               (Type_app Float ()))))
                            (fixity (Left 6)))))
                         (::
@@ -222,31 +228,35 @@ let names = {|
                             (Scheme
                              (Function
                               ((Var a) (Type_app Std.Prelude.List ((Var a))))
-                              (Type_app Std.Prelude.List ((Var a))))))
+                              () (Type_app Std.Prelude.List ((Var a))))))
                            (fixity (Right 5)))))
                         (<=
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                             (Function ((Var a) (Var a)) ()
+                              (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (==
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                             (Function ((Var a) (Var a)) ()
+                              (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (>=
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                             (Function ((Var a) (Var a)) ()
+                              (Type_app Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (|>
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Var a) (Function ((Var a)) (Var b)))
+                             (Function
+                              ((Var a) (Function ((Var a)) () (Var b))) ()
                               (Var b))))
                            (fixity (Left 0)))))
                         (||
@@ -254,14 +264,14 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Bool ()) (Type_app Bool ()))
+                              ((Type_app Bool ()) (Type_app Bool ())) ()
                               (Type_app Bool ()))))
                            (fixity (Left 2)))))
                         (not
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Type_app Bool ()))
+                             (Function ((Type_app Bool ())) ()
                               (Type_app Bool ())))))))))
                       (types ()) (modules ())))))))))
               ((names
@@ -290,23 +300,25 @@ let names = {|
                   (Local
                    ((typ
                      (Scheme
-                      (Function ((Type_app Float ())) (Type_app Float ()))))
+                      (Function ((Type_app Float ())) () (Type_app Float ()))))
                     (type_source Extern_declared)
                     (extern_name umber_float_sqrt))))
                  (print
                   (Local
                    ((typ
-                     (Scheme (Function ((Type_app String ())) (Tuple ()))))
+                     (Scheme (Function ((Type_app String ())) () (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_endline))))
                  (print_int
                   (Local
-                   ((typ (Scheme (Function ((Type_app Int ())) (Tuple ()))))
+                   ((typ
+                     (Scheme (Function ((Type_app Int ())) () (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_int))))
                  (print_bool
                   (Local
-                   ((typ (Scheme (Function ((Type_app Bool ())) (Tuple ()))))
+                   ((typ
+                     (Scheme (Function ((Type_app Bool ())) () (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_bool))))))
                (types ())
@@ -327,7 +339,7 @@ let names = {|
                             (Function
                              ((Var a)
                               (Type_app Std.Prelude.List.List ((Var a))))
-                             (Type_app Std.Prelude.List.List ((Var a)))))))))))
+                             () (Type_app Std.Prelude.List.List ((Var a)))))))))))
                      (types
                       ((List
                         ((Local
@@ -348,7 +360,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
-                             (Type_app Int ()))))
+                             () (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_mul))))
                        (+
@@ -356,7 +368,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
-                             (Type_app Int ()))))
+                             () (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_add))))
                        (-
@@ -364,7 +376,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
-                             (Type_app Int ()))))
+                             () (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_sub))))
                        (.
@@ -372,27 +384,30 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Function ((Var b)) (Var c))
-                              (Function ((Var a)) (Var b)) (Var a))
-                             (Var c))))
+                             ((Function ((Var b)) () (Var c))
+                              (Function ((Var a)) () (Var b)) (Var a))
+                             () (Var c))))
                           (fixity (Right 9)))))
                        (";"
                         (Local
                          ((typ
-                           (Scheme (Function ((Tuple ()) (Var a)) (Var a))))
+                           (Scheme
+                            (Function ((Tuple ()) (Var a)) () (Var a))))
                           (fixity (Left 0)))))
                        (<
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                            (Function ((Var a) (Var a)) ()
+                             (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lt))))
                        (>
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                            (Function ((Var a) (Var a)) ()
+                             (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gt))))
                        (^
@@ -400,14 +415,15 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Type_app Int ()) (Type_app Int ()))
-                             (Type_app Int ()))))
+                             () (Type_app Int ()))))
                           (type_source Extern_declared) (fixity (Right 8))
                           (extern_name umber_int_pow))))
                        (!=
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                            (Function ((Var a) (Var a)) ()
+                             (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_neq))))
                        (&&
@@ -415,14 +431,14 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Type_app Bool ()) (Type_app Bool ()))
-                             (Type_app Bool ()))))
+                             () (Type_app Bool ()))))
                           (fixity (Left 3)))))
                        (*.
                         (Local
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Float ()) (Type_app Float ()))
+                             ((Type_app Float ()) (Type_app Float ())) ()
                              (Type_app Float ()))))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_float_mul))))
@@ -431,7 +447,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app String ()) (Type_app String ()))
+                             ((Type_app String ()) (Type_app String ())) ()
                              (Type_app String ()))))
                           (type_source Extern_declared) (fixity (Left 5))
                           (extern_name umber_string_append))))
@@ -440,7 +456,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Float ()) (Type_app Float ()))
+                             ((Type_app Float ()) (Type_app Float ())) ()
                              (Type_app Float ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_add))))
@@ -449,7 +465,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Float ()) (Type_app Float ()))
+                             ((Type_app Float ()) (Type_app Float ())) ()
                              (Type_app Float ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_sub))))
@@ -459,34 +475,38 @@ let names = {|
                            (Scheme
                             (Function
                              ((Var a) (Type_app Std.Prelude.List ((Var a))))
-                             (Type_app Std.Prelude.List ((Var a))))))
+                             () (Type_app Std.Prelude.List ((Var a))))))
                           (fixity (Right 5)))))
                        (<=
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                            (Function ((Var a) (Var a)) ()
+                             (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lte))))
                        (==
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                            (Function ((Var a) (Var a)) ()
+                             (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_eq))))
                        (>=
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Var a) (Var a)) (Type_app Bool ()))))
+                            (Function ((Var a) (Var a)) ()
+                             (Type_app Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gte))))
                        (|>
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Var a) (Function ((Var a)) (Var b)))
+                            (Function
+                             ((Var a) (Function ((Var a)) () (Var b))) ()
                              (Var b))))
                           (fixity (Left 0)))))
                        (||
@@ -494,13 +514,13 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Type_app Bool ()) (Type_app Bool ()))
-                             (Type_app Bool ()))))
+                             () (Type_app Bool ()))))
                           (fixity (Left 2)))))
                        (not
                         (Local
                          ((typ
                            (Scheme
-                            (Function ((Type_app Bool ()))
+                            (Function ((Type_app Bool ())) ()
                              (Type_app Bool ()))))
                           (type_source Let_inferred))))))
                      (types ()) (modules ()))))))))))))))))))))))
