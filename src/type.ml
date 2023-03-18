@@ -233,6 +233,7 @@ module Expr = struct
       ~f_contra:(fun (t1, t2) -> Halt (union t1 t2))
   ;;
 
+  let total_effect = []
   let effect_is_total = List.is_empty
 end
 
@@ -244,6 +245,9 @@ module Scheme = struct
   module T = struct
     (* TODO: add trait constraints to this type here *)
     type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
+
+    type nonrec effect = (Param.t, Nothing.t) Expr.effect
+    [@@deriving compare, hash, equal, sexp]
 
     type nonrec effect_row = (Param.t, Nothing.t) Expr.effect_row
     [@@deriving compare, hash, equal, sexp]

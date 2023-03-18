@@ -56,6 +56,28 @@ let iter2 xs ys ~f =
   | Unequal_lengths -> raise Compatibility_error
 ;;
 
+let check_effects
+  ({ sig_ = sig_effects; def = def_effects } : _ By_kind.t)
+  ~param_matching
+  =
+  (* FIXME: Using scheme equality on effects won't work with type variable renaming. Need
+     to check the param table for `Lenient and `Strict. *)
+  match param_matching with
+  | `Lenient ->
+    (* Effects in the signature are the same or more than effects in the defintion. *)
+    (* FIXME: Need to handle subtyping properly. Should properly consider that first-class
+       here, since that's what we're basically doing. Need variance handling. It's
+       sufficient to keep tracking of how many function arrows we are to the left of. *)
+    List.for_all def_effects ~f:(List.mem sig_effects ~equal:[%equal: Type.Scheme.effect])
+  | `Strict | `None ->
+    (* Effects in the signature are exactly the same as effects in the definition. *)
+    Comparable.lift
+      ~f:(List.sort ~compare:[%compare: Type.Scheme.effect])
+      [%equal: Type.Scheme.effect_row]
+      sig_effects
+      def_effects
+;;
+
 let check_type_schemes =
   let rec check_type_schemes ~names ~param_matching ~param_table ~schemes =
     (* FIXME: Do we need to absolutify type app names in aliases? Likely yes? *)
@@ -110,14 +132,19 @@ let check_type_schemes =
       , _ ) ->
       check_type_app ~name ~args ~kind:`Def ~on_non_alias:(fun _ ->
         raise Compatibility_error)
-    | { sig_ = Function (args1, res1); def = Function (args2, res2) }, _ ->
+    | ( { sig_ = Function (args1, effect_row1, res1)
+        ; def = Function (args2, effect_row2, res2)
+        }
+      , _ ) ->
       iter2 (Nonempty.to_list args1) (Nonempty.to_list args2) ~f:(fun sig_ def ->
         check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def });
       check_type_schemes
         ~names
         ~param_matching
         ~param_table
-        ~schemes:{ sig_ = res1; def = res2 }
+        ~schemes:{ sig_ = res1; def = res2 };
+      if not (check_effects { sig_ = effect_row1; def = effect_row2 } ~param_matching)
+      then raise Compatibility_error
     | { sig_ = Tuple args1; def = Tuple args2 }, _ ->
       iter2 args1 args2 ~f:(fun sig_ def ->
         check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def })

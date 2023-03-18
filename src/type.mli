@@ -73,6 +73,7 @@ module Expr : sig
   val exists_var : ('v, _) t -> f:('v -> bool) -> bool
   val union : (Var_id.t, Var_id.t) t -> (Var_id.t, Var_id.t) t -> (Var_id.t, Var_id.t) t
   val union_effects : ('v, 'pf) effect_row -> ('v, 'pf) effect_row -> ('v, 'pf) effect_row
+  val total_effect : _ effect_row
   val effect_is_total : _ effect_row -> bool
 end
 
@@ -82,6 +83,9 @@ val fresh_var : unit -> t
 
 module Scheme : sig
   type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
+
+  type nonrec effect = (Param.t, Nothing.t) Expr.effect
+  [@@deriving compare, hash, equal, sexp]
 
   type nonrec effect_row = (Param.t, Nothing.t) Expr.effect_row
   [@@deriving compare, hash, equal, sexp]

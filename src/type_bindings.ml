@@ -1,5 +1,5 @@
 open! Import
-open Names
+open! Names
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -41,6 +41,13 @@ and occurs_in_effect_row id (effect_row : _ Type.Expr.effect_row) =
 ;;
 
 let fun_arg_number_mismatch = type_error "Function argument number mismatch"
+
+(* FIXME: I think we actually need to point the effect vars at total rows. Maybe this is
+   where multiple variables make us pretty sad. *)
+let check_effect_is_total effect =
+  if not (Type.Expr.effect_is_total effect)
+  then raise_s [%message "Effect in partial application is not total"]
+;;
 
 let iter2 xs ys ~f =
   match List.iter2 ~f xs ys with
@@ -92,34 +99,41 @@ let rec unify ~names ~types t1 t2 =
      | params, Alias expr ->
        unify ~names ~types (instantiate_alias params expr) other_type
      | _ -> type_error "Type application mismatch" t1 t2)
-  | Function (args1, effect_row1, res1), Function (args2, effect_row2, res2) ->
+  | Function (args1, _, res1), Function (args2, _, res2) ->
+    (* FIXME: Do we need to unify or do anything with effects here, or will subtyping
+       handle it later? We might end up needing to represent the subtyping contraints
+       explicitly here. Also ignored in partial same length cases below. *)
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
      | Same_length -> ()
      | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch t1 t2);
-    unify ~names ~types res1 res2;
-    unify_effect_rows ~names ~types effect_row1 effect_row2
+    unify ~names ~types res1 res2
   | Partial_function (args1, effect_row1, id1), Partial_function (args2, effect_row2, id2)
     ->
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
      | Left_trailing args1_trailing ->
-       unify ~names ~types (Partial_function (args1_trailing, x, id1)) (Var id2)
+       (* FIXME: Left fun has more args, right fun is under-applied and must be total. *)
+       check_effect_is_total effect_row2;
+       unify ~names ~types (Partial_function (args1_trailing, effect_row1, id1)) (Var id2)
      | Right_trailing args2_trailing ->
-       unify ~names ~types (Var id1) (Partial_function (args2_trailing, y id2))
+       check_effect_is_total effect_row1;
+       unify ~names ~types (Var id1) (Partial_function (args2_trailing, effect_row2, id2))
      | Same_length -> unify ~names ~types (Var id1) (Var id2))
   | Partial_function (args1, effect_row1, id), Function (args2, effect_row2, res) ->
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
      | Left_trailing _ -> fun_arg_number_mismatch t1 t2
      | Right_trailing args2_trailing ->
+       check_effect_is_total effect_row1;
        let id' = Type.Var_id.create () in
        unify ~names ~types (Var id') res;
-       unify ~names ~types (Var id) (Partial_function (args2_trailing, id'))
+       unify ~names ~types (Var id) (Partial_function (args2_trailing, effect_row2, id'))
      | Same_length -> unify ~names ~types (Var id) res)
   | Function (args2, effect_row2, res), Partial_function (args1, effect_row1, id) ->
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
      | Left_trailing args1_trailing ->
+       check_effect_is_total effect_row2;
        let id' = Type.Var_id.create () in
        unify ~names ~types res (Var id');
-       unify ~names ~types (Partial_function (args1_trailing, id')) (Var id)
+       unify ~names ~types (Partial_function (args1_trailing, effect_row1, id')) (Var id)
      | Right_trailing _ -> fun_arg_number_mismatch t1 t2
      | Same_length -> unify ~names ~types res (Var id))
   | Tuple xs, Tuple ys -> iter2 ~f:(unify ~names ~types) xs ys
@@ -160,31 +174,36 @@ let rec unify ~names ~types t1 t2 =
   unify ~names ~types
 ;; *)
 
+(* FIXME: Need to simplify effect types *)
 let rec substitute types typ =
   Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~f:(fun typ ->
     match typ with
     | Var id ->
-      (match Hashtbl.find types.vars id with
+      (match Hashtbl.find types.type_vars id with
        | Some type_sub -> Retry type_sub
        | None -> Halt typ)
-    | Partial_function (args, id) -> combine_partial_functions types typ args id
+    | Partial_function (args, effect_row, id) ->
+      combine_partial_functions types typ args effect_row id
     | _ -> Defer typ)
 
-and combine_partial_functions types typ args id =
-  match Hashtbl.find types.vars id with
+and combine_partial_functions types typ args effect_row id =
+  match Hashtbl.find types.type_vars id with
   | None -> Defer typ
   | Some type_sub ->
     let args = Nonempty.map args ~f:(substitute types) in
     (match substitute types type_sub with
-     | Partial_function (args', id') ->
+     | Partial_function (args', effect_row', id') ->
+       check_effect_is_total effect_row;
        let args' = Nonempty.map args' ~f:(substitute types) in
        let args_combined = Nonempty.(args @ args') in
-       let typ = Type.Expr.Partial_function (args_combined, id') in
-       combine_partial_functions types typ args_combined id'
+       let typ : Type.t = Partial_function (args_combined, effect_row', id') in
+       combine_partial_functions types typ args_combined effect_row' id'
      | (Var _ | Type_app _ | Tuple _ | Function _) as type_sub ->
-       Halt (Function (args, type_sub)))
+       Halt (Function (args, effect_row, type_sub)))
 ;;
 
+(* FIXME: Need to simplify effects. Generalization is probably a good place to do it. 
+   (Although maybe substitution could work too?)*)
 let generalize types typ =
   let env = Type.Param.Env_of_vars.create () in
   Type.Expr.map
@@ -193,7 +212,9 @@ let generalize types typ =
     ~pf:(never_happens [%here])
     ~f:
       (function
-       | Partial_function (args, id) -> Defer (Function (args, Var id))
+       | Partial_function (args, effect_row, id) ->
+         (* FIXME: fix effects *)
+         Defer (Function (args, effect_row, Var id))
        | typ -> Defer typ)
 ;;
 

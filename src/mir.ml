@@ -931,7 +931,11 @@ module Expr = struct
       | Fun_call (fun_, args_and_types), body_type ->
         let fun_call () =
           let arg_types = Nonempty.map ~f:snd args_and_types in
-          let fun_type = Type.Expr.Function (arg_types, body_type) in
+          (* FIXME: We lost the effect information. We don't actually use it, though.
+             For now, just making the effect total. *)
+          let fun_type =
+            Type.Expr.Function (arg_types, Type.Expr.total_effect, body_type)
+          in
           let fun_ = of_typed_expr ~ctx fun_ fun_type in
           let args =
             Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
@@ -958,7 +962,7 @@ module Expr = struct
               make_block ~ctx ~tag ~fields ~field_types
             | Error _ -> fun_call ())
          | _ -> fun_call ())
-      | Lambda (args, body), Function (arg_types, body_type) ->
+      | Lambda (args, body), Function (arg_types, _effect_row, body_type) ->
         (* TODO: Still need to try and coalesce lambdas/other function expressions for
            function definitions which are partially applied. See example in
            test/ast/TypeChecking.expected. *)
