@@ -100,6 +100,44 @@ module Expr = struct
       Effect (effect_name, List.map args ~f:(map ~f ~var ~pf))
   ;;
 
+  let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~pf ~eff =
+    match f (type1, type2) with
+    | Halt typ -> typ
+    | Retry (type1, type2) -> map2 type1 type2 ~f ~f_contra ~var ~pf ~eff
+    | Defer (type1, type2) ->
+      (match type1, type2 with
+       | Var v1, Var v2 -> Var (var v1 v2)
+       | Type_app (name1, args1), Type_app (name2, args2) ->
+         assert_or_compiler_bug ~here:[%here] (Type_name.Qualified.equal name1 name2);
+         Type_app (name1, List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~var ~pf ~eff))
+       | Tuple fields1, Tuple fields2 ->
+         Tuple (List.map2_exn fields1 fields2 ~f:(map2 ~f ~f_contra ~var ~pf ~eff))
+       | Function (args1, effect_row1, res1), Function (args2, effect_row2, res2) ->
+         let args =
+           Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~pf ~eff)
+         in
+         let effect_row = eff effect_row1 effect_row2 in
+         let res = map2 res1 res2 ~f ~f_contra ~var ~pf ~eff in
+         Function (args, effect_row, res)
+       | ( Partial_function (args1, effect_row1, v1)
+         , Partial_function (args2, effect_row2, v2) ) ->
+         let args =
+           Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~pf ~eff)
+         in
+         let effect_row = eff effect_row1 effect_row2 in
+         let v = pf v1 v2 in
+         Partial_function (args, effect_row, v)
+       | Partial_function _, Function _
+       | Function _, Partial_function _
+       | Var _, (Type_app _ | Tuple _ | Function _ | Partial_function _)
+       | Type_app _, (Var _ | Tuple _ | Function _ | Partial_function _)
+       | Tuple _, (Var _ | Type_app _ | Function _ | Partial_function _)
+       | Function _, (Var _ | Type_app _ | Tuple _)
+       | Partial_function _, (Var _ | Type_app _ | Tuple _) ->
+         compiler_bug
+           [%message "Incompatible types for map2" (type1 : (_, _) t) (type2 : (_, _) t)])
+  ;;
+
   let rec fold_until typ ~init ~f =
     match (f init typ : _ Fold_action.t) with
     | Stop _ as stop -> stop
@@ -146,7 +184,55 @@ module Expr = struct
      
      Let's remove effect variables which are unified later. Also want to remove
      duplicates later. *)
-  let combine_effects effects1 effects2 = effects1 @ effects2
+  let union_effects effects1 effects2 = effects1 @ effects2
+
+  (* FIXME: Maybe just make effects a set? *)
+  (* TODO: Since we don't consider unified type variables to be equal, this may give 
+     stricter types than necessary. Integrate this and union with `Type_bindings` so it
+     can deal with this. *)
+  let intersect_effects effects1 effects2 =
+    List.filter
+      effects1
+      ~f:(List.mem effects2 ~equal:[%equal: (Var_id.t, Var_id.t) effect])
+  ;;
+
+  (* FIXME: function variance goes from contra -> co.
+     You can reduce the set of possible inputs or increase the set of possible outputs
+     and get a supertype.
+     A -> B is a subtype of C -> D iff C is a subtype of A and B is a subtype of D.
+
+     When we take the "union" of two function types, we're trying to find a function
+     type which is a supertype of both of them. Maybe we can just consider the
+     effect types? Hmm, but now we've introduced subtyping in, it might be anywhere.
+
+     e.g. For
+     `Int -> <> (Int -> <Foo> Int)`
+     and
+     `Int -> <> (Int -> <Bar> Int)`
+     we can say the union is `Int -> <> (Int -> <Foo,Bar> Int)`
+
+     And for
+     `(Int -> <Foo> Int) -> <> Int`
+     and
+     `(Int -> <Bar> Int) -> <> Int`
+     we can say the union is `(Int -> <> Int) -> <> Int` by finding a type which is
+     a subtype of both of the effects in the argument functions. So this is
+     intersection instead of union.
+  *)
+  let rec union t1 t2 =
+    map2 t1 t2 ~var:Fn.const ~pf:Fn.const ~eff:union_effects ~f_contra:(fun (t1, t2) ->
+      Halt (intersect t1 t2))
+
+  and intersect t1 t2 =
+    map2
+      t1
+      t2
+      ~var:Fn.const
+      ~pf:Fn.const
+      ~eff:intersect_effects
+      ~f_contra:(fun (t1, t2) -> Halt (union t1 t2))
+  ;;
+
   let effect_is_total = List.is_empty
 end
 

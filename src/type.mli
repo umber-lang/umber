@@ -71,12 +71,8 @@ module Expr : sig
   val fold_vars : ('v, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
   val for_all_vars : ('v, _) t -> f:('v -> bool) -> bool
   val exists_var : ('v, _) t -> f:('v -> bool) -> bool
-
-  val combine_effects
-    :  ('v, 'pf) effect_row
-    -> ('v, 'pf) effect_row
-    -> ('v, 'pf) effect_row
-
+  val union : (Var_id.t, Var_id.t) t -> (Var_id.t, Var_id.t) t -> (Var_id.t, Var_id.t) t
+  val union_effects : ('v, 'pf) effect_row -> ('v, 'pf) effect_row -> ('v, 'pf) effect_row
   val effect_is_total : _ effect_row -> bool
 end
 

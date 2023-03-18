@@ -164,7 +164,7 @@ module Expr = struct
       let effects = ref [] in
       let (expr : _ t), (typ : _ Type.Expr.t) =
         f ~add_effects:(fun effects' ->
-          effects := Type.Expr.combine_effects !effects effects')
+          effects := Type.Expr.union_effects !effects effects')
       in
       expr, typ, !effects
     in
@@ -224,6 +224,9 @@ module Expr = struct
         let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
         Lambda (args, body), Function (arg_types, body_effects, body_type), []
       | If (cond, then_, else_) ->
+        (* FIXME: Places with multiple branches e.g. if, match, now can't rely on the
+           types of the two branches being unified to be equivalent, and arbitrarily
+           picking one. They need to get the supertype (for e.g functions). *)
         collect_effects (fun ~add_effects ->
           let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
           add_effects cond_effects;

@@ -2,10 +2,10 @@ open! Import
 open Names
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
-     GADTs (local type equality/type narrowing)
-     Some of these features can make local let-generalization difficult, see:
-     https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf
-     for an argument for just abolishing local let-generalization *)
+   GADTs (local type equality/type narrowing)
+   Some of these features can make local let-generalization difficult, see:
+   https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf
+   for an argument for just abolishing local let-generalization *)
 
 exception Type_error of Ustring.t * (Type.t * Type.t) option [@@deriving sexp]
 
@@ -34,9 +34,10 @@ let rec occurs_in id : Type.t -> bool = function
     || occurs_in_effect_row id effect_row
     || Type.Var_id.(id = id')
 
-and occurs_in_effect_row id ({ effects; effect_var } : _ Type.Expr.effect_row) =
-  Option.exists effect_var ~f:Type.Var_id.(( = ) id)
-  || Map.exists effects ~f:(List.exists ~f:(occurs_in id))
+and occurs_in_effect_row id (effect_row : _ Type.Expr.effect_row) =
+  List.exists effect_row ~f:(function
+    | Effect_var id' -> Type.Var_id.(id = id')
+    | Effect (_, args) -> List.exists args ~f:(occurs_in id))
 ;;
 
 let fun_arg_number_mismatch = type_error "Function argument number mismatch"
@@ -125,15 +126,18 @@ let rec unify ~names ~types t1 t2 =
   | Tuple _, (Function _ | Partial_function _)
   | Function _, Tuple _
   | Partial_function _, Tuple _ -> type_error "Types do not match" t1 t2
+;;
+
 (* | Partial_effect _, _ | _, Partial_effect _ ->
     (* FIXME: check *)
     compiler_bug [%message "unfying effect rows"] *)
 
-and unify_effect_rows
+(* FIXME: cleanup *)
+(* and unify_effect_rows
   ~names
   ~types
-  { effects = effects1; effect_var = var1 }
-  { effects = effects2; effect_var = var2 }
+  effects1
+  effects2
   =
   (* FIXME: How should I think about effect unification? What about multiples of the same
      effect with different type parameters? Maybe we just disallow that for now. *)
@@ -154,7 +158,7 @@ and unify_effect_rows
           left_only, right_only)
   in
   unify ~names ~types
-;;
+;; *)
 
 let rec substitute types typ =
   Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~f:(fun typ ->
