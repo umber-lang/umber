@@ -34,13 +34,6 @@ module By_kind = struct
     ; def : 'a
     }
   [@@deriving sexp_of]
-
-  (* FIXME: setup *)
-  (* let set t kind new_ =
-    match kind with
-    | `Sig -> { t with sig_ = new_ }
-    | `Def -> { t with def = new_ }
-  ;; *)
 end
 
 exception Compatibility_error
@@ -57,94 +50,9 @@ let iter2 xs ys ~f =
   | Unequal_lengths -> raise Compatibility_error
 ;;
 
-(* FIXME: We can express sig/def compatibility with skolemizaation. (Turning all type
-   variables in the signature into fresh abstract types, then trying to unify with the
-   def.) This is checking that the signature is at least as specific than the def.
-   I think checking type defintions can be done by checking both directions. *)
-(* let check_type_schemes =
-  let rec check_type_schemes ~names ~param_matching ~param_table ~schemes =
-    (* FIXME: Do we need to absolutify type app names in aliases? Likely yes? *)
-    (* let map_alias param_matching ~param_table expr =
-    Type.Expr.map expr ~var:Fn.id ~pf:Nothing.unreachable_code ~f:(function
-      | Var v -> Map.find_exn params v
-      | typ -> Defer typ)
-  in *)
-    let substitute_alias ~params ~args alias =
-      let args_by_parm = List.zip_exn params args in
-      Type.Expr.map alias ~var:Fn.id ~pf:Fn.id ~f:(function
-        | Var var -> Halt (List.Assoc.find_exn args_by_parm var ~equal:Type.Param.equal)
-        | expr -> Defer expr)
-    in
-    let check_type_app ~name ~args ~kind ~on_non_alias =
-      match Name_bindings.find_absolute_type_decl names name with
-      | params, Alias alias ->
-        let alias = substitute_alias ~params ~args alias in
-        check_type_schemes
-          ~names
-          ~param_matching
-          ~param_table
-          ~schemes:(By_kind.set schemes kind alias)
-      | decl -> on_non_alias decl
-    in
-    match (schemes : Type.Scheme.t By_kind.t), param_matching with
-    | { sig_ = Var sig_param; def = Var def_param }, `None ->
-      if not (Type.Param.equal sig_param def_param) then raise Compatibility_error
-    | { sig_ = sig_scheme; def = Var def_param }, `Lenient
-    | { sig_ = Var _ as sig_scheme; def = Var def_param }, `Strict ->
-      (match Hashtbl.find param_table def_param with
-       | None -> Hashtbl.set param_table ~key:def_param ~data:sig_scheme
-       | Some def_scheme ->
-         check_type_schemes
-           ~names
-           ~param_matching:`None
-           ~param_table
-           ~schemes:{ sig_ = sig_scheme; def = def_scheme })
-    | { sig_ = Type_app (name1, args1); def = Type_app (name2, args2) }, _ ->
-      check_type_app ~name:name1 ~args:args1 ~kind:`Sig ~on_non_alias:(fun decl1 ->
-        check_type_app ~name:name2 ~args:args2 ~kind:`Def ~on_non_alias:(fun decl2 ->
-          if not (phys_equal decl1 decl2) then raise Compatibility_error;
-          iter2 args1 args2 ~f:(fun sig_ def ->
-            check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def })))
-    | { sig_ = Type_app (name, args); def = Tuple _ | Function _ | Partial_function _ }, _
-    | { sig_ = Type_app (name, args); def = Var _ }, `None ->
-      check_type_app ~name ~args ~kind:`Sig ~on_non_alias:(fun _ ->
-        raise Compatibility_error)
-    | ( { sig_ = Var _ | Tuple _ | Function _ | Partial_function _
-        ; def = Type_app (name, args)
-        }
-      , _ ) ->
-      check_type_app ~name ~args ~kind:`Def ~on_non_alias:(fun _ ->
-        raise Compatibility_error)
-    | { sig_ = Function (args1, res1); def = Function (args2, res2) }, _ ->
-      iter2 (Nonempty.to_list args1) (Nonempty.to_list args2) ~f:(fun sig_ def ->
-        check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def });
-      check_type_schemes
-        ~names
-        ~param_matching
-        ~param_table
-        ~schemes:{ sig_ = res1; def = res2 }
-    | { sig_ = Tuple args1; def = Tuple args2 }, _ ->
-      iter2 args1 args2 ~f:(fun sig_ def ->
-        check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def })
-    | ( ( { sig_ = Var _; def = Tuple _ | Function _ }
-        | { sig_ = Tuple _; def = Function _ }
-        | { sig_ = Function _; def = Tuple _ } )
-      , _ )
-    | { sig_ = Type_app _ | Tuple _ | Function _; def = Var _ }, `Strict
-    | { sig_ = Tuple _ | Function _; def = Var _ }, `None -> raise Compatibility_error
-    | ({ sig_ = Partial_function _; def = _ } | { sig_ = _; def = Partial_function _ }), _
-      -> .
-  in
-  fun ~names ~param_matching ~schemes ->
-    check_type_schemes
-      ~names
-      ~param_matching
-      ~param_table:(Type.Param.Table.create ())
-      ~schemes
-;; *)
-
 (** Skolemization means replacing all type variables in a type expression with fresh
-    abstract types. *)
+    abstract types. e.g. `a -> b -> c` becomes something like `A -> B -> C` where `A`,
+    `B`, and `C` are fresh abstract types. *)
 let skomelize ~names scheme : Name_bindings.t * Type.t =
   Name_bindings.with_path names Name_bindings.Path.toplevel ~f:(fun names ->
     let names = ref names in
@@ -171,6 +79,13 @@ let skomelize ~names scheme : Name_bindings.t * Type.t =
     signature is a "more specific" version of the defintion. We can check this by
     skolemizing the signature, instatiating the defintion, and then unifying the two. *)
 let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
+  (* FIXME: Do we need to absolutify type app names in aliases? Likely yes?
+     Shouldn't we have done that earlier? Maybe we make absolute paths a type variable? *)
+  (* let map_alias param_matching ~param_table expr =
+    Type.Expr.map expr ~var:Fn.id ~pf:Nothing.unreachable_code ~f:(function
+      | Var v -> Map.find_exn params v
+      | typ -> Defer typ)
+  in *)
   let names, sig_type = skomelize ~names sig_scheme in
   let def_type = Type.Scheme.instantiate def_scheme in
   let types = Type_bindings.create () in
