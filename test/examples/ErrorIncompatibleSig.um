@@ -16,6 +16,12 @@ module : {
     type A = | A1 | A2
     val a : A
   }
+
+  type GoodRename a = a -> a
+  type BadRename a b = a -> b
+  type DifferentArity a
+  type LessGeneral a = Int -> Int
+  type MoreGeneral a = a -> a
 }
 
 type T = String
@@ -25,3 +31,9 @@ module A = {
   type A = | A1 | A2
   let a = "not a"
 }
+
+type GoodRename b = b -> b
+type BadRename a b = a -> a
+type DifferentArity = String
+type LessGeneral a = a -> a
+type MoreGeneral a = Int -> Int

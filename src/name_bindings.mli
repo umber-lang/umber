@@ -28,6 +28,7 @@ module Path : sig
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 
+  val toplevel : t
   val to_module_path : t -> Module_path.t
   val append : t -> Module_name.t -> place:[ `Sig | `Def ] -> t
 end

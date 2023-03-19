@@ -246,7 +246,23 @@ end
 
 module Lower_name_qualified = Ustring_qualified (Lower_name)
 module Upper_name_qualified = Ustring_qualified (Upper_name)
-module Type_name : Name_qualified = Upper_name_qualified
+
+module Type_name : sig
+  include Name_qualified
+
+  (** Create a fresh type name that looks like `_Skolemized1`. For use in creating fresh
+      abstract types ("skolemization"). *)
+  val create_skolemized : unit -> t
+end = struct
+  include Upper_name_qualified
+  module Skolemized_id = Unique_id.Int ()
+
+  let create_skolemized () =
+    let id = Skolemized_id.create () in
+    of_string_unchecked [%string "_Skolemized%{id#Skolemized_id}"]
+  ;;
+end
+
 module Cnstr_name : Name_qualified = Upper_name_qualified
 module Trait_name : Name_qualified = Upper_name_qualified
 

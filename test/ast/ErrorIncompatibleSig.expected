@@ -10,7 +10,19 @@
          (() (Alias (Type_app String ())))))
        (Weather
         (Incompatible (() (Variants ((Rainy ()) (Sunny ()))))
-         (() (Variants ((Rainy ()))))))))
+         (() (Variants ((Rainy ()))))))
+       (BadRename
+        (Incompatible ((a b) (Alias (Function ((Var a)) (Var b))))
+         ((a b) (Alias (Function ((Var a)) (Var a))))))
+       (LessGeneral
+        (Incompatible
+         ((a) (Alias (Function ((Type_app Int ())) (Type_app Int ()))))
+         ((a) (Alias (Function ((Var a)) (Var a))))))
+       (MoreGeneral
+        (Incompatible ((a) (Alias (Function ((Var a)) (Var a))))
+         ((a) (Alias (Function ((Type_app Int ())) (Type_app Int ()))))))
+       (DifferentArity
+        (Incompatible ((a) Abstract) (() (Alias (Type_app String ())))))))
      (module_diff
       ((A
         (Module_diff
