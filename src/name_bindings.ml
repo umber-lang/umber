@@ -151,6 +151,7 @@ module Path = struct
 
   let to_module_path = List.map ~f:fst
   let append t module_name ~place = t @ [ module_name, place ]
+  let toplevel = []
 end
 
 type t =

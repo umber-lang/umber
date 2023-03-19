@@ -35,11 +35,12 @@ module By_kind = struct
     }
   [@@deriving sexp_of]
 
-  let set t kind new_ =
+  (* FIXME: setup *)
+  (* let set t kind new_ =
     match kind with
     | `Sig -> { t with sig_ = new_ }
     | `Def -> { t with def = new_ }
-  ;;
+  ;; *)
 end
 
 exception Compatibility_error
@@ -47,7 +48,7 @@ exception Compatibility_error
 let no_errors f =
   match f () with
   | () -> true
-  | exception Compatibility_error -> false
+  | (exception Compatibility_error) | (exception Type_bindings.Type_error _) -> false
 ;;
 
 let iter2 xs ys ~f =
@@ -56,7 +57,11 @@ let iter2 xs ys ~f =
   | Unequal_lengths -> raise Compatibility_error
 ;;
 
-let check_type_schemes =
+(* FIXME: We can express sig/def compatibility with skolemizaation. (Turning all type
+   variables in the signature into fresh abstract types, then trying to unify with the
+   def.) This is checking that the signature is at least as specific than the def.
+   I think checking type defintions can be done by checking both directions. *)
+(* let check_type_schemes =
   let rec check_type_schemes ~names ~param_matching ~param_table ~schemes =
     (* FIXME: Do we need to absolutify type app names in aliases? Likely yes? *)
     (* let map_alias param_matching ~param_table expr =
@@ -136,6 +141,50 @@ let check_type_schemes =
       ~param_matching
       ~param_table:(Type.Param.Table.create ())
       ~schemes
+;; *)
+
+(** Skolemization means replacing all type variables in a type expression with fresh
+    abstract types. *)
+let skomelize ~names scheme : Name_bindings.t * Type.t =
+  Name_bindings.with_path names Name_bindings.Path.toplevel ~f:(fun names ->
+    let names = ref names in
+    let types_by_param = Type.Param.Table.create () in
+    let type_ =
+      Type.Expr.map
+        scheme
+        ~var:(fun var -> compiler_bug [%message "Unskolemized var" (var : Type.Param.t)])
+        ~pf:Nothing.unreachable_code
+        ~f:
+          (function
+           | Var param ->
+             Halt
+               (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
+                  let type_name = Type_name.create_skolemized () in
+                  names := Name_bindings.add_type_decl !names type_name ([], Abstract);
+                  Type.Expr.Type_app (([], type_name), [])))
+           | type_ -> Defer type_)
+    in
+    !names, type_)
+;;
+
+(** A `val` item in a signature is compatible with a `let` in a defintion if the
+    signature is a "more specific" version of the defintion. We can check this by
+    skolemizing the signature, instatiating the defintion, and then unifying the two. *)
+let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
+  let names, sig_type = skomelize ~names sig_scheme in
+  let def_type = Type.Scheme.instantiate def_scheme in
+  let types = Type_bindings.create () in
+  Type_bindings.unify ~names ~types sig_type def_type
+;;
+
+(* FIXME: Do we need to skolemize at the level of type declarations rather than individual
+   schemes? Not sure if "mutating" the name bindings makes things go wrong. *)
+(** Type definitions in a signature an defintion are compatible if they are the same
+    modulo type aliases and type variable renamings. Unlike for `val`s, the compatibility
+    is symmetrical. *)
+let check_type_decl_schemes ~names schemes =
+  check_val_type_schemes ~names schemes;
+  check_val_type_schemes ~names { sig_ = schemes.def; def = schemes.sig_ }
 ;;
 
 let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
@@ -160,10 +209,9 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
       Extern_name.equal sig_extern_name def_extern_name
   in
   no_errors (fun () ->
-    check_type_schemes
+    check_val_type_schemes
       ~names
-      ~param_matching:`Lenient
-      ~schemes:{ sig_ = get_scheme sig_entry; def = get_scheme def_entry };
+      { sig_ = get_scheme sig_entry; def = get_scheme def_entry };
     if not
          (compatible_fixities sig_entry def_entry
          && compatible_extern_names sig_entry def_entry)
@@ -182,15 +230,12 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
     match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
     | Abstract, _ -> ()
     | Alias sig_scheme, Alias def_scheme ->
-      check_type_schemes
-        ~names
-        ~param_matching:`Strict
-        ~schemes:{ sig_ = sig_scheme; def = def_scheme }
+      check_type_decl_schemes ~names { sig_ = sig_scheme; def = def_scheme }
     | Variants cnstrs1, Variants cnstrs2 ->
       iter2 cnstrs1 cnstrs2 ~f:(fun (cnstr1, args1) (cnstr2, args2) ->
         if not (Cnstr_name.equal cnstr1 cnstr2) then raise Compatibility_error;
         iter2 args1 args2 ~f:(fun sig_ def ->
-          check_type_schemes ~names ~param_matching:`Strict ~schemes:{ sig_; def }))
+          check_type_decl_schemes ~names { sig_; def }))
     | Record _, Record _ -> failwith "TODO: record types in compatibility checks"
     (* Records, variants and (in definitions) abstract type declarations always introduce
        new types, so they are never compatible with aliases. *)
