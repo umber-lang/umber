@@ -58,7 +58,7 @@ end
 module Expr = struct
   type ('v, 'pf) t =
     | Var of 'v
-    | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
+    | Type_app of Type_name.Relative.t * ('v, 'pf) t list
     | Tuple of ('v, 'pf) t list
     | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) t
     | Partial_function of ('v, 'pf) t Nonempty.t * 'pf

@@ -1,7 +1,7 @@
 open Import
 open Names
 
-type t = (Value_name.Qualified.t, Untyped.Expr.t) Btree.t
+type t = (Value_name.Relative.t, Untyped.Expr.t) Btree.t
 
 let rec fix_precedence ~names = function
   | Btree.Node (op_name, left_child, right_child) as root ->
@@ -24,23 +24,23 @@ let rec fix_precedence ~names = function
         else Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
     in
     (match rotation with
-    | None -> root
-    | Some (level, rotation_info) ->
-      let _, op_level = Name_bindings.find_fixity names op_name in
-      if Fixity.Level.(level < op_level)
-      then (
-        match rotation_info with
-        | `Clockwise, left_name, ll_child, lr_child ->
-          Node
-            ( left_name
-            , ll_child
-            , fix_precedence ~names (Node (op_name, lr_child, right_child)) )
-        | `Anticlockwise, right_name, rl_child, rr_child ->
-          Node
-            ( right_name
-            , fix_precedence ~names (Node (op_name, left_child, rl_child))
-            , rr_child ))
-      else root)
+     | None -> root
+     | Some (level, rotation_info) ->
+       let _, op_level = Name_bindings.find_fixity names op_name in
+       if Fixity.Level.(level < op_level)
+       then (
+         match rotation_info with
+         | `Clockwise, left_name, ll_child, lr_child ->
+           Node
+             ( left_name
+             , ll_child
+             , fix_precedence ~names (Node (op_name, lr_child, right_child)) )
+         | `Anticlockwise, right_name, rl_child, rr_child ->
+           Node
+             ( right_name
+             , fix_precedence ~names (Node (op_name, left_child, rl_child))
+             , rr_child ))
+       else root)
   | Leaf _ as leaf -> leaf
 ;;
 

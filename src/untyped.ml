@@ -13,10 +13,10 @@ end
 module Expr = struct
   type t =
     | Literal of Literal.t
-    | Name of Value_name.Qualified.t
+    | Name of Value_name.Relative.t
     | Qualified of Module_path.t * t
     | Fun_call of t * t Nonempty.t
-    | Op_tree of (Value_name.Qualified.t, t) Btree.t
+    | Op_tree of (Value_name.Relative.t, t) Btree.t
     | Lambda of Pattern.t Nonempty.t * t
     | If of t * t * t
     | Match of t * (Pattern.t * t) Nonempty.t
@@ -81,7 +81,7 @@ module Expr = struct
         | _, Some expr -> loop ~names used locals expr
         | _, None -> used)
     in
-    loop ~names Value_name.Qualified.Set.empty Value_name.Set.empty
+    loop ~names Value_name.Relative.Set.empty Value_name.Set.empty
   ;;
 
   let match_function branches =
@@ -96,16 +96,16 @@ module Expr = struct
   ;;
 
   let op_section_right op expr =
-    let op = Value_name.Qualified.of_ustrings_unchecked op in
+    let op = Value_name.Relative.of_ustrings_unchecked op in
     let left_var = Value_name.empty in
-    let left_var_qualified = Value_name.Qualified.with_path [] left_var in
+    let left_var_qualified = Value_name.Relative.with_path [] left_var in
     Lambda
       ( [ Catch_all (Some left_var) ]
       , Fun_call (Name op, [ Name left_var_qualified; expr ]) )
   ;;
 
   let op_section_left expr op =
-    Fun_call (Name (Value_name.Qualified.of_ustrings_unchecked op), [ expr ])
+    Fun_call (Name (Value_name.Relative.of_ustrings_unchecked op), [ expr ])
   ;;
 end
 

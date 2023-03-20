@@ -44,10 +44,10 @@ val prelude : t Lazy.t
 val without_std : t -> t
 
 (* Querying/updating names *)
-val find_entry : t -> Value_name.Qualified.t -> Name_entry.t
-val find_type : t -> Value_name.Qualified.t -> Type.t
-val find_cnstr_type : t -> Cnstr_name.Qualified.t -> Type.t
-val find_fixity : t -> Value_name.Qualified.t -> Fixity.t
+val find_entry : t -> Value_name.Relative.t -> Name_entry.t
+val find_type : t -> Value_name.Relative.t -> Type.t
+val find_cnstr_type : t -> Cnstr_name.Relative.t -> Type.t
+val find_fixity : t -> Value_name.Relative.t -> Fixity.t
 val set_inferred_scheme : t -> Value_name.t -> Type.Scheme.t -> t
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_placeholder : t -> Type_name.t -> t
@@ -56,7 +56,7 @@ val add_type_placeholder : t -> Type_name.t -> t
 val fold_local_names
   :  t
   -> init:'a
-  -> f:('a -> Value_name.Qualified.t -> Name_entry.t -> 'a)
+  -> f:('a -> Value_name.Relative.t -> Name_entry.t -> 'a)
   -> 'a
 
 val merge_names
@@ -66,16 +66,16 @@ val merge_names
   -> t
 
 (** Find a type declaration given a qualified name *)
-val find_type_decl : ?defs_only:bool -> t -> Type_name.Qualified.t -> Type.Decl.t
+val find_type_decl : ?defs_only:bool -> t -> Type_name.Relative.t -> Type.Decl.t
 
 (** Find a type declaration given an absolute qualified name *)
-val find_absolute_type_decl : ?defs_only:bool -> t -> Type_name.Qualified.t -> Type.Decl.t
+val find_absolute_type_decl : ?defs_only:bool -> t -> Type_name.Relative.t -> Type.Decl.t
 
 (** Convert a qualified type name to one with an absolute module path *)
-val absolutify_type_name : t -> Type_name.Qualified.t -> Type_name.Qualified.t
+val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Relative.t
 
 (** Convert a qualified value name to one with an absolute module path *)
-val absolutify_value_name : t -> Value_name.Qualified.t -> Value_name.Qualified.t
+val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Relative.t
 
 (* Scope handling *)
 val current_path : t -> Path.t

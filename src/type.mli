@@ -36,7 +36,7 @@ end
 module Expr : sig
   type ('v, 'pf) t =
     | Var of 'v
-    | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
+    | Type_app of Type_name.Relative.t * ('v, 'pf) t list
     | Tuple of ('v, 'pf) t list
     | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) t
     | Partial_function of ('v, 'pf) t Nonempty.t * 'pf
@@ -75,13 +75,13 @@ module Scheme : sig
   end
 
   val instantiate
-    :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
+    :  ?map_name:(Type_name.Relative.t -> Type_name.Relative.t)
     -> ?params:Param.Env_to_vars.t
     -> t
     -> (Var_id.t, _) Expr.t
 
   val instantiate_bounded
-    :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
+    :  ?map_name:(Type_name.Relative.t -> Type_name.Relative.t)
     -> ?params:Param.Env_to_vars.t
     -> Bounded.t
     -> (Var_id.t, _) Expr.t

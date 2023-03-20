@@ -10,7 +10,7 @@ type 'typ t =
   | Constant of Literal.t
   | Catch_all of Value_name.t option
   | As of 'typ t * Value_name.t
-  | Cnstr_appl of Cnstr_name.Qualified.t * 'typ t list
+  | Cnstr_appl of Cnstr_name.Relative.t * 'typ t list
   | Tuple of 'typ t list
   | Record of (Value_name.t * 'typ t option) Nonempty.t
   | Union of 'typ t * 'typ t

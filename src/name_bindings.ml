@@ -163,8 +163,8 @@ and sigs = Nothing.t bindings
 and defs = sigs bindings
 
 and 'a bindings =
-  { names : (Name_entry.t, Value_name.Qualified.t) Or_imported.t Value_name.Map.t
-  ; types : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option Type_name.Map.t
+  { names : (Name_entry.t, Value_name.Relative.t) Or_imported.t Value_name.Map.t
+  ; types : (Type.Decl.t, Type_name.Relative.t) Or_imported.t option Type_name.Map.t
   ; modules : ('a option * 'a bindings, Module_path.t) Or_imported.t Module_name.Map.t
   }
 [@@deriving sexp]
@@ -403,7 +403,7 @@ let rec find_entry' t name =
   find
     t
     name
-    ~to_ustring:Value_name.Qualified.to_ustring
+    ~to_ustring:Value_name.Relative.to_ustring
     ~f:(fun current_path name bindings ->
     let f bindings =
       Map.find bindings.names name >>| resolve_name_or_import' t (current_path, name)
@@ -425,7 +425,7 @@ and resolve_name_or_import t = function
 ;;
 
 let find_type t name = find_entry t name |> Name_entry.typ
-let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
+let find_cnstr_type t = Value_name.Relative.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
 let find_type_decl' ?at_path ?defs_only t name =
@@ -434,7 +434,7 @@ let find_type_decl' ?at_path ?defs_only t name =
     ?at_path
     t
     name
-    ~to_ustring:Type_name.Qualified.to_ustring
+    ~to_ustring:Type_name.Relative.to_ustring
     ?defs_only
     ~f:(fun path name bindings ->
     let f bindings ~check_submodule =
@@ -588,7 +588,7 @@ let add_val_or_extern
               Ustring.(
                 Value_name.to_ustring name
                 ^ of_string_exn " vs "
-                ^ Value_name.Qualified.to_ustring imported_name))
+                ^ Value_name.Relative.to_ustring imported_name))
     }
   in
   update_current t ~f:{ f }
@@ -754,7 +754,7 @@ let find_type_decl ?at_path ?(defs_only = false) t type_name =
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (type_name : Type_name.Qualified.t)
+          (type_name : Type_name.Relative.t)
           (without_std t : t)])
 ;;
 
@@ -763,7 +763,7 @@ let resolve_decl_or_import ?at_path t decl_or_import =
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option)
+          (decl_or_import : (Type.Decl.t, Type_name.Relative.t) Or_imported.t option)
           (without_std t : t)])
 ;;
 

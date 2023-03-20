@@ -188,9 +188,9 @@ module Context : sig
     [@@deriving sexp_of]
   end
 
-  val find_value_name : t -> Value_name.Qualified.t -> Mir_name.t * Extern_info.t
+  val find_value_name : t -> Value_name.Relative.t -> Mir_name.t * Extern_info.t
   val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
-  val peek_value_name : t -> Value_name.Qualified.t -> Mir_name.t option
+  val peek_value_name : t -> Value_name.Relative.t -> Mir_name.t option
 
   type find_override := Value_name.t -> Mir_name.t -> Mir_name.t option
 
@@ -213,14 +213,14 @@ end = struct
   end
 
   type t =
-    { names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t
+    { names : (Mir_name.t * Extern_info.t) Value_name.Relative.Map.t
     ; name_bindings : Name_bindings.t
     ; name_table : Mir_name.Name_table.t
     ; find_override : Value_name.t -> Mir_name.t -> Mir_name.t option
     }
 
   let sexp_of_t t =
-    [%sexp (t.names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t)]
+    [%sexp (t.names : (Mir_name.t * Extern_info.t) Value_name.Relative.Map.t)]
   ;;
 
   let with_module t module_name ~f =
@@ -274,8 +274,8 @@ end = struct
       compiler_bug
         [%message
           "Name missing from context"
-            (name : Value_name.Qualified.t)
-            (t.names : (Mir_name.t * Extern_info.t) Value_name.Qualified.Map.t)]
+            (name : Value_name.Relative.t)
+            (t.names : (Mir_name.t * Extern_info.t) Value_name.Relative.Map.t)]
   ;;
 
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
@@ -301,7 +301,7 @@ end = struct
 
   let create ~names:name_bindings ~name_table =
     let t =
-      { names = Value_name.Qualified.Map.empty
+      { names = Value_name.Relative.Map.empty
       ; name_bindings
       ; name_table
       ; find_override = (fun _ _ -> None)
@@ -329,7 +329,7 @@ end = struct
               compiler_bug
                 [%message
                   "Didn't find type scheme for external name entry"
-                    (name : Value_name.Qualified.t)
+                    (name : Value_name.Relative.t)
                     (entry : Name_bindings.Name_entry.t)])
           in
           External { arity = arity_of_type ~names:name_bindings scheme }

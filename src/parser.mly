@@ -96,14 +96,14 @@ pattern_term:
   | l = literal { Pattern.Constant l }
   | name = pattern_name { Pattern.Catch_all name }
   | name = qualified(UPPER_NAME)
-    { Pattern.Cnstr_appl (Cnstr_name.Qualified.of_ustrings_unchecked name, []) }
+    { Pattern.Cnstr_appl (Cnstr_name.Relative.of_ustrings_unchecked name, []) }
   | fields = braces(record_literal_fields(pattern)) { Pattern.Record fields }
 
 pattern:
   | p = pattern_term { p }
   | cnstr = qualified(UPPER_NAME); args = nonempty(pattern_term)
     { Pattern.Cnstr_appl (
-        Cnstr_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
+        Cnstr_name.Relative.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
   | left = pattern; PIPE; right = pattern { Pattern.Union (left, right) }
   | pat = pattern; AS; name = val_name
     { Pattern.As (pat, Value_name.of_ustring_unchecked name) }
@@ -119,10 +119,10 @@ expr_term:
     { Expr.qualified (fst e, single_or_list Expr.tuple (snd e)) }
   | op = qualified(parens(operator))
     { let path1, (path2, op) = op in
-      Expr.Name (Value_name.Qualified.of_ustrings_unchecked (path1 @ path2, op)) }
+      Expr.Name (Value_name.Relative.of_ustrings_unchecked (path1 @ path2, op)) }
   | op_section = qualified(parens(op_section)) { Expr.qualified op_section }
   | name = qualified(either(LOWER_NAME, UPPER_NAME))
-    { Expr.Name (Value_name.Qualified.of_ustrings_unchecked name) }
+    { Expr.Name (Value_name.Relative.of_ustrings_unchecked name) }
   | l = literal { Expr.Literal l }
   | items = brackets(flexible_list(COMMA, expr)) { Expr.Seq_literal items }
   | fields = braces(record_literal_fields(expr)) { Expr.Record_literal fields }
@@ -146,9 +146,9 @@ expr_op_term:
    left-associative with the same precedence. This operator tree is later re-associated. *)
 expr_op_tree:
   | left = expr_op_term; op = operator; right = expr_op_term
-    { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, Leaf left, Leaf right) }
+    { Btree.Node (Value_name.Relative.of_ustrings_unchecked op, Leaf left, Leaf right) }
   | left = expr_op_tree; op = operator; right = expr_op_term
-    { Btree.Node (Value_name.Qualified.of_ustrings_unchecked op, left, Leaf right) }
+    { Btree.Node (Value_name.Relative.of_ustrings_unchecked op, left, Leaf right) }
 
 match_branch:
   | branch = separated_pair(pattern, ARROW, expr) { branch }
@@ -194,14 +194,14 @@ type_tuple_or_fun:
 type_term:
   | t = type_tuple_or_fun { t }
   | cnstr = qualified(UPPER_NAME)
-    { Type.Expr.Type_app (Type_name.Qualified.of_ustrings_unchecked cnstr, []) }
+    { Type.Expr.Type_app (Type_name.Relative.of_ustrings_unchecked cnstr, []) }
   | param = LOWER_NAME { Type.Expr.Var (Type_param_name.of_ustring_unchecked param) }
 
 type_non_fun:
   | t = type_term { t }
   | cnstr = qualified(UPPER_NAME); args = nonempty(type_term)
     { Type.Expr.Type_app (
-        Type_name.Qualified.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
+        Type_name.Relative.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
 
 (* Writing this out like this instead of just using 
    `separated_nonempty(COMMA, type_non_fun)` prevents conflicts for some reason. *)

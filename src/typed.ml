@@ -145,7 +145,7 @@ end
 module Expr = struct
   type 'typ t =
     | Literal of Literal.t
-    | Name of Value_name.Qualified.t
+    | Name of Value_name.Relative.t
     | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
     | Lambda of Pattern.t Nonempty.t * 'typ t
     | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
@@ -610,9 +610,7 @@ module Module = struct
                 Type_error
                 ~msg:
                   [%message
-                    "Cyclic type alias"
-                      (name : Type_name.Qualified.t)
-                      (decl : Type.Decl.t)])
+                    "Cyclic type alias" (name : Type_name.Relative.t) (decl : Type.Decl.t)])
          | _ -> ());
         List.iter args ~f:(loop ~names aliases_seen)
       | Function (args, body) ->

@@ -211,7 +211,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_fixity : Fixity.t nonterminal
   | N_expr_term : Untyped.Expr.t nonterminal
   | N_expr_op_tree
-      : (Parser_scope.Value_name.Qualified.t, Untyped.Expr.t) Btree.t nonterminal
+      : (Parser_scope.Value_name.Relative.t, Untyped.Expr.t) Btree.t nonterminal
   | N_expr_op_term : Untyped.Expr.t nonterminal
   | N_expr : Untyped.Expr.t nonterminal
   | N_either_val_name_UPPER_NAME_ : Ustring.t nonterminal

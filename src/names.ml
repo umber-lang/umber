@@ -393,29 +393,29 @@ module Mir_name : sig
     val create : unit -> t
   end
 
-  val create_value_name : Name_table.t -> Value_name.Qualified.t -> t
+  val create_value_name : Name_table.t -> Value_name.Relative.t -> t
   val copy_name : Name_table.t -> t -> t
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
 end = struct
   module Name_table = struct
-    type t = int Value_name.Qualified.Table.t [@@deriving sexp_of]
+    type t = int Value_name.Relative.Table.t [@@deriving sexp_of]
 
-    let create () = Value_name.Qualified.Table.create ()
+    let create () = Value_name.Relative.Table.create ()
   end
 
   module T = struct
     module U = struct
-      type t = Value_name.Qualified.t * int [@@deriving compare, equal, hash]
+      type t = Value_name.Relative.t * int [@@deriving compare, equal, hash]
 
       let to_string (value_name, id) =
         if id = 0
-        then Value_name.Qualified.to_string value_name
-        else [%string "%{value_name#Value_name.Qualified}.%{id#Int}"]
+        then Value_name.Relative.to_string value_name
+        else [%string "%{value_name#Value_name.Relative}.%{id#Int}"]
       ;;
 
       let to_ustring (value_name, id) =
-        let ustr = Value_name.Qualified.to_ustring value_name in
+        let ustr = Value_name.Relative.to_ustring value_name in
         if id = 0 then ustr else Ustring.(ustr ^ of_string_exn [%string ".%{id#Int}"])
       ;;
 
@@ -429,7 +429,7 @@ end = struct
             else str, 0
           | None -> str, 0
         in
-        Value_name.Qualified.of_string name, id
+        Value_name.Relative.of_string name, id
       ;;
     end
 

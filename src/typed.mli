@@ -22,7 +22,7 @@ end
 module Expr : sig
   type 'typ t =
     | Literal of Literal.t
-    | Name of Value_name.Qualified.t
+    | Name of Value_name.Relative.t
     | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
     | Lambda of Pattern.t Nonempty.t * 'typ t
     | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t

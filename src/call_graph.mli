@@ -6,7 +6,7 @@ open Names
 module Binding : sig
   type 'a t =
     { bound_names : Value_name.Set.t
-    ; used_names : Value_name.Qualified.Set.t
+    ; used_names : Value_name.Relative.Set.t
     ; info : 'a
     }
   [@@deriving fields, sexp]
