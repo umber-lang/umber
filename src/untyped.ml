@@ -14,7 +14,7 @@ module Expr = struct
   type t =
     | Literal of Literal.t
     | Name of Value_name.Relative.t
-    | Qualified of Module_path.t * t
+    | Qualified of Module_path.Relative.t * t
     | Fun_call of t * t Nonempty.t
     | Op_tree of (Value_name.Relative.t, t) Btree.t
     | Lambda of Pattern.t Nonempty.t * t
@@ -92,7 +92,7 @@ module Expr = struct
   let qualified (path, expr) =
     match path with
     | [] -> expr
-    | _ -> Qualified (Module_path.of_ustrings_unchecked path, expr)
+    | _ -> Qualified (Module_path.Relative.of_ustrings_unchecked path, expr)
   ;;
 
   let op_section_right op expr =

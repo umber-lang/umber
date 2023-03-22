@@ -17,8 +17,8 @@ and common =
   (* TODO: Split imports into their own type and model importing all as a separate
      variant, not importing with an empty list, which is kinda hacky *)
   | Import of Module_name.t
-  | Import_with of Module_path.t * Unidentified_name.t list
-  | Import_without of Module_path.t * Unidentified_name.t Nonempty.t
+  | Import_with of Module_path.Relative.t * Unidentified_name.t list
+  | Import_without of Module_path.Relative.t * Unidentified_name.t Nonempty.t
 
 and sig_ =
   | Common_sig of common

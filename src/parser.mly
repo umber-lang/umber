@@ -253,7 +253,7 @@ fixity:
 
 %inline import_module_path:
   | IMPORT; path = separated_nonempty(PERIOD, UPPER_NAME)
-    { Module_path.of_ustrings_unchecked (Nonempty.to_list path) }
+    { Module_path.Relative.of_ustrings_unchecked (Nonempty.to_list path) }
 
 %inline import_item:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }

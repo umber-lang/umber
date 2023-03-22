@@ -29,7 +29,7 @@ module Path : sig
   include Hashable.S with type t := t
 
   val toplevel : t
-  val to_module_path : t -> Module_path.t
+  val to_module_path : t -> Module_path.Relative.t
   val append : t -> Module_name.t -> place:[ `Sig | `Def ] -> t
 end
 
@@ -69,13 +69,13 @@ val merge_names
 val find_type_decl : ?defs_only:bool -> t -> Type_name.Relative.t -> Type.Decl.t
 
 (** Find a type declaration given an absolute qualified name *)
-val find_absolute_type_decl : ?defs_only:bool -> t -> Type_name.Relative.t -> Type.Decl.t
+val find_absolute_type_decl : ?defs_only:bool -> t -> Type_name.Absolute.t -> Type.Decl.t
 
 (** Convert a qualified type name to one with an absolute module path *)
-val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Relative.t
+val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Absolute.t
 
 (** Convert a qualified value name to one with an absolute module path *)
-val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Relative.t
+val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Absolute.t
 
 (* Scope handling *)
 val current_path : t -> Path.t
@@ -98,9 +98,9 @@ val with_path : t -> Path.t -> f:(t -> t * 'a) -> t * 'a
 (* TODO: rename the existing module Import to Common, and split into Import.t with:
    `val import : t -> Import.t -> t` *)
 val import : t -> Module_name.t -> t
-val import_with : t -> Module_path.t -> Unidentified_name.t list -> t
-val import_all : t -> Module_path.t -> t
-val import_without : t -> Module_path.t -> Unidentified_name.t Nonempty.t -> t
+val import_with : t -> Module_path.Relative.t -> Unidentified_name.t list -> t
+val import_all : t -> Module_path.Relative.t -> t
+val import_without : t -> Module_path.Relative.t -> Unidentified_name.t Nonempty.t -> t
 
 val add_val
   :  t
@@ -138,6 +138,6 @@ end
    would be clearer to use.*)
 val find_sigs_and_defs
   :  t
-  -> Module_path.t
+  -> Module_path.Relative.t
   -> Module_name.t
   -> Sigs_or_defs.t option * Sigs_or_defs.t
