@@ -56,28 +56,29 @@ module Param = struct
 end
 
 module Expr = struct
-  type ('v, 'pf) t =
+  type ('v, 'pf, 'n) t =
     | Var of 'v
-    | Type_app of Type_name.Relative.t * ('v, 'pf) t list
-    | Tuple of ('v, 'pf) t list
-    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) t
-    | Partial_function of ('v, 'pf) t Nonempty.t * 'pf
+    | Type_app of 'n Type_name.Qualified.t * ('v, 'pf, 'n) t list
+    | Tuple of ('v, 'pf, 'n) t list
+    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) t
+    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * 'pf
   [@@deriving compare, equal, hash, sexp, variants]
 
-  let rec map ?(f = Map_action.defer) typ ~var ~pf =
+  let rec map ?(f = Map_action.defer) typ ~var ~pf ~name =
     match f typ with
     | Halt typ -> typ
-    | Retry typ -> map typ ~f ~var ~pf
+    | Retry typ -> map typ ~f ~var ~pf ~name
     | Defer typ ->
       (match typ with
        | Var v -> Var (var v)
-       | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var ~pf))
-       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf))
+       | Type_app (name', fields) ->
+         Type_app (name name', List.map fields ~f:(map ~f ~var ~pf ~name))
+       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf ~name))
        | Function (args, body) ->
-         let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
-         Function (args, map ~f ~var ~pf body)
+         let args = Nonempty.map args ~f:(map ~f ~var ~pf ~name) in
+         Function (args, map ~f ~var ~pf ~name body)
        | Partial_function (args, v) ->
-         let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
+         let args = Nonempty.map args ~f:(map ~f ~var ~pf ~name) in
          Partial_function (args, pf v))
   ;;
 
@@ -120,71 +121,69 @@ module Expr = struct
   ;;
 end
 
-type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
+type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
+[@@deriving compare, hash, equal, sexp]
 
 let fresh_var () = Expr.Var (Var_id.create ())
 
 module Scheme = struct
-  module T = struct
-    (* TODO: add trait constraints to this type here *)
-    type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
-  end
-
-  include T
-  include Comparable.Make (T)
-  include Hashable.Make (T)
+  type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
+  [@@deriving compare, hash, equal, sexp]
 
   module Bounded = struct
-    type nonrec t = Trait_bound.t * t [@@deriving compare, equal, hash, sexp]
+    type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
   end
 
-  let instantiate ?(map_name = Fn.id) ?params typ =
+  let instantiate ?params typ =
     let params = option_or_default params ~f:Param.Env_to_vars.create in
     Expr.map
       typ
       ~var:(Param.Env_to_vars.find_or_add params)
-      ~f:
-        (function
-         | Type_app (name, args) -> Defer (Expr.Type_app (map_name name, args))
-         | typ -> Defer typ)
       ~pf:Nothing.unreachable_code
+      ~name:Fn.id
   ;;
 
   (* TODO: handle trait bounds *)
-  let instantiate_bounded ?map_name ?params typ =
+  let instantiate_bounded ?params typ =
     match typ with
-    | [], typ -> instantiate ?map_name ?params typ
+    | [], typ -> instantiate ?params typ
     | _ -> raise_s [%message "Trait bounds not yet implemented"]
   ;;
 end
 
 module Concrete = struct
   module T = struct
-    type t = (Nothing.t, Nothing.t) Expr.t [@@deriving compare, equal, hash, sexp]
+    type t = (Nothing.t, Nothing.t, Module_path.absolute) Expr.t
+    [@@deriving compare, equal, hash, sexp]
   end
 
   include T
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let cast t = Expr.map t ~var:Nothing.unreachable_code ~pf:Nothing.unreachable_code
+  let cast t =
+    Expr.map t ~var:Nothing.unreachable_code ~pf:Nothing.unreachable_code ~name:Fn.id
+  ;;
 
   let of_polymorphic_exn t =
     let fail _ = compiler_bug [%message "Type.Concrete.of_polymorphic_exn: found var"] in
-    Expr.map t ~var:fail ~pf:fail
+    Expr.map t ~var:fail ~pf:fail ~name:Fn.id
   ;;
 end
 
 module Decl = struct
-  type decl =
+  type 'n decl =
     | Abstract
-    | Alias of Scheme.t
+    | Alias of 'n Scheme.t
     (* TODO: variant constructors should probably support fixity declarations *)
-    | Variants of (Cnstr_name.t * Scheme.t list) list
-    | Record of (Value_name.t * Scheme.t) Nonempty.t
+    | Variants of (Cnstr_name.t * 'n Scheme.t list) list
+    (* TODO: probably just make records a type expression - you can trivially get nominal
+       records with a single variant and an inline record. One problem with this is you
+       can no longer define recursive record types, which is a bit annoying. *)
+    | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]
+  type 'n t = Type_param_name.t list * 'n decl [@@deriving compare, equal, hash, sexp]
 
   let arity (params, _) = List.length params
 

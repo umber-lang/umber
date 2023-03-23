@@ -1,9 +1,12 @@
+open! Import
+open Names
+
 type t [@@deriving sexp_of]
 
 val create : unit -> t
 val unify : names:Name_bindings.t -> types:t -> Type.t -> Type.t -> unit
 val substitute : t -> Type.t -> Type.t
-val generalize : t -> Type.t -> Type.Scheme.t
+val generalize : t -> Type.t -> Module_path.absolute Type.Scheme.t
 
 exception Type_error of Ustring.t * (Type.t * Type.t) option [@@deriving sexp]
 

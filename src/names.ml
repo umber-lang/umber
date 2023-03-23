@@ -94,33 +94,55 @@ end)
 module Module_name : Name = Upper_name
 
 module Module_path : sig
-  type 'a t = Module_name.t list constraint 'a = [< `Relative | `Absolute ]
+  type +'a t = private Module_name.t list [@@deriving compare, equal, hash, sexp]
+  type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
+
+  type relative =
+    [ absolute
+    | `Relative
+    ]
   [@@deriving compare, equal, hash, sexp]
 
+  val is_empty : _ t -> bool
   val is_prefix : prefix:'a t -> 'a t -> bool
+  val append : 'a t -> Module_name.t list -> 'a t
+  val append' : 'a t -> _ t -> 'a t
+  val to_ustring : _ t -> Ustring.t
 
   module Relative : sig
-    type nonrec t = [ `Relative ] t [@@deriving compare, equal, hash, sexp]
+    type nonrec t = relative t [@@deriving compare, equal, hash, sexp]
 
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
+    val to_module_names : t -> Module_name.t list
+    val of_module_names : Module_name.t list -> t
     val of_ustrings_unchecked : Ustring.t list -> t
     val of_ustrings_exn : Ustring.t list -> t
-    val to_ustring : t -> Ustring.t
+    val empty : t
   end
 
   module Absolute : sig
-    type nonrec t = [ `Absolute ] t [@@deriving compare, equal, hash, sexp]
+    type nonrec t = absolute t [@@deriving compare, equal, hash, sexp]
 
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
+    val to_relative : t -> Relative.t
     val of_relative_unchecked : Relative.t -> t
+    val empty : t
   end
 end = struct
-  type 'a t = Module_name.t list constraint 'a = [< `Relative | `Absolute ]
+  type 'a t = Module_name.t list [@@deriving compare, equal, hash, sexp]
+  type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
+
+  type relative =
+    [ absolute
+    | `Relative
+    ]
   [@@deriving compare, equal, hash, sexp]
+
+  let is_empty = List.is_empty
 
   let rec is_prefix ~prefix:t t' =
     match t, t' with
@@ -130,6 +152,18 @@ end = struct
       if Module_name.equal module_name module_name'
       then is_prefix ~prefix:rest rest'
       else false
+  ;;
+
+  let append = ( @ )
+  let append' = ( @ )
+
+  let to_ustring path =
+    let q = Queue.create ~capacity:(List.length path * 10) () in
+    List.iter path ~f:(fun s ->
+      Queue.enqueue q (Uchar.of_char '.');
+      Ustring.iter (Module_name.to_ustring s) ~f:(Queue.enqueue q));
+    ignore (Queue.dequeue q : Uchar.t option);
+    Queue.to_array q |> Ustring.of_array_unchecked
   ;;
 
   module Relative = struct
@@ -143,22 +177,17 @@ end = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
+    let of_module_names = Fn.id
+    let to_module_names = Fn.id
     let of_ustrings_unchecked = List.map ~f:Module_name.of_ustring_unchecked
     let of_ustrings_exn = List.map ~f:Module_name.of_ustring_exn
-
-    let to_ustring path =
-      let q = Queue.create ~capacity:(List.length path * 10) () in
-      List.iter path ~f:(fun s ->
-        Queue.enqueue q (Uchar.of_char '.');
-        Ustring.iter (Module_name.to_ustring s) ~f:(Queue.enqueue q));
-      ignore (Queue.dequeue q : Uchar.t option);
-      Queue.to_array q |> Ustring.of_array_unchecked
-    ;;
+    let empty = []
   end
 
   module Absolute = struct
     include Relative
 
+    let to_relative = Fn.id
     let of_relative_unchecked = Fn.id
   end
 end
@@ -169,12 +198,11 @@ module type Name_qualified = sig
   type name := t
 
   module Qualified : sig
-    type 'a t = 'a Module_path.t * name constraint 'a = [< `Absolute | `Relative ]
-    [@@deriving compare, equal, hash, sexp]
+    type 'a t = 'a Module_path.t * name [@@deriving compare, equal, hash, sexp]
   end
 
   module Relative : sig
-    type t = [ `Relative ] Qualified.t [@@deriving compare, equal, hash, sexp]
+    type t = Module_path.relative Qualified.t [@@deriving compare, equal, hash, sexp]
 
     include Stringable.S with type t := t
     include Comparable.S with type t := t
@@ -187,13 +215,14 @@ module type Name_qualified = sig
   end
 
   module Absolute : sig
-    type t = [ `Absolute ] Qualified.t [@@deriving compare, equal, hash, sexp]
+    type t = Module_path.absolute Qualified.t [@@deriving compare, equal, hash, sexp]
 
     include Stringable.S with type t := t
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
     val of_relative_unchecked : Relative.t -> t
+    val to_relative : t -> Relative.t
     val with_path : Module_path.Absolute.t -> name -> t
     val to_ustring : t -> Ustring.t
   end
@@ -203,15 +232,14 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
   include N
 
   module Qualified = struct
-    type nonrec 'a t = 'a Module_path.t * t constraint 'a = [< `Absolute | `Relative ]
-    [@@deriving compare, equal, hash, sexp]
+    type nonrec 'a t = 'a Module_path.t * t [@@deriving compare, equal, hash, sexp]
   end
 
   module Make (Path : sig
     type t [@@deriving compare, equal, hash]
 
-    val to_list : t -> Module_name.t list
-    val of_list : Module_name.t list -> t
+    val to_module_names : t -> Module_name.t list
+    val of_module_names : Module_name.t list -> t
   end) =
   struct
     module T = struct
@@ -219,7 +247,7 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
         type nonrec t = Path.t * t [@@deriving compare, equal, hash]
 
         let iter_chars (path, name) ~f =
-          List.iter (Path.to_list path) ~f:(fun module_name ->
+          List.iter (Path.to_module_names path) ~f:(fun module_name ->
             Ustring.iter (Module_name.to_ustring module_name) ~f;
             f (Uchar.of_char '.'));
           Ustring.iter (to_ustring name) ~f
@@ -227,7 +255,7 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
 
         let total_len ((path, name) : t) =
           List.fold
-            (Path.to_list path)
+            (Path.to_module_names path)
             ~init:(Ustring.length (to_ustring name))
             ~f:(fun len module_name ->
               (* Add 1 additional char for the '.' *)
@@ -273,7 +301,7 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
         let of_string s =
           let path, name = split_dots s in
           if String.is_empty name then failwithf "Bad qualified name: '%s'" s ();
-          Path.of_list path, of_string_unchecked name
+          Path.of_module_names path, of_string_unchecked name
         ;;
       end
 
@@ -288,29 +316,30 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
     let with_path path name = path, name
 
     let of_ustrings_unchecked (path, name) =
-      ( Path.of_list (List.map path ~f:Module_name.of_ustring_unchecked)
+      ( Path.of_module_names (List.map path ~f:Module_name.of_ustring_unchecked)
       , of_ustring_unchecked name )
     ;;
 
     let of_ustrings_exn (path, name) =
-      Path.of_list (List.map path ~f:Module_name.of_ustring_exn), of_ustring_exn name
+      ( Path.of_module_names (List.map path ~f:Module_name.of_ustring_exn)
+      , of_ustring_exn name )
     ;;
   end
 
-  module Relative = Make (struct
-    include Module_path.Relative
-
-    let to_list = Fn.id
-    let of_list = Fn.id
-  end)
+  module Relative = Make (Module_path.Relative)
 
   module Absolute = struct
     include Make (struct
       include Module_path.Absolute
 
-      let to_list t = (t : Module_path.Absolute.t :> Module_name.t list)
-      let of_list = Module_path.Absolute.of_relative_unchecked
+      let to_module_names t = (t : Module_path.Absolute.t :> Module_name.t list)
+
+      let of_module_names =
+        Module_path.Absolute.of_relative_unchecked << Module_path.Relative.of_module_names
+      ;;
     end)
+
+    let to_relative (path, name) = Module_path.Absolute.to_relative path, name
 
     let of_relative_unchecked (path, name) =
       Module_path.Absolute.of_relative_unchecked path, name

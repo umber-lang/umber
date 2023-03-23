@@ -66,26 +66,32 @@ module Cnstr_info : sig
      callsites generally do that, which leads to looking up each constructor separately. *)
 
   val tag : t -> Cnstr.t -> Cnstr_tag.t
-  val arg_type : t -> Cnstr.t -> Block_index.t -> Type.Scheme.t
+  val arg_type : t -> Cnstr.t -> Block_index.t -> Module_path.absolute Type.Scheme.t
   val cnstrs : t -> Cnstr.t list
 
   val fold
     :  t
     -> init:'acc
-    -> f:('acc -> Cnstr.t -> Cnstr_tag.t -> Type.Scheme.t list -> 'acc)
+    -> f:
+         ('acc
+          -> Cnstr.t
+          -> Cnstr_tag.t
+          -> Module_path.absolute Type.Scheme.t list
+          -> 'acc)
     -> 'acc
 
-  val of_variants : (Cnstr_name.t * Type.Scheme.t list) list -> t
-  val of_tuple : Type.Scheme.t list -> t
+  val of_variants : (Cnstr_name.t * Module_path.absolute Type.Scheme.t list) list -> t
+  val of_tuple : Module_path.absolute Type.Scheme.t list -> t
 end = struct
   (* TODO: The constant/non-constant split might not be that useful really. Probably get
      rid of it. *)
   type t =
     | Variants of
         { constant_cnstrs : Cnstr_name.t list
-        ; non_constant_cnstrs : (Cnstr_name.t * Type.Scheme.t list) list
+        ; non_constant_cnstrs :
+            (Cnstr_name.t * Module_path.absolute Type.Scheme.t list) list
         }
-    | Tuple of Type.Scheme.t list
+    | Tuple of Module_path.absolute Type.Scheme.t list
   [@@deriving sexp_of]
 
   let of_variants variants =
@@ -163,10 +169,12 @@ end
 
 (* TODO: This doesn't handle polymorphic types particularly smartly. Should think about
    whether that matters. *)
-let rec arity_of_type ~names : Type.Scheme.t -> int = function
+let rec arity_of_type ~names : Module_path.absolute Type.Scheme.t -> int = function
   | Var _ | Tuple _ -> 0
   | Type_app (type_name, _) ->
-    (match snd (Name_bindings.find_type_decl ~defs_only:true names type_name) with
+    (match
+       snd (Name_bindings.find_absolute_type_decl ~defs_only:true names type_name)
+     with
      | Abstract | Variants _ | Record _ -> 0
      | Alias type_ -> arity_of_type ~names type_)
   | Function (args, _) -> Nonempty.length args
@@ -196,11 +204,11 @@ module Context : sig
 
   val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
-  val find_cnstr_info : t -> Type.Scheme.t -> Cnstr_info.t
+  val find_cnstr_info : t -> Module_path.absolute Type.Scheme.t -> Cnstr_info.t
 
   val find_cnstr_info_from_decl
     :  t
-    -> Type.Decl.decl
+    -> Module_path.absolute Type.Decl.decl
     -> follow_aliases:bool
     -> Cnstr_info.t option
 end = struct
@@ -350,11 +358,13 @@ end = struct
   ;;
 
   let cnstr_info_lookup_failed type_ =
-    compiler_bug [%message "Constructor info lookup failed" (type_ : Type.Scheme.t)]
+    compiler_bug
+      [%message
+        "Constructor info lookup failed" (type_ : Module_path.absolute Type.Scheme.t)]
   ;;
 
   let rec find_cnstr_info_internal t type_ =
-    match (type_ : Type.Scheme.t) with
+    match (type_ : Module_path.absolute Type.Scheme.t) with
     | Type_app (type_name, _args) ->
       let decl =
         snd (Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name)
@@ -372,7 +382,9 @@ end = struct
 
   let find_cnstr_info t type_ =
     option_or_default (find_cnstr_info_internal t type_) ~f:(fun () ->
-      compiler_bug [%message "Constructor info lookup failed" (type_ : Type.Scheme.t)])
+      compiler_bug
+        [%message
+          "Constructor info lookup failed" (type_ : Module_path.absolute Type.Scheme.t)])
   ;;
 end
 
@@ -399,7 +411,7 @@ module Simple_pattern : sig
     val missing_cases
       :  t
       -> ctx:Context.t
-      -> input_type:Type.Scheme.t
+      -> input_type:Module_path.absolute Type.Scheme.t
       -> simple_pattern list
   end
 end = struct
@@ -918,7 +930,10 @@ module Expr = struct
       , Hash_set.mem local_fun_defs )
     in
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
-      match (expr : Type.Scheme.t Typed.Expr.t), (expr_type : Type.Scheme.t) with
+      match
+        ( (expr : Module_path.absolute Type.Scheme.t Typed.Expr.t)
+        , (expr_type : Type.Scheme.t) )
+      with
       | Literal lit, _ -> Primitive lit
       | Name name, _ ->
         let name, extern_info = Context.find_value_name ctx name in
@@ -985,7 +1000,8 @@ module Expr = struct
             ~ctx
             ~rec_
             ~init:[]
-            ~add_let:(fun bindings name mir_expr (_ : Type.Scheme.t) ->
+            ~add_let:
+              (fun bindings name mir_expr (_ : Module_path.absolute Type.Scheme.t) ->
               (name, mir_expr) :: bindings)
             ~extract_binding:(fun ((pat, typ), expr) -> pat, typ, expr)
             ~process_expr:(fun bindings ~just_bound ~ctx expr typ ->

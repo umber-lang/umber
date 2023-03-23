@@ -6,15 +6,15 @@ open Names
    - No more type annotations without needing a type parameter
    - Replacing record expressions like `{ name }` with `{ name = name }`
    - Putting record field names in a canonical order, probably in a map *)
-type 'typ t =
+type ('typ, 'name) t =
   | Constant of Literal.t
   | Catch_all of Value_name.t option
-  | As of 'typ t * Value_name.t
-  | Cnstr_appl of Cnstr_name.Relative.t * 'typ t list
-  | Tuple of 'typ t list
-  | Record of (Value_name.t * 'typ t option) Nonempty.t
-  | Union of 'typ t * 'typ t
-  | Type_annotation of 'typ t * 'typ
+  | As of ('typ, 'name) t * Value_name.t
+  | Cnstr_appl of 'name Cnstr_name.Qualified.t * ('typ, 'name) t list
+  | Tuple of ('typ, 'name) t list
+  | Record of (Value_name.t * ('typ, 'name) t option) Nonempty.t
+  | Union of ('typ, 'name) t * ('typ, 'name) t
+  | Type_annotation of ('typ, 'name) t * 'typ
 [@@deriving sexp, variants]
 
 let rec fold pat ~init ~f =

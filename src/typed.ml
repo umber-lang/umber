@@ -6,7 +6,7 @@ let type_error_msg = Type_bindings.type_error_msg
 module Pattern = struct
   include Pattern
 
-  type nonrec t = Nothing.t t [@@deriving sexp]
+  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
 
   (* TODO: either split up Untyped/Typed patterns into different types or stop returning
      a pattern from these functions *)
@@ -44,7 +44,10 @@ module Pattern = struct
              pat_names, arg :: args)
          with
          | Ok (pat_names, args) ->
-           pat_names, (Cnstr_appl (cnstr, List.rev args), body_type)
+           (* FIXME: Need to absolutify cnstr here *)
+           let _ = cnstr in
+           ( pat_names
+           , (Cnstr_appl (failwith "cnstr not absolutified", List.rev args), body_type) )
          | Unequal_lengths ->
            type_error_msg "Wrong number of arguments in constructor application")
       | Tuple fields ->
@@ -109,9 +112,13 @@ module Pattern = struct
         pat_names, (As (pat, name), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
-          Type.Scheme.instantiate_bounded
-            ~map_name:(Name_bindings.absolutify_type_name names)
-            typ
+          Tuple2.map_snd typ ~f:(fun typ ->
+            Type.Expr.map
+              typ
+              ~name:(Name_bindings.absolutify_type_name names)
+              ~var:Fn.id
+              ~pf:Nothing.unreachable_code)
+          |> Type.Scheme.instantiate_bounded
         in
         let pat_names, (pat, typ2) = of_untyped_with_names ~names ~types pat_names pat in
         Type_bindings.unify ~names ~types typ1 typ2;
@@ -156,7 +163,9 @@ module Expr = struct
     | Record_field_access of 'typ t * Value_name.t
   [@@deriving sexp]
 
-  type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp_of]
+  type generalized =
+    Module_path.absolute Type.Scheme.t t * Module_path.absolute Type.Scheme.t
+  [@@deriving sexp_of]
 
   let of_untyped, type_recursive_let_bindings =
     let rec of_untyped ~names ~types ~f_name expr =
@@ -264,9 +273,13 @@ module Expr = struct
       | Record_field_access (_record, _name) -> failwith "TODO: record3"
       | Type_annotation (expr, typ) ->
         let t1 =
-          Type.Scheme.instantiate_bounded
-            ~map_name:(Name_bindings.absolutify_type_name names)
-            typ
+          Tuple2.map_snd typ ~f:(fun t1 ->
+            Type.Expr.map
+              t1
+              ~name:(Name_bindings.absolutify_type_name names)
+              ~var:Fn.id
+              ~pf:Nothing.unreachable_code)
+          |> Type.Scheme.instantiate_bounded
         in
         let expr, t2 = of_untyped ~names ~types ~f_name expr in
         Type_bindings.unify ~names ~types t1 t2;
@@ -287,14 +300,15 @@ module Expr = struct
       let f_name name name_entry =
         f_name name name_entry;
         (* FIXME: I don't think this handles shadowing correctly. Regular equality of the
-           name entries isn't sufficient. Maybe we should assign an id to name entries. *)
+           name entries isn't sufficient. Maybe we should assign an id to name entries.
+           Maybe with absolute paths it's ok? *)
         match name with
-        | [], name ->
+        | path, name when Module_path.is_empty path ->
           if Option.exists
                ~f:(Name_bindings.Name_entry.equal name_entry)
                (Pattern.Names.find all_bound_names name)
           then used_a_bound_name := true
-        | _ :: _, _ -> ()
+        | _, _ -> ()
       in
       let bindings =
         Nonempty.map bindings ~f:(fun binding ->
@@ -377,8 +391,11 @@ end
 module Module = struct
   include Module
 
-  type nonrec t = (Pattern.t, Expr.generalized) t [@@deriving sexp_of]
-  type nonrec def = (Pattern.t, Expr.generalized) def [@@deriving sexp_of]
+  type nonrec t = (Pattern.t, Expr.generalized, Module_path.absolute) t
+  [@@deriving sexp_of]
+
+  type nonrec def = (Pattern.t, Expr.generalized, Module_path.absolute) def
+  [@@deriving sexp_of]
 
   let rec gather_names ~names ~f_common ?f_def module_name sigs defs =
     let names =
@@ -598,19 +615,23 @@ module Module = struct
   (** Raise an error upon finding any cycles in a given type alias. *)
   let check_cyclic_type_alias ~names name alias =
     (* TODO: can rewrite this with [Type.Expr.map] *)
-    let rec loop ~names aliases_seen = function
-      | Type.Expr.Type_app (name, args) ->
-        let decl = Name_bindings.find_type_decl names name in
+    let rec loop ~names aliases_seen (alias : Module_path.absolute Type.Scheme.t) =
+      Hash_set.add aliases_seen alias;
+      match alias with
+      | Type_app (name, args) ->
+        let decl = Name_bindings.find_absolute_type_decl names name in
         (match decl with
          | _, Alias alias ->
-           (match Hashtbl.add aliases_seen ~key:decl ~data:name with
-            | `Ok -> loop ~names aliases_seen alias
-            | `Duplicate ->
-              Compilation_error.raise
-                Type_error
-                ~msg:
-                  [%message
-                    "Cyclic type alias" (name : Type_name.Relative.t) (decl : Type.Decl.t)])
+           if Hash_set.mem aliases_seen alias
+           then
+             Compilation_error.raise
+               Type_error
+               ~msg:
+                 [%message
+                   "Cyclic type alias"
+                     (name : Type_name.Absolute.t)
+                     (decl : Module_path.absolute Type.Decl.t)]
+           else loop ~names aliases_seen alias
          | _ -> ());
         List.iter args ~f:(loop ~names aliases_seen)
       | Function (args, body) ->
@@ -620,17 +641,22 @@ module Module = struct
       | Var _ -> ()
       | Partial_function _ -> .
     in
-    let aliases_seen = Hashtbl.create (module Type.Decl) in
-    let name = Name_bindings.(Path.to_module_path (current_path names)), name in
-    let decl = Name_bindings.find_absolute_type_decl names name in
-    Hashtbl.set aliases_seen ~key:decl ~data:name;
+    let aliases_seen =
+      Hash_set.create
+        (module struct
+          type t = Module_path.absolute Type.Scheme.t [@@deriving compare, hash, sexp]
+        end)
+    in
     loop ~names aliases_seen alias
   ;;
 
   (* TODO: We should make this a record type, it would a lot of this code way easier to
      read. *)
   type intermediate_def =
-    (Pattern.t * (Type.t * Pattern.Names.t), Untyped.Expr.t) Module.def
+    ( Pattern.t * (Type.t * Pattern.Names.t)
+    , Untyped.Expr.t
+    , Module_path.absolute )
+    Module.def
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type

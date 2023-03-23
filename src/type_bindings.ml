@@ -41,10 +41,7 @@ let rec unify ~names ~types t1 t2 =
     let params = Type.Param.Env_to_vars.create () in
     List.iter param_list ~f:(fun p ->
       ignore (Type.Param.Env_to_vars.find_or_add params p : Type.Var_id.t));
-    Type.Scheme.instantiate
-      expr
-      ~params
-      ~map_name:(Name_bindings.absolutify_type_name names)
+    Type.Scheme.instantiate expr ~params
   in
   let get_decl names name args =
     let decl = Name_bindings.find_absolute_type_decl names name in
@@ -109,7 +106,7 @@ let rec unify ~names ~types t1 t2 =
 ;;
 
 let rec substitute types typ =
-  Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~f:(fun typ ->
+  Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~name:Fn.id ~f:(fun typ ->
     match typ with
     | Var id ->
       (match Hashtbl.find types.vars id with
@@ -139,6 +136,7 @@ let generalize types typ =
     (substitute types typ)
     ~var:(Type.Param.Env_of_vars.find_or_add env)
     ~pf:(never_happens [%here])
+    ~name:Fn.id
     ~f:
       (function
        | Partial_function (args, id) -> Defer (Function (args, Var id))

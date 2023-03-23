@@ -26,7 +26,7 @@ module Name_entry = struct
   module Type_or_scheme = struct
     type t =
       | Type of Type.t
-      | Scheme of Type.Scheme.t
+      | Scheme of Module_path.absolute Type.Scheme.t
     [@@deriving equal, sexp]
   end
 
@@ -43,7 +43,7 @@ module Name_entry = struct
   let typ entry =
     match entry.typ with
     | Type typ -> typ
-    | Scheme scheme -> Type.Scheme.instantiate ~map_name:Fn.id scheme
+    | Scheme scheme -> Type.Scheme.instantiate scheme
   ;;
 
   let scheme entry =
@@ -149,7 +149,7 @@ module Path = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let to_module_path = List.map ~f:fst
+  let to_module_path t = List.map t ~f:fst |> Module_path.Relative.of_module_names
   let append t module_name ~place = t @ [ module_name, place ]
   let toplevel = []
 end
@@ -164,7 +164,9 @@ and defs = sigs bindings
 
 and 'a bindings =
   { names : (Name_entry.t, Value_name.Relative.t) Or_imported.t Value_name.Map.t
-  ; types : (Type.Decl.t, Type_name.Relative.t) Or_imported.t option Type_name.Map.t
+  ; types :
+      (Module_path.absolute Type.Decl.t, Type_name.Relative.t) Or_imported.t option
+      Type_name.Map.t
   ; modules :
       ('a option * 'a bindings, Module_path.Relative.t) Or_imported.t Module_name.Map.t
   }
@@ -180,7 +182,7 @@ let name_error ~msg ustr =
 ;;
 
 let name_error_path path =
-  name_error ~msg:"Couldn't find path" (Module_path.Relative.to_ustring path)
+  name_error ~msg:"Couldn't find path" (Module_path.to_ustring path)
 ;;
 
 let or_name_clash msg ustr = function
@@ -200,6 +202,13 @@ let empty_bindings =
 ;;
 
 let empty = { current_path = []; toplevel = empty_bindings }
+
+(* FIXME: Maybe we should propogate the type parameter here too? *)
+(* We maintain the invariant that the current path of [t] is an absolute path from the
+   toplevel down. *)
+let current_absolute_module_path t =
+  t.current_path |> Path.to_module_path |> Module_path.Absolute.of_relative_unchecked
+;;
 
 let without_std t =
   { t with
@@ -228,7 +237,9 @@ let update_current t ~f =
           Map.update sigs.modules module_name ~f:(function
             | Some (Local (None, sigs)) -> Local (None, loop_sigs t sigs rest ~f)
             | Some (Imported imported_module) -> updating_import_err t imported_module
-            | None -> name_error_path (Path.to_module_path t.current_path)
+            | None ->
+              name_error_path
+                (Path.to_module_path t.current_path :> Module_path.Relative.t)
             | Some (Local (Some _, _)) -> .)
       }
   in
@@ -246,7 +257,9 @@ let update_current t ~f =
                  Local (Some (loop_sigs t sigs rest ~f), defs)
                | `Def -> Local (sigs, loop_defs t defs rest ~f))
             | Some (Imported imported_module) -> updating_import_err t imported_module
-            | None -> name_error_path (Path.to_module_path t.current_path))
+            | None ->
+              name_error_path
+                (Path.to_module_path t.current_path :> Module_path.Relative.t))
       }
   in
   { t with toplevel = loop_defs t t.toplevel t.current_path ~f }
@@ -351,8 +364,8 @@ let resolve_path =
        | Imported path -> resolve_path t path ~defs_only:true)
   and resolve_path t path ~defs_only =
     if defs_only
-    then loop_defs_only t path t.toplevel
-    else loop_defs t (Some t.current_path) path t.toplevel
+    then loop_defs_only t (path :> Module_name.t list) t.toplevel
+    else loop_defs t (Some t.current_path) (path :> Module_name.t list) t.toplevel
   in
   resolve_path
 ;;
@@ -369,11 +382,15 @@ let with_path t path ~f =
 let find =
   let rec loop ?at_path ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
-    let at_path = Option.value at_path ~default:(Path.to_module_path t.current_path) in
+    let at_path =
+      Option.value
+        at_path
+        ~default:(Path.to_module_path t.current_path :> Module_path.Relative.t)
+    in
     let bindings_at_current = resolve_path_exn ~defs_only t at_path in
-    match List.hd path with
+    match List.hd (path : _ Module_path.t :> Module_name.t list) with
     | Some first_module ->
-      let full_path = at_path @ path in
+      let full_path = Module_path.append' at_path path in
       let f bindings =
         if Map.mem bindings.modules first_module
         then (
@@ -392,8 +409,10 @@ let find =
         check_parent t at_path input ~f ~to_ustring)
   and check_parent t current_path input ~f ~to_ustring =
     (* Recursively check the parent *)
-    match List.drop_last current_path with
-    | Some parent_path -> loop t ~at_path:parent_path input ~f ~to_ustring
+    match List.drop_last (current_path :> Module_name.t list) with
+    | Some parent_path ->
+      let at_path = Module_path.Relative.of_module_names parent_path in
+      loop t ~at_path input ~f ~to_ustring
     | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
   in
   fun ?at_path ?defs_only t input ~f ~to_ustring ->
@@ -474,7 +493,7 @@ let absolutify_path t path =
     t
     (path, ())
     ~f:(fun path () _ -> Some path)
-    ~to_ustring:(fun (path, ()) -> Module_path.Relative.to_ustring path)
+    ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
   |> Module_path.Absolute.of_relative_unchecked
 ;;
 
@@ -511,7 +530,7 @@ let import_filtered t path ~f =
   (* FIXME: Does this path actually need to be relative? If so, the functions using it
      should probably require so. Absolute and relative paths with the same contents could
      point to different things, so it's not safe to mix them up arbitrarily. *)
-  let path = (absolutify_path t path :> Module_path.Relative.t) in
+  let path = absolutify_path t path |> Module_path.Absolute.to_relative in
   let map_to_imports_filtered path bindings ~f =
     { names =
         Map.filter_mapi bindings.names ~f:(fun ~key:name ~data:_ ->
@@ -527,7 +546,7 @@ let import_filtered t path ~f =
         Map.filter_mapi bindings.modules ~f:(fun ~key:module_name ~data:_ ->
           Option.some_if
             (f (Module_name.unidentify module_name))
-            (Or_imported.Imported (path @ [ module_name ])))
+            (Or_imported.Imported (Module_path.append path [ module_name ])))
     }
   in
   let bindings_to_import =
@@ -550,21 +569,13 @@ let import_without t path hiding =
   import_filtered t path ~f:(not << Nonempty.mem hiding ~equal:Unidentified_name.equal)
 ;;
 
-let map_type_expr_names type_expr ~f =
-  Type.Expr.map type_expr ~var:Fn.id ~pf:Fn.id ~f:(function
-    | Type_app (name, args) -> Defer (Type_app (f name, args))
-    | typ -> Defer typ)
-;;
-
-(* FIXME: How should I represent the absolute and non-absolute type expressions?
-   Maybe we have two types an suck it up? Add a type parameter? *)
 let absolutify_type_expr t =
-  map_type_expr_names ~f:(fun name -> absolutify_type_name t name)
+  Type.Expr.map ~var:Fn.id ~pf:Fn.id ~name:(fun name -> absolutify_type_name t name)
 ;;
 
 let of_prelude_sexp sexp =
   let t = into_parent (t_of_sexp sexp) in
-  import_all t Intrinsics.prelude_module_path
+  import_all t (Module_path.Absolute.to_relative Intrinsics.prelude_module_path)
 ;;
 
 let prelude = lazy (of_prelude_sexp Umber_std.Prelude.names)
@@ -621,13 +632,16 @@ let add_to_types ?(err_msg = "Type name clash") types name decl =
     | Some _ -> name_error ~msg:err_msg (Type_name.to_ustring name))
 ;;
 
-let add_type_decl ({ current_path; _ } as t) type_name decl =
+let add_type_decl t type_name decl =
   let f bindings =
     if not (Type.Decl.no_free_params decl)
     then
       Compilation_error.raise
         Type_error
-        ~msg:[%message "Free parameters in type declaration" (decl : Type.Decl.t)];
+        ~msg:
+          [%message
+            "Free parameters in type declaration"
+              (decl : Module_path.relative Type.Decl.t)];
     let decl = absolutify_type_decl t decl in
     { bindings with
       types =
@@ -640,8 +654,8 @@ let add_type_decl ({ current_path; _ } as t) type_name decl =
         (match decl with
          | params, Variants cnstrs ->
            (* Add constructors as functions to the namespace *)
-           let result_type : Type.Scheme.t =
-             let path = Path.to_module_path current_path in
+           let result_type : _ Type.Scheme.t =
+             let path = current_absolute_module_path t in
              let params = List.map params ~f:Type.Expr.var in
              Type_app ((path, type_name), params)
            in
@@ -725,10 +739,11 @@ let fold_local_names t ~init ~f =
       ~f:(fun ~key:module_name ~data acc ->
       (* We can ignore sigs here because defs should have all the names *)
       match data with
-      | Local (_, defs) -> fold_defs t (path @ [ module_name ]) defs ~init:acc ~f
+      | Local (_, defs) ->
+        fold_defs t (Module_path.append path [ module_name ]) defs ~init:acc ~f
       | Imported _ -> acc)
   in
-  fold_defs t [] t.toplevel ~init ~f
+  fold_defs t Module_path.Absolute.empty t.toplevel ~init ~f
 ;;
 
 let merge_names t new_names ~combine =
@@ -776,19 +791,24 @@ let resolve_decl_or_import ?at_path t decl_or_import =
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import : (Type.Decl.t, Type_name.Relative.t) Or_imported.t option)
+          (decl_or_import
+            : (Module_path.absolute Type.Decl.t, Type_name.Relative.t) Or_imported.t
+              option)
           (without_std t : t)])
 ;;
 
 let find_absolute_type_decl ?defs_only t (path : Type_name.Absolute.t) =
-  find_type_decl ~at_path:[] ?defs_only t (path :> Type_name.Relative.t)
+  find_type_decl
+    ~at_path:Module_path.Relative.empty
+    ?defs_only
+    t
+    (path :> Type_name.Relative.t)
 ;;
 
 let find_type_decl = find_type_decl ?at_path:None
 let current_path t = t.current_path
 
 let find_sigs_and_defs t path module_name =
-  let open Option.Let_syntax in
   let rec loop t path module_name =
     find
       t
@@ -799,17 +819,20 @@ let find_sigs_and_defs t path module_name =
             compiler_bug
               [%message
                 "Name_bindings.find_sigs_and_defs found only sigs"
-                  (path : Module_path.Relative.t)
+                  ~path:(path : Module_path.Relative.t)
                   (module_name : Module_name.t)
                   (t : t)]
           | Defs bindings ->
-            (match%bind Map.find bindings.modules module_name with
+            (match%bind.Option Map.find bindings.modules module_name with
              | Imported path ->
-               let%bind path, module_name = List.split_last path in
+               let%bind.Option path, module_name =
+                 List.split_last (path :> Module_name.t list)
+               in
+               let path = Module_path.Relative.of_module_names path in
                Some (loop t path module_name)
              | Local sigs_and_defs -> Some sigs_and_defs))
       ~to_ustring:(fun (path, module_name) ->
-        Module_path.Relative.to_ustring (path @ [ module_name ]))
+        Module_path.to_ustring (Module_path.append path [ module_name ]))
   in
   let sigs, defs = loop t path module_name in
   Option.map sigs ~f:(fun sigs -> Sigs sigs), Defs defs

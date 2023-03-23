@@ -7,7 +7,8 @@ open Names
 module Pattern = struct
   include Pattern
 
-  type nonrec t = Type.Scheme.Bounded.t t [@@deriving sexp]
+  type nonrec t = (Module_path.relative Type.Scheme.Bounded.t, Module_path.relative) t
+  [@@deriving sexp]
 end
 
 module Expr = struct
@@ -26,7 +27,7 @@ module Expr = struct
     | Record_literal of (Value_name.t * t option) Nonempty.t
     | Record_update of t * (Value_name.t * t option) Nonempty.t
     | Record_field_access of t * Value_name.t
-    | Type_annotation of t * Type.Scheme.Bounded.t
+    | Type_annotation of t * Module_path.relative Type.Scheme.Bounded.t
   [@@deriving sexp, variants]
 
   (** Get all the external names referenced by an expression. Names local to the
@@ -35,8 +36,10 @@ module Expr = struct
     let add_locals init = Pattern.Names.fold ~init ~f:Set.add in
     let rec loop ~names used locals = function
       | Literal _ -> used
-      | Name ([], name) when Set.mem locals name -> used
-      | Name name -> Set.add used (Name_bindings.absolutify_value_name names name)
+      | Name ((path, name) as name') ->
+        if Module_path.is_empty path && Set.mem locals name
+        then used
+        else Set.add used (Name_bindings.absolutify_value_name names name')
       | Qualified (path, expr) ->
         loop ~names:(Name_bindings.import_all names path) used locals expr
       | Fun_call (fun_, args) ->
@@ -45,6 +48,7 @@ module Expr = struct
       | Op_tree tree ->
         let rec tree_loop acc = function
           | Btree.Node (op_name, left_child, right_child) ->
+            let op_name = Name_bindings.absolutify_value_name names op_name in
             tree_loop (tree_loop (Set.add used op_name) left_child) right_child
           | Leaf expr -> loop ~names acc locals expr
         in
@@ -81,12 +85,14 @@ module Expr = struct
         | _, Some expr -> loop ~names used locals expr
         | _, None -> used)
     in
-    loop ~names Value_name.Relative.Set.empty Value_name.Set.empty
+    loop ~names Value_name.Absolute.Set.empty Value_name.Set.empty
   ;;
 
   let match_function branches =
     let name = Value_name.empty in
-    Lambda ([ Catch_all (Some name) ], Match (Name ([], name), branches))
+    Lambda
+      ( [ Catch_all (Some name) ]
+      , Match (Name (Module_path.Relative.empty, name), branches) )
   ;;
 
   let qualified (path, expr) =
@@ -98,7 +104,9 @@ module Expr = struct
   let op_section_right op expr =
     let op = Value_name.Relative.of_ustrings_unchecked op in
     let left_var = Value_name.empty in
-    let left_var_qualified = Value_name.Relative.with_path [] left_var in
+    let left_var_qualified =
+      Value_name.Relative.with_path Module_path.Relative.empty left_var
+    in
     Lambda
       ( [ Catch_all (Some left_var) ]
       , Fun_call (Name op, [ Name left_var_qualified; expr ]) )
@@ -112,6 +120,6 @@ end
 module Module = struct
   include Module
 
-  type nonrec t = (Pattern.t, Expr.t) t [@@deriving sexp_of]
-  type nonrec def = (Pattern.t, Expr.t) def [@@deriving sexp_of]
+  type nonrec t = (Pattern.t, Expr.t, Module_path.relative) t [@@deriving sexp_of]
+  type nonrec def = (Pattern.t, Expr.t, Module_path.relative) def [@@deriving sexp_of]
 end

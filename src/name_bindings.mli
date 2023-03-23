@@ -14,7 +14,7 @@ module Name_entry : sig
   type t [@@deriving equal, sexp]
 
   val typ : t -> Type.t
-  val scheme : t -> Type.Scheme.t option
+  val scheme : t -> Module_path.absolute Type.Scheme.t option
   val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
@@ -48,7 +48,7 @@ val find_entry : t -> Value_name.Relative.t -> Name_entry.t
 val find_type : t -> Value_name.Relative.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Relative.t -> Type.t
 val find_fixity : t -> Value_name.Relative.t -> Fixity.t
-val set_inferred_scheme : t -> Value_name.t -> Type.Scheme.t -> t
+val set_inferred_scheme : t -> Value_name.t -> Module_path.absolute Type.Scheme.t -> t
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_placeholder : t -> Type_name.t -> t
 
@@ -56,7 +56,7 @@ val add_type_placeholder : t -> Type_name.t -> t
 val fold_local_names
   :  t
   -> init:'a
-  -> f:('a -> Value_name.Relative.t -> Name_entry.t -> 'a)
+  -> f:('a -> Value_name.Absolute.t -> Name_entry.t -> 'a)
   -> 'a
 
 val merge_names
@@ -66,10 +66,18 @@ val merge_names
   -> t
 
 (** Find a type declaration given a qualified name *)
-val find_type_decl : ?defs_only:bool -> t -> Type_name.Relative.t -> Type.Decl.t
+val find_type_decl
+  :  ?defs_only:bool
+  -> t
+  -> Type_name.Relative.t
+  -> Module_path.absolute Type.Decl.t
 
 (** Find a type declaration given an absolute qualified name *)
-val find_absolute_type_decl : ?defs_only:bool -> t -> Type_name.Absolute.t -> Type.Decl.t
+val find_absolute_type_decl
+  :  ?defs_only:bool
+  -> t
+  -> Type_name.Absolute.t
+  -> Module_path.absolute Type.Decl.t
 
 (** Convert a qualified type name to one with an absolute module path *)
 val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Absolute.t
@@ -79,6 +87,7 @@ val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Absolute.t
 
 (* Scope handling *)
 val current_path : t -> Path.t
+val current_absolute_module_path : t -> Module_path.Absolute.t
 val into_module : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
 val into_parent : t -> t
 
@@ -102,11 +111,14 @@ val import_with : t -> Module_path.Relative.t -> Unidentified_name.t list -> t
 val import_all : t -> Module_path.Relative.t -> t
 val import_without : t -> Module_path.Relative.t -> Unidentified_name.t Nonempty.t -> t
 
+(* FIXME: add_val, add_extern and add_type_decl might want take in absolute paths so we
+   don't end up absolutifying multiple times. *)
+
 val add_val
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Type.Scheme.Bounded.t
+  -> Module_path.relative Type.Scheme.Bounded.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
@@ -114,12 +126,12 @@ val add_extern
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Type.Scheme.Bounded.t
+  -> Module_path.relative Type.Scheme.Bounded.t
   -> Extern_name.t
   -> unify:(Type.t -> Type.t -> unit)
   -> t
 
-val add_type_decl : t -> Type_name.t -> Type.Decl.t -> t
+val add_type_decl : t -> Type_name.t -> Module_path.relative Type.Decl.t -> t
 
 module Sigs_or_defs : sig
   type name_bindings = t
@@ -130,7 +142,13 @@ module Sigs_or_defs : sig
   val type_names : t -> Type_name.Set.t
   val module_names : t -> Module_name.Set.t
   val find_entry : name_bindings -> t -> Value_name.t -> Name_entry.t
-  val find_type_decl : name_bindings -> t -> Type_name.t -> Type.Decl.t
+
+  val find_type_decl
+    :  name_bindings
+    -> t
+    -> Type_name.t
+    -> Module_path.absolute Type.Decl.t
+
   val find_module : name_bindings -> t -> Module_name.t -> t option
 end
 
