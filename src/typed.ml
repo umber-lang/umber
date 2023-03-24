@@ -609,7 +609,7 @@ module Module = struct
       | Val _ | Extern _ | Type_decl _ -> names)
   ;;
 
-  let absolutify_everything ~names sigs defs =
+  let absolutify_everything =
     let absolutify_common ~names common =
       match (common : _ Module.common) with
       | Val (name, fixity, type_) ->
@@ -658,8 +658,15 @@ module Module = struct
                   ~names:(Name_bindings.into_module names ~place:`Def module_name)
                   defs )
           | Trait _ | Impl _ -> failwith "absolutify_everything: traits and impls"))
+    and absolutify_module ~names module_name sigs defs =
+      ( absolutify_sigs
+          ~names:(Name_bindings.into_module names ~place:`Sig module_name)
+          sigs
+      , absolutify_defs
+          ~names:(Name_bindings.into_module names ~place:`Def module_name)
+          defs )
     in
-    absolutify_sigs ~names sigs, absolutify_defs ~names defs
+    absolutify_module
   ;;
 
   let gather_type_decls ~names sigs defs =
@@ -919,7 +926,7 @@ module Module = struct
       let defs = copy_some_sigs_to_defs sigs defs in
       let names = gather_name_placeholders ~names module_name sigs defs in
       let names = gather_imports ~names module_name sigs defs in
-      let sigs, defs = absolutify_everything ~names sigs defs in
+      let sigs, defs = absolutify_everything ~names module_name sigs defs in
       let names = gather_type_decls ~names module_name sigs defs in
       (* FIXME: After gathering imports, we should go in and and absolutify things once.
          It should be done in this file rather than in name_bindings.ml so we keep the
