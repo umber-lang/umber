@@ -33,7 +33,6 @@ module Constant_names : sig
   val lambda_arg : Value_name.t
   val underscore : Value_name.t
   val closure_env : Value_name.t
-  val mem : Value_name.t -> bool
   val synthetic_arg : int -> Value_name.t
 end = struct
   (* NOTE: none of these can be valid value names a user could enter. *)
@@ -44,19 +43,7 @@ end = struct
   let lambda_arg = Value_name.of_string_unchecked "*lambda_arg"
   let underscore = Value_name.of_string_unchecked "_"
   let closure_env = Value_name.of_string_unchecked "*closure_env"
-
-  let constant_names_table =
-    Value_name.Hash_set.of_list
-      [ binding; fun_; match_; lambda_arg; underscore; closure_env ]
-  ;;
-
-  let synthetic_arg i =
-    let argi = Value_name.of_string_exn [%string "arg%{i#Int}"] in
-    Hash_set.add constant_names_table argi;
-    argi
-  ;;
-
-  let mem = Hash_set.mem constant_names_table
+  let synthetic_arg i = Value_name.of_string_exn [%string "arg%{i#Int}"]
 end
 
 module Cnstr_info : sig
@@ -245,21 +232,12 @@ end = struct
   ;;
 
   let add_value_name t name =
-    if Constant_names.mem name
-    then add t (Module_path.Absolute.empty, name) ~extern_info:Local
-    else (
-      let path = Name_bindings.current_path t.name_bindings in
-      add t (path, name) ~extern_info:Local)
+    let path = Name_bindings.current_path t.name_bindings in
+    add t (path, name) ~extern_info:Local
   ;;
 
   let copy_name t name = Mir_name.copy_name t.name_table name
-  let find { names; _ } name = Map.find names name
-
-  let peek_value_name_internal t (name : Value_name.Absolute.t) =
-    match (name :> Module_name.t list * Value_name.t) with
-    | [], name when Constant_names.mem name -> find t (Module_path.Absolute.empty, name)
-    | _ -> find t name
-  ;;
+  let peek_value_name_internal t name = Map.find t.names name
 
   let find_value_name t name : Mir_name.t * Extern_info.t =
     match peek_value_name_internal t name with
@@ -278,7 +256,9 @@ end = struct
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
 
   let find_value_name_assert_local t name =
-    let name, extern_info = find_value_name t (Module_path.Absolute.empty, name) in
+    let name, extern_info =
+      find_value_name t (Name_bindings.current_path t.name_bindings, name)
+    in
     (match extern_info with
      | Local | Bool_intrinsic _ -> ()
      | External _ ->
