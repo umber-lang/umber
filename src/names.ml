@@ -378,10 +378,11 @@ module Value_name : sig
   val to_cnstr_name : t -> Cnstr_name.t Or_error.t
   val is_cnstr_name : t -> bool
 
-  module Relative : sig
-    include module type of Relative
+  module Qualified : sig
+    include module type of Qualified
 
-    val of_cnstr_name : Cnstr_name.Relative.t -> t
+    val of_cnstr_name : 'n Cnstr_name.Qualified.t -> 'n t
+    val to_cnstr_name : 'n t -> 'n Cnstr_name.Qualified.t Or_error.t
   end
 end = struct
   include Lower_name_qualified
@@ -390,10 +391,15 @@ end = struct
   let to_cnstr_name = Cnstr_name.of_ustring << to_ustring
   let is_cnstr_name = Or_error.is_ok << to_cnstr_name
 
-  module Relative = struct
-    include Relative
+  module Qualified = struct
+    include Qualified
 
     let of_cnstr_name (path, name) = path, of_cnstr_name name
+
+    let to_cnstr_name (path, name) =
+      let%map.Or_error name = to_cnstr_name name in
+      path, name
+    ;;
   end
 end
 

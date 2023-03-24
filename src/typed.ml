@@ -44,10 +44,14 @@ module Pattern = struct
              pat_names, arg :: args)
          with
          | Ok (pat_names, args) ->
-           (* FIXME: Need to absolutify cnstr here *)
-           let _ = cnstr in
-           ( pat_names
-           , (Cnstr_appl (failwith "cnstr not absolutified", List.rev args), body_type) )
+           let cnstr =
+             Name_bindings.absolutify_value_name
+               names
+               (Value_name.Qualified.of_cnstr_name cnstr)
+             |> Value_name.Qualified.to_cnstr_name
+             |> ok_or_compiler_bug ~here:[%here]
+           in
+           pat_names, (Cnstr_appl (cnstr, List.rev args), body_type)
          | Unequal_lengths ->
            type_error_msg "Wrong number of arguments in constructor application")
       | Tuple fields ->

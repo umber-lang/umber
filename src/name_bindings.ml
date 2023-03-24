@@ -448,7 +448,7 @@ and resolve_name_or_import t = function
 ;;
 
 let find_type t name = find_entry t name |> Name_entry.typ
-let find_cnstr_type t = Value_name.Relative.of_cnstr_name >> find_type t
+let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
 let find_type_decl' ?at_path ?defs_only t name =
