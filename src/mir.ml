@@ -196,11 +196,11 @@ module Context : sig
     [@@deriving sexp_of]
   end
 
-  val find_value_name : t -> Value_name.Relative.t -> Mir_name.t * Extern_info.t
+  val find_value_name : t -> Value_name.Absolute.t -> Mir_name.t * Extern_info.t
   val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
-  val peek_value_name : t -> Value_name.Relative.t -> Mir_name.t option
+  val peek_value_name : t -> Value_name.Absolute.t -> Mir_name.t option
 
-  type find_override := Value_name.t -> Mir_name.t -> Mir_name.t option
+  type find_override := Value_name.Absolute.t -> Mir_name.t -> Mir_name.t option
 
   val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
@@ -221,14 +221,14 @@ end = struct
   end
 
   type t =
-    { names : (Mir_name.t * Extern_info.t) Value_name.Relative.Map.t
+    { names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Map.t
     ; name_bindings : Name_bindings.t
     ; name_table : Mir_name.Name_table.t
-    ; find_override : Value_name.t -> Mir_name.t -> Mir_name.t option
+    ; find_override : Value_name.Absolute.t -> Mir_name.t -> Mir_name.t option
     }
 
   let sexp_of_t t =
-    [%sexp (t.names : (Mir_name.t * Extern_info.t) Value_name.Relative.Map.t)]
+    [%sexp (t.names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Map.t)]
   ;;
 
   let with_module t module_name ~f =
@@ -246,50 +246,39 @@ end = struct
 
   let add_value_name t name =
     if Constant_names.mem name
-    then add t ([], name) ~extern_info:Local
+    then add t (Module_path.Absolute.empty, name) ~extern_info:Local
     else (
-      let path = Name_bindings.(current_path t.name_bindings |> Path.to_module_path) in
+      let path = Name_bindings.current_path t.name_bindings in
       add t (path, name) ~extern_info:Local)
   ;;
 
   let copy_name t name = Mir_name.copy_name t.name_table name
   let find { names; _ } name = Map.find names name
 
-  let peek_value_name_internal t name =
-    match name with
-    | [], name when Constant_names.mem name -> find t ([], name)
-    | _ ->
-      let name =
-        try Name_bindings.absolutify_value_name t.name_bindings name with
-        | Compilation_error.Compilation_error { kind = Name_error; _ } ->
-          (* This is a name for a variable local to an expression (these aren't in the
-             name bindings). *)
-          Name_bindings.(current_path t.name_bindings |> Path.to_module_path), snd name
-      in
-      find t name
+  let peek_value_name_internal t (name : Value_name.Absolute.t) =
+    match (name :> Module_name.t list * Value_name.t) with
+    | [], name when Constant_names.mem name -> find t (Module_path.Absolute.empty, name)
+    | _ -> find t name
   ;;
 
   let find_value_name t name : Mir_name.t * Extern_info.t =
     match peek_value_name_internal t name with
     | Some ((name', _) as entry) ->
-      (match name with
-       | _ :: _, _ -> entry
-       | [], name ->
-         (match t.find_override name name' with
-          | Some name_override -> name_override, Local
-          | None -> entry))
+      (match t.find_override name name' with
+       | Some name_override -> name_override, Local
+       | None -> entry)
     | None ->
       compiler_bug
         [%message
           "Name missing from context"
-            (name : Value_name.Relative.t)
-            (t.names : (Mir_name.t * Extern_info.t) Value_name.Relative.Map.t)]
+            (name : Value_name.Absolute.t)
+            (t.names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Map.t)]
   ;;
 
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
 
   let find_value_name_assert_local t name =
-    let name, extern_info = find_value_name t ([], name) in
+    let name, extern_info = find_value_name t (Module_path.Absolute.empty, name) in
     (match extern_info with
      | Local | Bool_intrinsic _ -> ()
      | External _ ->
@@ -309,15 +298,13 @@ end = struct
 
   let create ~names:name_bindings ~name_table =
     let t =
-      { names = Value_name.Relative.Map.empty
+      { names = Value_name.Absolute.Map.empty
       ; name_bindings
       ; name_table
       ; find_override = (fun _ _ -> None)
       }
     in
-    let current_path =
-      Name_bindings.current_path name_bindings |> Name_bindings.Path.to_module_path
-    in
+    let current_path = Name_bindings.current_path name_bindings in
     Name_bindings.fold_local_names
       name_bindings
       ~init:t
@@ -337,7 +324,7 @@ end = struct
               compiler_bug
                 [%message
                   "Didn't find type scheme for external name entry"
-                    (name : Value_name.Relative.t)
+                    (name : Value_name.Absolute.t)
                     (entry : Name_bindings.Name_entry.t)])
           in
           External { arity = arity_of_type ~names:name_bindings scheme }
@@ -367,14 +354,18 @@ end = struct
     match (type_ : Module_path.absolute Type.Scheme.t) with
     | Type_app (type_name, _args) ->
       let decl =
-        snd (Name_bindings.find_type_decl ~defs_only:true t.name_bindings type_name)
+        snd
+          (Name_bindings.find_absolute_type_decl
+             ~defs_only:true
+             t.name_bindings
+             type_name)
       in
       find_cnstr_info_from_decl t decl ~follow_aliases:true
     | Tuple args -> Some (Cnstr_info.of_tuple args)
     | Function _ | Partial_function _ | Var _ -> cnstr_info_lookup_failed type_
 
   and find_cnstr_info_from_decl t decl ~follow_aliases =
-    match (decl : Type.Decl.decl) with
+    match (decl : _ Type.Decl.decl) with
     | Alias alias -> if follow_aliases then find_cnstr_info_internal t alias else None
     | Variants variants -> Some (Cnstr_info.of_variants variants)
     | Abstract | Record _ -> None
@@ -932,7 +923,7 @@ module Expr = struct
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match
         ( (expr : Module_path.absolute Type.Scheme.t Typed.Expr.t)
-        , (expr_type : Type.Scheme.t) )
+        , (expr_type : _ Type.Scheme.t) )
       with
       | Literal lit, _ -> Primitive lit
       | Name name, _ ->
@@ -1072,7 +1063,7 @@ module Expr = struct
       let ctx =
         let from_which_context name mir_name =
           let in_context ctx =
-            Context.peek_value_name ctx ([], name)
+            Context.peek_value_name ctx name
             |> Option.value_map ~default:false ~f:(Mir_name.equal mir_name)
           in
           if in_context outer_ctx || is_local_fun_def mir_name
@@ -1385,7 +1376,7 @@ let of_typed_module =
           Context.with_module ctx module_name ~f:(fun ctx ->
             loop ~ctx ~names ~stmts ~fun_decls defs)
         | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
-        | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : Type.Decl.t))) ->
+        | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type.Decl.t))) ->
           generate_variant_constructor_values ~ctx ~stmts decl
         | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
           let ctx, name = Context.add_value_name ctx value_name in

@@ -9,7 +9,7 @@ type 'a diff =
 
 type t =
   { name_diff : (Value_name.t * Name_bindings.Name_entry.t diff) Sequence.t
-  ; type_diff : (Type_name.t * Type.Decl.t diff) Sequence.t
+  ; type_diff : (Type_name.t * Module_path.absolute Type.Decl.t diff) Sequence.t
   ; module_diff : (Module_name.t * module_diff) Sequence.t
   }
 [@@deriving sexp_of]
@@ -54,7 +54,7 @@ let iter2 xs ys ~f =
     abstract types. e.g. `a -> b -> c` becomes something like `A -> B -> C` where `A`,
     `B`, and `C` are fresh abstract types. *)
 let skomelize ~names scheme : Name_bindings.t * Type.t =
-  Name_bindings.with_path names Name_bindings.Path.toplevel ~f:(fun names ->
+  Name_bindings.with_path_into_defs names Module_path.Absolute.empty ~f:(fun names ->
     let names = ref names in
     let types_by_param = Type.Param.Table.create () in
     let type_ =
@@ -62,6 +62,7 @@ let skomelize ~names scheme : Name_bindings.t * Type.t =
         scheme
         ~var:(fun var -> compiler_bug [%message "Unskolemized var" (var : Type.Param.t)])
         ~pf:Nothing.unreachable_code
+        ~name:Fn.id
         ~f:
           (function
            | Var param ->
@@ -69,7 +70,7 @@ let skomelize ~names scheme : Name_bindings.t * Type.t =
                (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
                   let type_name = Type_name.create_skolemized () in
                   names := Name_bindings.add_type_decl !names type_name ([], Abstract);
-                  Type.Expr.Type_app (([], type_name), [])))
+                  Type.Expr.Type_app ((Module_path.Absolute.empty, type_name), [])))
            | type_ -> Defer type_)
     in
     !names, type_)
@@ -142,7 +143,7 @@ let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, 
       let sig_var = Type.Param.Env_to_vars.find_or_add params sig_param in
       let def_var = Type.Param.Env_to_vars.find_or_add params def_param in
       Type_bindings.unify ~names ~types (Var sig_var) (Var def_var));
-    match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
+    match (sig_type : _ Type.Decl.decl), (def_type : _ Type.Decl.decl) with
     | Abstract, _ -> ()
     | Alias sig_scheme, Alias def_scheme ->
       check_type_decl_schemes ~names { sig_ = sig_scheme; def = def_scheme }
@@ -222,7 +223,9 @@ let create ~names module_name =
            else Some (module_name, Module_diff module_diff)
          | None, None -> compiler_bug [%message "Both sig and def module missing"])
   in
-  let sigs, defs = Name_bindings.find_sigs_and_defs names [] module_name in
+  let sigs, defs =
+    Name_bindings.find_sigs_and_defs names Module_path.Relative.empty module_name
+  in
   match sigs with
   | Some sigs -> loop ~names ~parent_module_name:module_name sigs defs
   | None -> empty

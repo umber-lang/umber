@@ -150,8 +150,6 @@ module Path = struct
   include Hashable.Make (T)
 
   let to_module_path t = List.map t ~f:fst |> Module_path.Relative.of_module_names
-  let append t module_name ~place = t @ [ module_name, place ]
-  let toplevel = []
 end
 
 type t =
@@ -206,7 +204,7 @@ let empty = { current_path = []; toplevel = empty_bindings }
 (* FIXME: Maybe we should propogate the type parameter here too? *)
 (* We maintain the invariant that the current path of [t] is an absolute path from the
    toplevel down. *)
-let current_absolute_module_path t =
+let current_path t =
   t.current_path |> Path.to_module_path |> Module_path.Absolute.of_relative_unchecked
 ;;
 
@@ -374,20 +372,24 @@ let resolve_path_exn t path ~defs_only =
   or_name_error_path (resolve_path t path ~defs_only) path
 ;;
 
-let with_path t path ~f =
-  let t', x = f { t with current_path = path } in
+let with_path_into_defs t (path : Module_path.Absolute.t) ~f =
+  let t', x =
+    f
+      { t with
+        current_path =
+          List.map (path :> Module_name.t list) ~f:(fun module_name -> module_name, `Def)
+      }
+  in
   { t' with current_path = t.current_path }, x
 ;;
 
 let find =
   let rec loop ?at_path ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
-    let at_path =
-      Option.value
-        at_path
-        ~default:(Path.to_module_path t.current_path :> Module_path.Relative.t)
+    let at_path = Option.value at_path ~default:(current_path t) in
+    let bindings_at_current =
+      resolve_path_exn ~defs_only t (at_path :> Module_path.Relative.t)
     in
-    let bindings_at_current = resolve_path_exn ~defs_only t at_path in
     match List.hd (path : _ Module_path.t :> Module_name.t list) with
     | Some first_module ->
       let full_path = Module_path.append' at_path path in
@@ -395,7 +397,9 @@ let find =
         if Map.mem bindings.modules first_module
         then (
           let bindings =
-            or_name_error_path (resolve_path ~defs_only t full_path) at_path
+            or_name_error_path
+              (resolve_path ~defs_only t (full_path :> Module_path.Relative.t))
+              at_path
           in
           option_or_default (f full_path name bindings) ~f:(fun () ->
             name_error ~msg:"Couldn't find name" (to_ustring input)))
@@ -409,10 +413,8 @@ let find =
         check_parent t at_path input ~f ~to_ustring)
   and check_parent t current_path input ~f ~to_ustring =
     (* Recursively check the parent *)
-    match List.drop_last (current_path :> Module_name.t list) with
-    | Some parent_path ->
-      let at_path = Module_path.Relative.of_module_names parent_path in
-      loop t ~at_path input ~f ~to_ustring
+    match Module_path.drop_last current_path with
+    | Some parent_path -> loop t ~at_path:parent_path input ~f ~to_ustring
     | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
   in
   fun ?at_path ?defs_only t input ~f ~to_ustring ->
@@ -494,16 +496,10 @@ let absolutify_path t path =
     (path, ())
     ~f:(fun path () _ -> Some path)
     ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
-  |> Module_path.Absolute.of_relative_unchecked
 ;;
 
-let absolutify_type_name t ((_, name) as path) =
-  Module_path.Absolute.of_relative_unchecked (fst (find_type_decl' t path)), name
-;;
-
-let absolutify_value_name t name =
-  Value_name.Absolute.of_relative_unchecked (fst (find_entry' t name))
-;;
+let absolutify_type_name t ((_, name) as path) = fst (find_type_decl' t path), name
+let absolutify_value_name t name = fst (find_entry' t name)
 
 (* TODO: how do I fill in foreign modules?
    For now, just assume a toplevel module already exists and copy (?) it into scope
@@ -569,8 +565,8 @@ let import_without t path hiding =
   import_filtered t path ~f:(not << Nonempty.mem hiding ~equal:Unidentified_name.equal)
 ;;
 
-let absolutify_type_expr t =
-  Type.Expr.map ~var:Fn.id ~pf:Fn.id ~name:(fun name -> absolutify_type_name t name)
+let absolutify_type_expr t type_ =
+  Type.Expr.map type_ ~var:Fn.id ~pf:Fn.id ~name:(fun name -> absolutify_type_name t name)
 ;;
 
 let of_prelude_sexp sexp =
@@ -585,13 +581,12 @@ let add_val_or_extern
   t
   name
   fixity
-  (trait_bounds, type_expr)
+  (trait_bounds, scheme)
   ~unify
   ~type_source
   =
   let f bindings =
     if not (List.is_empty trait_bounds) then failwith "TODO: trait bounds in val";
-    let scheme = absolutify_type_expr t type_expr in
     { bindings with
       names =
         Map.update bindings.names name ~f:(function
@@ -641,8 +636,7 @@ let add_type_decl t type_name decl =
         ~msg:
           [%message
             "Free parameters in type declaration"
-              (decl : Module_path.relative Type.Decl.t)];
-    let decl = absolutify_type_decl t decl in
+              (decl : Module_path.absolute Type.Decl.t)];
     { bindings with
       types =
         add_to_types
@@ -655,7 +649,7 @@ let add_type_decl t type_name decl =
          | params, Variants cnstrs ->
            (* Add constructors as functions to the namespace *)
            let result_type : _ Type.Scheme.t =
-             let path = current_absolute_module_path t in
+             let path = current_path t in
              let params = List.map params ~f:Type.Expr.var in
              Type_app ((path, type_name), params)
            in
@@ -799,14 +793,13 @@ let resolve_decl_or_import ?at_path t decl_or_import =
 
 let find_absolute_type_decl ?defs_only t (path : Type_name.Absolute.t) =
   find_type_decl
-    ~at_path:Module_path.Relative.empty
+    ~at_path:Module_path.Absolute.empty
     ?defs_only
     t
     (path :> Type_name.Relative.t)
 ;;
 
 let find_type_decl = find_type_decl ?at_path:None
-let current_path t = t.current_path
 
 let find_sigs_and_defs t path module_name =
   let rec loop t path module_name =
