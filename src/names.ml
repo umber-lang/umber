@@ -109,6 +109,8 @@ module Module_path : sig
   val append' : 'a t -> _ t -> 'a t
   val drop_last : 'a t -> 'a t option
   val to_ustring : _ t -> Ustring.t
+  val to_module_names : _ t -> Module_name.t list
+  val of_module_names_unchecked : Module_name.t list -> _ t
 
   module Relative : sig
     type nonrec t = relative t [@@deriving compare, equal, hash, sexp]
@@ -116,7 +118,6 @@ module Module_path : sig
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
-    val to_module_names : t -> Module_name.t list
     val of_module_names : Module_name.t list -> t
     val of_ustrings_unchecked : Ustring.t list -> t
     val of_ustrings_exn : Ustring.t list -> t
@@ -168,6 +169,9 @@ end = struct
     Queue.to_array q |> Ustring.of_array_unchecked
   ;;
 
+  let to_module_names = Fn.id
+  let of_module_names_unchecked = Fn.id
+
   module Relative = struct
     (* TODO: Maybe the sexp of this type should use the nice ustring representation, rather
      than just being a sexp list. *)
@@ -180,7 +184,6 @@ end = struct
     include Hashable.Make (T)
 
     let of_module_names = Fn.id
-    let to_module_names = Fn.id
     let of_ustrings_unchecked = List.map ~f:Module_name.of_ustring_unchecked
     let of_ustrings_exn = List.map ~f:Module_name.of_ustring_exn
     let empty = []
@@ -234,81 +237,82 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
   include N
 
   module Qualified = struct
-    type nonrec 'a t = 'a Module_path.t * t [@@deriving compare, equal, hash, sexp]
-  end
+    type nonrec 'a t = 'a Module_path.t * t [@@deriving compare, equal, hash]
 
-  module Make (Path : sig
-    type t [@@deriving compare, equal, hash]
+    let iter_chars ((path, name) : _ t) ~f =
+      List.iter (Module_path.to_module_names path) ~f:(fun module_name ->
+        Ustring.iter (Module_name.to_ustring module_name) ~f;
+        f (Uchar.of_char '.'));
+      Ustring.iter (to_ustring name) ~f
+    ;;
 
-    val to_module_names : t -> Module_name.t list
-    val of_module_names : Module_name.t list -> t
-  end) =
-  struct
-    module T = struct
-      module U = struct
-        type nonrec t = Path.t * t [@@deriving compare, equal, hash]
+    let total_len (path, name) =
+      List.fold
+        (Module_path.to_module_names path)
+        ~init:(Ustring.length (to_ustring name))
+        ~f:(fun len module_name ->
+          (* Add 1 additional char for the '.' *)
+          len + Ustring.length (Module_name.to_ustring module_name) + 1)
+    ;;
 
-        let iter_chars (path, name) ~f =
-          List.iter (Path.to_module_names path) ~f:(fun module_name ->
-            Ustring.iter (Module_name.to_ustring module_name) ~f;
-            f (Uchar.of_char '.'));
-          Ustring.iter (to_ustring name) ~f
-        ;;
+    let to_string t =
+      let buf = Buffer.create ((total_len t + 3) / 4) in
+      iter_chars t ~f:(Uchar.add_to_buffer buf);
+      Buffer.contents buf
+    ;;
 
-        let total_len ((path, name) : t) =
-          List.fold
-            (Path.to_module_names path)
-            ~init:(Ustring.length (to_ustring name))
-            ~f:(fun len module_name ->
-              (* Add 1 additional char for the '.' *)
-              len + Ustring.length (Module_name.to_ustring module_name) + 1)
-        ;;
+    let to_ustring t =
+      let q = Queue.create ~capacity:(total_len t) () in
+      iter_chars t ~f:(Queue.enqueue q);
+      Queue.to_array q |> Ustring.of_array_unchecked
+    ;;
 
-        let to_string t =
-          let buf = Buffer.create ((total_len t + 3) / 4) in
-          iter_chars t ~f:(Uchar.add_to_buffer buf);
-          Buffer.contents buf
-        ;;
-
-        let to_ustring t =
-          let q = Queue.create ~capacity:(total_len t) () in
-          iter_chars t ~f:(Queue.enqueue q);
-          Queue.to_array q |> Ustring.of_array_unchecked
-        ;;
-
-        let split_dots s =
-          let rec loop i j acc s =
-            if Int.( >= ) j (String.length s)
-            then List.rev acc, String.subo s ~pos:i
-            else if Char.equal s.[j] '.'
-            then
-              if Int.equal i j
-              then
-                (* Multiple '.'s in a row. This is ok, seen in e.g.
+    let split_dots s =
+      let rec loop i j acc s =
+        if Int.( >= ) j (String.length s)
+        then List.rev acc, String.subo s ~pos:i
+        else if Char.equal s.[j] '.'
+        then
+          if Int.equal i j
+          then
+            (* Multiple '.'s in a row. This is ok, seen in e.g.
                    `Std.Prelude.Operators..` This is only allowed in the name itself, so
                    we can just take the rest of the string *)
-                List.rev acc, String.subo s ~pos:i
-              else (
-                let substring = String.sub s ~pos:i ~len:(j - i) in
-                match Module_name.of_ustring (Ustring.of_string_exn substring) with
-                | Error _ ->
-                  (* This is not a module name, so it must be the last name in the path. *)
-                  List.rev acc, String.subo s ~pos:i
-                | Ok module_name -> loop (j + 1) (j + 1) (module_name :: acc) s)
-            else loop i (j + 1) acc s
-          in
-          loop 0 0 [] s
-        ;;
+            List.rev acc, String.subo s ~pos:i
+          else (
+            let substring = String.sub s ~pos:i ~len:(j - i) in
+            match Module_name.of_ustring (Ustring.of_string_exn substring) with
+            | Error _ ->
+              (* This is not a module name, so it must be the last name in the path. *)
+              List.rev acc, String.subo s ~pos:i
+            | Ok module_name -> loop (j + 1) (j + 1) (module_name :: acc) s)
+        else loop i (j + 1) acc s
+      in
+      loop 0 0 [] s
+    ;;
 
-        let of_string s =
-          let path, name = split_dots s in
-          if String.is_empty name then failwithf "Bad qualified name: '%s'" s ();
-          Path.of_module_names path, of_string_unchecked name
-        ;;
-      end
+    let of_string s =
+      let path, name = split_dots s in
+      if String.is_empty name then failwithf "Bad qualified name: '%s'" s ();
+      Module_path.of_module_names_unchecked path, of_string_unchecked name
+    ;;
 
-      include U
-      include Sexpable.Of_stringable (U)
+    let sexp_of_t _ t : Sexp.t = Atom (to_string t)
+
+    let t_of_sexp _ (sexp : Sexp.t) =
+      match sexp with
+      | Atom s -> of_string s
+      | List _ as sexp ->
+        raise_s [%message "Qualified.t_of_sexp: expected atom" (sexp : Sexp.t)]
+    ;;
+  end
+
+  module Make (Phantom : T) = struct
+    include Qualified
+
+    module T = struct
+      type t = (Phantom.t[@ignore] [@sexp.opaque]) Qualified.t
+      [@@deriving compare, equal, hash, sexp]
     end
 
     include T
@@ -318,27 +322,24 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
     let with_path path name = path, name
 
     let of_ustrings_unchecked (path, name) =
-      ( Path.of_module_names (List.map path ~f:Module_name.of_ustring_unchecked)
+      ( Module_path.of_module_names_unchecked
+          (List.map path ~f:Module_name.of_ustring_unchecked)
       , of_ustring_unchecked name )
     ;;
 
     let of_ustrings_exn (path, name) =
-      ( Path.of_module_names (List.map path ~f:Module_name.of_ustring_exn)
+      ( Module_path.of_module_names_unchecked (List.map path ~f:Module_name.of_ustring_exn)
       , of_ustring_exn name )
     ;;
   end
 
-  module Relative = Make (Module_path.Relative)
+  module Relative = Make (struct
+    type t = Module_path.relative
+  end)
 
   module Absolute = struct
     include Make (struct
-      include Module_path.Absolute
-
-      let to_module_names t = (t : Module_path.Absolute.t :> Module_name.t list)
-
-      let of_module_names =
-        Module_path.Absolute.of_relative_unchecked << Module_path.Relative.of_module_names
-      ;;
+      type t = Module_path.absolute
     end)
 
     let to_relative (path, name) = Module_path.Absolute.to_relative path, name
