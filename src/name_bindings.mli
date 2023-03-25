@@ -40,7 +40,7 @@ val find_cnstr_type : t -> Cnstr_name.Relative.t -> Type.t
 val find_fixity : t -> Value_name.Relative.t -> Fixity.t
 val set_inferred_scheme : t -> Value_name.t -> Module_path.absolute Type.Scheme.t -> t
 val add_name_placeholder : t -> Value_name.t -> t
-val add_type_placeholder : t -> Type_name.t -> t
+val add_type_decl_placeholder : t -> Type_name.t -> Module_path.relative Type.Decl.t -> t
 
 (** Fold over all the local (non-imported) names bound. *)
 val fold_local_names

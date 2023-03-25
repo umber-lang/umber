@@ -183,11 +183,6 @@ let name_error_path path =
   name_error ~msg:"Couldn't find path" (Module_path.to_ustring path)
 ;;
 
-let or_name_clash msg ustr = function
-  | `Ok value -> value
-  | `Duplicate -> name_error ~msg ustr
-;;
-
 let or_name_error_path x path =
   Option.value_or_thunk x ~default:(fun () -> name_error_path path)
 ;;
@@ -660,10 +655,7 @@ let add_type_decl t type_name decl =
                   | Some args -> Function (args, result_type)
                   | None -> result_type)
              in
-             Map.add names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry)
-             |> or_name_clash
-                  "Variant constructor name clashes with another value"
-                  (Cnstr_name.to_ustring cnstr_name))
+             Map.set names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry))
          | _ -> bindings.names)
     }
   in
@@ -697,23 +689,32 @@ let set_inferred_scheme t name scheme =
   update_current t ~f:{ f }
 ;;
 
+let add_name_placeholder_internal names name =
+  Map.update names name ~f:(function
+    | None -> Local Name_entry.placeholder
+    | Some (Or_imported.Local { Name_entry.type_source = Let_inferred; _ } as entry) ->
+      entry
+    | _ -> name_error ~msg:"Duplicate name" (Value_name.to_ustring name))
+;;
+
 let add_name_placeholder t name =
   let f bindings =
-    { bindings with
-      names =
-        Map.update bindings.names name ~f:(function
-          | None -> Local Name_entry.placeholder
-          | Some (Local { Name_entry.type_source = Let_inferred; _ } as entry) -> entry
-          | _ -> name_error ~msg:"Duplicate name" (Value_name.to_ustring name))
-    }
+    { bindings with names = add_name_placeholder_internal bindings.names name }
   in
   update_current t ~f:{ f }
 ;;
 
-let add_type_placeholder t type_name =
+let add_type_decl_placeholder t type_name (decl : _ Type.Decl.t) =
   let f bindings =
     { bindings with
       types = add_to_types bindings.types type_name None ~err_msg:"Duplicate type name"
+    ; names =
+        (match decl with
+         | _, Variants cnstrs ->
+           (* Add placeholders for variant constructor names. *)
+           List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, _) ->
+             add_name_placeholder_internal names (Value_name.of_cnstr_name cnstr_name))
+         | _ -> bindings.names)
     }
   in
   update_current t ~f:{ f }

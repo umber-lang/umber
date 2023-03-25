@@ -577,7 +577,8 @@ module Module = struct
     let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
         Name_bindings.add_name_placeholder names name
-      | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
+      | Type_decl (type_name, decl) ->
+        Name_bindings.add_type_decl_placeholder names type_name decl
       | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
