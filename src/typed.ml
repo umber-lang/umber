@@ -301,18 +301,17 @@ module Expr = struct
             all_bound_names))
       in
       let used_a_bound_name = ref false in
+      let current_path = Name_bindings.current_path names in
       let f_name name name_entry =
         f_name name name_entry;
-        (* FIXME: I don't think this handles shadowing correctly. Regular equality of the
-           name entries isn't sufficient. Maybe we should assign an id to name entries.
-           Maybe with absolute paths it's ok? *)
-        match name with
-        | path, name when Module_path.is_empty path ->
-          if Option.exists
-               ~f:(Name_bindings.Name_entry.equal name_entry)
-               (Pattern.Names.find all_bound_names name)
-          then used_a_bound_name := true
-        | _, _ -> ()
+        let path, name = name in
+        (* TODO: Physical equality is pretty sad/fragile. We should consider adding
+           unique ids to each name entry. *)
+        if Module_path.Absolute.equal path current_path
+           && Option.exists
+                (Pattern.Names.find all_bound_names name)
+                ~f:(phys_equal name_entry)
+        then used_a_bound_name := true
       in
       let bindings =
         Nonempty.map bindings ~f:(fun binding ->
