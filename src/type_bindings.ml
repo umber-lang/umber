@@ -64,8 +64,6 @@ let rec unify ~names ~types t1 t2 =
        (match Name_bindings.Type_entry.decl type_entry2 with
         | params, Alias expr -> unify ~names ~types t1 (instantiate_alias params expr)
         | (_ : _ Type.Decl.t) ->
-          (* FIXME: type name equality doesn't work because of imports and type/module
-             name punning. We need some kind of type decl id. *)
           if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
           then type_error "Type application mismatch" t1 t2;
           iter2 args1 args2 ~f:(unify ~names ~types)))

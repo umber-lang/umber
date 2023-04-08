@@ -304,21 +304,6 @@ module Expr = struct
       let current_path = Name_bindings.current_path names in
       let f_name name name_entry =
         f_name name name_entry;
-        (* FIXME: cleanup *)
-        (* FIXME: Problem: when doing name binding merges (e.g. by adding an inferred
-           scheme or something) we lose physical equality. I'm not sure how ids should
-           work with merges though. Make a set of ids? A big global table with the
-           equivalence classes? Or just keep the first id? *)
-        (* let sexp_of_addr x = [%sexp (Obj.magic x : int)] in
-        print_s
-          [%message
-            "f_name"
-              (name : Value_name.Absolute.t)
-              (name_entry : Name_bindings.Name_entry.t)
-              ~name_entry_addr:(name_entry : addr)
-              (current_path : Module_path.Absolute.t)
-              (all_bound_names : Name_bindings.Name_entry.t Value_name.Map.t)
-              ~all_bound_addrs:(all_bound_names : addr Value_name.Map.t)]; *)
         let path, name = name in
         if Module_path.Absolute.equal path current_path
            && Option.exists
@@ -657,8 +642,6 @@ module Module = struct
         Node.map sig_ ~f:(function
           | Common_def common -> Common_def (absolutify_common ~names common)
           | Let { rec_; bindings } ->
-            (* FIXME: This doesn't absolutify patterns/expressions. Wait, actually, we can
-               get away with absolutifying all the common things first! Let's do that. *)
             Let
               { rec_
               ; bindings =
@@ -724,7 +707,9 @@ module Module = struct
     in
     (* FIXME: Not sure if this works properly. This checks aliases with identical contents
        not identities. But maybe checking the contents is good enough? Aliases with
-       identical contents should be semantically identical. *)
+       identical contents should be semantically identical. 
+       
+       Maybe this should just use type entry ids now that that's a thing. *)
     let aliases_seen =
       Hash_set.create
         (module struct
@@ -857,7 +842,6 @@ module Module = struct
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings ~names ~types bindings
     in
-    (* FIXME: Do we need to use the bindings from before? *)
     Nonempty.fold_map bindings ~init:names ~f:(fun names binding ->
       Node.fold_map names binding ~f:(fun names ((pat, (pat_type, pat_names)), expr) ->
         let names, scheme = Pattern.generalize ~names ~types pat_names pat_type in
@@ -945,12 +929,6 @@ module Module = struct
       let names = gather_imports ~names module_name sigs defs in
       let sigs, defs = absolutify_everything ~names module_name sigs defs in
       let names = gather_type_decls ~names module_name sigs defs in
-      (* FIXME: After gathering imports, we should go in and and absolutify things once.
-         It should be done in this file rather than in name_bindings.ml so we keep the
-         results for the typed ast output.
-         
-         PROBLEM: We kind of want to absolutify the types first, but then we can't keep
-         them together in the sigs with the unabsolutified expressions. *)
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
       (* TODO: should check every [Val] has a corresponding [Let]. *)

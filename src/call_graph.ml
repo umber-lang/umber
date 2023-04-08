@@ -31,7 +31,6 @@ let add_binding t new_binding new_path =
     (fun old_id ->
       (* TODO: test if these [Module_path] checks are fooled by aliasing/imports *)
       let old_binding, old_path = Hashtbl.find_exn t.binding_table old_id in
-      (* FIXME: Should this use absolute paths? *)
       (* Check if the new binding used any names bound by the old binding *)
       if Set.exists new_binding.used_names ~f:(fun (path, name) ->
            Module_path.Absolute.equal path old_path

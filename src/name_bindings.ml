@@ -88,15 +88,6 @@ module Name_entry = struct
   ;;
 
   let merge entry entry' =
-    (* FIXME: cleanup *)
-    (* let sexp_of_addr x = [%sexp (Obj.magic x : int)] in
-    print_s
-      [%message
-        "Name_entry.merge"
-          (entry : t)
-          ~addr:(entry : addr)
-          (entry' : t)
-          ~addr':(entry' : addr)]; *)
     let preferred, typ, other =
       match
         Ordering.of_int (Type_source.compare entry.type_source entry'.type_source)
@@ -429,12 +420,6 @@ let with_path_into_defs t (path : Module_path.Absolute.t) ~f =
 
 let find =
   let rec loop t ((path, name) as input) ~at_path ~defs_only ~f ~to_ustring =
-    (* FIXME: cleanup *)
-    (* print_s
-      [%message
-        "find loop"
-          ~input:(to_ustring input : Ustring.t)
-          (at_path : Module_path.Absolute.t)]; *)
     (* Try looking at the current scope, then travel up to parent scopes to find a
        matching name. *)
     let bindings_at_current =
@@ -513,9 +498,6 @@ let find_type_entry' ?at_path ?defs_only t name =
     ~to_ustring:Type_name.Relative.to_ustring
     ?defs_only
     ~f:(fun path name bindings ->
-    (* FIXME: clenaup *)
-    (* print_s
-      [%message "find_type_decl'.f" (path : Module_path.Absolute.t) (name : Type_name.t)]; *)
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
       | Some decl -> Some (path, decl)
