@@ -7,7 +7,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block1 = type { %umber_header, [1 x i64] }
 
 @TypeChecking.id_for_chars.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @TypeChecking.id to %umber_block*)
-@"*binding" = global %umber_block* null
+@"TypeChecking.*binding" = global %umber_block* null
 @TypeChecking.id_alias = global %umber_block* null
 @TypeChecking.five = global %umber_block* null
 @int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
@@ -25,14 +25,14 @@ entry:
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
-  store %umber_block* %box6, %umber_block** @"*binding", align 8
-  %"*binding" = load %umber_block*, %umber_block** @"*binding", align 8
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"*binding", i32 0, i32 1, i32 0
+  store %umber_block* %box6, %umber_block** @"TypeChecking.*binding", align 8
+  %"TypeChecking.*binding" = load %umber_block*, %umber_block** @"TypeChecking.*binding", align 8
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"TypeChecking.*binding", i32 0, i32 1, i32 0
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
   store %umber_block* %block_field, %umber_block** @TypeChecking.id_alias, align 8
-  %"*binding7" = load %umber_block*, %umber_block** @"*binding", align 8
-  %block_field_gep8 = getelementptr %umber_block, %umber_block* %"*binding7", i32 0, i32 1, i32 1
+  %"TypeChecking.*binding7" = load %umber_block*, %umber_block** @"TypeChecking.*binding", align 8
+  %block_field_gep8 = getelementptr %umber_block, %umber_block* %"TypeChecking.*binding7", i32 0, i32 1, i32 1
   %block_field_raw9 = load i64, i64* %block_field_gep8, align 8
   %block_field10 = inttoptr i64 %block_field_raw9 to %umber_block*
   store %umber_block* %block_field10, %umber_block** @TypeChecking.five, align 8
@@ -54,10 +54,10 @@ entry:
   ret %umber_block* %TypeChecking.x.2
 }
 
-define tailcc %umber_block* @TypeChecking.id_for_chars(%umber_block* %arg0) {
+define tailcc %umber_block* @TypeChecking.id_for_chars(%umber_block* %TypeChecking.arg0) {
 entry:
   %TypeChecking.id_for_chars.1 = load %umber_block*, %umber_block** @TypeChecking.id_for_chars.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %TypeChecking.id_for_chars.1, %umber_block* %arg0)
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %TypeChecking.id_for_chars.1, %umber_block* %TypeChecking.arg0)
   ret %umber_block* %fun_call
 }
 
@@ -73,12 +73,12 @@ entry:
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @"*fun"(%umber_block* %"*closure_env", %umber_block* %TypeChecking.) {
+define tailcc %umber_block* @"TypeChecking.*fun"(%umber_block* %"TypeChecking.*closure_env", %umber_block* %TypeChecking.) {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"*closure_env", i32 0, i32 1, i32 2
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"TypeChecking.*closure_env", i32 0, i32 1, i32 2
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"*closure_env", i32 0, i32 1, i32 1
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"TypeChecking.*closure_env", i32 0, i32 1, i32 1
   %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
   br label %cond
@@ -113,7 +113,7 @@ entry:
   store i16 3, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"*fun" to %umber_block*), %umber_block** %box4, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"TypeChecking.*fun" to %umber_block*), %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* %TypeChecking.else_, %umber_block** %box5, align 8
   %box6 = getelementptr %umber_block*, %umber_block** %box3, i32 3

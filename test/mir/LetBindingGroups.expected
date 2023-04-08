@@ -26,7 +26,7 @@
  (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
  (Fun_decl ((name Std.Prelude.Operators.||) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
- (Value_def _
+ (Value_def LetBindingGroups._
   (Let LetBindingGroups.list
    (Fun_call Std.Prelude.Operators.::
     ((Primitive (String a))
@@ -48,9 +48,10 @@
   ((fun_name LetBindingGroups.go_right) (args (LetBindingGroups.x.1))
    (body (Fun_call LetBindingGroups.go_left ((Name LetBindingGroups.x.1))))))
  (Fun_def
-  ((fun_name LetBindingGroups.bottom_again) (args (*lambda_arg))
+  ((fun_name LetBindingGroups.bottom_again)
+   (args (LetBindingGroups.*lambda_arg))
    (body (Fun_call LetBindingGroups.go_left ((Primitive (Int 17)))))))
  (Value_def LetBindingGroups.bottom.1 (Name LetBindingGroups.bottom_again))
  (Fun_def
-  ((fun_name LetBindingGroups.bottom) (args (arg0))
-   (body (Fun_call LetBindingGroups.bottom.1 ((Name arg0)))))))
+  ((fun_name LetBindingGroups.bottom) (args (LetBindingGroups.arg0))
+   (body (Fun_call LetBindingGroups.bottom.1 ((Name LetBindingGroups.arg0)))))))

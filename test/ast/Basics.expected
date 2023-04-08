@@ -6,7 +6,7 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all ())
-      ((Match (Name false) (Type_app Bool ())
+      ((Match (Name Basics.false) (Type_app Bool ())
         (((Cnstr_appl True ()) (Literal (Float 1)))
          ((Cnstr_appl False ()) (Literal (Float 2.5)))))
        (Type_app Float ()))))))
@@ -19,8 +19,8 @@
    (Type_decl GeneralColor
     (()
      (Variants
-      ((Regular ((Type_app Color ())))
-       (Expanded ((Type_app ExpandedColor ()))))))))
+      ((Regular ((Type_app Basics.Color ())))
+       (Expanded ((Type_app Basics.ExpandedColor ()))))))))
   (Common_def
    (Type_decl Point3
     (()
@@ -29,7 +29,7 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all (xyz))
-      ((Fun_call (Name Point3)
+      ((Fun_call (Name Basics.Point3)
         (((Literal (Int 1)) (Type_app Int ()))
          ((Literal (Int 2)) (Type_app Int ()))
          ((Literal (Int 3)) (Type_app Int ()))))

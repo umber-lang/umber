@@ -2,5 +2,5 @@
  ((kind Mir_error)
   (msg
    ("Recursive let bindings can only be used to define functions"
-    (expr (Name b))))
+    (expr (Name ErrorLetRecExpression.b))))
   (filename ErrorLetRecExpression.um) (span 1:5-1:10)))

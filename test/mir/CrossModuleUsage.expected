@@ -1,23 +1,26 @@
 ((Value_def CrossModuleUsage.source
   (Primitive (String "everything depends on me")))
  (Fun_def
-  ((fun_name CrossModuleUsage.A.a) (args (*lambda_arg))
+  ((fun_name CrossModuleUsage.A.a) (args (CrossModuleUsage.A.*lambda_arg))
    (body (Fun_call CrossModuleUsage.A.b ((Make_block (tag 0)))))))
  (Fun_def
-  ((fun_name CrossModuleUsage.A.b) (args (*lambda_arg.1))
+  ((fun_name CrossModuleUsage.A.b) (args (CrossModuleUsage.A.*lambda_arg.1))
    (body (Fun_call CrossModuleUsage.A.a ((Make_block (tag 0)))))))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Value_def CrossModuleUsage.A.print.1 (Name Std.Prelude.print))
  (Fun_def
-  ((fun_name CrossModuleUsage.A.print) (args (arg0))
-   (body (Fun_call CrossModuleUsage.A.print.1 ((Name arg0))))))
+  ((fun_name CrossModuleUsage.A.print) (args (CrossModuleUsage.A.arg0))
+   (body
+    (Fun_call CrossModuleUsage.A.print.1 ((Name CrossModuleUsage.A.arg0))))))
  (Fun_def
-  ((fun_name CrossModuleUsage.A.print_source) (args (*lambda_arg.2))
+  ((fun_name CrossModuleUsage.A.print_source)
+   (args (CrossModuleUsage.A.*lambda_arg.2))
    (body
     (Fun_call CrossModuleUsage.A.print ((Name CrossModuleUsage.source))))))
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_def
-  ((fun_name CrossModuleUsage.print_source) (args (*lambda_arg.3))
+  ((fun_name CrossModuleUsage.print_source)
+   (args (CrossModuleUsage.*lambda_arg))
    (body
     (Fun_call "Std.Prelude.Operators.;"
      ((Fun_call CrossModuleUsage.A.print_source ((Make_block (tag 0))))

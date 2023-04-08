@@ -2,6 +2,6 @@
  ((Let (rec_ false)
    (bindings
     (((Tuple ())
-      ((Fun_call (Name print)
+      ((Fun_call (Name Std.Prelude.print)
         (((Literal (String "Hello world!")) (Type_app String ()))))
        (Tuple ()))))))))
