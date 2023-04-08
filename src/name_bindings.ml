@@ -121,6 +121,25 @@ module Name_entry = struct
   ;;
 end
 
+module Type_entry = struct
+  module Id = Unique_id.Int ()
+
+  type t =
+    { id : Id.t
+    ; decl : Module_path.absolute Type.Decl.t
+    }
+
+  let sexp_of_t { id = _; decl } = [%sexp (decl : Module_path.absolute Type.Decl.t)]
+
+  let t_of_sexp sexp =
+    { id = Id.create (); decl = [%of_sexp: Module_path.absolute Type.Decl.t] sexp }
+  ;;
+
+  let decl t = t.decl
+  let identical t t' = Id.equal t.id t'.id
+  let create decl = { id = Id.create (); decl }
+end
+
 (* TODO: probably just make 'path the variable so we don't have to put unit for module paths *)
 module Or_imported = struct
   type ('entry, 'path) t =
@@ -191,9 +210,7 @@ and defs = sigs bindings
 
 and 'a bindings =
   { names : (Name_entry.t, Value_name.Relative.t) Or_imported.t Value_name.Map.t
-  ; types :
-      (Module_path.absolute Type.Decl.t, Type_name.Relative.t) Or_imported.t option
-      Type_name.Map.t
+  ; types : (Type_entry.t, Type_name.Relative.t) Or_imported.t option Type_name.Map.t
   ; modules :
       ('a option * 'a bindings, Module_path.Relative.t) Or_imported.t Module_name.Map.t
   }
@@ -323,7 +340,10 @@ let core =
             Intrinsics.all
             ~init:empty_bindings.types
             ~f:(fun types (module Intrinsic) ->
-            Map.set types ~key:Intrinsic.name ~data:(Some (Local Intrinsic.decl)))
+            Map.set
+              types
+              ~key:Intrinsic.name
+              ~data:(Some (Local (Type_entry.create Intrinsic.decl))))
       ; names =
           List.fold
             Intrinsics.Bool.cnstrs
@@ -408,10 +428,18 @@ let with_path_into_defs t (path : Module_path.Absolute.t) ~f =
 ;;
 
 let find =
-  let rec loop ?at_path ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
-    (* Try looking at the current scope, then travel up to parent scopes to find a matching name *)
-    let at_path = Option.value at_path ~default:(current_path t) in
+  let rec loop t ((path, name) as input) ~at_path ~defs_only ~f ~to_ustring =
+    (* FIXME: cleanup *)
+    (* print_s
+      [%message
+        "find loop"
+          ~input:(to_ustring input : Ustring.t)
+          (at_path : Module_path.Absolute.t)]; *)
+    (* Try looking at the current scope, then travel up to parent scopes to find a
+       matching name. *)
     let bindings_at_current =
+      (* FIXME: I don't think upcasting the path to relative works here. It might go to a
+         different place than an absolute path. *)
       resolve_path_exn ~defs_only t (at_path :> Module_path.Relative.t)
     in
     match List.hd (path : _ Module_path.t :> Module_name.t list) with
@@ -427,22 +455,23 @@ let find =
           in
           option_or_default (f full_path name bindings) ~f:(fun () ->
             name_error ~msg:"Couldn't find name" (to_ustring input)))
-        else check_parent t at_path input ~f ~to_ustring
+        else check_parent t at_path input ~defs_only ~f ~to_ustring
       in
       (match bindings_at_current with
        | Sigs sigs -> f sigs
        | Defs defs -> f defs)
     | None ->
       option_or_default (f at_path name bindings_at_current) ~f:(fun () ->
-        check_parent t at_path input ~f ~to_ustring)
-  and check_parent t current_path input ~f ~to_ustring =
-    (* Recursively check the parent *)
+        check_parent t at_path input ~defs_only ~f ~to_ustring)
+  and check_parent t current_path input ~defs_only ~f ~to_ustring =
+    (* Recursively check the parent. *)
     match Module_path.drop_last current_path with
-    | Some parent_path -> loop t ~at_path:parent_path input ~f ~to_ustring
+    | Some parent_path -> loop t input ~at_path:parent_path ~defs_only ~f ~to_ustring
     | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
   in
-  fun ?at_path ?defs_only t input ~f ~to_ustring ->
-    loop ?at_path ?defs_only t input ~f ~to_ustring
+  fun ?at_path ?(defs_only = false) t input ~f ~to_ustring ->
+    let at_path = Option.value_or_thunk at_path ~default:(fun () -> current_path t) in
+    loop t input ~at_path ~defs_only ~f ~to_ustring
 ;;
 
 let rec find_entry' t name =
@@ -475,7 +504,7 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_decl' ?at_path ?defs_only t name =
+let find_type_entry' ?at_path ?defs_only t name =
   let open Option.Let_syntax in
   find
     ?at_path
@@ -484,11 +513,15 @@ let find_type_decl' ?at_path ?defs_only t name =
     ~to_ustring:Type_name.Relative.to_ustring
     ?defs_only
     ~f:(fun path name bindings ->
+    (* FIXME: clenaup *)
+    (* print_s
+      [%message "find_type_decl'.f" (path : Module_path.Absolute.t) (name : Type_name.t)]; *)
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
       | Some decl -> Some (path, decl)
       | None ->
-        (* Allow type names like [List.List] to be found as just [List] *)
+        (* FIXME: Test how this works with multiple layers of nesting e.g. `Foo.Foo.Foo` *)
+        (* Allow type names like `List.List` to be found as just `List` *)
         let module_name = Type_name.to_ustring name |> Module_name.of_ustring_unchecked in
         Map.find bindings.modules module_name >>= check_submodule
     in
@@ -496,18 +529,18 @@ let find_type_decl' ?at_path ?defs_only t name =
     | Sigs sigs ->
       f sigs ~check_submodule:(function
         | Local (None, sigs) ->
-          let%bind decl = Map.find sigs.types name in
-          Some (path, decl)
+          let%map decl = Map.find sigs.types name in
+          path, decl
         | Local (Some _, _) -> .
         | Imported import_path -> Some (path, Some (Imported (import_path, name))))
     | Defs defs ->
       f defs ~check_submodule:(function
         | Local (None, defs) ->
-          let%bind decl = Map.find defs.types name in
-          Some (path, decl)
+          let%map decl = Map.find defs.types name in
+          path, decl
         | Local (Some sigs, _defs) ->
-          let%bind decl = Map.find sigs.types name in
-          Some (path, decl)
+          let%map decl = Map.find sigs.types name in
+          path, decl
         | Imported import_path -> Some (path, Some (Imported (import_path, name)))))
 ;;
 
@@ -522,7 +555,7 @@ let absolutify_path t path =
     ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
 ;;
 
-let absolutify_type_name t ((_, name) as path) = fst (find_type_decl' t path), name
+let absolutify_type_name t ((_, name) as path) = fst (find_type_entry' t path), name
 let absolutify_value_name t name = fst (find_entry' t name)
 
 (* TODO: how do I fill in foreign modules?
@@ -671,7 +704,7 @@ let add_type_decl t type_name decl =
         add_to_types
           bindings.types
           type_name
-          (Some (Local decl))
+          (Some (Local (Type_entry.create decl)))
           ~err_msg:"Duplicate type declarations"
     ; names =
         (match decl with
@@ -791,24 +824,24 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let rec find_type_decl ?at_path ?defs_only t type_name =
-  resolve_decl_or_import
+let rec find_type_entry ?at_path ?defs_only t type_name =
+  resolve_type_or_import
     ?at_path
     ?defs_only
     t
-    (snd (find_type_decl' ?at_path ?defs_only t type_name))
+    (snd (find_type_entry' ?at_path ?defs_only t type_name))
 
-and resolve_decl_or_import ?at_path ?defs_only t = function
+and resolve_type_or_import ?at_path ?defs_only t = function
   | Some (Or_imported.Local decl) -> Some decl
   | Some (Imported path_name) ->
     (* TODO: pretty sure this import path should be resolved at the place it's written,
        not the current path - this goes for all imports, unless we absolutify their paths *)
-    find_type_decl ?at_path ?defs_only t path_name
+    find_type_entry ?at_path ?defs_only t path_name
   | None -> None
 ;;
 
-let find_type_decl ?at_path ?(defs_only = false) t type_name =
-  option_or_default (find_type_decl ?at_path ~defs_only t type_name) ~f:(fun () ->
+let find_type_entry ?at_path ?(defs_only = false) t type_name =
+  option_or_default (find_type_entry ?at_path ~defs_only t type_name) ~f:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
@@ -816,19 +849,29 @@ let find_type_decl ?at_path ?(defs_only = false) t type_name =
           (without_std t : t)])
 ;;
 
-let resolve_decl_or_import ?at_path t decl_or_import =
-  option_or_default (resolve_decl_or_import ?at_path t decl_or_import) ~f:(fun () ->
+let find_type_decl ?at_path ?defs_only t type_name =
+  (find_type_entry ?at_path ?defs_only t type_name).decl
+;;
+
+let resolve_type_or_import ?at_path t decl_or_import =
+  option_or_default (resolve_type_or_import ?at_path t decl_or_import) ~f:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import
-            : (Module_path.absolute Type.Decl.t, Type_name.Relative.t) Or_imported.t
-              option)
+          (decl_or_import : (Type_entry.t, Type_name.Relative.t) Or_imported.t option)
           (without_std t : t)])
 ;;
 
 let find_absolute_type_decl ?defs_only t (path : Type_name.Absolute.t) =
   find_type_decl
+    ~at_path:Module_path.Absolute.empty
+    ?defs_only
+    t
+    (path :> Type_name.Relative.t)
+;;
+
+let find_absolute_type_entry ?defs_only t (path : Type_name.Absolute.t) =
+  find_type_entry
     ~at_path:Module_path.Absolute.empty
     ?defs_only
     t
@@ -897,7 +940,11 @@ module Sigs_or_defs = struct
   ;;
 
   let find_entry = make_find ~into_bindings:names ~resolve:resolve_name_or_import
-  let find_type_decl = make_find ~into_bindings:types ~resolve:resolve_decl_or_import
+
+  let find_type_decl names t type_name =
+    (make_find names t type_name ~into_bindings:types ~resolve:resolve_type_or_import)
+      .decl
+  ;;
 
   let find_module t bindings module_name =
     let open Option.Let_syntax in

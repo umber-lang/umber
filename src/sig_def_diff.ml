@@ -80,13 +80,6 @@ let skomelize ~names scheme : Name_bindings.t * Type.t =
     signature is a "more specific" version of the defintion. We can check this by
     skolemizing the signature, instatiating the defintion, and then unifying the two. *)
 let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
-  (* FIXME: Do we need to absolutify type app names in aliases? Likely yes?
-     Shouldn't we have done that earlier? Maybe we make absolute paths a type variable? *)
-  (* let map_alias param_matching ~param_table expr =
-    Type.Expr.map expr ~var:Fn.id ~pf:Nothing.unreachable_code ~f:(function
-      | Var v -> Map.find_exn params v
-      | typ -> Defer typ)
-  in *)
   let names, sig_type = skomelize ~names sig_scheme in
   let def_type = Type.Scheme.instantiate def_scheme in
   let types = Type_bindings.create () in
@@ -98,7 +91,7 @@ let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ B
 (** Type definitions in a signature an defintion are compatible if they are the same
     modulo type aliases and type variable renamings. Unlike for `val`s, the compatibility
     is symmetrical. *)
-let check_type_decl_schemes ~names schemes =
+let check_type_decl_schemes ~names (schemes : _ By_kind.t) =
   check_val_type_schemes ~names schemes;
   check_val_type_schemes ~names { sig_ = schemes.def; def = schemes.sig_ }
 ;;

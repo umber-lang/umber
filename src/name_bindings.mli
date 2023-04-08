@@ -23,6 +23,13 @@ module Name_entry : sig
   val identical : t -> t -> bool
 end
 
+module Type_entry : sig
+  type t
+
+  val decl : t -> Module_path.absolute Type.Decl.t
+  val identical : t -> t -> bool
+end
+
 type t [@@deriving sexp]
 
 val name_error : msg:string -> Ustring.t -> 'a
@@ -56,6 +63,8 @@ val merge_names
   -> combine:(Value_name.t -> Name_entry.t -> Name_entry.t -> Name_entry.t)
   -> t
 
+(* TODO: removed the non-qualified version, since it's unused. *)
+
 (** Find a type declaration given a qualified name *)
 val find_type_decl
   :  ?defs_only:bool
@@ -69,6 +78,12 @@ val find_absolute_type_decl
   -> t
   -> Type_name.Absolute.t
   -> Module_path.absolute Type.Decl.t
+
+val find_absolute_type_entry
+  :  ?defs_only:bool
+  -> t
+  -> Type_name.Absolute.t
+  -> Type_entry.t
 
 val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Absolute.t
 val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Absolute.t
