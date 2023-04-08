@@ -55,7 +55,7 @@ module : {
 
   import Operators with *
 
-  val sqrt : Int -> Float
+  val sqrt : Float -> Float
 
   extern print : String -> () = "umber_print_endline"  # TODO: effects
   extern print_int : Int -> () = "umber_print_int"

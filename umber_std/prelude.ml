@@ -63,7 +63,7 @@ let names = {|
                    (Local
                     ((typ
                       (Scheme
-                       (Function ((Type_app Int ())) (Type_app Float ())))))))
+                       (Function ((Type_app Float ())) (Type_app Float ())))))))
                   (print
                    (Local
                     ((typ
