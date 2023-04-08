@@ -20,6 +20,7 @@ module Name_entry : sig
   val extern_name : t -> Extern_name.t option
   val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
   val merge : t -> t -> t
+  val identical : t -> t -> bool
 end
 
 type t [@@deriving sexp]

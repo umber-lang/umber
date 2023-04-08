@@ -304,13 +304,26 @@ module Expr = struct
       let current_path = Name_bindings.current_path names in
       let f_name name name_entry =
         f_name name name_entry;
+        (* FIXME: cleanup *)
+        (* FIXME: Problem: when doing name binding merges (e.g. by adding an inferred
+           scheme or something) we lose physical equality. I'm not sure how ids should
+           work with merges though. Make a set of ids? A big global table with the
+           equivalence classes? Or just keep the first id? *)
+        (* let sexp_of_addr x = [%sexp (Obj.magic x : int)] in
+        print_s
+          [%message
+            "f_name"
+              (name : Value_name.Absolute.t)
+              (name_entry : Name_bindings.Name_entry.t)
+              ~name_entry_addr:(name_entry : addr)
+              (current_path : Module_path.Absolute.t)
+              (all_bound_names : Name_bindings.Name_entry.t Value_name.Map.t)
+              ~all_bound_addrs:(all_bound_names : addr Value_name.Map.t)]; *)
         let path, name = name in
-        (* TODO: Physical equality is pretty sad/fragile. We should consider adding
-           unique ids to each name entry. *)
         if Module_path.Absolute.equal path current_path
            && Option.exists
                 (Pattern.Names.find all_bound_names name)
-                ~f:(phys_equal name_entry)
+                ~f:(Name_bindings.Name_entry.identical name_entry)
         then used_a_bound_name := true
       in
       let bindings =

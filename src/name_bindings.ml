@@ -30,15 +30,21 @@ module Name_entry = struct
     [@@deriving equal, sexp]
   end
 
+  module Id = Unique_id.Int ()
+
   (* TODO: Consider having this type be responsible for assigning/tracking unique names,
      rather than doing it in the MIR. *)
   type t =
-    { typ : Type_or_scheme.t
+    { ids : Id.Set.t
+         [@default Id.Set.singleton (Id.create ())] [@sexp_drop_default fun _ _ -> true]
+    ; typ : Type_or_scheme.t
     ; type_source : Type_source.t [@default Val_declared] [@sexp_drop_default.equal]
     ; fixity : Fixity.t option [@sexp.option]
     ; extern_name : Extern_name.t option [@sexp.option]
     }
   [@@deriving equal, fields, sexp]
+
+  let identical entry entry' = not (Set.are_disjoint entry.ids entry'.ids)
 
   let typ entry =
     match entry.typ with
@@ -53,15 +59,28 @@ module Name_entry = struct
   ;;
 
   let val_declared ?fixity ?extern_name typ =
-    { type_source = Val_declared; typ = Scheme typ; fixity; extern_name }
+    { ids = Id.Set.singleton (Id.create ())
+    ; type_source = Val_declared
+    ; typ = Scheme typ
+    ; fixity
+    ; extern_name
+    }
   ;;
 
+  (* FIXME: Probably stop exposing let_inferred, just use types inside pattern names, and
+     don't merge names entries, etc. *)
   let let_inferred ?fixity ?extern_name typ =
-    { type_source = Let_inferred; typ = Type typ; fixity; extern_name }
+    { ids = Id.Set.singleton (Id.create ())
+    ; type_source = Let_inferred
+    ; typ = Type typ
+    ; fixity
+    ; extern_name
+    }
   ;;
 
-  let placeholder =
-    { type_source = Placeholder
+  let placeholder () =
+    { ids = Id.Set.singleton (Id.create ())
+    ; type_source = Placeholder
     ; typ = Scheme (Var Type.Param.dummy)
     ; fixity = None
     ; extern_name = None
@@ -69,6 +88,15 @@ module Name_entry = struct
   ;;
 
   let merge entry entry' =
+    (* FIXME: cleanup *)
+    (* let sexp_of_addr x = [%sexp (Obj.magic x : int)] in
+    print_s
+      [%message
+        "Name_entry.merge"
+          (entry : t)
+          ~addr:(entry : addr)
+          (entry' : t)
+          ~addr':(entry' : addr)]; *)
     let preferred, typ, other =
       match
         Ordering.of_int (Type_source.compare entry.type_source entry'.type_source)
@@ -84,7 +112,8 @@ module Name_entry = struct
         entry', typ, entry
     in
     let pick getter = Option.first_some (getter preferred) (getter other) in
-    { typ
+    { ids = Set.union entry.ids entry'.ids
+    ; typ
     ; type_source = preferred.type_source
     ; fixity = pick fixity
     ; extern_name = pick extern_name
@@ -592,7 +621,12 @@ let add_val_or_extern
             Local
               (Name_entry.merge
                  existing_entry
-                 { type_source; typ = Scheme scheme; fixity; extern_name })
+                 { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
+                 ; type_source
+                 ; typ = Scheme scheme
+                 ; fixity
+                 ; extern_name
+                 })
           | Some (Imported imported_name) ->
             (* TODO: consider allowing this use case
                e.g. importing from another module, and then giving that import a new,
@@ -664,8 +698,9 @@ let add_type_decl t type_name decl =
 
 let set_inferred_scheme t name scheme =
   let f bindings =
-    let inferred_entry =
-      { Name_entry.type_source = Let_inferred
+    let inferred_entry : Name_entry.t =
+      { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
+      ; type_source = Let_inferred
       ; typ = Scheme scheme
       ; fixity = None
       ; extern_name = None
@@ -691,7 +726,7 @@ let set_inferred_scheme t name scheme =
 
 let add_name_placeholder_internal names name =
   Map.update names name ~f:(function
-    | None -> Local Name_entry.placeholder
+    | None -> Local (Name_entry.placeholder ())
     | Some (Or_imported.Local { Name_entry.type_source = Let_inferred; _ } as entry) ->
       entry
     | _ -> name_error ~msg:"Duplicate name" (Value_name.to_ustring name))

@@ -62,6 +62,8 @@ let rec unify ~names ~types t1 t2 =
        (match get_decl names name2 args2 with
         | params, Alias expr -> unify ~names ~types t1 (instantiate_alias params expr)
         | decl2 ->
+          (* TODO: Using [phys_equal] is pretty fragile here. These declarations should
+             probably have unique ids to compare to, like name entries do. *)
           if not (phys_equal decl1 decl2)
           then type_error "Type application mismatch" t1 t2;
           iter2 args1 args2 ~f:(unify ~names ~types)))
