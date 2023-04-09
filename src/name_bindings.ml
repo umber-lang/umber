@@ -499,7 +499,6 @@ let find_type_entry' ?at_path ?defs_only t name =
       match Map.find bindings.types name with
       | Some decl -> Some (path, decl)
       | None ->
-        (* FIXME: Test how this works with multiple layers of nesting e.g. `Foo.Foo.Foo` *)
         (* Allow type names like `List.List` to be found as just `List` *)
         let module_name = Type_name.to_ustring name |> Module_name.of_ustring_unchecked in
         Map.find bindings.modules module_name >>= check_submodule

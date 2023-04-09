@@ -724,6 +724,33 @@
   (no-infer (diff output/TypeChecking.expected output/TypeChecking.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/TypeModuleNamePunning.expected
+    tokens/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/TypeModuleNamePunning.expected ast/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/TypeModuleNamePunning.expected mir/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/TypeModuleNamePunning.expected llvm/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/TypeModuleNamePunning.expected
+    output/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Types.expected tokens/Types.out))))
 
 (rule (alias runtest) (deps test.dummy)
