@@ -67,7 +67,7 @@ module Name_entry = struct
     }
   ;;
 
-  (* FIXME: Probably stop exposing let_inferred, just use types inside pattern names, and
+  (* TODO: Probably stop exposing let_inferred, just use types inside pattern names, and
      don't merge names entries, etc. *)
   let let_inferred ?fixity ?extern_name typ =
     { ids = Id.Set.singleton (Id.create ())
