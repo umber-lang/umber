@@ -59,6 +59,8 @@ let names = {|
                   (Nil (Imported Std.Prelude.List.Nil))
                   (not (Imported Std.Prelude.Operators.not))
                   (Cons (Imported Std.Prelude.List.Cons))
+                  (None (Imported Std.Prelude.Option.None))
+                  (Some (Imported Std.Prelude.Option.Some))
                   (sqrt
                    (Local
                     ((typ
@@ -109,6 +111,26 @@ let names = {|
                               (Cons
                                ((Var a)
                                 (Type_app Std.Prelude.List.List ((Var a)))))))))))))
+                      (modules ())))))
+                  (Option
+                   (Local
+                    (()
+                     ((names
+                       ((None
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Type_app Std.Prelude.Option.Option ((Var a))))))))
+                        (Some
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function ((Var a))
+                              (Type_app Std.Prelude.Option.Option ((Var a)))))))))))
+                      (types
+                       ((Option
+                         ((Local
+                           ((a) (Variants ((None ()) (Some ((Var a)))))))))))
                       (modules ())))))
                   (Operators
                    (Local
@@ -336,6 +358,26 @@ let names = {|
                               ((Var a)
                                (Type_app Std.Prelude.List.List ((Var a)))))))))))))
                      (modules ())))))
+                 (Option
+                  (Local
+                   (()
+                    ((names
+                      ((None
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Type_app Std.Prelude.Option.Option ((Var a))))))))
+                       (Some
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function ((Var a))
+                             (Type_app Std.Prelude.Option.Option ((Var a)))))))))))
+                     (types
+                      ((Option
+                        ((Local
+                          ((a) (Variants ((None ()) (Some ((Var a)))))))))))
+                     (modules ())))))
                  (Operators
                   (Local
                    (()
@@ -514,12 +556,27 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 
+@Std.Prelude.Option.None = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Std.Prelude.List.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @"Std.Prelude.Operators.::.1" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons to %umber_block*)
 
 define i32 @"umber_main:Std/Prelude.um"() {
 entry:
   ret i32 0
+}
+
+define tailcc %umber_block* @Std.Prelude.Option.Some(%umber_block* %Std.Prelude.Option.arg0) {
+entry:
+  %box = call i64* @umber_gc_alloc(i64 16)
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i32 1
+  store i16 1, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
+  store %umber_block* %Std.Prelude.Option.arg0, %umber_block** %box4, align 8
+  %box5 = bitcast %umber_block** %box3 to %umber_block*
+  ret %umber_block* %box5
 }
 
 define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %Std.Prelude.List.arg0, %umber_block* %Std.Prelude.List.arg1) {

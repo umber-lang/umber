@@ -7,6 +7,14 @@ module : {
 
   import List with Nil, Cons
 
+  module Option : {
+    type Option a =
+      | None
+      | Some a
+  }
+
+  import Option with None, Some
+
   module Operators : {
     val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
     # `() =>` is a hack for the parser as it confuses the `(` in `(b -> c)` as the start
