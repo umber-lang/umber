@@ -677,16 +677,17 @@ module Module = struct
   ;;
 
   (** Raise an error upon finding any cycles in a given type alias. *)
-  let check_cyclic_type_alias ~names alias =
+  let check_cyclic_type_alias ~names  alias =
     (* TODO: can rewrite this with [Type.Expr.map] *)
     let rec loop ~names aliases_seen (alias : Module_path.absolute Type.Scheme.t) =
-      Hash_set.add aliases_seen alias;
       match alias with
       | Type_app (name, args) ->
-        let decl = Name_bindings.find_absolute_type_decl names name in
+        let type_entry = Name_bindings.find_absolute_type_entry names name in
+        let decl = Name_bindings.Type_entry.decl type_entry in
         (match decl with
          | _, Alias alias ->
-           if Hash_set.mem aliases_seen alias
+           let id = Name_bindings.Type_entry.id type_entry in
+           if Hash_set.mem aliases_seen id
            then
              Compilation_error.raise
                Type_error
@@ -694,8 +695,9 @@ module Module = struct
                  [%message
                    "Cyclic type alias"
                      (name : Type_name.Absolute.t)
-                     (decl : Module_path.absolute Type.Decl.t)]
-           else loop ~names aliases_seen alias
+                     (decl : Module_path.absolute Type.Decl.t)];
+           Hash_set.add aliases_seen id;
+           loop ~names aliases_seen alias
          | _ -> ());
         List.iter args ~f:(loop ~names aliases_seen)
       | Function (args, body) ->
@@ -705,17 +707,7 @@ module Module = struct
       | Var _ -> ()
       | Partial_function _ -> .
     in
-    (* FIXME: Not sure if this works properly. This checks aliases with identical contents
-       not identities. But maybe checking the contents is good enough? Aliases with
-       identical contents should be semantically identical. 
-       
-       Maybe this should just use type entry ids now that that's a thing. *)
-    let aliases_seen =
-      Hash_set.create
-        (module struct
-          type t = Module_path.absolute Type.Scheme.t [@@deriving compare, hash, sexp]
-        end)
-    in
+    let aliases_seen = Name_bindings.Type_entry.Id.Hash_set.create () in
     loop ~names aliases_seen alias
   ;;
 

@@ -26,8 +26,15 @@ end
 module Type_entry : sig
   type t
 
+  module Id : sig
+    type t [@@deriving equal, compare, hash, sexp_of]
+
+    include Hashable.S_plain with type t := t
+  end
+
   val decl : t -> Module_path.absolute Type.Decl.t
   val identical : t -> t -> bool
+  val id : t -> Id.t
 end
 
 type t [@@deriving sexp]

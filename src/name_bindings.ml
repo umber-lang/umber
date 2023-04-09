@@ -119,6 +119,7 @@ module Type_entry = struct
     { id : Id.t
     ; decl : Module_path.absolute Type.Decl.t
     }
+  [@@deriving fields]
 
   let sexp_of_t { id = _; decl } = [%sexp (decl : Module_path.absolute Type.Decl.t)]
 
@@ -126,7 +127,6 @@ module Type_entry = struct
     { id = Id.create (); decl = [%of_sexp: Module_path.absolute Type.Decl.t] sexp }
   ;;
 
-  let decl t = t.decl
   let identical t t' = Id.equal t.id t'.id
   let create decl = { id = Id.create (); decl }
 end
@@ -233,7 +233,6 @@ let empty_bindings =
 
 let empty = { current_path = []; toplevel = empty_bindings }
 
-(* FIXME: Maybe we should propogate the type parameter here too? *)
 (* We maintain the invariant that the current path of [t] is an absolute path from the
    toplevel down. *)
 let current_path t =
