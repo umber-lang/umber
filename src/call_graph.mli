@@ -1,4 +1,4 @@
-open Import
+open! Import
 open Names
 
 (* TODO: probably shouldn't overload terminology between [Name_bindings], [Type_bindings],
@@ -14,8 +14,8 @@ end
 
 type 'a t
 
-val of_bindings : ('a Binding.t * Module_path.Absolute.t) Sequence.t -> 'a t
+val of_bindings : ('a Binding.t * Module_path.Absolute.t) list -> 'a t
 
 val to_regrouped_bindings
   :  'a t
-  -> ('a Binding.t Nonempty.t * Module_path.Absolute.t) Sequence.t
+  -> ('a Binding.t Nonempty.t * Module_path.Absolute.t) list

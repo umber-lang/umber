@@ -791,7 +791,7 @@ module Module = struct
       This is done by topologically sorting the strongly-connected components of the call
       graph (dependencies between bindings). *)
   let extract_binding_groups ~names (defs : intermediate_def Node.t list)
-    : _ * (_ Node.t Call_graph.Binding.t Nonempty.t * Module_path.Absolute.t) Sequence.t
+    : _ * (_ Node.t Call_graph.Binding.t Nonempty.t * Module_path.Absolute.t) list
     =
     let rec gather_bindings_in_defs ~names defs acc =
       List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
@@ -822,8 +822,7 @@ module Module = struct
     in
     let other_defs, bindings = gather_bindings_in_defs ~names defs ([], []) in
     let binding_groups =
-      Call_graph.of_bindings (Sequence.of_list bindings)
-      |> Call_graph.to_regrouped_bindings
+      Call_graph.of_bindings bindings |> Call_graph.to_regrouped_bindings
     in
     other_defs, binding_groups
   ;;
@@ -896,15 +895,14 @@ module Module = struct
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
       let other_defs, binding_groups = extract_binding_groups ~names defs in
       let names, binding_groups =
-        Sequence.to_list binding_groups
-        |> List.fold_map ~init:names ~f:(fun names (bindings, path) ->
-             (* FIXME: check if this is resolving paths correctly.
-                I think it will resolve in the parent, not the current module, which is
-                surely wrong. It also doesn't handle sigs/defs properly - it needs to know
-                the original bindings_path *)
-             Name_bindings.with_path_into_defs names path ~f:(fun names ->
-               let names, def = type_binding_group ~names ~types bindings in
-               names, (def, path)))
+        List.fold_map binding_groups ~init:names ~f:(fun names (bindings, path) ->
+          (* FIXME: check if this is resolving paths correctly.
+             I think it will resolve in the parent, not the current module, which is
+             surely wrong. It also doesn't handle sigs/defs properly - it needs to know
+             the original bindings_path *)
+          Name_bindings.with_path_into_defs names path ~f:(fun names ->
+            let names, def = type_binding_group ~names ~types bindings in
+            names, (def, path)))
       in
       let path = Name_bindings.current_path names in
       let defs = reintegrate_binding_groups path other_defs binding_groups in

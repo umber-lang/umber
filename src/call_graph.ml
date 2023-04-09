@@ -46,15 +46,13 @@ let add_binding t new_binding new_path =
 
 let of_bindings bindings =
   let t = create () in
-  Sequence.iter bindings ~f:(fun (binding, path) -> add_binding t binding path);
+  List.iter bindings ~f:(fun (binding, path) -> add_binding t binding path);
   t
 ;;
 
 let to_regrouped_bindings t =
-  (* FIXME: This should just use lists. *)
   Topologically_sorted_components.scc_list t.graph
-  |> Sequence.of_list
-  |> Sequence.map ~f:(function
+  |> List.map ~f:(function
        | [] ->
          compiler_bug [%message "Topologically_sorted_components: empty binding group"]
        | id :: ids ->
