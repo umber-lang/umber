@@ -1,0 +1,24 @@
+module : {
+  module Std : {
+    module Prelude : {
+      module List : {
+        # TODO: I don't think paths should be allowed to be self-referential.
+        # Or maybe it's ok, if we can fix things up with import renaming?
+        # Maybe all module paths should have to be explicitly relative/absolute?
+        type List a = Option (a, Prelude.List a)
+
+        val to_list : List a -> Std.Prelude.List a
+      }
+    }
+  }
+}
+
+
+module Std = {
+  module Prelude = {
+    module List = {
+      # NOTE: this definition isn't right
+      let to_list x = x
+    }
+  }
+}

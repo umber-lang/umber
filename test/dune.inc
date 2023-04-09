@@ -662,6 +662,21 @@
  (action (no-infer (diff output/Option.expected output/Option.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Paths.expected tokens/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Paths.expected ast/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/Paths.expected mir/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff llvm/Paths.expected llvm/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Paths.expected output/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Text.expected tokens/Text.out))))
 
 (rule (alias runtest) (deps test.dummy)
