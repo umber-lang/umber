@@ -251,10 +251,8 @@ let without_std t =
 type f_bindings = { f : 'a. 'a bindings -> 'a bindings }
 
 let update_current t ~f =
-  let updating_import_err t imported_module =
-    compiler_bug
-      [%message
-        "Updating imported module" (imported_module : Module_path.Relative.t) (t : t)]
+  let updating_import_err imported_module =
+    name_error ~msg:"Name clashes with import" (Module_path.to_ustring imported_module)
   in
   let rec loop_sigs t (sigs : sigs) path ~f =
     match path with
@@ -265,7 +263,7 @@ let update_current t ~f =
         modules =
           Map.update sigs.modules module_name ~f:(function
             | Some (Local (None, sigs)) -> Local (None, loop_sigs t sigs rest ~f)
-            | Some (Imported imported_module) -> updating_import_err t imported_module
+            | Some (Imported imported_module) -> updating_import_err imported_module
             | None ->
               name_error_path
                 (Path.to_module_path t.current_path :> Module_path.Relative.t)
@@ -285,7 +283,7 @@ let update_current t ~f =
                  let sigs = Option.value sigs ~default:empty_bindings in
                  Local (Some (loop_sigs t sigs rest ~f), defs)
                | `Def -> Local (sigs, loop_defs t defs rest ~f))
-            | Some (Imported imported_module) -> updating_import_err t imported_module
+            | Some (Imported imported_module) -> updating_import_err imported_module
             | None ->
               name_error_path
                 (Path.to_module_path t.current_path :> Module_path.Relative.t))
