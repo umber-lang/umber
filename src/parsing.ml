@@ -115,21 +115,41 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
 type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_val_operator : Ustring.t nonterminal
   | N_val_name : Ustring.t nonterminal
-  | N_type_tuple_or_fun : (Type.Param.t, Core.never_returns) Type.Expr.t nonterminal
-  | N_type_term : (Type.Param.t, Core.never_returns) Type.Expr.t nonterminal
-  | N_type_record : Type.Decl.decl nonterminal
-  | N_type_non_fun : (Type.Param.t, Core.never_returns) Type.Expr.t nonterminal
+  | N_type_tuple_or_fun
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        nonterminal
+  | N_type_term
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        nonterminal
+  | N_type_record : Parser_scope.Module_path.relative Type.Decl.decl nonterminal
+  | N_type_non_fun
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        nonterminal
   | N_type_fun_args
-      : (Type.Param.t, Core.never_returns) Type.Expr.t Nonempty.t nonterminal
-  | N_type_expr : (Type.Param.t, Core.never_returns) Type.Expr.t nonterminal
-  | N_type_decl : Type.Decl.decl nonterminal
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        Nonempty.t
+        nonterminal
+  | N_type_expr
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        nonterminal
+  | N_type_decl : Parser_scope.Module_path.relative Type.Decl.decl nonterminal
   | N_type_cnstr_decl
-      : (Parser_scope.Cnstr_name.t * Type.Scheme.Table.key list) nonterminal
-  | N_stmt_sig_ : Module.sig_ nonterminal
-  | N_stmt_common : Module.common nonterminal
-  | N_stmt_ : (Umber__Untyped.Pattern.t, Untyped.Expr.t) Module.def nonterminal
+      : (Parser_scope.Cnstr_name.t
+        * Parser_scope.Module_path.relative Umber__Type.Scheme.t list)
+        nonterminal
+  | N_stmt_sig_ : Parser_scope.Module_path.relative Module.sig_ nonterminal
+  | N_stmt_common : Parser_scope.Module_path.relative Module.common nonterminal
+  | N_stmt_
+      : ( Umber__Untyped.Pattern.t
+        , Untyped.Expr.t
+        , Parser_scope.Module_path.relative )
+        Module.def
+        nonterminal
   | N_separated_nonempty_list_PIPE_type_cnstr_decl_
-      : (Parser_scope.Cnstr_name.t * Type.Scheme.Table.key list) list nonterminal
+      : (Parser_scope.Cnstr_name.t
+        * Parser_scope.Module_path.relative Umber__Type.Scheme.t list)
+        list
+        nonterminal
   | N_separated_nonempty_list_PIPE_match_branch_
       : (Umber__Untyped.Pattern.t * Untyped.Expr.t) list nonterminal
   | N_separated_nonempty_list_PERIOD_UPPER_NAME_ : Ustring.t list nonterminal
@@ -143,67 +163,130 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_qualified_either_LOWER_NAME_UPPER_NAME__ : (Ustring.t list * Ustring.t) nonterminal
   | N_qualified_UPPER_NAME_ : (Ustring.t list * Ustring.t) nonterminal
   | N_prog : Untyped.Module.t nonterminal
-  | N_pattern_term : Type.Scheme.Bounded.t Pattern.t nonterminal
+  | N_pattern_term
+      : ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+        , Parser_scope.Module_path.relative )
+        Pattern.t
+        nonterminal
   | N_pattern_name : Parser_scope.Value_name.t option nonterminal
-  | N_pattern : Type.Scheme.Bounded.t Pattern.t nonterminal
-  | N_option_preceded_EQUALS_type_decl__ : Type.Decl.decl option nonterminal
+  | N_pattern
+      : ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+        , Parser_scope.Module_path.relative )
+        Pattern.t
+        nonterminal
+  | N_option_preceded_EQUALS_type_decl__
+      : Parser_scope.Module_path.relative Type.Decl.decl option nonterminal
   | N_option_preceded_EQUALS_pattern__
-      : Type.Scheme.Bounded.t Pattern.t option nonterminal
+      : ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+        , Parser_scope.Module_path.relative )
+        Pattern.t
+        option
+        nonterminal
   | N_option_preceded_EQUALS_expr__ : Untyped.Expr.t option nonterminal
   | N_option_parens_fixity__ : Fixity.t option nonterminal
   | N_operator : (Ustring.t list * Ustring.t) nonterminal
   | N_op_section : Untyped.Expr.t nonterminal
   | N_nonempty_list_type_term_
-      : (Type.Param.t, Core.never_returns) Type.Expr.t list nonterminal
-  | N_nonempty_list_pattern_term_ : Type.Scheme.Bounded.t Pattern.t list nonterminal
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        list
+        nonterminal
+  | N_nonempty_list_pattern_term_
+      : ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+        , Parser_scope.Module_path.relative )
+        Pattern.t
+        list
+        nonterminal
   | N_nonempty_list_expr_term_ : Untyped.Expr.t list nonterminal
   | N_nonempty_list_LOWER_NAME_ : Ustring.t list nonterminal
   | N_match_branches : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Nonempty.t nonterminal
   | N_match_branch : (Umber__Untyped.Pattern.t * Untyped.Expr.t) nonterminal
   | N_loption_trait_bound_ : Trait_bound.t nonterminal
   | N_loption_separated_nonempty_list_PIPE_type_cnstr_decl__
-      : (Parser_scope.Cnstr_name.t * Type.Scheme.Table.key list) list nonterminal
+      : (Parser_scope.Cnstr_name.t
+        * Parser_scope.Module_path.relative Umber__Type.Scheme.t list)
+        list
+        nonterminal
   | N_loption_preceded_FILE_MODULE_braces_list_stmt_sig____
-      : Module.sig_ Node.t list nonterminal
+      : Parser_scope.Module_path.relative Module.sig_ Node.t list nonterminal
   | N_loption_equals_defs_
-      : (Umber__Untyped.Pattern.t, Untyped.Expr.t) Module.def Node.t list nonterminal
-  | N_loption_colon_sigs_ : Module.sig_ Node.t list nonterminal
+      : ( Umber__Untyped.Pattern.t
+        , Untyped.Expr.t
+        , Parser_scope.Module_path.relative )
+        Module.def
+        Node.t
+        list
+        nonterminal
+  | N_loption_colon_sigs_
+      : Parser_scope.Module_path.relative Module.sig_ Node.t list nonterminal
   | N_literal : Literal.t nonterminal
-  | N_list_type_term_ : Type.Scheme.Table.key list nonterminal
-  | N_list_stmt_sig_ : Module.sig_ Node.t list nonterminal
+  | N_list_type_term_
+      : Parser_scope.Module_path.relative Umber__Type.Scheme.t list nonterminal
+  | N_list_stmt_sig_
+      : Parser_scope.Module_path.relative Module.sig_ Node.t list nonterminal
   | N_list_stmt_
-      : (Umber__Untyped.Pattern.t, Untyped.Expr.t) Module.def Node.t list nonterminal
+      : ( Umber__Untyped.Pattern.t
+        , Untyped.Expr.t
+        , Parser_scope.Module_path.relative )
+        Module.def
+        Node.t
+        list
+        nonterminal
   | N_list_LOWER_NAME_ : Ustring.t list nonterminal
   | N_let_rec : bool nonterminal
   | N_let_binding_ : (Umber__Untyped.Pattern.t * Untyped.Expr.t) nonterminal
   | N_let_binding : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Node.t nonterminal
-  | N_import_stmt : Module.common nonterminal
+  | N_import_stmt : Parser_scope.Module_path.relative Module.common nonterminal
   | N_flexible_nonempty_COMMA_type_non_fun_
-      : (Type.Param.t, Core.never_returns) Type.Expr.t Nonempty.t nonterminal
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        Nonempty.t
+        nonterminal
   | N_flexible_nonempty_COMMA_type_annot_non_fun_LOWER_NAME__
-      : (Ustring.t * Type.Scheme.Table.key) Nonempty.t nonterminal
+      : (Ustring.t * Parser_scope.Module_path.relative Umber__Type.Scheme.t) Nonempty.t
+        nonterminal
   | N_flexible_nonempty_COMMA_record_field_EQUALS_pattern__
-      : (Parser_scope.Value_name.t * Type.Scheme.Bounded.t Pattern.t option) Nonempty.t
+      : (Parser_scope.Value_name.t
+        * ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+          , Parser_scope.Module_path.relative )
+          Pattern.t
+          option)
+        Nonempty.t
         nonterminal
   | N_flexible_nonempty_COMMA_record_field_EQUALS_expr__
       : (Parser_scope.Value_name.t * Untyped.Expr.t option) Nonempty.t nonterminal
   | N_flexible_nonempty_COMMA_pattern_
-      : Type.Scheme.Bounded.t Pattern.t Nonempty.t nonterminal
+      : ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+        , Parser_scope.Module_path.relative )
+        Pattern.t
+        Nonempty.t
+        nonterminal
   | N_flexible_nonempty_COMMA_pair_UPPER_NAME_type_params_nonempty__
       : (Ustring.t, Type.Param.t Nonempty.t) Import.Tuple2.t Nonempty.t nonterminal
   | N_flexible_nonempty_COMMA_import_item_
       : Parser_scope.Unidentified_name.t Nonempty.t nonterminal
   | N_flexible_nonempty_COMMA_expr_ : Untyped.Expr.t Nonempty.t nonterminal
   | N_flexible_list_COMMA_type_non_fun_
-      : (Type.Param.t, Core.never_returns) Type.Expr.t list nonterminal
+      : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
+        list
+        nonterminal
   | N_flexible_list_COMMA_type_annot_non_fun_LOWER_NAME__
-      : (Ustring.t * Type.Scheme.Table.key) list nonterminal
+      : (Ustring.t * Parser_scope.Module_path.relative Umber__Type.Scheme.t) list
+        nonterminal
   | N_flexible_list_COMMA_record_field_EQUALS_pattern__
-      : (Parser_scope.Value_name.t * Type.Scheme.Bounded.t Pattern.t option) list
+      : (Parser_scope.Value_name.t
+        * ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+          , Parser_scope.Module_path.relative )
+          Pattern.t
+          option)
+        list
         nonterminal
   | N_flexible_list_COMMA_record_field_EQUALS_expr__
       : (Parser_scope.Value_name.t * Untyped.Expr.t option) list nonterminal
-  | N_flexible_list_COMMA_pattern_ : Type.Scheme.Bounded.t Pattern.t list nonterminal
+  | N_flexible_list_COMMA_pattern_
+      : ( Parser_scope.Module_path.relative Type.Scheme.Bounded.t
+        , Parser_scope.Module_path.relative )
+        Pattern.t
+        list
+        nonterminal
   | N_flexible_list_COMMA_pair_UPPER_NAME_type_params_nonempty__
       : (Ustring.t, Type.Param.t Nonempty.t) Import.Tuple2.t list nonterminal
   | N_flexible_list_COMMA_import_item_ : Parser_scope.Unidentified_name.t list nonterminal
@@ -211,7 +294,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_fixity : Fixity.t nonterminal
   | N_expr_term : Untyped.Expr.t nonterminal
   | N_expr_op_tree
-      : (Parser_scope.Value_name.Qualified.t, Untyped.Expr.t) Btree.t nonterminal
+      : (Parser_scope.Value_name.Relative.t, Untyped.Expr.t) Btree.t nonterminal
   | N_expr_op_term : Untyped.Expr.t nonterminal
   | N_expr : Untyped.Expr.t nonterminal
   | N_either_val_name_UPPER_NAME_ : Ustring.t nonterminal

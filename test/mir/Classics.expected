@@ -38,7 +38,7 @@
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
- (Value_def *binding
+ (Value_def Classics.*binding
   (Fun_call "Std.Prelude.Operators.;"
    ((Fun_call "Std.Prelude.Operators.;"
      ((Fun_call Std.Prelude.print ((Primitive (String "5! is:"))))

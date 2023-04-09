@@ -41,15 +41,12 @@ let rec unify ~names ~types t1 t2 =
     let params = Type.Param.Env_to_vars.create () in
     List.iter param_list ~f:(fun p ->
       ignore (Type.Param.Env_to_vars.find_or_add params p : Type.Var_id.t));
-    Type.Scheme.instantiate
-      expr
-      ~params
-      ~map_name:(Name_bindings.absolutify_type_name names)
+    Type.Scheme.instantiate expr ~params
   in
-  let get_decl names name args =
-    let decl = Name_bindings.find_absolute_type_decl names name in
-    if List.length args = Type.Decl.arity decl
-    then decl
+  let lookup_type names name args =
+    let type_entry = Name_bindings.find_absolute_type_entry names name in
+    if List.length args = Type.Decl.arity (Name_bindings.Type_entry.decl type_entry)
+    then type_entry
     else type_error "Partially applied type constructor" t1 t2
   in
   match t1, t2 with
@@ -59,18 +56,20 @@ let rec unify ~names ~types t1 t2 =
   | Var id1, _ -> set_type id1 t2
   | _, Var id2 -> set_type id2 t1
   | Type_app (name1, args1), Type_app (name2, args2) ->
-    (match get_decl names name1 args1 with
+    let type_entry1 = lookup_type names name1 args1 in
+    (match Name_bindings.Type_entry.decl type_entry1 with
      | params, Alias expr -> unify ~names ~types (instantiate_alias params expr) t2
-     | decl1 ->
-       (match get_decl names name2 args2 with
+     | (_ : _ Type.Decl.t) ->
+       let type_entry2 = lookup_type names name2 args2 in
+       (match Name_bindings.Type_entry.decl type_entry2 with
         | params, Alias expr -> unify ~names ~types t1 (instantiate_alias params expr)
-        | decl2 ->
-          if not (phys_equal decl1 decl2)
+        | (_ : _ Type.Decl.t) ->
+          if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
           then type_error "Type application mismatch" t1 t2;
           iter2 args1 args2 ~f:(unify ~names ~types)))
   | Type_app (name, args), ((Tuple _ | Function _ | Partial_function _) as other_type)
   | ((Tuple _ | Function _ | Partial_function _) as other_type), Type_app (name, args) ->
-    (match get_decl names name args with
+    (match Name_bindings.Type_entry.decl (lookup_type names name args) with
      | params, Alias expr ->
        unify ~names ~types (instantiate_alias params expr) other_type
      | _ -> type_error "Type application mismatch" t1 t2)
@@ -109,7 +108,7 @@ let rec unify ~names ~types t1 t2 =
 ;;
 
 let rec substitute types typ =
-  Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~f:(fun typ ->
+  Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~name:Fn.id ~f:(fun typ ->
     match typ with
     | Var id ->
       (match Hashtbl.find types.vars id with
@@ -139,6 +138,7 @@ let generalize types typ =
     (substitute types typ)
     ~var:(Type.Param.Env_of_vars.find_or_add env)
     ~pf:(never_happens [%here])
+    ~name:Fn.id
     ~f:
       (function
        | Partial_function (args, id) -> Defer (Function (args, Var id))

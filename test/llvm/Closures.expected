@@ -14,12 +14,12 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.<"(%umber_block*, %umber_bl
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"*fun"(%umber_block* %"*closure_env", %umber_block* %Closures.current) {
+define tailcc %umber_block* @"Closures.*fun"(%umber_block* %"Closures.*closure_env", %umber_block* %Closures.current) {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"*closure_env", i32 0, i32 1, i32 2
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"Closures.*closure_env", i32 0, i32 1, i32 2
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"*closure_env", i32 0, i32 1, i32 1
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"Closures.*closure_env", i32 0, i32 1, i32 1
   %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
   %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.<"(%umber_block* %Closures.current, %umber_block* %block_field)
@@ -27,7 +27,7 @@ entry:
 
 cond_binding_merge:                               ; preds = %cond_binding
   %fun_call4 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %Closures.current, %umber_block* %block_field3)
-  %fun_call5 = tail call tailcc %umber_block* @"*fun"(%umber_block* %"*closure_env", %umber_block* %fun_call4)
+  %fun_call5 = tail call tailcc %umber_block* @"Closures.*fun"(%umber_block* %"Closures.*closure_env", %umber_block* %fun_call4)
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
@@ -55,7 +55,7 @@ entry:
   store i16 3, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"*fun" to %umber_block*), %umber_block** %box4, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Closures.*fun" to %umber_block*), %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* %Closures.count_by, %umber_block** %box5, align 8
   %box6 = getelementptr %umber_block*, %umber_block** %box3, i32 3

@@ -1,6 +1,6 @@
 open Names
 
-type t = (Value_name.Qualified.t, Untyped.Expr.t) Btree.t
+type t = (Value_name.Relative.t, Untyped.Expr.t) Btree.t
 
 (* TODO: add more tests for this *)
 

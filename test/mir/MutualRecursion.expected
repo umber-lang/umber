@@ -42,10 +42,13 @@
             ((Name MutualRecursion.forest.2)))))))))))))
  (Value_def MutualRecursion.Leaf (Make_block (tag 0)))
  (Fun_def
-  ((fun_name MutualRecursion.Node) (args (arg0 arg1))
-   (body (Make_block (tag 0) (fields ((Name arg0) (Name arg1)))))))
+  ((fun_name MutualRecursion.Node)
+   (args (MutualRecursion.arg0 MutualRecursion.arg1))
+   (body
+    (Make_block (tag 0)
+     (fields ((Name MutualRecursion.arg0) (Name MutualRecursion.arg1)))))))
  (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
- (Value_def *binding
+ (Value_def MutualRecursion.*binding
   (Let MutualRecursion.tree.1
    (Make_block (tag 0)
     (fields
@@ -65,10 +68,11 @@
  (Fun_def
   ((fun_name MutualRecursion.even) (args (MutualRecursion.x.1))
    (body
-    (Let match
+    (Let MutualRecursion.match
      (Fun_call Std.Prelude.Operators.==
       ((Name MutualRecursion.x.1) (Primitive (Int 0))))
-     (Cond_assign (conds (((Constant_tag_equals (Name match) 1) ())))
+     (Cond_assign
+      (conds (((Constant_tag_equals (Name MutualRecursion.match) 1) ())))
       (body (Make_block (tag 1)))
       (if_none_matched
        (Otherwise
@@ -78,10 +82,11 @@
  (Fun_def
   ((fun_name MutualRecursion.odd) (args (MutualRecursion.x.2))
    (body
-    (Let match.1
+    (Let MutualRecursion.match.1
      (Fun_call Std.Prelude.Operators.==
       ((Name MutualRecursion.x.2) (Primitive (Int 0))))
-     (Cond_assign (conds (((Constant_tag_equals (Name match.1) 1) ())))
+     (Cond_assign
+      (conds (((Constant_tag_equals (Name MutualRecursion.match.1) 1) ())))
       (body (Make_block (tag 0)))
       (if_none_matched
        (Otherwise

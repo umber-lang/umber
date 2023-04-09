@@ -59,11 +59,13 @@ let names = {|
                   (Nil (Imported Std.Prelude.List.Nil))
                   (not (Imported Std.Prelude.Operators.not))
                   (Cons (Imported Std.Prelude.List.Cons))
+                  (None (Imported Std.Prelude.Option.None))
+                  (Some (Imported Std.Prelude.Option.Some))
                   (sqrt
                    (Local
                     ((typ
                       (Scheme
-                       (Function ((Type_app Int ())) (Type_app Float ())))))))
+                       (Function ((Type_app Float ())) (Type_app Float ())))))))
                   (print
                    (Local
                     ((typ
@@ -109,6 +111,26 @@ let names = {|
                               (Cons
                                ((Var a)
                                 (Type_app Std.Prelude.List.List ((Var a)))))))))))))
+                      (modules ())))))
+                  (Option
+                   (Local
+                    (()
+                     ((names
+                       ((None
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Type_app Std.Prelude.Option.Option ((Var a))))))))
+                        (Some
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function ((Var a))
+                              (Type_app Std.Prelude.Option.Option ((Var a)))))))))))
+                      (types
+                       ((Option
+                         ((Local
+                           ((a) (Variants ((None ()) (Some ((Var a)))))))))))
                       (modules ())))))
                   (Operators
                    (Local
@@ -336,6 +358,26 @@ let names = {|
                               ((Var a)
                                (Type_app Std.Prelude.List.List ((Var a)))))))))))))
                      (modules ())))))
+                 (Option
+                  (Local
+                   (()
+                    ((names
+                      ((None
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Type_app Std.Prelude.Option.Option ((Var a))))))))
+                       (Some
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function ((Var a))
+                             (Type_app Std.Prelude.Option.Option ((Var a)))))))))))
+                     (types
+                      ((Option
+                        ((Local
+                          ((a) (Variants ((None ()) (Some ((Var a)))))))))))
+                     (modules ())))))
                  (Operators
                   (Local
                    (()
@@ -514,6 +556,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 
+@Std.Prelude.Option.None = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Std.Prelude.List.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @"Std.Prelude.Operators.::.1" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons to %umber_block*)
 
@@ -522,7 +565,21 @@ entry:
   ret i32 0
 }
 
-define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %arg0, %umber_block* %arg1) {
+define tailcc %umber_block* @Std.Prelude.Option.Some(%umber_block* %Std.Prelude.Option.arg0) {
+entry:
+  %box = call i64* @umber_gc_alloc(i64 16)
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i32 1
+  store i16 1, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
+  store %umber_block* %Std.Prelude.Option.arg0, %umber_block** %box4, align 8
+  %box5 = bitcast %umber_block** %box3 to %umber_block*
+  ret %umber_block* %box5
+}
+
+define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %Std.Prelude.List.arg0, %umber_block* %Std.Prelude.List.arg1) {
 entry:
   %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
@@ -531,9 +588,9 @@ entry:
   store i16 2, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* %arg0, %umber_block** %box4, align 8
+  store %umber_block* %Std.Prelude.List.arg0, %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
-  store %umber_block* %arg1, %umber_block** %box5, align 8
+  store %umber_block* %Std.Prelude.List.arg1, %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box6
 }
@@ -601,10 +658,10 @@ entry:
 
 declare %umber_block* @umber_float_sub(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %arg0.1, %umber_block* %arg1.1) {
+define tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %Std.Prelude.Operators.arg0, %umber_block* %Std.Prelude.Operators.arg1) {
 entry:
   %"Std.Prelude.Operators.::.1" = load %umber_block*, %umber_block** @"Std.Prelude.Operators.::.1", align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %"Std.Prelude.Operators.::.1", %umber_block* %arg0.1, %umber_block* %arg1.1)
+  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %"Std.Prelude.Operators.::.1", %umber_block* %Std.Prelude.Operators.arg0, %umber_block* %Std.Prelude.Operators.arg1)
   ret %umber_block* %fun_call
 }
 
@@ -731,7 +788,7 @@ entry:
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %"*lambda_arg", %umber_block* %Std.Prelude.Operators.x.2) {
+define tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %"Std.Prelude.Operators.*lambda_arg", %umber_block* %Std.Prelude.Operators.x.2) {
 entry:
   ret %umber_block* %Std.Prelude.Operators.x.2
 }

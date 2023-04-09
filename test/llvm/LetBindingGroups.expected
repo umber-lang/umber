@@ -9,7 +9,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @LetBindingGroups.a = constant %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*)
 @LetBindingGroups.b = global %umber_block* null
 @Std.Prelude.List.Nil = external global %umber_block*
-@_ = global %umber_block* null
+@LetBindingGroups._ = global %umber_block* null
 @LetBindingGroups.bottom.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @LetBindingGroups.bottom_again to %umber_block*)
 @int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
@@ -37,7 +37,7 @@ entry:
   %fun_call5 = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
   %fun_call6 = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.4 to %umber_block*))
   %fun_call7 = tail call tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block* %fun_call5, %umber_block* %fun_call6)
-  store %umber_block* %fun_call7, %umber_block** @_, align 8
+  store %umber_block* %fun_call7, %umber_block** @LetBindingGroups._, align 8
   ret i32 0
 }
 
@@ -79,16 +79,16 @@ entry:
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @LetBindingGroups.bottom_again(%umber_block* %"*lambda_arg") {
+define tailcc %umber_block* @LetBindingGroups.bottom_again(%umber_block* %"LetBindingGroups.*lambda_arg") {
 entry:
   %fun_call = tail call tailcc %umber_block* @LetBindingGroups.go_left(%umber_block* bitcast (%umber_block1* @int.17 to %umber_block*))
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @LetBindingGroups.bottom(%umber_block* %arg0) {
+define tailcc %umber_block* @LetBindingGroups.bottom(%umber_block* %LetBindingGroups.arg0) {
 entry:
   %LetBindingGroups.bottom.1 = load %umber_block*, %umber_block** @LetBindingGroups.bottom.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %LetBindingGroups.bottom.1, %umber_block* %arg0)
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %LetBindingGroups.bottom.1, %umber_block* %LetBindingGroups.arg0)
   ret %umber_block* %fun_call
 }
 

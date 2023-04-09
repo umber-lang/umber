@@ -4,7 +4,7 @@ open Names
 module Pattern : sig
   include module type of Pattern
 
-  type nonrec t = Nothing.t t [@@deriving sexp]
+  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
 
   val of_untyped_with_names
     :  names:Name_bindings.t
@@ -22,7 +22,7 @@ end
 module Expr : sig
   type 'typ t =
     | Literal of Literal.t
-    | Name of Value_name.Qualified.t
+    | Name of Value_name.Absolute.t
     | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
     | Lambda of Pattern.t Nonempty.t * 'typ t
     | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
@@ -35,7 +35,9 @@ module Expr : sig
     | Record_field_access of 'typ t * Value_name.t
   [@@deriving sexp]
 
-  type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp_of]
+  type generalized =
+    Module_path.absolute Type.Scheme.t t * Module_path.absolute Type.Scheme.t
+  [@@deriving sexp_of]
 
   val of_untyped
     :  names:Name_bindings.t
@@ -47,8 +49,11 @@ end
 module Module : sig
   include module type of Module
 
-  type nonrec t = (Pattern.t, Expr.generalized) t [@@deriving sexp_of]
-  type nonrec def = (Pattern.t, Expr.generalized) def [@@deriving sexp_of]
+  type nonrec t = (Pattern.t, Expr.generalized, Module_path.absolute) t
+  [@@deriving sexp_of]
+
+  type nonrec def = (Pattern.t, Expr.generalized, Module_path.absolute) def
+  [@@deriving sexp_of]
 
   val of_untyped
     :  names:Name_bindings.t

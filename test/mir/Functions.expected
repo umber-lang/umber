@@ -13,7 +13,7 @@
   ((fun_name Functions.lots_of_args)
    (args (Functions.a Functions.b Functions.c Functions.d Functions.e))
    (body (Make_block (tag 0)))))
- (Value_def *binding
+ (Value_def Functions.*binding
   (Fun_call Functions.lots_of_args
    ((Primitive (Int 5)) (Primitive (Float 10000000000000))
     (Primitive (Int -89)) (Primitive (String huh)) (Primitive (Char c))))))

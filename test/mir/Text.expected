@@ -4,14 +4,14 @@
                                             \n\t line 2")))
  (Value_def Text.dec_code_exclam (Primitive (String !)))
  (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
- (Value_def _
+ (Value_def Text._
   (Fun_call Std.Prelude.Operators.++
    ((Primitive (String "hello\n")) (Primitive (String "\bworld!")))))
- (Value_def *binding
+ (Value_def Text.*binding
   (Let Text.empty (Primitive (String ""))
    (Make_block (tag 0) (fields ((Primitive (Char a)) (Primitive (Char b)))))))
- (Value_def Text.a (Get_block_field 0 (Name *binding)))
- (Value_def Text.b (Get_block_field 1 (Name *binding)))
+ (Value_def Text.a (Get_block_field 0 (Name Text.*binding)))
+ (Value_def Text.b (Get_block_field 1 (Name Text.*binding)))
  (Value_def Text._UNICODE_WORKS_TOO
   (Primitive
    (String "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186"))))
