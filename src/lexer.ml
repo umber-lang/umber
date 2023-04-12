@@ -24,7 +24,7 @@ let exp = [%sedlex.regexp? ('e' | 'E'), Opt ('-' | '+'), Plus digit]
 
 let operator_symbol =
   [%sedlex.regexp?
-    Sub ((pc | pd | pe | pf | pi | po | ps | sc | sk | sm | so), Chars "'\"()[]{},#")]
+    Sub ((pc | pd | pe | pf | pi | po | ps | sc | sk | sm | so), Chars "'\"()[]{},#_")]
 ;;
 
 let line_comment = [%sedlex.regexp? '#', Star (Compl (Chars "\r\n"))]
@@ -94,7 +94,6 @@ let rec read lexbuf =
   | "in" -> IN
   | "match" -> MATCH
   | "with" -> WITH
-  | "without" -> WITHOUT
   | "as" -> AS
   | "type" -> TYPE
   | "val" -> VAL

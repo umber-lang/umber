@@ -1,11 +1,14 @@
 import Math
-import Math with abs
+import Math.abs
+import Math.(sin, cos)
 type Cool =
   | You_can_define_types_in_between_imports ()
   | Bad_style_though (Option ())
-import Number.Int with *
-import Number.Float without pi
-import Number with (*)
+import Number.Int._
+import Number.(*)
+import Number.(Int, Float.(pi, (+)))
+
+# TODO: Consider implementing the ability to import everything *except* some names
 
 module : {
   val (*) : (Num a) => a, a -> a

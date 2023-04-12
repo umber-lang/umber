@@ -17,7 +17,6 @@
 %token IN
 %token MATCH
 %token WITH
-%token WITHOUT
 %token AS
 %token TYPE
 %token VAL
@@ -252,18 +251,6 @@ fixity:
   | INFIX; n = INT { Fixity.(of_decl_exn Non_assoc n) }
   | INFIXL; n = INT { Fixity.(of_decl_exn Left n) }
   | INFIXR; n = INT { Fixity.(of_decl_exn Right n) }
-
-import_kind:
-  | { Import_path.Kind.Absolute }
-  | PERIOD { Relative_to_current }
-  (* FIXME: I think this actually gets parsed as an operator? *)
-  | PERIOD; PERIOD { Relative_to_parent }
-
-%inline import_path:
-  | IMPORT; kind = import_kind; path = separated_nonempty(PERIOD, UPPER_NAME)
-    { { Import_path.kind;
-        path = Module_path.Absolute.of_relative_unchecked
-          (Module_path.Relative.of_ustrings_unchecked (Nonempty.to_list path)) } }
 
 n_periods:
   | { 0 }

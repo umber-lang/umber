@@ -1,13 +1,20 @@
 (Imports
  ((Common_sig (Val * () (((Num (a))) (Function ((Var a) (Var a)) (Var a))))))
- ((Common_def (Import Math)) (Common_def (Import_with (Math) (abs)))
+ ((Common_def (Import ((kind Absolute) (paths (Name Math)))))
+  (Common_def (Import ((kind Absolute) (paths (Module Math ((Name abs)))))))
+  (Common_def
+   (Import ((kind Absolute) (paths (Module Math ((Name sin) (Name cos)))))))
   (Common_def
    (Type_decl Cool
     (()
      (Variants
       ((You_can_define_types_in_between_imports ((Tuple ())))
        (Bad_style_though ((Type_app Option ((Tuple ()))))))))))
-  (Common_def (Import_with (Number Int) ()))
-  (Common_def (Import_without (Number Float) (pi)))
-  (Common_def (Import_with (Number) (*)))
+  (Common_def
+   (Import ((kind Absolute) (paths (Module Number ((Module Int (All))))))))
+  (Common_def (Import ((kind Absolute) (paths (Module Number ((Name *)))))))
+  (Common_def
+   (Import
+    ((kind Absolute)
+     (paths (Module Number ((Name Int) (Module Float ((Name pi) (Name +)))))))))
   (Let (rec_ true) (bindings (((Catch_all (*)) (Name *)))))))

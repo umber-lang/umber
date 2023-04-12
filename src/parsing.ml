@@ -2,7 +2,6 @@ open Import
 open Sedlexing
 
 type token = Parser.token =
-  | WITHOUT
   | WITH
   | VAL
   | UPPER_NAME of Ustring.t
@@ -63,7 +62,6 @@ module I = Parser.MenhirInterpreter
 
 type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_error : unit terminal
-  | T_WITHOUT : unit terminal
   | T_WITH : unit terminal
   | T_VAL : unit terminal
   | T_UPPER_NAME : Ustring.t terminal

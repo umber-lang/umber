@@ -540,47 +540,7 @@ let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules
 ;;
 
-(* FIXME: Don't need this because we can just import things as we get to them: any errors
-   encountered are good. *)
-(* module Import_paths = struct
-  module Names = struct
-    type t =
-      | These of { names : Unidentified_name.t list ; renames : Unidentified_name.t * Unidentified_name.t option }
-      | All of { except_these : Unidentified_name.t list }
-
-    let add t name =
-      match t with
-      | These names -> These (name :: names)
-      | All _ -> t
-    ;;
-
-    let add_all t name =
-      match t with
-      | These _ -> All { except_these = []}
-      | All _
-  end
-
-  type t =
-    { names : Names.t
-    ; child_paths : (Module_name.t * t) list
-    }
-
-  let empty = { names = These []; child_paths = [] }
-
-  let of_module_import_paths (paths : Module.Import.Paths.t list) =
-    List.fold paths ~init:empty ~f:(fun t paths ->
-      match paths with
-      | Name (Some name) -> { t with names = Names.add t.names name }
-      | Name None -> { t with names = Names.add_all t.names name }
-      )
-  ;;
-end *)
-
-(* TODO: how do I fill in foreign modules?
-   For now, just assume a toplevel module already exists and copy (?) it into scope
-   Later we can implement looking up new modules from the file system, installed packages, etc. 
-   Should be able to work out all dependency information fairly easily by enforcing that
-   everything is imported, including toplevel modules *)
+(* FIXME: I don't think this toplevel behavior difference is implemented right. *)
 (* NOTE: Imports at toplevel defs affect both sigs and defs, but in submodules,
    they affect defs only. This behavior is super weird, tbh.
    TODO: try to make this less confusing
