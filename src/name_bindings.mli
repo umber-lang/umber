@@ -123,12 +123,8 @@ val with_submodule'
 val with_path_into_defs : t -> Module_path.Absolute.t -> f:(t -> t * 'a) -> t * 'a
 
 (* AST handling *)
-(* TODO: rename the existing module Import to Common, and split into Import.t with:
-   `val import : t -> Import.t -> t` *)
-val import : t -> Module_name.t -> t
-val import_with : t -> Module_path.Relative.t -> Unidentified_name.t list -> t
+val import : t -> Module.Import.t -> t
 val import_all : t -> Module_path.Relative.t -> t
-val import_without : t -> Module_path.Relative.t -> Unidentified_name.t Nonempty.t -> t
 
 val add_val
   :  t

@@ -1,6 +1,41 @@
 open Import
 open Names
 
+module Import = struct
+  module Kind = struct
+    type t =
+      | Absolute
+      | Relative of { nth_parent : int (** 0 means relative to current *) }
+    [@@deriving sexp_of]
+
+    let of_n_periods = function
+      | 0 -> Absolute
+      | n -> Relative { nth_parent = n - 1 }
+    ;;
+
+    let convert_path t (path : Module_path.Absolute.t) =
+      match t with
+      | Absolute -> path
+      | Relative { nth_parent } -> Module_path.drop_last_n_exn path nth_parent
+    ;;
+  end
+
+  module Paths = struct
+    type t =
+      | Module of Module_name.t * t Nonempty.t
+      | Name of Unidentified_name.t
+      | All
+      | Name_as of Unidentified_name.t * Unidentified_name.t
+    [@@deriving sexp_of]
+  end
+
+  type t =
+    { kind : Kind.t
+    ; paths : Paths.t
+    }
+  [@@deriving sexp_of]
+end
+
 type ('pat, 'expr, 'name) t =
   Module_name.t * 'name sig_ Node.t list * ('pat, 'expr, 'name) def Node.t list
 
@@ -12,14 +47,7 @@ and 'name common =
   (* TODO: [Trait_sig] actually can't appear in defs as it is just parsed as [Trait].
      There should probably be a sig-only type. *)
   | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * 'name sig_ Node.t list
-  (* TODO: Allow importing paths all at once
-     e.g. `import A.B` instead of `import A with B`
-     Related: allow `import A with B.C` or `import A.B.C` instead of multiple imports *)
-  (* TODO: Split imports into their own type and model importing all as a separate
-     variant, not importing with an empty list, which is kinda hacky *)
-  | Import of Module_name.t
-  | Import_with of Module_path.Relative.t * Unidentified_name.t list
-  | Import_without of Module_path.Relative.t * Unidentified_name.t Nonempty.t
+  | Import of Import.t
 
 and 'name sig_ =
   | Common_sig of 'name common

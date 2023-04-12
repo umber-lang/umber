@@ -136,6 +136,7 @@ let reduce xs ~f =
   | x :: x' :: xs -> List.fold ~init:(f x x') xs ~f
 ;;
 
+let fold' (x :: xs) ~init ~f = List.fold xs ~init:(init x) ~f
 let fold_right xs ~init ~f = List.fold_right (to_list xs) ~init ~f
 
 let fold_map xs ~init ~f =

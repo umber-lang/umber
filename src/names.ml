@@ -108,7 +108,9 @@ module Module_path : sig
   val append : 'a t -> Module_name.t list -> 'a t
   val append' : 'a t -> _ t -> 'a t
   val drop_last : 'a t -> 'a t option
+  val drop_last_n_exn : 'a t -> int -> 'a t
   val to_ustring : _ t -> Ustring.t
+  val to_string : _ t -> string
   val to_module_names : _ t -> Module_name.t list
   val of_module_names_unchecked : Module_name.t list -> _ t
 
@@ -160,6 +162,18 @@ end = struct
   let append' = ( @ )
   let drop_last = List.drop_last
 
+  let drop_last_n_exn t n =
+    let remaining = List.length t - n in
+    if remaining < 0
+    then
+      Compilation_error.raise
+        Name_error
+        ~msg:
+          [%message
+            "Relative path went up too many nesting levels" (n : int) ~path:(t : _ t)];
+    List.take t remaining
+  ;;
+
   let to_ustring path =
     let q = Queue.create ~capacity:(List.length path * 10) () in
     List.iter path ~f:(fun s ->
@@ -169,6 +183,7 @@ end = struct
     Queue.to_array q |> Ustring.of_array_unchecked
   ;;
 
+  let to_string t = to_ustring t |> Ustring.to_string
   let to_module_names = Fn.id
   let of_module_names_unchecked = Fn.id
 

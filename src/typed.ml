@@ -504,9 +504,7 @@ module Module = struct
              | Extern _
              (* We could consider handling imports bringing in type declarations to copy
                 over, but the cost-benefit of this feature isn't clear right now. *)
-             | Import _
-             | Import_with _
-             | Import_without _ -> sig_map)
+             | Import _ -> sig_map)
           | Module_sig (module_name, sigs) ->
             Nested_map.with_module sig_map module_name ~f:(fun sig_map ->
               gather_decls
@@ -528,8 +526,7 @@ module Module = struct
                  ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_type_decl type_name)
                  , def )
                | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-               | Val _ | Extern _ | Import _ | Import_with _ | Import_without _ ->
-                 sig_map, def)
+               | Val _ | Extern _ | Import _ -> sig_map, def)
             | Module (module_name, sigs, defs) ->
               (match Nested_map.find_module sig_map module_name with
                | Some child_map ->
@@ -576,7 +573,7 @@ module Module = struct
         Name_bindings.add_name_placeholder names name
       | Type_decl (type_name, decl) ->
         Name_bindings.add_type_decl_placeholder names type_name decl
-      | Import _ | Import_with _ | Import_without _ | Trait_sig _ -> names
+      | Import _ | Trait_sig _ -> names
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
       Node.with_value def ~f:(function
@@ -604,9 +601,7 @@ module Module = struct
 
   let gather_imports ~names sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
-      | Import module_name -> Name_bindings.import names module_name
-      | Import_with (path, imports) -> Name_bindings.import_with names path imports
-      | Import_without (path, hiding) -> Name_bindings.import_without names path hiding
+      | Import import -> Name_bindings.import names import
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ | Type_decl _ -> names)
   ;;
@@ -623,7 +618,7 @@ module Module = struct
         Extern (name, fixity, Name_bindings.absolutify_type_expr names type_, extern_name)
       | Type_decl (type_name, decl) ->
         Type_decl (type_name, Name_bindings.absolutify_type_decl names decl)
-      | (Import _ | Import_with _ | Import_without _) as common -> common
+      | Import _ as common -> common
       | Trait_sig _ -> failwith "absolutify_everything: traits"
     in
     let rec absolutify_sigs ~names sigs =
@@ -672,12 +667,12 @@ module Module = struct
   let gather_type_decls ~names sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
-      | Val _ | Extern _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ ->
+      | Val _ | Extern _ | Trait_sig _ | Import _  ->
         names)
   ;;
 
   (** Raise an error upon finding any cycles in a given type alias. *)
-  let check_cyclic_type_alias ~names  alias =
+  let check_cyclic_type_alias ~names alias =
     (* TODO: can rewrite this with [Type.Expr.map] *)
     let rec loop ~names aliases_seen (alias : Module_path.absolute Type.Scheme.t) =
       match alias with
@@ -735,7 +730,7 @@ module Module = struct
       | Type_decl (_, (_, Alias alias)) ->
         check_cyclic_type_alias ~names alias;
         names
-      | Type_decl _ | Trait_sig _ | Import _ | Import_with _ | Import_without _ -> names
+      | Type_decl _ | Trait_sig _ | Import _  -> names
     in
     let rec handle_sigs ~names ~handle_common =
       List.fold ~init:names ~f:(fun names sig_ ->

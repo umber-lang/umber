@@ -6,6 +6,8 @@
   [@@@ocaml.warning "-3"]
 %}
 
+(* FIXME: Clean up now unused tokens like ASTERISK and WITHOUT. WITH too? *)
+
 %token IF
 %token THEN
 %token ELSE
@@ -251,22 +253,40 @@ fixity:
   | INFIXL; n = INT { Fixity.(of_decl_exn Left n) }
   | INFIXR; n = INT { Fixity.(of_decl_exn Right n) }
 
-%inline import_module_path:
-  | IMPORT; path = separated_nonempty(PERIOD, UPPER_NAME)
-    { Module_path.Relative.of_ustrings_unchecked (Nonempty.to_list path) }
+import_kind:
+  | { Import_path.Kind.Absolute }
+  | PERIOD { Relative_to_current }
+  (* FIXME: I think this actually gets parsed as an operator? *)
+  | PERIOD; PERIOD { Relative_to_parent }
 
-%inline import_item:
+%inline import_path:
+  | IMPORT; kind = import_kind; path = separated_nonempty(PERIOD, UPPER_NAME)
+    { { Import_path.kind;
+        path = Module_path.Absolute.of_relative_unchecked
+          (Module_path.Relative.of_ustrings_unchecked (Nonempty.to_list path)) } }
+
+n_periods:
+  | { 0 }
+  | PERIOD; rest = n_periods { rest + 1 }
+
+%inline unidentified_name:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
-%inline import_items: items = flexible_nonempty(COMMA, import_item) { items }
+import_paths:
+  | module_name = UPPER_NAME; PERIOD; rest = import_paths
+    { Module.Import.Paths.Module (Module_name.of_ustring_unchecked module_name, [ rest ]) }
+  | module_name = UPPER_NAME; PERIOD; L_PAREN;
+    rest = separated_nonempty(COMMA, import_paths); R_PAREN
+    { Module (Module_name.of_ustring_unchecked module_name, rest) }
+  | name = unidentified_name { Name name }
+  | UNDERSCORE { All }
+  | name = unidentified_name; AS; as_name = unidentified_name { Name_as (name, as_name) }
 
 import_stmt:
-  | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
-  | path = import_module_path; WITH; ASTERISK { Module.Import_with (path, []) }
-  | path = import_module_path; WITH; items = import_items
-    { Module.Import_with (path, Nonempty.to_list items) }
-  | path = import_module_path; WITHOUT; items = import_items
-    { Module.Import_without (path, items) }
+  (* FIXME: I think more than one period will become an operator. Maybe a separate token
+     for periods when there's more than one? *)
+  | IMPORT; n_periods = n_periods; paths = import_paths
+    { { Module.Import.kind = Module.Import.Kind.of_n_periods n_periods ; paths } }
 
 stmt_common:
   | VAL; name = val_name; fix = parens(fixity)?; colon; t = type_expr_bounded
@@ -279,7 +299,7 @@ stmt_common:
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
         (params, Option.value decl ~default:Abstract)) }
-  | import = import_stmt { import }
+  | import = import_stmt { Module.Import import }
 
 stmt_sig_:
   | s = stmt_common { Module.Common_sig s }

@@ -525,7 +525,7 @@ let find_type_entry' ?at_path ?defs_only t name =
 (* TODO: Ideally we should have consistent behavior between all the absolutify functions,
    which should include following imports all the way to a local name. I don't think that
    is currently the case. *)
-let absolutify_path t path =
+let absolutify_path t (path : Module_path.Relative.t) =
   find
     t
     (path, ())
@@ -536,6 +536,46 @@ let absolutify_path t path =
 let absolutify_type_name t ((_, name) as path) = fst (find_type_entry' t path), name
 let absolutify_value_name t name = fst (find_entry' t name)
 
+let bindings_are_empty { names; types; modules } =
+  Map.is_empty names && Map.is_empty types && Map.is_empty modules
+;;
+
+(* FIXME: Don't need this because we can just import things as we get to them: any errors
+   encountered are good. *)
+(* module Import_paths = struct
+  module Names = struct
+    type t =
+      | These of { names : Unidentified_name.t list ; renames : Unidentified_name.t * Unidentified_name.t option }
+      | All of { except_these : Unidentified_name.t list }
+
+    let add t name =
+      match t with
+      | These names -> These (name :: names)
+      | All _ -> t
+    ;;
+
+    let add_all t name =
+      match t with
+      | These _ -> All { except_these = []}
+      | All _
+  end
+
+  type t =
+    { names : Names.t
+    ; child_paths : (Module_name.t * t) list
+    }
+
+  let empty = { names = These []; child_paths = [] }
+
+  let of_module_import_paths (paths : Module.Import.Paths.t list) =
+    List.fold paths ~init:empty ~f:(fun t paths ->
+      match paths with
+      | Name (Some name) -> { t with names = Names.add t.names name }
+      | Name None -> { t with names = Names.add_all t.names name }
+      )
+  ;;
+end *)
+
 (* TODO: how do I fill in foreign modules?
    For now, just assume a toplevel module already exists and copy (?) it into scope
    Later we can implement looking up new modules from the file system, installed packages, etc. 
@@ -545,60 +585,126 @@ let absolutify_value_name t name = fst (find_entry' t name)
    they affect defs only. This behavior is super weird, tbh.
    TODO: try to make this less confusing
    Also, maybe the order of imports should matter - could just gather them as we go? *)
-let import _t _module_name =
-  (*let module_bindings = find_module t [ module_name ] in
-  update_current t ~f:(fun bindings ->
-    { bindings with
-      modules =
-        Map.add bindings.modules ~key:module_name ~data:module_bindings
-        |> or_name_clash "Import of duplicate module" (Module_name.to_ustring module_name)
-    })*)
-  failwith "TODO: module imports (properly)"
-;;
-
-(* TODO: test this, it's almost certainly wrong somehow *)
-let import_filtered t path ~f =
-  (* FIXME: Does this path actually need to be relative? If so, the functions using it
-     should probably require so. Absolute and relative paths with the same contents could
-     point to different things, so it's not safe to mix them up arbitrarily. *)
-  let path = absolutify_path t path |> Module_path.Absolute.to_relative in
-  let map_to_imports_filtered path bindings ~f =
-    { names =
-        Map.filter_mapi bindings.names ~f:(fun ~key:name ~data:_ ->
-          Option.some_if
-            (f (Value_name.unidentify name))
-            (Or_imported.Imported (path, name)))
-    ; types =
-        Map.filter_mapi bindings.types ~f:(fun ~key:type_name ~data:_ ->
-          Option.some_if
-            (f (Type_name.unidentify type_name))
-            (Some (Or_imported.Imported (path, type_name))))
-    ; modules =
-        Map.filter_mapi bindings.modules ~f:(fun ~key:module_name ~data:_ ->
-          Option.some_if
-            (f (Module_name.unidentify module_name))
-            (Or_imported.Imported (Module_path.append path [ module_name ])))
-    }
+let import t ({ kind; paths } : Module.Import.t) =
+  let sigs_or_defs_into_module sigs_or_defs module_name ~path_so_far =
+    let get_bindings modules =
+      match or_name_error_path (Map.find modules module_name) path_so_far with
+      | Or_imported.Local local -> local
+      | Imported import_path ->
+        name_error
+          (Module_path.to_ustring path_so_far)
+          ~msg:
+            [%string
+              "Can't import an item imported but not exported by another module: \
+               %{import_path#Module_path}"]
+    in
+    match sigs_or_defs with
+    | Sigs sigs ->
+      let None, sigs = get_bindings sigs.modules in
+      Sigs sigs
+    | Defs defs ->
+      let sigs, defs = get_bindings defs.modules in
+      (match sigs with
+       | Some sigs -> Sigs sigs
+       | None -> Defs defs)
   in
-  let bindings_to_import =
-    match resolve_path_exn t path ~defs_only:false with
-    | Sigs sigs -> map_to_imports_filtered path ~f sigs
-    | Defs defs -> map_to_imports_filtered path ~f defs
+  let import_name t sigs_or_defs path name ~as_:as_name =
+    let name = Unidentified_name.to_ustring name in
+    let as_name = Unidentified_name.to_ustring as_name in
+    let import_from_bindings bindings =
+      let find_singleton_map map name_module of_ustring import =
+        if Map.mem map (of_ustring name)
+        then Map.singleton name_module (of_ustring as_name) (import (of_ustring name))
+        else Map.empty name_module
+      in
+      let bindings_to_import =
+        { names =
+            find_singleton_map
+              bindings.names
+              (module Value_name)
+              Value_name.of_ustring_unchecked
+              (fun name -> Or_imported.Imported (path, name))
+        ; types =
+            find_singleton_map
+              bindings.types
+              (module Type_name)
+              Type_name.of_ustring_unchecked
+              (fun name -> Some (Or_imported.Imported (path, name)))
+        ; modules =
+            find_singleton_map
+              bindings.modules
+              (module Module_name)
+              Module_name.of_ustring_unchecked
+              (fun name -> Or_imported.Imported (Module_path.append path [ name ]))
+        }
+      in
+      if bindings_are_empty bindings_to_import
+      then
+        name_error
+          (Ustring.concat
+             [ Module_path.to_ustring path; Ustring.of_string_exn "."; name ])
+          ~msg:"Import not found";
+      let f bindings = merge_no_shadow bindings bindings_to_import in
+      update_current t ~f:{ f }
+    in
+    match sigs_or_defs with
+    | Sigs sigs -> import_from_bindings sigs
+    | Defs defs -> import_from_bindings defs
   in
-  let f bindings = merge_no_shadow bindings bindings_to_import in
-  update_current t ~f:{ f }
+  let import_all t sigs_or_defs path =
+    let import_from_bindings bindings =
+      let bindings_to_import =
+        { names =
+            Map.mapi bindings.names ~f:(fun ~key:name ~data:_ ->
+              Or_imported.Imported (path, name))
+        ; types =
+            Map.mapi bindings.types ~f:(fun ~key:name ~data:_ ->
+              Some (Or_imported.Imported (path, name)))
+        ; modules =
+            Map.mapi bindings.modules ~f:(fun ~key:name ~data:_ ->
+              Or_imported.Imported (Module_path.append path [ name ]))
+        }
+      in
+      let f bindings = merge_no_shadow bindings bindings_to_import in
+      update_current t ~f:{ f }
+    in
+    match sigs_or_defs with
+    | Sigs sigs -> import_from_bindings sigs
+    | Defs defs -> import_from_bindings defs
+  in
+  let rec loop t import_bindings (paths : Module.Import.Paths.t) ~path_so_far =
+    match paths with
+    | Module (module_name, paths') ->
+      Nonempty.fold paths' ~init:t ~f:(fun t paths' ->
+        loop
+          t
+          (sigs_or_defs_into_module import_bindings module_name ~path_so_far)
+          paths'
+          ~path_so_far:(Module_path.append path_so_far [ module_name ]))
+    | Name name -> import_name t import_bindings path_so_far name ~as_:name
+    | Name_as (name, as_) -> import_name t import_bindings path_so_far name ~as_
+    | All -> import_all t import_bindings path_so_far
+  in
+  let import_bindings =
+    let src_path = Module.Import.Kind.convert_path kind (current_path t) in
+    (* FIXME: relative paths again *)
+    resolve_path_exn t (src_path :> Module_path.Relative.t) ~defs_only:false
+  in
+  loop t import_bindings paths ~path_so_far:Module_path.Relative.empty
 ;;
 
-let import_all = import_filtered ~f:(fun _ -> true)
-
-let import_with t path = function
-  | [] -> import_all t path
-  | imports -> import_filtered t path ~f:(List.mem imports ~equal:Unidentified_name.equal)
+let import_all_absolute t (path : Module_path.Absolute.t) =
+  match Nonempty.of_list (path :> Module_name.t list) with
+  | None -> compiler_bug [%message "import_all on empty path"]
+  | Some path ->
+    let paths =
+      Nonempty.fold_right path ~init:Module.Import.Paths.All ~f:(fun module_name paths ->
+        Module (module_name, [ paths ]))
+    in
+    import t { kind = Absolute; paths }
 ;;
 
-let import_without t path hiding =
-  import_filtered t path ~f:(not << Nonempty.mem hiding ~equal:Unidentified_name.equal)
-;;
+let import_all t path = import_all_absolute t (absolutify_path t path)
 
 let absolutify_type_expr t type_ =
   Type.Expr.map type_ ~var:Fn.id ~pf:Fn.id ~name:(fun name -> absolutify_type_name t name)
@@ -606,7 +712,7 @@ let absolutify_type_expr t type_ =
 
 let of_prelude_sexp sexp =
   let t = into_parent (t_of_sexp sexp) in
-  import_all t (Module_path.Absolute.to_relative Intrinsics.prelude_module_path)
+  import_all_absolute t Intrinsics.prelude_module_path
 ;;
 
 let prelude = lazy (of_prelude_sexp Umber_std.Prelude.names)

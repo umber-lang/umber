@@ -152,7 +152,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_separated_nonempty_list_PIPE_match_branch_
       : (Umber__Untyped.Pattern.t * Untyped.Expr.t) list nonterminal
-  | N_separated_nonempty_list_PERIOD_UPPER_NAME_ : Ustring.t list nonterminal
+  | N_separated_nonempty_list_COMMA_import_paths_ : Module.Import.Paths.t list nonterminal
   | N_separated_nonempty_list_AND_let_binding_
       : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Node.t list nonterminal
   | N_qualified_val_name_ : (Ustring.t list * Ustring.t) nonterminal
@@ -198,6 +198,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_nonempty_list_expr_term_ : Untyped.Expr.t list nonterminal
   | N_nonempty_list_LOWER_NAME_ : Ustring.t list nonterminal
+  | N_n_periods : int nonterminal
   | N_match_branches : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Nonempty.t nonterminal
   | N_match_branch : (Umber__Untyped.Pattern.t * Untyped.Expr.t) nonterminal
   | N_loption_trait_bound_ : Trait_bound.t nonterminal
@@ -235,7 +236,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_let_rec : bool nonterminal
   | N_let_binding_ : (Umber__Untyped.Pattern.t * Untyped.Expr.t) nonterminal
   | N_let_binding : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Node.t nonterminal
-  | N_import_stmt : Parser_scope.Module_path.relative Module.common nonterminal
+  | N_import_stmt : Module.Import.t nonterminal
+  | N_import_paths : Module.Import.Paths.t nonterminal
   | N_flexible_nonempty_COMMA_type_non_fun_
       : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
         Nonempty.t
@@ -261,8 +263,6 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_flexible_nonempty_COMMA_pair_UPPER_NAME_type_params_nonempty__
       : (Ustring.t, Type.Param.t Nonempty.t) Import.Tuple2.t Nonempty.t nonterminal
-  | N_flexible_nonempty_COMMA_import_item_
-      : Parser_scope.Unidentified_name.t Nonempty.t nonterminal
   | N_flexible_nonempty_COMMA_expr_ : Untyped.Expr.t Nonempty.t nonterminal
   | N_flexible_list_COMMA_type_non_fun_
       : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t
@@ -289,7 +289,6 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_flexible_list_COMMA_pair_UPPER_NAME_type_params_nonempty__
       : (Ustring.t, Type.Param.t Nonempty.t) Import.Tuple2.t list nonterminal
-  | N_flexible_list_COMMA_import_item_ : Parser_scope.Unidentified_name.t list nonterminal
   | N_flexible_list_COMMA_expr_ : Untyped.Expr.t list nonterminal
   | N_fixity : Fixity.t nonterminal
   | N_expr_term : Untyped.Expr.t nonterminal

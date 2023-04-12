@@ -26,6 +26,7 @@ val zip_strict : 'a t -> 'b t -> ('a * 'b) t List.Or_unequal_lengths.t
 val zip_exn : 'a t -> 'b t -> ('a * 'b) t
 val unzip : ('a * 'b) t -> 'a t * 'b t
 val concat_map : 'a t -> f:('a -> 'b t) -> 'b t
+val fold' : 'a t -> init:('a -> 'acc) -> f:('acc -> 'a -> 'acc) -> 'acc
 val fold_right : 'a t -> init:'acc -> f:('a -> 'acc -> 'acc) -> 'acc
 val fold_map : 'a t -> init:'acc -> f:('acc -> 'a -> 'acc * 'b) -> 'acc * 'b t
 val foldi : 'a t -> init:'acc -> f:(int -> 'acc -> 'a -> 'acc) -> 'acc
