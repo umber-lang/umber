@@ -97,6 +97,11 @@ module Module_path : sig
   type +'a t = private Module_name.t list [@@deriving compare, equal, hash, sexp]
   type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
 
+  (* TODO: Consider making relative paths *not* a supertype of absolute paths. This is
+     because just blindly upcasting an absolute path to a relative path is not guaranteed
+     to produce a relative path with the same semantics as the absolute path (due to the
+     possibility of local module shadowing). If you can't upcast to a value with the same
+     semantics, I think that's breaking some OOP subtyping principal or something. *)
   type relative =
     [ absolute
     | `Relative
@@ -109,6 +114,7 @@ module Module_path : sig
   val append' : 'a t -> _ t -> 'a t
   val drop_last : 'a t -> 'a t option
   val drop_last_n_exn : 'a t -> int -> 'a t
+  val split_last : 'a t -> ('a t * Module_name.t) option
   val to_ustring : _ t -> Ustring.t
   val to_string : _ t -> string
   val to_module_names : _ t -> Module_name.t list
@@ -161,6 +167,7 @@ end = struct
   let append = ( @ )
   let append' = ( @ )
   let drop_last = List.drop_last
+  let split_last = List.split_last
 
   let drop_last_n_exn t n =
     let remaining = List.length t - n in

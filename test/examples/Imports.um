@@ -11,6 +11,25 @@ import Number.(Int, Float.(pi, (+)))
 # TODO: Consider implementing the ability to import everything *except* some names
 
 module : {
+  # Imports work in signatures as well
+  import .SiblingImports
+
+  module A : {
+    import .B.Bar # Not needed since `B.Bar` is already in scope, but allowed
+
+    type Foo = Bar
+  }
+
+  module B : {
+    import Number.Int
+
+    type Bar = Int
+
+    module C : {
+      import ..A.Foo
+    }
+  }
+
   val (*) : (Num a) => a, a -> a
 }
 

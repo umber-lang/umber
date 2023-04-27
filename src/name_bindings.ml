@@ -131,6 +131,9 @@ module Type_entry = struct
   let create decl = { id = Id.create (); decl }
 end
 
+(* FIXME: imported entries shouldn't count the same as real entries for e.g.
+   absolutification. The code looks like it already does that but I'm not 100% sure. *)
+
 (* TODO: probably just make 'path the variable so we don't have to put unit for module paths *)
 module Or_imported = struct
   type ('entry, 'path) t =
@@ -522,19 +525,48 @@ let find_type_entry' ?at_path ?defs_only t name =
         | Imported import_path -> Some (path, Some (Imported (import_path, name)))))
 ;;
 
-(* TODO: Ideally we should have consistent behavior between all the absolutify functions,
+(* FIXME: Ideally we should have consistent behavior between all the absolutify functions,
    which should include following imports all the way to a local name. I don't think that
    is currently the case. *)
 let absolutify_path t (path : Module_path.Relative.t) =
-  find
-    t
-    (path, ())
-    ~f:(fun path () _ -> Some path)
-    ~to_ustring:(fun (path, ()) -> Module_path.to_ustring path)
+  match Module_path.split_last path with
+  | None -> current_path t
+  | Some (path, name) ->
+    find
+      t
+      (path, name)
+      ~f:(fun path module_name sigs_or_defs ->
+        let check_bindings bindings =
+          if Map.mem bindings.modules module_name
+          then Some (Module_path.append path [ module_name ])
+          else None
+        in
+        match sigs_or_defs with
+        | Sigs sigs -> check_bindings sigs
+        | Defs defs -> check_bindings defs)
+      ~to_ustring:(fun (path, name) ->
+        Module_path.to_ustring (Module_path.append path [ name ]))
 ;;
 
 let absolutify_type_name t ((_, name) as path) = fst (find_type_entry' t path), name
-let absolutify_value_name t name = fst (find_entry' t name)
+
+let absolutify_value_name t name =
+  (* FIXME: cleanup *)
+  let name' = fst (find_entry' t name) in
+  match
+    fst name'
+    |> Module_path.to_module_names
+    |> List.hd
+    |> Option.map ~f:(Module_name.to_ustring >> Ustring.to_string)
+  with
+  | Some ("List" | "Operators") ->
+    raise_s
+      [%message
+        "Weird absolute name"
+          ~absolute_name:(name' : Value_name.Absolute.t)
+          ~relative_name:(name : Value_name.Relative.t)]
+  | Some _ | None -> name'
+;;
 
 let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules

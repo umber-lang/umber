@@ -115,11 +115,14 @@ let rec read lexbuf =
   | '\\' -> BACKSLASH
   | '*' -> ASTERISK
   (* Need to support: `f . g`, `(. f)`, `(f .)`, and `(.)` as an operator *)
-  | '.', Plus white_space -> OPERATOR (Ustring.of_string_exn ".")
+  (* FIXME: cleanup. Ok. *)
+  (* | '.', Plus white_space -> OPERATOR (Ustring.of_string_exn ".")
   | ".)" ->
     rollback lexbuf;
     ignore (next lexbuf : Uchar.t option);
-    OPERATOR (Ustring.of_string_exn ".")
+    OPERATOR (Ustring.of_string_exn ".") *)
+  | '.', Sub (operator_symbol, '.'), Star operator_symbol -> OPERATOR (lexeme lexbuf)
+  | '.', Plus white_space -> OPERATOR (Ustring.of_string_exn ".")
   | '.' -> PERIOD
   | "->" -> ARROW
   | "=>" -> FAT_ARROW
