@@ -18,9 +18,10 @@
     (((Catch_all (sqr))
       ((Lambda ((Catch_all (x)))
         (Fun_call (Name Std.Prelude.Operators.*)
-         (((Name Functions.x) (Type_app Int ()))
-          ((Name Functions.x) (Type_app Int ())))))
-       (Function ((Type_app Int ())) (Type_app Int ())))))))
+         (((Name Functions.x) (Type_app Std.Prelude.Int ()))
+          ((Name Functions.x) (Type_app Std.Prelude.Int ())))))
+       (Function ((Type_app Std.Prelude.Int ()))
+        (Type_app Std.Prelude.Int ())))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (lots_of_args))

@@ -13,55 +13,63 @@
          (bindings
           ((((Catch_all (loop))
              (Function
-              ((Type_app Int ())
+              ((Type_app Std.Prelude.Int ())
                (Type_app Std.Prelude.List.List
-                ((Type_app MutualRecursion.Tree ((Type_app Int ()))))))
-              (Type_app Int ())))
+                ((Type_app MutualRecursion.Tree
+                  ((Type_app Std.Prelude.Int ()))))))
+              (Type_app Std.Prelude.Int ())))
             (Lambda ((Catch_all (acc)) (Catch_all (forest)))
              (Match (Name MutualRecursion.forest)
               (Type_app Std.Prelude.List.List
-               ((Type_app MutualRecursion.Tree ((Type_app Int ())))))
+               ((Type_app MutualRecursion.Tree
+                 ((Type_app Std.Prelude.Int ())))))
               (((Cnstr_appl Std.Prelude.List.Nil ())
                 (Name MutualRecursion.acc))
                ((Cnstr_appl Std.Prelude.List.Cons
                  ((Catch_all (tree)) (Catch_all (trees))))
                 (Fun_call (Name MutualRecursion.loop)
                  (((Fun_call (Name Std.Prelude.Operators.+)
-                    (((Name MutualRecursion.acc) (Type_app Int ()))
+                    (((Name MutualRecursion.acc)
+                      (Type_app Std.Prelude.Int ()))
                      ((Fun_call (Name MutualRecursion.sum_tree)
                        (((Name MutualRecursion.tree)
-                         (Type_app MutualRecursion.Tree ((Type_app Int ()))))))
-                      (Type_app Int ()))))
-                   (Type_app Int ()))
+                         (Type_app MutualRecursion.Tree
+                          ((Type_app Std.Prelude.Int ()))))))
+                      (Type_app Std.Prelude.Int ()))))
+                   (Type_app Std.Prelude.Int ()))
                   ((Name MutualRecursion.trees)
                    (Type_app Std.Prelude.List.List
-                    ((Type_app MutualRecursion.Tree ((Type_app Int ())))))))))))))))
+                    ((Type_app MutualRecursion.Tree
+                      ((Type_app Std.Prelude.Int ())))))))))))))))
          (body
           (Lambda ((Catch_all (forest)))
            (Fun_call (Name MutualRecursion.loop)
             (((Literal (Int 0)) (Type_app Int ()))
              ((Name MutualRecursion.forest)
               (Type_app Std.Prelude.List.List
-               ((Type_app MutualRecursion.Tree ((Type_app Int ()))))))))))))
+               ((Type_app MutualRecursion.Tree
+                 ((Type_app Std.Prelude.Int ()))))))))))))
        (Function
         ((Type_app Std.Prelude.List.List
-          ((Type_app MutualRecursion.Tree ((Type_app Int ()))))))
-        (Type_app Int ()))))
+          ((Type_app MutualRecursion.Tree ((Type_app Std.Prelude.Int ()))))))
+        (Type_app Std.Prelude.Int ()))))
      ((Catch_all (sum_tree))
       ((Lambda ((Catch_all ("")))
         (Match (Name MutualRecursion.)
-         (Type_app MutualRecursion.Tree ((Type_app Int ())))
+         (Type_app MutualRecursion.Tree ((Type_app Std.Prelude.Int ())))
          (((Cnstr_appl MutualRecursion.Leaf ()) (Literal (Int 0)))
           ((Cnstr_appl MutualRecursion.Node
             ((Catch_all (x)) (Catch_all (forest))))
            (Fun_call (Name Std.Prelude.Operators.+)
-            (((Name MutualRecursion.x) (Type_app Int ()))
+            (((Name MutualRecursion.x) (Type_app Std.Prelude.Int ()))
              ((Fun_call (Name MutualRecursion.sum_forest)
                (((Name MutualRecursion.forest)
-                 (Type_app MutualRecursion.Forest ((Type_app Int ()))))))
-              (Type_app Int ()))))))))
-       (Function ((Type_app MutualRecursion.Tree ((Type_app Int ()))))
-        (Type_app Int ())))))))
+                 (Type_app MutualRecursion.Forest
+                  ((Type_app Std.Prelude.Int ()))))))
+              (Type_app Std.Prelude.Int ()))))))))
+       (Function
+        ((Type_app MutualRecursion.Tree ((Type_app Std.Prelude.Int ()))))
+        (Type_app Std.Prelude.Int ())))))))
   (Common_def
    (Type_decl Forest
     ((a) (Alias (Type_app List ((Type_app MutualRecursion.Tree ((Var a)))))))))
@@ -103,7 +111,7 @@
            (((Fun_call (Name MutualRecursion.sum_tree)
               (((Name MutualRecursion.tree)
                 (Type_app MutualRecursion.Tree ((Type_app Int ()))))))
-             (Type_app Int ())))))))
+             (Type_app Std.Prelude.Int ())))))))
        (Tuple ()))))))
   (Let (rec_ true)
    (bindings
@@ -120,7 +128,7 @@
             (((Fun_call (Name Std.Prelude.Operators.-)
                (((Name MutualRecursion.x) (Type_app Int ()))
                 ((Literal (Int 1)) (Type_app Int ()))))
-              (Type_app Int ()))))))))
+              (Type_app Std.Prelude.Int ()))))))))
        (Function ((Type_app Int ())) (Type_app Bool ()))))
      ((Catch_all (odd))
       ((Lambda ((Catch_all (x)))
@@ -135,8 +143,8 @@
             (((Fun_call (Name Std.Prelude.Operators.-)
                (((Name MutualRecursion.x) (Type_app Int ()))
                 ((Literal (Int 1)) (Type_app Int ()))))
-              (Type_app Int ()))))))))
-       (Function ((Type_app Int ())) (Type_app Bool ())))))))
+              (Type_app Std.Prelude.Int ()))))))))
+       (Function ((Type_app Std.Prelude.Int ())) (Type_app Bool ())))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (number))
@@ -148,9 +156,11 @@
           (Let
            ((rec_ false)
             (bindings
-             ((((Catch_all (number)) (Type_app Int ()))
+             ((((Catch_all (number)) (Type_app Std.Prelude.Int ()))
                (Fun_call (Name Std.Prelude.Operators.+)
-                (((Name MutualRecursion.number) (Type_app Int ()))
-                 ((Name MutualRecursion.number) (Type_app Int ())))))))
+                (((Name MutualRecursion.number)
+                  (Type_app Std.Prelude.Int ()))
+                 ((Name MutualRecursion.number)
+                  (Type_app Std.Prelude.Int ())))))))
             (body (Name MutualRecursion.number)))))))
-       (Type_app Int ()))))))))
+       (Type_app Std.Prelude.Int ()))))))))

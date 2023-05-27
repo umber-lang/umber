@@ -122,10 +122,6 @@ module Module_path : sig
     val empty : t
   end
 
-  (* FIXME: To be a useful unique identifier, this might also need the sig/def information.
-     Whether you refer to e.g. the type definition in a sig or def matters. Due to sig/def
-     layering in submodules, the same absolute path could refer to a lot of different
-     places. *)
   module Absolute : sig
     type nonrec t = absolute t [@@deriving compare, equal, hash, sexp]
 
@@ -349,7 +345,6 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
     include Make (struct
       type t = Module_path.absolute
     end)
-
 
     let of_relative_unchecked (path, name) =
       Module_path.Absolute.of_relative_unchecked path, name

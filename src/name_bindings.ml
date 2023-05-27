@@ -619,15 +619,19 @@ let bindings_are_empty { names; types; modules } =
 let import t ({ kind; paths } : Module.Import.t) =
   let sigs_or_defs_into_module sigs_or_defs module_name ~path_so_far =
     let get_bindings modules =
-      match or_name_error_path (Map.find modules module_name) path_so_far with
-      | Or_imported.Local local -> local
-      | Imported import_path ->
+      match Map.find modules module_name with
+      | Some (Or_imported.Local local) -> local
+      | Some (Imported import_path) ->
         name_error
-          (Module_path.to_ustring path_so_far)
+          (Module_path.to_ustring (Module_path.append path_so_far [ module_name ]))
           ~msg:
             [%string
               "Can't import an item imported but not exported by another module: \
                %{import_path#Module_path}"]
+      | None ->
+        name_error
+          (Module_path.to_ustring (Module_path.append path_so_far [ module_name ]))
+          ~msg:"Couldn't find import path"
     in
     match sigs_or_defs with
     | Sigs sigs ->

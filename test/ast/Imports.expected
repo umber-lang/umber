@@ -1,7 +1,5 @@
 (Imports
  ((Common_sig
-   (Import ((kind (Relative (nth_parent 1))) (paths (Name SiblingImports)))))
-  (Common_sig
    (Import
     ((kind (Relative (nth_parent 0))) (paths (Module A ((Name Foo)))))))
   (Module_sig A
@@ -18,10 +16,19 @@
        (Import
         ((kind (Relative (nth_parent 2))) (paths (Module A ((Name Foo)))))))))))
   (Common_sig (Val * () (((Num (a))) (Function ((Var a) (Var a)) (Var a))))))
- ((Common_def (Import ((kind Absolute) (paths (Name Math)))))
-  (Common_def (Import ((kind Absolute) (paths (Module Math ((Name abs)))))))
+ ((Common_def
+   (Import
+    ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Float)))))))))
   (Common_def
-   (Import ((kind Absolute) (paths (Module Math ((Name sin) (Name cos)))))))
+   (Import
+    ((kind Absolute)
+     (paths (Module Std ((Module Prelude ((Module Float ((Name abs)))))))))))
+  (Common_def
+   (Import
+    ((kind Absolute)
+     (paths
+      (Module Std
+       ((Module Prelude ((Module Float ((Name sin) (Name cos)))))))))))
   (Common_def
    (Type_decl Cool
     (()
@@ -29,10 +36,17 @@
       ((You_can_define_types_in_between_imports ((Tuple ())))
        (Bad_style_though ((Type_app Option ((Tuple ()))))))))))
   (Common_def
-   (Import ((kind Absolute) (paths (Module Number ((Module Int (All))))))))
-  (Common_def (Import ((kind Absolute) (paths (Module Number ((Name *)))))))
+   (Import
+    ((kind Absolute)
+     (paths (Module Std ((Module Prelude ((Module Int (All))))))))))
   (Common_def
    (Import
     ((kind Absolute)
-     (paths (Module Number ((Name Int) (Module Float ((Name pi) (Name +)))))))))
+     (paths (Module Std ((Module Prelude ((Module Operators ((Name *)))))))))))
+  (Common_def
+   (Import
+    ((kind Absolute)
+     (paths
+      (Module Std
+       ((Module Prelude ((Name Int) (Module Float ((Name pi) (Name +)))))))))))
   (Let (rec_ true) (bindings (((Catch_all (*)) (Name *)))))))

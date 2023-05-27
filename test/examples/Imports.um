@@ -1,18 +1,17 @@
-import Math
-import Math.abs
-import Math.(sin, cos)
+import Std.Prelude.Float
+import Std.Prelude.Float.abs
+import Std.Prelude.Float.(sin, cos)
 type Cool =
   | You_can_define_types_in_between_imports ()
   | Bad_style_though (Option ())
-import Number.Int._
-import Number.(*)
-import Number.(Int, Float.(pi, (+)))
+import Std.Prelude.Int._
+import Std.Prelude.Operators.(*)
+import Std.Prelude.(Int, Float.(pi, (+)))
 
 # TODO: Consider implementing the ability to import everything *except* some names
 
 module : {
   # Imports work in signatures as well
-  import ..SiblingImports
   import .A.Foo
 
   module A : {

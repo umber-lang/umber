@@ -15,6 +15,22 @@ module : {
 
   import .Option.(None, Some)
 
+  module Int : {
+    import Int as PrimitiveInt
+    type Int = PrimitiveInt
+  }
+
+  module Float : {
+    import Float as PrimitiveFloat
+    type Float = PrimitiveFloat
+
+    val (+) (infixl 6) : Float, Float -> Float
+    val abs : Float, Float -> Float
+    val sin : Float, Float -> Float
+    val cos : Float, Float -> Float
+    val pi : Float
+  }
+
   module Operators : {
     val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
     # `() =>` is a hack for the parser as it confuses the `(` in `(b -> c)` as the start
@@ -100,6 +116,22 @@ module : {
 # TODO: macro support
 
 # TODO: randomness
+
+module Int = {
+  import Int as PrimitiveInt
+  type Int = PrimitiveInt
+}
+
+module Float = {
+  import Float as PrimitiveFloat
+  type Float = PrimitiveFloat
+
+  extern (+) (infixl 6) : Float, Float -> Float = "umber_float_add"
+  extern abs : Float, Float -> Float = "umber_float_abs"
+  extern sin : Float, Float -> Float = "umber_float_sin"
+  extern cos : Float, Float -> Float = "umber_float_cos"
+  extern pi : Float = "umber_float_pi"
+}
 
 module Operators = {
   # TODO: Consider removing these fixity declarations and copying them from the sig
