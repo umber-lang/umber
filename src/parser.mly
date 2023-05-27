@@ -37,7 +37,6 @@
 %token COMMA
 %token BACKSLASH
 %token ASTERISK
-%token PERIOD
 %token ARROW
 %token FAT_ARROW
 %token L_PAREN
@@ -46,7 +45,9 @@
 %token R_BRACKET
 %token L_BRACE
 %token R_BRACE
+%token PERIOD
 
+%token <int> N_PERIODS
 %token <int> INT
 %token <float> FLOAT
 %token <Uchar.t> CHAR
@@ -70,7 +71,7 @@
 val_operator:
   | op = OPERATOR { op }
   | ASTERISK { Ustring.of_string_exn "*" }
-  | PERIOD { Ustring.of_string_exn "." }
+  | n = N_PERIODS { Ustring.make n (Uchar.of_char '.') }
 
 operator:
   | COLON; name = qualified(val_name); colon { name }
@@ -255,7 +256,8 @@ fixity:
 
 n_periods:
   | { 0 }
-  | PERIOD; rest = n_periods { rest + 1 }
+  | PERIOD { 1 }
+  | n = N_PERIODS { n }
 
 %inline unidentified_name:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }

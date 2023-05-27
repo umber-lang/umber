@@ -12,10 +12,11 @@ import Number.(Int, Float.(pi, (+)))
 
 module : {
   # Imports work in signatures as well
-  import .SiblingImports
+  import ..SiblingImports
+  import .A.Foo
 
   module A : {
-    import .B.Bar # Not needed since `B.Bar` is already in scope, but allowed
+    import ..B.Bar # Not needed since `B.Bar` is already in scope, but allowed
 
     type Foo = Bar
   }
@@ -26,7 +27,7 @@ module : {
     type Bar = Int
 
     module C : {
-      import ..A.Foo
+      import ...A.Foo
     }
   }
 

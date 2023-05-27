@@ -16,6 +16,7 @@ type token = Parser.token =
   | PIPE
   | PERIOD
   | OPERATOR of Ustring.t
+  | N_PERIODS of int
   | MODULE
   | MATCH
   | L_PAREN
@@ -76,6 +77,7 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_PIPE : unit terminal
   | T_PERIOD : unit terminal
   | T_OPERATOR : Ustring.t terminal
+  | T_N_PERIODS : int terminal
   | T_MODULE : unit terminal
   | T_MATCH : unit terminal
   | T_L_PAREN : unit terminal

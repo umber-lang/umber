@@ -1,5 +1,23 @@
 (Imports
- ((Common_sig (Val * () (((Num (a))) (Function ((Var a) (Var a)) (Var a))))))
+ ((Common_sig
+   (Import ((kind (Relative (nth_parent 1))) (paths (Name SiblingImports)))))
+  (Common_sig
+   (Import
+    ((kind (Relative (nth_parent 0))) (paths (Module A ((Name Foo)))))))
+  (Module_sig A
+   ((Common_sig
+     (Import
+      ((kind (Relative (nth_parent 1))) (paths (Module B ((Name Bar)))))))
+    (Common_sig (Type_decl Foo (() (Alias (Type_app Bar ())))))))
+  (Module_sig B
+   ((Common_sig
+     (Import ((kind Absolute) (paths (Module Number ((Name Int)))))))
+    (Common_sig (Type_decl Bar (() (Alias (Type_app Int ())))))
+    (Module_sig C
+     ((Common_sig
+       (Import
+        ((kind (Relative (nth_parent 2))) (paths (Module A ((Name Foo)))))))))))
+  (Common_sig (Val * () (((Num (a))) (Function ((Var a) (Var a)) (Var a))))))
  ((Common_def (Import ((kind Absolute) (paths (Name Math)))))
   (Common_def (Import ((kind Absolute) (paths (Module Math ((Name abs)))))))
   (Common_def
