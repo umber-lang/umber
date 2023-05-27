@@ -5,7 +5,7 @@ module : {
       | Cons a (List a)
   }
 
-  import List.(Nil, Cons)
+  import .List.(Nil, Cons)
 
   module Option : {
     type Option a =
@@ -13,7 +13,7 @@ module : {
       | Some a
   }
 
-  import Option.(None, Some)
+  import .Option.(None, Some)
 
   module Operators : {
     val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
@@ -61,7 +61,7 @@ module : {
     val (++) (infixl 5) : String, String -> String
   }
 
-  import Operators._
+  import .Operators._
 
   val sqrt : Float -> Float
 
@@ -72,8 +72,6 @@ module : {
 
 # TODO: implement public/private distinction for modules
 
-#import Bool._
-#import Fun
 # TODO: need some kind of syntax for re-exporting things easily
 # Idea: just put the imports inside `module :` (could work)
 # Perhaps nicer: just use `include` instead of `import`
@@ -146,7 +144,7 @@ module Operators = {
   extern (++) (infixl 5) : String, String -> String = "umber_string_append"
 }
 
-import Operators._
+import .Operators._
 
 extern sqrt : Float -> Float = "umber_float_sqrt"
 extern print : String -> () = "umber_print_endline"
