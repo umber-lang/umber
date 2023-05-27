@@ -96,22 +96,12 @@ module Module_name : Name = Upper_name
 module Module_path : sig
   type +'a t = private Module_name.t list [@@deriving compare, equal, hash, sexp]
   type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
-
-  (* TODO: Consider making relative paths *not* a supertype of absolute paths. This is
-     because just blindly upcasting an absolute path to a relative path is not guaranteed
-     to produce a relative path with the same semantics as the absolute path (due to the
-     possibility of local module shadowing). If you can't upcast to a value with the same
-     semantics, I think that's breaking some OOP subtyping principal or something. *)
-  type relative =
-    [ absolute
-    | `Relative
-    ]
-  [@@deriving compare, equal, hash, sexp]
+  type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
   val is_empty : _ t -> bool
   val is_prefix : prefix:'a t -> 'a t -> bool
   val append : 'a t -> Module_name.t list -> 'a t
-  val append' : 'a t -> _ t -> 'a t
+  val append' : 'a t -> relative t -> 'a t
   val drop_last : 'a t -> 'a t option
   val drop_last_n_exn : 'a t -> int -> 'a t
   val split_last : 'a t -> ('a t * Module_name.t) option
@@ -132,25 +122,23 @@ module Module_path : sig
     val empty : t
   end
 
+  (* FIXME: To be a useful unique identifier, this might also need the sig/def information.
+     Whether you refer to e.g. the type definition in a sig or def matters. Due to sig/def
+     layering in submodules, the same absolute path could refer to a lot of different
+     places. *)
   module Absolute : sig
     type nonrec t = absolute t [@@deriving compare, equal, hash, sexp]
 
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
-    val to_relative : t -> Relative.t
     val of_relative_unchecked : Relative.t -> t
     val empty : t
   end
 end = struct
   type 'a t = Module_name.t list [@@deriving compare, equal, hash, sexp]
   type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
-
-  type relative =
-    [ absolute
-    | `Relative
-    ]
-  [@@deriving compare, equal, hash, sexp]
+  type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
   let is_empty = List.is_empty
 
@@ -214,7 +202,6 @@ end = struct
   module Absolute = struct
     include Relative
 
-    let to_relative = Fn.id
     let of_relative_unchecked = Fn.id
   end
 end
@@ -249,7 +236,6 @@ module type Name_qualified = sig
     include Hashable.S with type t := t
 
     val of_relative_unchecked : Relative.t -> t
-    val to_relative : t -> Relative.t
     val with_path : Module_path.Absolute.t -> name -> t
     val to_ustring : t -> Ustring.t
   end
@@ -364,7 +350,6 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
       type t = Module_path.absolute
     end)
 
-    let to_relative (path, name) = Module_path.Absolute.to_relative path, name
 
     let of_relative_unchecked (path, name) =
       Module_path.Absolute.of_relative_unchecked path, name

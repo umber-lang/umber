@@ -139,7 +139,7 @@ module Or_imported = struct
   type ('entry, 'path) t =
     | Local of 'entry
     | Imported of 'path
-  [@@deriving sexp, variants]
+  [@@deriving equal, sexp, variants]
 end
 
 module Path = struct
@@ -203,10 +203,10 @@ and sigs = Nothing.t bindings
 and defs = sigs bindings
 
 and 'a bindings =
-  { names : (Name_entry.t, Value_name.Relative.t) Or_imported.t Value_name.Map.t
-  ; types : (Type_entry.t, Type_name.Relative.t) Or_imported.t option Type_name.Map.t
+  { names : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t
+  ; types : (Type_entry.t, Type_name.Absolute.t) Or_imported.t option Type_name.Map.t
   ; modules :
-      ('a option * 'a bindings, Module_path.Relative.t) Or_imported.t Module_name.Map.t
+      ('a option * 'a bindings, Module_path.Absolute.t) Or_imported.t Module_name.Map.t
   }
 [@@deriving sexp]
 
@@ -360,7 +360,25 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
-let resolve_path =
+(* FIXME: How about we just rewrite the path resolution logic to something more sane?
+   e.g. we keep a list (like a stack) of parent bindings and update it whenever we go
+   in/out out modules. Then we can just simply walk up that list looking for relative things.
+
+   Looking up absolute paths can then walk from the top every time (?).
+   
+   Really maybe absolute paths need sig/def qualifiers?
+   Why do we need absolute paths anyways? I guess we want to use them to do equality checks, and make sure we can always look up things
+   correctly wherever we are. Sig/def qualifiers do seem important then. Unfortunately if
+   we do that we lose the parametric Module_path.t type unless we chuck in some GADTs.
+   And actually for the equality checks we do I don't *think* we need them. We added entry
+   ids to fix this problem (since multiple absolute paths can still point to the same
+   place due to imports. They'd have to be Unique_path.t then.) 
+   
+   Actually sig/def qualifiers are no good, because it could let you break abstraction
+   boundaries accidentally. When looking up types we want to make sure you get to the right
+   one (so a relative path wouldn't work), but how you get there should depend on where
+   you are. *)
+(* let resolve_path =
   let open Option.Let_syntax in
   let rec loop_sigs t path sigs =
     match path with
@@ -396,15 +414,69 @@ let resolve_path =
        | Local (_, defs) -> loop_defs_only t rest defs
        | Imported path -> resolve_path t path ~defs_only:true)
   and resolve_path t path ~defs_only =
+    (* FIXME: How is it right to start the defs at toplevel when resolving a relative
+       path? It's wrong. If you give an empty path you end up at toplevel defs, not the
+       current bindings. I'm going to repurpose this as the absolute path lookup logic. *)
     if defs_only
     then loop_defs_only t (path :> Module_name.t list) t.toplevel
     else loop_defs t (Some t.current_path) (path :> Module_name.t list) t.toplevel
   in
   resolve_path
+;; *)
+
+(* FIXME: Resolving an absolute path is not the same as resolving from the toplevel
+   because of sig/def distinctions! *)
+(* let resolve_absolute_path t path ~defs_only =
+  resolve_path t (Module_path.Absolute.to_relative path) ~defs_only
+;; *)
+
+let resolve_absolute_path =
+  let open Option.Let_syntax in
+  let rec loop_sigs t path sigs =
+    match path with
+    | [] -> Some (Sigs sigs)
+    | module_name :: rest ->
+      (match%bind Map.find sigs.modules module_name with
+       | Local (None, sigs) -> loop_sigs t rest sigs
+       | Local (Some _, _) -> .
+       | Imported path -> resolve_absolute_path t path ~defs_only:false)
+  and loop_defs t current_path path defs =
+    match path with
+    | [] -> Some (Defs defs)
+    | module_name :: rest ->
+      (match%bind Map.find defs.modules module_name with
+       | Local (sigs, defs) ->
+         let current_path, go_into =
+           match current_path with
+           | Some [] | None -> None, `Sig
+           | Some ((module_name', place) :: rest') ->
+             if Module_name.(module_name = module_name')
+             then Some rest', place
+             else None, `Sig
+         in
+         (match go_into, sigs with
+          | `Sig, Some sigs -> loop_sigs t rest sigs
+          | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
+       | Imported path -> resolve_absolute_path t path ~defs_only:false)
+  and loop_defs_only t path defs =
+    match path with
+    | [] -> Some (Defs defs)
+    | module_name :: rest ->
+      (match%bind Map.find defs.modules module_name with
+       | Local (_, defs) -> loop_defs_only t rest defs
+       | Imported path -> resolve_absolute_path t path ~defs_only:true)
+  and resolve_absolute_path t (path : Module_path.Absolute.t) ~defs_only =
+    (* FIXME: cleanup *)
+    print_s [%message "resolve_absolute_path" (path : Module_path.Absolute.t)];
+    if defs_only
+    then loop_defs_only t (path :> Module_name.t list) t.toplevel
+    else loop_defs t (Some t.current_path) (path :> Module_name.t list) t.toplevel
+  in
+  resolve_absolute_path
 ;;
 
-let resolve_path_exn t path ~defs_only =
-  or_name_error_path (resolve_path t path ~defs_only) path
+let resolve_absolute_path_exn t path ~defs_only =
+  or_name_error_path (resolve_absolute_path t path ~defs_only) path
 ;;
 
 let with_path_into_defs t (path : Module_path.Absolute.t) ~f =
@@ -420,35 +492,47 @@ let with_path_into_defs t (path : Module_path.Absolute.t) ~f =
 
 let find =
   let rec loop t ((path, name) as input) ~at_path ~defs_only ~f ~to_ustring =
+    (* FIXME: cleanup *)
+    print_s
+      [%message
+        "find loop"
+          ~input:(to_ustring input : Ustring.t)
+          (at_path : Module_path.Absolute.t)];
+    let f full_path name bindings_at_current =
+      print_s
+        [%message
+          "find loop f"
+            (full_path : Module_path.Absolute.t)
+            ~input:(to_ustring input : Ustring.t)
+            ~names:
+              (match (bindings_at_current : sigs_or_defs) with
+               | Sigs sigs -> sigs.names
+               | Defs defs -> defs.names
+                : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t)];
+      f full_path name bindings_at_current
+    in
     (* Try looking at the current scope, then travel up to parent scopes to find a
        matching name. *)
-    let bindings_at_current =
-      (* FIXME: I don't think upcasting the path to relative works here. It might go to a
-         different place than an absolute path. *)
-      resolve_path_exn ~defs_only t (at_path :> Module_path.Relative.t)
-    in
-    match List.hd (path : _ Module_path.t :> Module_name.t list) with
+    let bindings_at_current = resolve_absolute_path_exn ~defs_only t at_path in
+    print_s [%message "find bindings" (bindings_at_current : sigs_or_defs)];
+    match List.hd (path : Module_path.Relative.t :> Module_name.t list) with
     | Some first_module ->
       let full_path = Module_path.append' at_path path in
       let f bindings =
         if Map.mem bindings.modules first_module
         then (
-          let bindings =
-            or_name_error_path
-              (resolve_path ~defs_only t (full_path :> Module_path.Relative.t))
-              at_path
-          in
+          let bindings = resolve_absolute_path_exn ~defs_only t full_path in
           option_or_default (f full_path name bindings) ~f:(fun () ->
             name_error ~msg:"Couldn't find name" (to_ustring input)))
-        else check_parent t at_path input ~defs_only ~f ~to_ustring
+        else check_parent t ~at_path input ~defs_only ~f ~to_ustring
       in
       (match bindings_at_current with
        | Sigs sigs -> f sigs
        | Defs defs -> f defs)
     | None ->
       option_or_default (f at_path name bindings_at_current) ~f:(fun () ->
-        check_parent t at_path input ~defs_only ~f ~to_ustring)
-  and check_parent t current_path input ~defs_only ~f ~to_ustring =
+        check_parent t ~at_path input ~defs_only ~f ~to_ustring)
+  and check_parent t ~at_path:current_path input ~defs_only ~f ~to_ustring =
     (* Recursively check the parent. *)
     match Module_path.drop_last current_path with
     | Some parent_path -> loop t input ~at_path:parent_path ~defs_only ~f ~to_ustring
@@ -456,10 +540,20 @@ let find =
   in
   fun ?at_path ?(defs_only = false) t input ~f ~to_ustring ->
     let at_path = Option.value_or_thunk at_path ~default:(fun () -> current_path t) in
+    print_s
+      [%message
+        "find" ~input:(to_ustring input : Ustring.t) (at_path : Module_path.Absolute.t)];
     loop t input ~at_path ~defs_only ~f ~to_ustring
 ;;
 
+let find_absolute ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
+  match f name (resolve_absolute_path_exn t path ~defs_only) with
+  | Some result -> result
+  | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
+;;
+
 let rec find_entry' t name =
+  print_s [%message "Name_bindings.find_entry'" (name : Value_name.Relative.t) (t : t)];
   let open Option.Let_syntax in
   find
     t
@@ -473,31 +567,40 @@ let rec find_entry' t name =
     | Sigs sigs -> f sigs
     | Defs defs -> f defs)
 
+and find_absolute_entry' t (path, name) =
+  let open Option.Let_syntax in
+  find_absolute
+    t
+    (path, name)
+    ~to_ustring:Value_name.Absolute.to_ustring
+    ~f:(fun name bindings ->
+    let f bindings =
+      Map.find bindings.names name >>| resolve_name_or_import' t (path, name)
+    in
+    match bindings with
+    | Sigs sigs -> f sigs
+    | Defs defs -> f defs)
+
 and resolve_name_or_import' t name = function
-  | Or_imported.Local entry -> name, entry
-  | Imported path_name -> find_entry' t path_name
+  | Local entry -> name, entry
+  | Imported path_name -> find_absolute_entry' t path_name
 ;;
 
 let rec find_entry t name = snd (find_entry' t name)
+and find_absolute_entry t name = snd (find_absolute_entry' t name)
 
 and resolve_name_or_import t = function
   | Or_imported.Local entry -> entry
-  | Imported path_name -> find_entry t path_name
+  | Imported path_name -> find_absolute_entry t path_name
 ;;
 
 let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_entry' ?at_path ?defs_only t name =
+let find_type_entry', find_absolute_type_entry' =
   let open Option.Let_syntax in
-  find
-    ?at_path
-    t
-    name
-    ~to_ustring:Type_name.Relative.to_ustring
-    ?defs_only
-    ~f:(fun path name bindings ->
+  let f path name bindings =
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
       | Some decl -> Some (path, decl)
@@ -522,7 +625,20 @@ let find_type_entry' ?at_path ?defs_only t name =
         | Local (Some sigs, _defs) ->
           let%map decl = Map.find sigs.types name in
           path, decl
-        | Imported import_path -> Some (path, Some (Imported (import_path, name)))))
+        | Imported import_path -> Some (path, Some (Imported (import_path, name))))
+  in
+  let find_type_entry' ?at_path ?defs_only t name =
+    find ?at_path t name ~to_ustring:Type_name.Relative.to_ustring ?defs_only ~f
+  in
+  let find_absolute_type_entry' ?defs_only t (path, name) =
+    find_absolute
+      t
+      (path, name)
+      ~to_ustring:Type_name.Absolute.to_ustring
+      ?defs_only
+      ~f:(f path)
+  in
+  find_type_entry', find_absolute_type_entry'
 ;;
 
 (* FIXME: Ideally we should have consistent behavior between all the absolutify functions,
@@ -677,12 +793,13 @@ let import t ({ kind; paths } : Module.Import.t) =
     | Name_as (name, as_) -> import_name t import_bindings path_so_far name ~as_
     | All -> import_all t import_bindings path_so_far
   in
-  let import_bindings =
-    let src_path = Module.Import.Kind.convert_path kind (current_path t) in
-    (* FIXME: relative paths again *)
-    resolve_path_exn t (src_path :> Module_path.Relative.t) ~defs_only:false
+  let src_path =
+    match kind with
+    | Absolute -> Module_path.Absolute.empty
+    | Relative { nth_parent } -> Module_path.drop_last_n_exn (current_path t) nth_parent
   in
-  loop t import_bindings paths ~path_so_far:Module_path.Relative.empty
+  let import_bindings = resolve_absolute_path_exn t src_path ~defs_only:false in
+  loop t import_bindings paths ~path_so_far:src_path
 ;;
 
 let import_all_absolute t (path : Module_path.Absolute.t) =
@@ -745,7 +862,7 @@ let add_val_or_extern
               Ustring.(
                 Value_name.to_ustring name
                 ^ of_string_exn " vs "
-                ^ Value_name.Relative.to_ustring imported_name))
+                ^ Value_name.Absolute.to_ustring imported_name))
     }
   in
   update_current t ~f:{ f }
@@ -888,31 +1005,57 @@ let fold_local_names t ~init ~f =
 let merge_names t new_names ~combine =
   let new_names = Map.map new_names ~f:Or_imported.local in
   let f bindings =
-    { bindings with
-      names =
-        Map.merge_skewed bindings.names new_names ~combine:(fun ~key entry1 entry2 ->
-          let entry1, entry2 =
-            resolve_name_or_import t entry1, resolve_name_or_import t entry2
-          in
-          Local (combine key entry1 entry2))
-    }
+    let new_bindings =
+      { bindings with
+        names =
+          Map.merge_skewed bindings.names new_names ~combine:(fun ~key entry1 entry2 ->
+            let entry1, entry2 =
+              resolve_name_or_import t entry1, resolve_name_or_import t entry2
+            in
+            Local (combine key entry1 entry2))
+      }
+    in
+    print_s
+      [%message
+        "Merging names"
+          ~diff:
+            (Map.symmetric_diff
+               bindings.names
+               new_bindings.names
+               ~data_equal:[%equal: (Name_entry.t, Value_name.Absolute.t) Or_imported.t]
+              : ( Value_name.t
+                , (Name_entry.t, Value_name.Absolute.t) Or_imported.t )
+                Map.Symmetric_diff_element.t
+                Sequence.t)
+          ~old_names:
+            (bindings.names
+              : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t)
+          ~new_names:
+            (new_bindings.names
+              : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t)];
+    new_bindings
   in
   update_current t ~f:{ f }
 ;;
 
 let rec find_type_entry ?at_path ?defs_only t type_name =
   resolve_type_or_import
-    ?at_path
     ?defs_only
     t
     (snd (find_type_entry' ?at_path ?defs_only t type_name))
 
-and resolve_type_or_import ?at_path ?defs_only t = function
+and find_absolute_type_entry ?defs_only t type_name =
+  resolve_type_or_import
+    ?defs_only
+    t
+    (snd (find_absolute_type_entry' ?defs_only t type_name))
+
+and resolve_type_or_import ?defs_only t = function
   | Some (Or_imported.Local decl) -> Some decl
   | Some (Imported path_name) ->
-    (* TODO: pretty sure this import path should be resolved at the place it's written,
+    (* FIXME: pretty sure this import path should be resolved at the place it's written,
        not the current path - this goes for all imports, unless we absolutify their paths *)
-    find_type_entry ?at_path ?defs_only t path_name
+    find_absolute_type_entry ?defs_only t path_name
   | None -> None
 ;;
 
@@ -925,33 +1068,30 @@ let find_type_entry ?at_path ?(defs_only = false) t type_name =
           (without_std t : t)])
 ;;
 
+let find_absolute_type_entry ?(defs_only = false) t type_name =
+  option_or_default (find_absolute_type_entry ~defs_only t type_name) ~f:(fun () ->
+    compiler_bug
+      [%message
+        "Placeholder decl not replaced"
+          (type_name : Type_name.Absolute.t)
+          (without_std t : t)])
+;;
+
 let find_type_decl ?at_path ?defs_only t type_name =
   (find_type_entry ?at_path ?defs_only t type_name).decl
 ;;
 
-let resolve_type_or_import ?at_path t decl_or_import =
-  option_or_default (resolve_type_or_import ?at_path t decl_or_import) ~f:(fun () ->
+let find_absolute_type_decl ?defs_only t type_name =
+  (find_absolute_type_entry ?defs_only t type_name).decl
+;;
+
+let resolve_type_or_import t decl_or_import =
+  option_or_default (resolve_type_or_import t decl_or_import) ~f:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import : (Type_entry.t, Type_name.Relative.t) Or_imported.t option)
+          (decl_or_import : (Type_entry.t, Type_name.Absolute.t) Or_imported.t option)
           (without_std t : t)])
-;;
-
-let find_absolute_type_decl ?defs_only t (path : Type_name.Absolute.t) =
-  find_type_decl
-    ~at_path:Module_path.Absolute.empty
-    ?defs_only
-    t
-    (path :> Type_name.Relative.t)
-;;
-
-let find_absolute_type_entry ?defs_only t (path : Type_name.Absolute.t) =
-  find_type_entry
-    ~at_path:Module_path.Absolute.empty
-    ?defs_only
-    t
-    (path :> Type_name.Relative.t)
 ;;
 
 let find_type_decl = find_type_decl ?at_path:None
@@ -962,13 +1102,14 @@ let find_sigs_and_defs t path module_name =
       t
       (path, module_name)
       ~f:
-        (fun _ module_name -> function
+        (fun absolute_path module_name -> function
           | Sigs _ ->
             compiler_bug
               [%message
                 "Name_bindings.find_sigs_and_defs found only sigs"
-                  ~path:(path : Module_path.Relative.t)
+                  ~relative_path:(path : Module_path.Relative.t)
                   (module_name : Module_name.t)
+                  (absolute_path : Module_path.Absolute.t)
                   (t : t)]
           | Defs bindings ->
             (match%bind.Option Map.find bindings.modules module_name with
@@ -1027,12 +1168,12 @@ module Sigs_or_defs = struct
     match bindings with
     | Sigs bindings ->
       (match%bind Map.find bindings.modules module_name with
-       | Imported path -> resolve_path t path ~defs_only:false
+       | Imported path -> resolve_absolute_path t path ~defs_only:false
        | Local (None, sigs) -> Some (Sigs sigs)
        | Local (Some _, _) -> .)
     | Defs bindings ->
       (match%bind Map.find bindings.modules module_name with
-       | Imported path -> resolve_path t path ~defs_only:false
+       | Imported path -> resolve_absolute_path t path ~defs_only:false
        | Local (Some sigs, _) -> Some (Sigs sigs)
        | Local (None, defs) -> Some (Defs defs))
   ;;

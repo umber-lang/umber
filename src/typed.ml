@@ -667,8 +667,7 @@ module Module = struct
   let gather_type_decls ~names sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
-      | Val _ | Extern _ | Trait_sig _ | Import _  ->
-        names)
+      | Val _ | Extern _ | Trait_sig _ | Import _ -> names)
   ;;
 
   (** Raise an error upon finding any cycles in a given type alias. *)
@@ -730,7 +729,7 @@ module Module = struct
       | Type_decl (_, (_, Alias alias)) ->
         check_cyclic_type_alias ~names alias;
         names
-      | Type_decl _ | Trait_sig _ | Import _  -> names
+      | Type_decl _ | Trait_sig _ | Import _ -> names
     in
     let rec handle_sigs ~names ~handle_common =
       List.fold ~init:names ~f:(fun names sig_ ->

@@ -12,12 +12,6 @@ module Import = struct
       | 0 -> Absolute
       | n -> Relative { nth_parent = n - 1 }
     ;;
-
-    let convert_path t (path : Module_path.Absolute.t) =
-      match t with
-      | Absolute -> path
-      | Relative { nth_parent } -> Module_path.drop_last_n_exn path nth_parent
-    ;;
   end
 
   module Paths = struct
