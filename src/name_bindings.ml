@@ -378,57 +378,6 @@ let merge_no_shadow t1 t2 =
    boundaries accidentally. When looking up types we want to make sure you get to the right
    one (so a relative path wouldn't work), but how you get there should depend on where
    you are. *)
-(* let resolve_path =
-  let open Option.Let_syntax in
-  let rec loop_sigs t path sigs =
-    match path with
-    | [] -> Some (Sigs sigs)
-    | module_name :: rest ->
-      (match%bind Map.find sigs.modules module_name with
-       | Local (None, sigs) -> loop_sigs t rest sigs
-       | Local (Some _, _) -> .
-       | Imported path -> resolve_path t path ~defs_only:false)
-  and loop_defs t current_path path defs =
-    match path with
-    | [] -> Some (Defs defs)
-    | module_name :: rest ->
-      (match%bind Map.find defs.modules module_name with
-       | Local (sigs, defs) ->
-         let current_path, go_into =
-           match current_path with
-           | Some [] | None -> None, `Sig
-           | Some ((module_name', place) :: rest') ->
-             if Module_name.(module_name = module_name')
-             then Some rest', place
-             else None, `Sig
-         in
-         (match go_into, sigs with
-          | `Sig, Some sigs -> loop_sigs t rest sigs
-          | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
-       | Imported path -> resolve_path t path ~defs_only:false)
-  and loop_defs_only t path defs =
-    match path with
-    | [] -> Some (Defs defs)
-    | module_name :: rest ->
-      (match%bind Map.find defs.modules module_name with
-       | Local (_, defs) -> loop_defs_only t rest defs
-       | Imported path -> resolve_path t path ~defs_only:true)
-  and resolve_path t path ~defs_only =
-    (* FIXME: How is it right to start the defs at toplevel when resolving a relative
-       path? It's wrong. If you give an empty path you end up at toplevel defs, not the
-       current bindings. I'm going to repurpose this as the absolute path lookup logic. *)
-    if defs_only
-    then loop_defs_only t (path :> Module_name.t list) t.toplevel
-    else loop_defs t (Some t.current_path) (path :> Module_name.t list) t.toplevel
-  in
-  resolve_path
-;; *)
-
-(* FIXME: Resolving an absolute path is not the same as resolving from the toplevel
-   because of sig/def distinctions! *)
-(* let resolve_absolute_path t path ~defs_only =
-  resolve_path t (Module_path.Absolute.to_relative path) ~defs_only
-;; *)
 
 let resolve_absolute_path =
   let open Option.Let_syntax in
@@ -466,8 +415,6 @@ let resolve_absolute_path =
        | Local (_, defs) -> loop_defs_only t rest defs
        | Imported path -> resolve_absolute_path t path ~defs_only:true)
   and resolve_absolute_path t (path : Module_path.Absolute.t) ~defs_only =
-    (* FIXME: cleanup *)
-    print_s [%message "resolve_absolute_path" (path : Module_path.Absolute.t)];
     if defs_only
     then loop_defs_only t (path :> Module_name.t list) t.toplevel
     else loop_defs t (Some t.current_path) (path :> Module_name.t list) t.toplevel
@@ -492,29 +439,9 @@ let with_path_into_defs t (path : Module_path.Absolute.t) ~f =
 
 let find =
   let rec loop t ((path, name) as input) ~at_path ~defs_only ~f ~to_ustring =
-    (* FIXME: cleanup *)
-    print_s
-      [%message
-        "find loop"
-          ~input:(to_ustring input : Ustring.t)
-          (at_path : Module_path.Absolute.t)];
-    let f full_path name bindings_at_current =
-      print_s
-        [%message
-          "find loop f"
-            (full_path : Module_path.Absolute.t)
-            ~input:(to_ustring input : Ustring.t)
-            ~names:
-              (match (bindings_at_current : sigs_or_defs) with
-               | Sigs sigs -> sigs.names
-               | Defs defs -> defs.names
-                : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t)];
-      f full_path name bindings_at_current
-    in
     (* Try looking at the current scope, then travel up to parent scopes to find a
        matching name. *)
     let bindings_at_current = resolve_absolute_path_exn ~defs_only t at_path in
-    print_s [%message "find bindings" (bindings_at_current : sigs_or_defs)];
     match List.hd (path : Module_path.Relative.t :> Module_name.t list) with
     | Some first_module ->
       let full_path = Module_path.append' at_path path in
@@ -540,9 +467,6 @@ let find =
   in
   fun ?at_path ?(defs_only = false) t input ~f ~to_ustring ->
     let at_path = Option.value_or_thunk at_path ~default:(fun () -> current_path t) in
-    print_s
-      [%message
-        "find" ~input:(to_ustring input : Ustring.t) (at_path : Module_path.Absolute.t)];
     loop t input ~at_path ~defs_only ~f ~to_ustring
 ;;
 
@@ -553,7 +477,6 @@ let find_absolute ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring 
 ;;
 
 let rec find_entry' t name =
-  print_s [%message "Name_bindings.find_entry'" (name : Value_name.Relative.t) (t : t)];
   let open Option.Let_syntax in
   find
     t
@@ -1005,35 +928,14 @@ let fold_local_names t ~init ~f =
 let merge_names t new_names ~combine =
   let new_names = Map.map new_names ~f:Or_imported.local in
   let f bindings =
-    let new_bindings =
-      { bindings with
-        names =
-          Map.merge_skewed bindings.names new_names ~combine:(fun ~key entry1 entry2 ->
-            let entry1, entry2 =
-              resolve_name_or_import t entry1, resolve_name_or_import t entry2
-            in
-            Local (combine key entry1 entry2))
-      }
-    in
-    print_s
-      [%message
-        "Merging names"
-          ~diff:
-            (Map.symmetric_diff
-               bindings.names
-               new_bindings.names
-               ~data_equal:[%equal: (Name_entry.t, Value_name.Absolute.t) Or_imported.t]
-              : ( Value_name.t
-                , (Name_entry.t, Value_name.Absolute.t) Or_imported.t )
-                Map.Symmetric_diff_element.t
-                Sequence.t)
-          ~old_names:
-            (bindings.names
-              : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t)
-          ~new_names:
-            (new_bindings.names
-              : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t)];
-    new_bindings
+    { bindings with
+      names =
+        Map.merge_skewed bindings.names new_names ~combine:(fun ~key entry1 entry2 ->
+          let entry1, entry2 =
+            resolve_name_or_import t entry1, resolve_name_or_import t entry2
+          in
+          Local (combine key entry1 entry2))
+    }
   in
   update_current t ~f:{ f }
 ;;
