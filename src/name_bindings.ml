@@ -131,9 +131,6 @@ module Type_entry = struct
   let create decl = { id = Id.create (); decl }
 end
 
-(* FIXME: imported entries shouldn't count the same as real entries for e.g.
-   absolutification. The code looks like it already does that but I'm not 100% sure. *)
-
 (* TODO: probably just make 'path the variable so we don't have to put unit for module paths *)
 module Or_imported = struct
   type ('entry, 'path) t =
@@ -360,25 +357,6 @@ let merge_no_shadow t1 t2 =
   }
 ;;
 
-(* FIXME: How about we just rewrite the path resolution logic to something more sane?
-   e.g. we keep a list (like a stack) of parent bindings and update it whenever we go
-   in/out out modules. Then we can just simply walk up that list looking for relative things.
-
-   Looking up absolute paths can then walk from the top every time (?).
-   
-   Really maybe absolute paths need sig/def qualifiers?
-   Why do we need absolute paths anyways? I guess we want to use them to do equality checks, and make sure we can always look up things
-   correctly wherever we are. Sig/def qualifiers do seem important then. Unfortunately if
-   we do that we lose the parametric Module_path.t type unless we chuck in some GADTs.
-   And actually for the equality checks we do I don't *think* we need them. We added entry
-   ids to fix this problem (since multiple absolute paths can still point to the same
-   place due to imports. They'd have to be Unique_path.t then.) 
-   
-   Actually sig/def qualifiers are no good, because it could let you break abstraction
-   boundaries accidentally. When looking up types we want to make sure you get to the right
-   one (so a relative path wouldn't work), but how you get there should depend on where
-   you are. *)
-
 let resolve_absolute_path =
   let open Option.Let_syntax in
   let rec loop_sigs t path sigs =
@@ -437,6 +415,9 @@ let with_path_into_defs t (path : Module_path.Absolute.t) ~f =
   { t' with current_path = t.current_path }, x
 ;;
 
+(* TODO: Consider having `Name_bindings.t` contain a list (stack) of parent bindings up to
+   the toplevel. This would let us just walk up those bindings instead of doing a
+   complicated loop that has to keep walking from the top of tree downwards. *)
 let find =
   let rec loop t ((path, name) as input) ~at_path ~defs_only ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a

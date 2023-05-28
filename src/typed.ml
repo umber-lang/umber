@@ -882,10 +882,6 @@ module Module = struct
       let other_defs, binding_groups = extract_binding_groups ~names defs in
       let names, binding_groups =
         List.fold_map binding_groups ~init:names ~f:(fun names (bindings, path) ->
-          (* FIXME: check if this is resolving paths correctly.
-             I think it will resolve in the parent, not the current module, which is
-             surely wrong. It also doesn't handle sigs/defs properly - it needs to know
-             the original bindings_path *)
           Name_bindings.with_path_into_defs names path ~f:(fun names ->
             let names, def = type_binding_group ~names ~types bindings in
             names, (def, path)))
