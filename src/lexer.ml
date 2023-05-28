@@ -113,7 +113,6 @@ let rec read lexbuf =
   | ':' -> COLON
   | ',' -> COMMA
   | '\\' -> BACKSLASH
-  | '*' -> ASTERISK
   (* Need to support: `f . g`, `(. f)`, `(f .)`, and `(.)` as an operator. *)
   | Plus '.', (")" | white_space) ->
     let lexeme = lexeme lexbuf in

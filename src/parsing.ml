@@ -45,7 +45,6 @@ type token = Parser.token =
   | COLON
   | CHAR of Uchar.t
   | BACKSLASH
-  | ASTERISK
   | AS
   | ARROW
   | AND
@@ -106,7 +105,6 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_COLON : unit terminal
   | T_CHAR : Uchar.t terminal
   | T_BACKSLASH : unit terminal
-  | T_ASTERISK : unit terminal
   | T_AS : unit terminal
   | T_ARROW : unit terminal
   | T_AND : unit terminal

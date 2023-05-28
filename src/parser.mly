@@ -6,8 +6,6 @@
   [@@@ocaml.warning "-3"]
 %}
 
-(* FIXME: Clean up now unused tokens like ASTERISK and WITHOUT. WITH too? *)
-
 %token IF
 %token THEN
 %token ELSE
@@ -36,7 +34,6 @@
 %token COLON_SPACED
 %token COMMA
 %token BACKSLASH
-%token ASTERISK
 %token ARROW
 %token FAT_ARROW
 %token L_PAREN
@@ -70,7 +67,6 @@
 
 val_operator:
   | op = OPERATOR { op }
-  | ASTERISK { Ustring.of_string_exn "*" }
   | n = N_PERIODS { Ustring.make n (Uchar.of_char '.') }
 
 operator:
@@ -178,6 +174,7 @@ expr:
   | BACKSLASH; args = nonempty(pattern_term); ARROW; body = expr
     { Expr.Lambda (args, body) }
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
+  (* TODO: Allow the OCaml-like `match ... with` syntax to reduce surprise. *)
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
   | MATCH; branches = match_branches { Expr.match_function branches }
   | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding); IN; body = expr
