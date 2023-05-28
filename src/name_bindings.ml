@@ -588,24 +588,7 @@ let absolutify_path t (path : Module_path.Relative.t) =
 ;;
 
 let absolutify_type_name t ((_, name) as path) = fst (find_type_entry' t path), name
-
-let absolutify_value_name t name =
-  (* FIXME: cleanup *)
-  let name' = fst (find_entry' t name) in
-  match
-    fst name'
-    |> Module_path.to_module_names
-    |> List.hd
-    |> Option.map ~f:(Module_name.to_ustring >> Ustring.to_string)
-  with
-  | Some ("List" | "Operators") ->
-    raise_s
-      [%message
-        "Weird absolute name"
-          ~absolute_name:(name' : Value_name.Absolute.t)
-          ~relative_name:(name : Value_name.Relative.t)]
-  | Some _ | None -> name'
-;;
+let absolutify_value_name t name = fst (find_entry' t name)
 
 let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules
@@ -958,10 +941,7 @@ and find_absolute_type_entry ?defs_only t type_name =
 
 and resolve_type_or_import ?defs_only t = function
   | Some (Or_imported.Local decl) -> Some decl
-  | Some (Imported path_name) ->
-    (* FIXME: pretty sure this import path should be resolved at the place it's written,
-       not the current path - this goes for all imports, unless we absolutify their paths *)
-    find_absolute_type_entry ?defs_only t path_name
+  | Some (Imported path_name) -> find_absolute_type_entry ?defs_only t path_name
   | None -> None
 ;;
 

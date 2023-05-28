@@ -273,8 +273,6 @@ import_paths:
   | name = unidentified_name; AS; as_name = unidentified_name { Name_as (name, as_name) }
 
 import_stmt:
-  (* FIXME: I think more than one period will become an operator. Maybe a separate token
-     for periods when there's more than one? *)
   | IMPORT; n_periods = n_periods; paths = import_paths
     { { Module.Import.kind = Module.Import.Kind.of_n_periods n_periods ; paths } }
 
