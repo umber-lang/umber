@@ -446,9 +446,8 @@ let find =
     | Some parent_path -> loop t input ~at_path:parent_path ~defs_only ~f ~to_ustring
     | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
   in
-  fun ?at_path ?(defs_only = false) t input ~f ~to_ustring ->
-    let at_path = Option.value_or_thunk at_path ~default:(fun () -> current_path t) in
-    loop t input ~at_path ~defs_only ~f ~to_ustring
+  fun ?(defs_only = false) t input ~f ~to_ustring ->
+    loop t input ~at_path:(current_path t) ~defs_only ~f ~to_ustring
 ;;
 
 let find_absolute ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
@@ -457,41 +456,29 @@ let find_absolute ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring 
   | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
 ;;
 
-let rec find_entry' t name =
+let find_entry_with_path, find_absolute_entry_with_path, resolve_name_or_import_with_path =
   let open Option.Let_syntax in
-  find
-    t
-    name
-    ~to_ustring:Value_name.Relative.to_ustring
-    ~f:(fun current_path name bindings ->
+  let rec f t current_path name bindings =
     let f bindings =
-      Map.find bindings.names name >>| resolve_name_or_import' t (current_path, name)
+      Map.find bindings.names name
+      >>| resolve_name_or_import_with_path t (current_path, name)
     in
     match bindings with
     | Sigs sigs -> f sigs
-    | Defs defs -> f defs)
-
-and find_absolute_entry' t (path, name) =
-  let open Option.Let_syntax in
-  find_absolute
-    t
-    (path, name)
-    ~to_ustring:Value_name.Absolute.to_ustring
-    ~f:(fun name bindings ->
-    let f bindings =
-      Map.find bindings.names name >>| resolve_name_or_import' t (path, name)
-    in
-    match bindings with
-    | Sigs sigs -> f sigs
-    | Defs defs -> f defs)
-
-and resolve_name_or_import' t name = function
-  | Local entry -> name, entry
-  | Imported path_name -> find_absolute_entry' t path_name
+    | Defs defs -> f defs
+  and find_entry_with_path t name =
+    find t name ~to_ustring:Value_name.Relative.to_ustring ~f:(f t)
+  and find_absolute_entry_with_path t (path, name) =
+    find_absolute t (path, name) ~to_ustring:Value_name.Absolute.to_ustring ~f:(f t path)
+  and resolve_name_or_import_with_path t name = function
+    | Local entry -> name, entry
+    | Imported path_name -> find_absolute_entry_with_path t path_name
+  in
+  find_entry_with_path, find_absolute_entry_with_path, resolve_name_or_import_with_path
 ;;
 
-let rec find_entry t name = snd (find_entry' t name)
-and find_absolute_entry t name = snd (find_absolute_entry' t name)
+let rec find_entry t name = snd (find_entry_with_path t name)
+and find_absolute_entry t name = snd (find_absolute_entry_with_path t name)
 
 and resolve_name_or_import t = function
   | Or_imported.Local entry -> entry
@@ -502,7 +489,7 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_entry', find_absolute_type_entry' =
+let find_type_entry_with_path, find_absolute_type_entry_with_path =
   let open Option.Let_syntax in
   let f path name bindings =
     let f bindings ~check_submodule =
@@ -531,10 +518,10 @@ let find_type_entry', find_absolute_type_entry' =
           path, decl
         | Imported import_path -> Some (path, Some (Imported (import_path, name))))
   in
-  let find_type_entry' ?at_path ?defs_only t name =
-    find ?at_path t name ~to_ustring:Type_name.Relative.to_ustring ?defs_only ~f
+  let find_type_entry_with_path ?defs_only t name =
+    find t name ~to_ustring:Type_name.Relative.to_ustring ?defs_only ~f
   in
-  let find_absolute_type_entry' ?defs_only t (path, name) =
+  let find_absolute_type_entry_with_path ?defs_only t (path, name) =
     find_absolute
       t
       (path, name)
@@ -542,7 +529,7 @@ let find_type_entry', find_absolute_type_entry' =
       ?defs_only
       ~f:(f path)
   in
-  find_type_entry', find_absolute_type_entry'
+  find_type_entry_with_path, find_absolute_type_entry_with_path
 ;;
 
 (* FIXME: Ideally we should have consistent behavior between all the absolutify functions,
@@ -568,8 +555,11 @@ let absolutify_path t (path : Module_path.Relative.t) =
         Module_path.to_ustring (Module_path.append path [ name ]))
 ;;
 
-let absolutify_type_name t ((_, name) as path) = fst (find_type_entry' t path), name
-let absolutify_value_name t name = fst (find_entry' t name)
+let absolutify_type_name t ((_, name) as path) =
+  fst (find_type_entry_with_path t path), name
+;;
+
+let absolutify_value_name t name = fst (find_entry_with_path t name)
 
 let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules
@@ -908,17 +898,17 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let rec find_type_entry ?at_path ?defs_only t type_name =
+let rec find_type_entry ?defs_only t type_name =
   resolve_type_or_import
     ?defs_only
     t
-    (snd (find_type_entry' ?at_path ?defs_only t type_name))
+    (snd (find_type_entry_with_path ?defs_only t type_name))
 
 and find_absolute_type_entry ?defs_only t type_name =
   resolve_type_or_import
     ?defs_only
     t
-    (snd (find_absolute_type_entry' ?defs_only t type_name))
+    (snd (find_absolute_type_entry_with_path ?defs_only t type_name))
 
 and resolve_type_or_import ?defs_only t = function
   | Some (Or_imported.Local decl) -> Some decl
@@ -926,8 +916,8 @@ and resolve_type_or_import ?defs_only t = function
   | None -> None
 ;;
 
-let find_type_entry ?at_path ?(defs_only = false) t type_name =
-  option_or_default (find_type_entry ?at_path ~defs_only t type_name) ~f:(fun () ->
+let find_type_entry ?(defs_only = false) t type_name =
+  option_or_default (find_type_entry ~defs_only t type_name) ~f:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
@@ -944,9 +934,7 @@ let find_absolute_type_entry ?(defs_only = false) t type_name =
           (without_std t : t)])
 ;;
 
-let find_type_decl ?at_path ?defs_only t type_name =
-  (find_type_entry ?at_path ?defs_only t type_name).decl
-;;
+let find_type_decl ?defs_only t type_name = (find_type_entry ?defs_only t type_name).decl
 
 let find_absolute_type_decl ?defs_only t type_name =
   (find_absolute_type_entry ?defs_only t type_name).decl
@@ -960,8 +948,6 @@ let resolve_type_or_import t decl_or_import =
           (decl_or_import : (Type_entry.t, Type_name.Absolute.t) Or_imported.t option)
           (without_std t : t)])
 ;;
-
-let find_type_decl = find_type_decl ?at_path:None
 
 let find_sigs_and_defs t path module_name =
   let rec loop t path module_name =
