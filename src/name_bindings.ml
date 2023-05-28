@@ -565,11 +565,8 @@ let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules
 ;;
 
-(* FIXME: I don't think this toplevel behavior difference is implemented right. *)
-(* NOTE: Imports at toplevel defs affect both sigs and defs, but in submodules,
-   they affect defs only. This behavior is super weird, tbh.
-   TODO: try to make this less confusing
-   Also, maybe the order of imports should matter - could just gather them as we go? *)
+(* FIXME: I think this implementation lets you import things from a previous import, which
+   means the order of imports matters, which isn't great. *)
 let import t ({ kind; paths } : Module.Import.t) =
   let sigs_or_defs_into_module sigs_or_defs module_name ~path_so_far =
     let get_bindings modules =

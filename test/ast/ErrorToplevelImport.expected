@@ -1,0 +1,3 @@
+("Compilation error"
+ ((kind Name_error) (msg ("Couldn't find name" ToplevelDefInt))
+  (filename ErrorToplevelImport.um) (span 11:3-11:26)))

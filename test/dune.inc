@@ -463,6 +463,31 @@
     output/ErrorSubmoduleSignatures.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorToplevelImport.expected tokens/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorToplevelImport.expected ast/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorToplevelImport.expected mir/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorToplevelImport.expected llvm/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorToplevelImport.expected output/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
 
 (rule (alias runtest) (deps test.dummy)
