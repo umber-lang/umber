@@ -456,7 +456,7 @@ let find_absolute ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring 
   | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
 ;;
 
-let find_entry_with_path, find_absolute_entry_with_path, resolve_name_or_import_with_path =
+let find_entry_with_path, find_absolute_entry_with_path =
   let open Option.Let_syntax in
   let rec f t current_path name bindings =
     let f bindings =
@@ -474,7 +474,7 @@ let find_entry_with_path, find_absolute_entry_with_path, resolve_name_or_import_
     | Local entry -> name, entry
     | Imported path_name -> find_absolute_entry_with_path t path_name
   in
-  find_entry_with_path, find_absolute_entry_with_path, resolve_name_or_import_with_path
+  find_entry_with_path, find_absolute_entry_with_path
 ;;
 
 let rec find_entry t name = snd (find_entry_with_path t name)
@@ -532,7 +532,7 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
   find_type_entry_with_path, find_absolute_type_entry_with_path
 ;;
 
-(* FIXME: Ideally we should have consistent behavior between all the absolutify functions,
+(* TODO: Ideally we should have consistent behavior between all the absolutify functions,
    which should include following imports all the way to a local name. I don't think that
    is currently the case. *)
 let absolutify_path t (path : Module_path.Relative.t) =

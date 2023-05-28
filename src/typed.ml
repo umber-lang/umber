@@ -176,7 +176,7 @@ module Expr = struct
       match (expr : Untyped.Expr.t) with
       | Literal lit -> Literal lit, Type.Concrete.cast (Literal.typ lit)
       | Name name ->
-        let name, name_entry = Name_bindings.find_entry' names name in
+        let name, name_entry = Name_bindings.find_entry_with_path names name in
         f_name name name_entry;
         Name name, Name_bindings.Name_entry.typ name_entry
       | Qualified (path, expr) ->

@@ -49,7 +49,12 @@ val without_std : t -> t
 
 (* Querying/updating names *)
 val find_entry : t -> Value_name.Relative.t -> Name_entry.t
-val find_entry' : t -> Value_name.Relative.t -> Value_name.Absolute.t * Name_entry.t
+
+val find_entry_with_path
+  :  t
+  -> Value_name.Relative.t
+  -> Value_name.Absolute.t * Name_entry.t
+
 val find_type : t -> Value_name.Relative.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Relative.t -> Type.t
 val find_fixity : t -> Value_name.Relative.t -> Fixity.t
