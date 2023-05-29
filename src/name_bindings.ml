@@ -613,8 +613,8 @@ let import t ({ kind; paths } : Module.Import.t) =
           (Module_path.to_ustring (Module_path.append path_so_far [ module_name ]))
           ~msg:
             [%string
-              "Can't import an item imported but not exported by another module: \
-               %{import_path#Module_path}"]
+              "Can't import an item via another import. Try importing from \
+               %{import_path#Module_path} directly."]
       | None ->
         name_error
           (Module_path.to_ustring (Module_path.append path_so_far [ module_name ]))

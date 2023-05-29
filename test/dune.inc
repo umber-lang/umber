@@ -231,6 +231,31 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorImportOfImport.expected tokens/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorImportOfImport.expected ast/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorImportOfImport.expected mir/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorImportOfImport.expected llvm/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorImportOfImport.expected output/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorIncompatibleSig.expected
     tokens/ErrorIncompatibleSig.out))))
 

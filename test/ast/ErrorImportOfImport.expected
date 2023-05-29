@@ -1,0 +1,6 @@
+("Compilation error"
+ ((kind Name_error)
+  (msg
+   ("Can't import an item via another import. Try importing from Std directly."
+    ErrorImportOfImport.MyStd))
+  (filename ErrorImportOfImport.um) (span 2:1-2:18)))
