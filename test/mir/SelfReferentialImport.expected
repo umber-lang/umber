@@ -1,0 +1,7 @@
+((Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_def
+  ((fun_name SelfReferentialImport.goose)
+   (args (SelfReferentialImport.*lambda_arg))
+   (body (Fun_call Std.Prelude.print ((Primitive (String Honk!)))))))
+ (Value_def SelfReferentialImport.*binding
+  (Fun_call SelfReferentialImport.goose ((Make_block (tag 0))))))

@@ -757,6 +757,33 @@
  (action (no-infer (diff output/Paths.expected output/Paths.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/SelfReferentialImport.expected
+    tokens/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/SelfReferentialImport.expected ast/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/SelfReferentialImport.expected mir/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/SelfReferentialImport.expected llvm/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/SelfReferentialImport.expected
+    output/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Text.expected tokens/Text.out))))
 
 (rule (alias runtest) (deps test.dummy)

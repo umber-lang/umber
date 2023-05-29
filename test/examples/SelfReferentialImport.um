@@ -1,0 +1,7 @@
+# This is pretty weird, it's but equivalent to doing `import .goose as gander`, so it's
+# harmless to allow it.
+import ..SelfReferentialImport.goose as gander
+
+let goose () = print "Honk!"
+
+let () = gander ()
