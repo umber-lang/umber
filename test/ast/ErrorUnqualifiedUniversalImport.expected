@@ -1,0 +1,4 @@
+("Compilation error"
+ ((kind Name_error)
+  (msg "Universal (underscore) import without a module path")
+  (filename ErrorUnqualifiedUniversalImport.um) (span 1:1-1:9)))

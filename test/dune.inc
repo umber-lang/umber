@@ -488,6 +488,36 @@
    (diff output/ErrorToplevelImport.expected output/ErrorToplevelImport.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorUnqualifiedUniversalImport.expected
+    tokens/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorUnqualifiedUniversalImport.expected
+    ast/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorUnqualifiedUniversalImport.expected
+    mir/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorUnqualifiedUniversalImport.expected
+    llvm/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorUnqualifiedUniversalImport.expected
+    output/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
 
 (rule (alias runtest) (deps test.dummy)

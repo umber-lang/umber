@@ -707,6 +707,12 @@ let import t ({ kind; paths } : Module.Import.t) =
     | Name_as (name, as_) -> import_name t import_bindings path_so_far name ~as_
     | All -> import_all t import_bindings path_so_far
   in
+  (match paths with
+   | Module _ | Name _ | Name_as _ -> ()
+   | All ->
+     Compilation_error.raise
+       Name_error
+       ~msg:[%message "Universal (underscore) import without a module path"]);
   let src_path =
     match kind with
     | Absolute -> Module_path.Absolute.empty
