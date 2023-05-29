@@ -599,11 +599,40 @@ module Module = struct
 
   (* TODO: figure out import shadowing semantics - basically, probably ban shadowing *)
 
-  let gather_imports ~names sigs defs =
-    gather_names ~names sigs defs ~f_common:(fun names -> function
-      | Import import -> Name_bindings.import names import
-      | Trait_sig _ -> failwith "TODO: trait sigs"
-      | Val _ | Extern _ | Type_decl _ -> names)
+  (* FIXME: I don't think this works since you can do `import Std` then
+     `import .Std.Prelude`. We should:
+      - disallow imports of imports to stop this.
+      - disallow self-referential imports, just cause they don't make sense.
+      - disallow `import _`, unqualified universal imports *)
+  let import_mentions_prelude : Module.Import.t -> bool = function
+    | { kind = Absolute; paths = Module (module_name, paths) } ->
+      Module_name.equal module_name Intrinsics.std_module_name
+      && Nonempty.exists paths ~f:(function
+           | Module (module_name, _) ->
+             Module_name.equal module_name Intrinsics.prelude_module_name
+           | Name name | Name_as (name, _) ->
+             Unidentified_name.equal
+               name
+               (Module_name.unidentify Intrinsics.prelude_module_name)
+           | All -> true)
+    | { kind = Absolute; paths = All | Name _ | Name_as _ }
+    | { kind = Relative _; paths = _ } -> false
+  ;;
+
+  let gather_imports ~names ~include_std module_name sigs defs =
+    let import_mentioned_prelude = ref false in
+    let names =
+      gather_names ~names module_name sigs defs ~f_common:(fun names -> function
+        | Import import ->
+          if include_std && not !import_mentioned_prelude
+          then import_mentioned_prelude := import_mentions_prelude import;
+          Name_bindings.import names import
+        | Trait_sig _ -> failwith "TODO: trait sigs"
+        | Val _ | Extern _ | Type_decl _ -> names)
+    in
+    if !import_mentioned_prelude || not include_std
+    then names
+    else Name_bindings.import_all_absolute names Intrinsics.prelude_module_path
   ;;
 
   let absolutify_everything =
@@ -902,11 +931,11 @@ module Module = struct
       names, defs)
   ;;
 
-  let of_untyped ~names ~types (module_name, sigs, defs) =
+  let of_untyped ~names ~types ~include_std (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
       let names = gather_name_placeholders ~names module_name sigs defs in
-      let names = gather_imports ~names module_name sigs defs in
+      let names = gather_imports ~names ~include_std module_name sigs defs in
       let sigs, defs = absolutify_everything ~names module_name sigs defs in
       let names = gather_type_decls ~names module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in

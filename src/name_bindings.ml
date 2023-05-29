@@ -350,10 +350,42 @@ let core =
 ;;
 
 let merge_no_shadow t1 t2 =
-  let err to_ustring ~key:name = name_error ~msg:"Name clash" (to_ustring name) in
-  { names = Map.merge_skewed t1.names t2.names ~combine:(err Value_name.to_ustring)
-  ; types = Map.merge_skewed t1.types t2.types ~combine:(err Type_name.to_ustring)
-  ; modules = Map.merge_skewed t1.modules t2.modules ~combine:(err Module_name.to_ustring)
+  let err to_ustring sexp_of_entry ~key:name entry1 entry2 =
+    (* TODO: Attach span information to name/type/module entries so we can get good type
+       errors out of them. I guess we can just chuck everything inside a Node.t? *)
+    Compilation_error.raise
+      Name_error
+      ~msg:
+        [%message
+          "Name clash"
+            ~name:(to_ustring name : Ustring.t)
+            (entry1 : entry)
+            (entry2 : entry)]
+  in
+  { names =
+      Map.merge_skewed
+        t1.names
+        t2.names
+        ~combine:
+          (err
+             Value_name.to_ustring
+             [%sexp_of: (Name_entry.t, Value_name.Absolute.t) Or_imported.t])
+  ; types =
+      Map.merge_skewed
+        t1.types
+        t2.types
+        ~combine:
+          (err
+             Type_name.to_ustring
+             [%sexp_of: (Type_entry.t, Type_name.Absolute.t) Or_imported.t option])
+  ; modules =
+      Map.merge_skewed
+        t1.modules
+        t2.modules
+        ~combine:
+          (err
+             Module_name.to_ustring
+             [%sexp_of: (_, Module_path.Absolute.t) Or_imported.t])
   }
 ;;
 
@@ -567,6 +599,10 @@ let bindings_are_empty { names; types; modules } =
 
 (* FIXME: I think this implementation lets you import things from a previous import, which
    means the order of imports matters, which isn't great. *)
+(* FIXME: Wait, you shouldn't just be able to do `import _` or something, that
+   doesn't make sense. So `paths = All` shouldn't be valid. Does `import ..*` make sense
+   though? Also, wait, what about if you have a module `Foo` and then do `import ..Foo.*`
+   I guess we need a rule against self-referential imports. *)
 let import t ({ kind; paths } : Module.Import.t) =
   let sigs_or_defs_into_module sigs_or_defs module_name ~path_so_far =
     let get_bindings modules =
@@ -697,12 +733,7 @@ let absolutify_type_expr t type_ =
   Type.Expr.map type_ ~var:Fn.id ~pf:Fn.id ~name:(fun name -> absolutify_type_name t name)
 ;;
 
-let of_prelude_sexp sexp =
-  let t = into_parent (t_of_sexp sexp) in
-  import_all_absolute t Intrinsics.prelude_module_path
-;;
-
-let prelude = lazy (of_prelude_sexp Umber_std.Prelude.names)
+let prelude = lazy (into_parent (t_of_sexp Umber_std.Prelude.names))
 
 let add_val_or_extern
   ?extern_name

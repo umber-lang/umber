@@ -130,6 +130,7 @@ val with_path_into_defs : t -> Module_path.Absolute.t -> f:(t -> t * 'a) -> t * 
 (* AST handling *)
 val import : t -> Module.Import.t -> t
 val import_all : t -> Module_path.Relative.t -> t
+val import_all_absolute : t -> Module_path.Absolute.t -> t
 
 val add_val
   :  t

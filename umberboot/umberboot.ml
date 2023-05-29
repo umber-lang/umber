@@ -182,7 +182,11 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
              | None -> names
            in
            let%map.Result names, ast =
-             Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast
+             Ast.Typed.Module.of_untyped
+               ~names
+               ~types:(Type_bindings.create ())
+               ~include_std:(not no_std)
+               ast
            in
            maybe_output Typed_ast ~f:(fun out ->
              Parsing.fprint_s [%sexp (ast : Ast.Typed.Module.t)] ~out);

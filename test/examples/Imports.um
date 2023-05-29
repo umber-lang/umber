@@ -1,4 +1,5 @@
 import Std.Prelude.Float
+import Std.Prelude.(Int, Option)
 import Std.Prelude.Float.abs
 import Std.Prelude.Float.(sin, cos)
 type Cool =
@@ -6,7 +7,7 @@ type Cool =
   | Bad_style_though (Option ())
 import Std.Prelude.Int._
 import Std.Prelude.Operators.(*)
-import Std.Prelude.(Int, Float.(pi, (+)))
+import Std.Prelude.(List, Float.(pi, (+)))
 
 # TODO: Consider implementing the ability to import everything *except* some names
 

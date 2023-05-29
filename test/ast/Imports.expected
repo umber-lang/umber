@@ -25,6 +25,10 @@
   (Common_def
    (Import
     ((kind Absolute)
+     (paths (Module Std ((Module Prelude ((Name Int) (Name Option)))))))))
+  (Common_def
+   (Import
+    ((kind Absolute)
      (paths (Module Std ((Module Prelude ((Module Float ((Name abs)))))))))))
   (Common_def
    (Import
@@ -37,7 +41,7 @@
     (()
      (Variants
       ((You_can_define_types_in_between_imports ((Tuple ())))
-       (Bad_style_though ((Type_app Option ((Tuple ()))))))))))
+       (Bad_style_though ((Type_app Imports.Option ((Tuple ()))))))))))
   (Common_def
    (Import
     ((kind Absolute)
@@ -51,7 +55,7 @@
     ((kind Absolute)
      (paths
       (Module Std
-       ((Module Prelude ((Name Int) (Module Float ((Name pi) (Name +)))))))))))
+       ((Module Prelude ((Name List) (Module Float ((Name pi) (Name +)))))))))))
   (Module
    (A ()
     ((Common_def (Type_decl Foo (() (Alias (Type_app Imports.A.Bar ())))))

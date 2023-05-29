@@ -1,3 +1,6 @@
 ("Compilation error"
- ((kind Name_error) (msg ("Name clashes with import" Std.Prelude.Option))
-  (filename Option.um) (span 9:3-11:13)))
+ ((kind Name_error)
+  (msg
+   ("Name clash" (name Option) (entry1 (Local _))
+    (entry2 (Imported (Std Prelude Option)))))
+  (filename Option.um)))
