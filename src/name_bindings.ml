@@ -597,12 +597,6 @@ let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules
 ;;
 
-(* FIXME: I think this implementation lets you import things from a previous import, which
-   means the order of imports matters, which isn't great. *)
-(* FIXME: Wait, you shouldn't just be able to do `import _` or something, that
-   doesn't make sense. So `paths = All` shouldn't be valid. Does `import ..*` make sense
-   though? Also, wait, what about if you have a module `Foo` and then do `import ..Foo.*`
-   I guess we need a rule against self-referential imports. *)
 let import t ({ kind; paths } : Module.Import.t) =
   let sigs_or_defs_into_module sigs_or_defs module_name ~path_so_far =
     let get_bindings modules =

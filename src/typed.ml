@@ -597,13 +597,6 @@ module Module = struct
         | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)"))
   ;;
 
-  (* TODO: figure out import shadowing semantics - basically, probably ban shadowing *)
-
-  (* FIXME: I don't think this works since you can do `import Std` then
-     `import .Std.Prelude`. We should:
-      - disallow imports of imports to stop this.
-      - disallow self-referential imports, just cause they don't make sense.
-      - disallow `import _`, unqualified universal imports *)
   let import_mentions_prelude : Module.Import.t -> bool = function
     | { kind = Absolute; paths = Module (module_name, paths) } ->
       Module_name.equal module_name Intrinsics.std_module_name
