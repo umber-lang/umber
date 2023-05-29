@@ -603,12 +603,12 @@ module Module = struct
       && Nonempty.exists paths ~f:(function
            | Module (module_name, _) ->
              Module_name.equal module_name Intrinsics.prelude_module_name
-           | Name name | Name_as (name, _) ->
+           | Name name | Name_as (name, _) | Name_excluded name ->
              Unidentified_name.equal
                name
                (Module_name.unidentify Intrinsics.prelude_module_name)
            | All -> true)
-    | { kind = Absolute; paths = All | Name _ | Name_as _ }
+    | { kind = Absolute; paths = All | Name _ | Name_as _ | Name_excluded _ }
     | { kind = Relative _; paths = _ } -> false
   ;;
 

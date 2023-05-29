@@ -597,7 +597,7 @@ let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules
 ;;
 
-let import t ({ kind; paths } : Module.Import.t) =
+let import =
   let sigs_or_defs_into_module sigs_or_defs module_name ~path_so_far =
     let get_bindings modules =
       match Map.find modules module_name with
@@ -624,7 +624,7 @@ let import t ({ kind; paths } : Module.Import.t) =
        | Some sigs -> Sigs sigs
        | None -> Defs defs)
   in
-  let import_name t sigs_or_defs path name ~as_:as_name =
+  let import_name acc sigs_or_defs path name ~as_:as_name =
     let name = Unidentified_name.to_ustring name in
     let as_name = Unidentified_name.to_ustring as_name in
     let import_from_bindings bindings =
@@ -660,14 +660,13 @@ let import t ({ kind; paths } : Module.Import.t) =
           (Ustring.concat
              [ Module_path.to_ustring path; Ustring.of_string_exn "."; name ])
           ~msg:"Import not found";
-      let f bindings = merge_no_shadow bindings bindings_to_import in
-      update_current t ~f:{ f }
+      merge_no_shadow acc bindings_to_import
     in
     match sigs_or_defs with
     | Sigs sigs -> import_from_bindings sigs
     | Defs defs -> import_from_bindings defs
   in
-  let import_all t sigs_or_defs path =
+  let import_all acc sigs_or_defs path =
     let import_from_bindings bindings =
       let bindings_to_import =
         { names =
@@ -681,39 +680,67 @@ let import t ({ kind; paths } : Module.Import.t) =
               Or_imported.Imported (Module_path.append path [ name ]))
         }
       in
-      let f bindings = merge_no_shadow bindings bindings_to_import in
-      update_current t ~f:{ f }
+      (* FIXME: We can't just import everything and then un-import it. We'll still get
+         issues about importing things we shouldn't. *)
+      merge_no_shadow acc bindings_to_import
     in
     match sigs_or_defs with
     | Sigs sigs -> import_from_bindings sigs
     | Defs defs -> import_from_bindings defs
   in
-  let rec loop t import_bindings (paths : Module.Import.Paths.t) ~path_so_far =
+  (* FIXME: Ok, how about this? We come up with all the bindings we need, then import them
+     all in one go?*)
+  let exclude_imported_name acc path_so_far name =
+    let name = Unidentified_name.to_ustring name in
+    let value_name = Value_name.of_ustring_unchecked name in
+    let type_name = Type_name.of_ustring_unchecked name in
+    let module_name = Module_name.of_ustring_unchecked name in
+    if not
+         (Map.mem acc.names value_name
+         || Map.mem acc.types type_name
+         || Map.mem acc.modules module_name)
+    then name_error_path (Module_path.append path_so_far [ module_name ]);
+    { names = Map.remove acc.names value_name
+    ; types = Map.remove acc.types type_name
+    ; modules = Map.remove acc.modules module_name
+    }
+  in
+  let rec loop acc import_bindings (paths : Module.Import.Paths.t) ~path_so_far =
     match paths with
     | Module (module_name, paths') ->
-      Nonempty.fold paths' ~init:t ~f:(fun t paths' ->
+      (* We need to sort the paths to ensure that we always add names before
+         excluding/removing them. This works because `Module.Import.Paths.compare` puts
+         `Name_excluded` last in sorted order. *)
+      let paths' = Nonempty.sort paths' ~compare:Module.Import.Paths.compare in
+      Nonempty.fold paths' ~init:acc ~f:(fun acc paths' ->
         loop
-          t
+          acc
           (sigs_or_defs_into_module import_bindings module_name ~path_so_far)
           paths'
           ~path_so_far:(Module_path.append path_so_far [ module_name ]))
-    | Name name -> import_name t import_bindings path_so_far name ~as_:name
-    | Name_as (name, as_) -> import_name t import_bindings path_so_far name ~as_
-    | All -> import_all t import_bindings path_so_far
+    | Name name -> import_name acc import_bindings path_so_far name ~as_:name
+    | Name_as (name, as_) -> import_name acc import_bindings path_so_far name ~as_
+    | Name_excluded name -> exclude_imported_name acc path_so_far name
+    | All -> import_all acc import_bindings path_so_far
   in
-  (match paths with
-   | Module _ | Name _ | Name_as _ -> ()
-   | All ->
-     Compilation_error.raise
-       Name_error
-       ~msg:[%message "Universal (underscore) import without a module path"]);
-  let src_path =
-    match kind with
-    | Absolute -> Module_path.Absolute.empty
-    | Relative { nth_parent } -> Module_path.drop_last_n_exn (current_path t) nth_parent
-  in
-  let import_bindings = resolve_absolute_path_exn t src_path ~defs_only:false in
-  loop t import_bindings paths ~path_so_far:src_path
+  fun t ({ kind; paths } : Module.Import.t) ->
+    (match paths with
+     | Module _ | Name _ | Name_as _ | Name_excluded _ -> ()
+     | All ->
+       Compilation_error.raise
+         Name_error
+         ~msg:[%message "Universal (underscore) import without a module path"]);
+    let src_path =
+      match kind with
+      | Absolute -> Module_path.Absolute.empty
+      | Relative { nth_parent } -> Module_path.drop_last_n_exn (current_path t) nth_parent
+    in
+    let import_bindings = resolve_absolute_path_exn t src_path ~defs_only:false in
+    let bindings_to_import =
+      loop empty_bindings import_bindings paths ~path_so_far:src_path
+    in
+    let f bindings = merge_no_shadow bindings bindings_to_import in
+    update_current t ~f:{ f }
 ;;
 
 let import_all_absolute t (path : Module_path.Absolute.t) =

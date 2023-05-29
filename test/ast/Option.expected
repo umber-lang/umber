@@ -1,6 +1,9 @@
-("Compilation error"
- ((kind Name_error)
-  (msg
-   ("Name clash" (name Option) (entry1 (Local _))
-    (entry2 (Imported (Std Prelude Option)))))
-  (filename Option.um)))
+(Option
+ ((Common_sig
+   (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a)))))))))
+ ((Common_def
+   (Import
+    ((kind Absolute)
+     (paths (Module Std ((Module Prelude ((Name_as Option Blah)))))))))
+  (Common_def
+   (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a))))))))))

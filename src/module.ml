@@ -15,12 +15,35 @@ module Import = struct
   end
 
   module Paths = struct
+    (* TODO: Consider making a ['a Or_underscore.t] type. Then we could rephrase this type
+       in terms of that. *)
     type t =
+      | All
       | Module of Module_name.t * t Nonempty.t
       | Name of Unidentified_name.t
-      | All
       | Name_as of Unidentified_name.t * Unidentified_name.t
-    [@@deriving sexp_of]
+      | Name_excluded of Unidentified_name.t
+    [@@deriving compare, sexp_of, variants]
+
+    (* We need `Name_excluded` to come last in sorted order so that when imports are
+       processed in this sorted order, names are always added before being removed.  *)
+    let%expect_test "Name_excluded comes last in sorted order" =
+      let module_name = Module_name.of_string_exn "ModuleName" in
+      let name = Unidentified_name.of_string_exn "name" in
+      let examples =
+        Variants.fold
+          ~init:[]
+          ~all:(fun acc variant -> variant.constructor :: acc)
+          ~module_:(fun acc variant -> variant.constructor module_name [ All ] :: acc)
+          ~name:(fun acc variant -> variant.constructor name :: acc)
+          ~name_as:(fun acc variant -> variant.constructor name name :: acc)
+          ~name_excluded:(fun acc variant -> variant.constructor name :: acc)
+      in
+      print_s [%sexp (List.sort examples ~compare : t list)];
+      [%expect {|
+        (All (Module ModuleName (All)) (Name name) (Name_as name name)
+         (Name_excluded name)) |}]
+    ;;
   end
 
   type t =

@@ -235,6 +235,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_let_binding_ : (Umber__Untyped.Pattern.t * Untyped.Expr.t) nonterminal
   | N_let_binding : (Umber__Untyped.Pattern.t * Untyped.Expr.t) Node.t nonterminal
   | N_import_stmt : Module.Import.t nonterminal
+  | N_import_paths_after_module : Module.Import.Paths.t Nonempty.t nonterminal
   | N_import_paths : Module.Import.Paths.t nonterminal
   | N_flexible_nonempty_COMMA_type_non_fun_
       : (Type.Param.t, Core.never_returns, Parser_scope.Module_path.relative) Type.Expr.t

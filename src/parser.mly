@@ -259,15 +259,18 @@ n_periods:
 %inline unidentified_name:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
+(* FIXME: Probably put this back the way it was. *)
+import_paths_after_module:
+  | paths = import_paths { [ paths ] }
+  | paths = parens(separated_nonempty(COMMA, import_paths)) { paths }
+
 import_paths:
-  | module_name = UPPER_NAME; PERIOD; rest = import_paths
-    { Module.Import.Paths.Module (Module_name.of_ustring_unchecked module_name, [ rest ]) }
-  | module_name = UPPER_NAME; PERIOD; L_PAREN;
-    rest = separated_nonempty(COMMA, import_paths); R_PAREN
-    { Module (Module_name.of_ustring_unchecked module_name, rest) }
+  | module_name = UPPER_NAME; PERIOD; paths = import_paths_after_module
+    { Module.Import.Paths.Module (Module_name.of_ustring_unchecked module_name, paths) }
   | name = unidentified_name { Name name }
   | UNDERSCORE { All }
   | name = unidentified_name; AS; as_name = unidentified_name { Name_as (name, as_name) }
+  | name = unidentified_name; AS; UNDERSCORE { Name_excluded name }
 
 import_stmt:
   | IMPORT; n_periods = n_periods; paths = import_paths
