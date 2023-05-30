@@ -564,9 +564,14 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
   find_type_entry_with_path, find_absolute_type_entry_with_path
 ;;
 
-(* TODO: Ideally we should have consistent behavior between all the absolutify functions,
+(* FIXME: Ideally we should have consistent behavior between all the absolutify functions,
    which should include following imports all the way to a local name. I don't think that
-   is currently the case. *)
+   is currently the case.
+   
+   I'm not sure if we want to follow all imports all the way, necessarily. We just need an
+   absolute path, so this is basically aesthetics. I think following imports 1 step is
+   probably good, since otherwise basically every path is from the current module, and
+   that way the imports don't get too far away. *)
 let absolutify_path t (path : Module_path.Relative.t) =
   match Module_path.split_last path with
   | None -> current_path t

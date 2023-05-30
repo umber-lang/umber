@@ -5,16 +5,19 @@
      (Common_sig
       (Val between ()
        (()
-        (Function ((Type_app Int ()) (Type_app Int ()))
+        (Function ((Type_app ModuleSig.Int ()) (Type_app ModuleSig.Int ()))
          (Type_app ModuleSig.Range.Range ())))))
      (Common_sig
       (Val elem ()
        (()
-        (Function ((Type_app Int ()) (Type_app ModuleSig.Range.Range ()))
+        (Function
+         ((Type_app ModuleSig.Int ()) (Type_app ModuleSig.Range.Range ()))
          (Type_app Bool ()))))))
     ((Common_def
       (Type_decl Range
-       (() (Alias (Tuple ((Type_app Int ()) (Type_app Int ())))))))
+       (()
+        (Alias
+         (Tuple ((Type_app ModuleSig.Int ()) (Type_app ModuleSig.Int ())))))))
      (Let (rec_ false)
       (bindings
        (((Catch_all (between))

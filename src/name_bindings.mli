@@ -29,7 +29,7 @@ module Type_entry : sig
   module Id : sig
     type t [@@deriving equal, compare, hash, sexp_of]
 
-    include Hashable.S_plain with type t := t
+    include Comparable.S_plain with type t := t
   end
 
   val decl : t -> Module_path.absolute Type.Decl.t

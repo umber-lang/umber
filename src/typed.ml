@@ -701,15 +701,17 @@ module Module = struct
   (** Raise an error upon finding any cycles in a given type alias. *)
   let check_cyclic_type_alias ~names alias =
     (* TODO: can rewrite this with [Type.Expr.map] *)
-    let rec loop ~names aliases_seen (alias : Module_path.absolute Type.Scheme.t) =
+    (* TODO: This could stop checking for cyclic aliases early if it reaches a type in
+       another file. (There should be a separate check for cyclic imports.) *)
+    let rec loop ~names ~aliases_seen (alias : Module_path.absolute Type.Scheme.t) =
       match alias with
       | Type_app (name, args) ->
         let type_entry = Name_bindings.find_absolute_type_entry names name in
         let decl = Name_bindings.Type_entry.decl type_entry in
-        (match decl with
-         | _, Alias alias ->
+        (match snd decl with
+         | Alias alias ->
            let id = Name_bindings.Type_entry.id type_entry in
-           if Hash_set.mem aliases_seen id
+           if Set.mem aliases_seen id
            then
              Compilation_error.raise
                Type_error
@@ -717,20 +719,18 @@ module Module = struct
                  [%message
                    "Cyclic type alias"
                      (name : Type_name.Absolute.t)
-                     (decl : Module_path.absolute Type.Decl.t)];
-           Hash_set.add aliases_seen id;
-           loop ~names aliases_seen alias
-         | _ -> ());
-        List.iter args ~f:(loop ~names aliases_seen)
+                     (decl : Module_path.absolute Type.Decl.t)]
+           else loop ~names ~aliases_seen:(Set.add aliases_seen id) alias
+         | Abstract | Variants _ | Record _ -> ());
+        List.iter args ~f:(loop ~names ~aliases_seen)
       | Function (args, body) ->
-        Nonempty.iter args ~f:(loop ~names aliases_seen);
-        loop ~names aliases_seen body
-      | Tuple items -> List.iter items ~f:(loop ~names aliases_seen)
+        Nonempty.iter args ~f:(loop ~names ~aliases_seen);
+        loop ~names ~aliases_seen body
+      | Tuple items -> List.iter items ~f:(loop ~names ~aliases_seen)
       | Var _ -> ()
       | Partial_function _ -> .
     in
-    let aliases_seen = Name_bindings.Type_entry.Id.Hash_set.create () in
-    loop ~names aliases_seen alias
+    loop ~names ~aliases_seen:Name_bindings.Type_entry.Id.Set.empty alias
   ;;
 
   (* TODO: We should make this a record type, it would a lot of this code way easier to
