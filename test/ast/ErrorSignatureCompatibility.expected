@@ -22,7 +22,10 @@
           (type_source Let_inferred))))
        (plus_one'
         (Incompatible
-         ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ())))))
+         ((typ
+           (Scheme
+            (Function ((Type_app ErrorSignatureCompatibility.Int ()))
+             (Type_app ErrorSignatureCompatibility.Int ())))))
          ((typ
            (Scheme
             (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
@@ -41,7 +44,8 @@
              (Incompatible
               (()
                (Variants
-                ((Int ((Type_app Int ()))) (Float ((Type_app Float ()))))))
+                ((Int ((Type_app ErrorSignatureCompatibility.Int ())))
+                 (Float ((Type_app ErrorSignatureCompatibility.Float ()))))))
               (()
                (Variants
                 ((Int ((Type_app ErrorSignatureCompatibility.A.Int ())))

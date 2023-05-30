@@ -1,3 +1,5 @@
+import Std.Prelude.((|>) as _, _)
+
 let () = ()
 let id x = x
 let id_for_ints (x : Int) = x

@@ -4,7 +4,9 @@
   (Common_def
    (Type_decl Thing
     (()
-     (Variants ((Thing1 ((Type_app Int ()))) (Thing2 ((Type_app Int ()))))))))
+     (Variants
+      ((Thing1 ((Type_app LetPattern.Int ())))
+       (Thing2 ((Type_app LetPattern.Int ()))))))))
   (Let (rec_ false)
    (bindings
     (((Union (Cnstr_appl LetPattern.Thing1 ((Catch_all (one))))

@@ -1,10 +1,13 @@
 (TypeModuleNamePunning ()
  ((Module
    (Foo ()
-    ((Common_def (Type_decl Foo (() (Alias (Type_app Int ())))))
+    ((Common_def
+      (Type_decl Foo (() (Alias (Type_app TypeModuleNamePunning.Int ())))))
      (Module
       (Foo ()
-       ((Common_def (Type_decl Foo (() (Alias (Type_app Float ())))))
+       ((Common_def
+         (Type_decl Foo
+          (() (Alias (Type_app TypeModuleNamePunning.Float ())))))
         (Module
          (Foo ()
           ((Common_def (Type_decl Foo (() (Alias (Type_app String ()))))))))))))))
