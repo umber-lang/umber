@@ -1,16 +1,5 @@
-# FIXME: Allow explicit imports of the prelude that hide things.
-# e.g. `import Prelude without Option`
-# This seems nontrivial since we have to look through local imports for prelude imports,
-# then do the prelude import, then resolve the local imports. Also, imports of `Prelude`
-# of `Std.Prelude` might not actually refer to the prelude, right? Unless, we force import
-# paths to be absolute or explicitly relative. That sounds like a good idea!
-import Std.Prelude.Option as Blah
-
-# FIXME: Why does the following not typecheck?
-#import Std.Prelude.Option as _
-
-# FIXME: Why does the following not parse?
-#import Std.Prelude.(Option as _, _)
+# Import from the prelude, hiding just these items to prevent a clash
+import Std.Prelude.(_, Option as _, None as _, Some as _)
 
 # FIXME: I should add another test showing the name clash error message
 

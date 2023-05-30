@@ -4,6 +4,10 @@
  ((Common_def
    (Import
     ((kind Absolute)
-     (paths (Module Std ((Module Prelude ((Name_as Option Blah)))))))))
+     (paths
+      (Module Std
+       ((Module Prelude
+         (All (Name_excluded Option) (Name_excluded None)
+          (Name_excluded Some)))))))))
   (Common_def
    (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a))))))))))
