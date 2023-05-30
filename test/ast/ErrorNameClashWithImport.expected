@@ -1,0 +1,7 @@
+("Compilation error"
+ ((kind Name_error)
+  (msg
+   ("Name clash" (name None)
+    (entry1 (Local ((typ (Scheme (Var a))) (type_source Placeholder))))
+    (entry2 (Imported Std.Prelude.None))))
+  (filename ErrorNameClashWithImport.um)))

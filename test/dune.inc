@@ -340,6 +340,36 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorNameClashWithImport.expected
+    tokens/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorNameClashWithImport.expected
+    ast/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorNameClashWithImport.expected
+    mir/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorNameClashWithImport.expected
+    llvm/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorNameClashWithImport.expected
+    output/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorPartialApplication.expected
     tokens/ErrorPartialApplication.out))))
 

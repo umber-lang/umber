@@ -625,7 +625,13 @@ module Module = struct
     in
     if !import_mentioned_prelude || not include_std
     then names
-    else Name_bindings.import_all_absolute names Intrinsics.prelude_module_path
+    else
+      List.fold [ `Sig; `Def ] ~init:names ~f:(fun names place ->
+        Name_bindings.with_submodule
+          names
+          ~place
+          module_name
+          ~f:(Fn.flip Name_bindings.import_all_absolute Intrinsics.prelude_module_path))
   ;;
 
   let absolutify_everything =

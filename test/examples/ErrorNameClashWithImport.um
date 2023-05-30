@@ -1,0 +1,19 @@
+# TODO: We aren't detecting clashes caused by type/module name punning, so we're getting
+# an error for `None` here, but not for `Option`.
+# 
+# Some options:
+# - Instead of doing an extra lookup, copy types with the same name as their module into
+#   the parent. Problems: depending on when we do this, it might also bring in constructor
+#   names, which could be confusing/cause clashes. Maybe this could work ok if we
+#   generated extra imports like `import .Foo.Foo`? Although that wouldn't play great with
+#   imports of imports not being allowed. (Maybe they should be allowed?)
+# - Have import clash checking also check for name clashes between these types/module
+#   names. (e.g. if we are importing a module name which contains a type with the same
+#   name, check that it doesn't clash with a local type name.)
+# - Just don't bother disallowing this? The name shadowing seems kind of ok. In general
+#   it kinda seems nice to ban imports clashing with local names though. The imports
+#   aren't usable in that case.
+type Option a = | None
+
+# TODO: Write a test on the behavior of name clashes between e.g. `Foo` and `Foo.Foo`
+# in a submodule. That one seems possibly more egregious.
