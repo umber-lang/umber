@@ -102,6 +102,7 @@ module Module_path : sig
   val is_prefix : prefix:'a t -> 'a t -> bool
   val append : 'a t -> Module_name.t list -> 'a t
   val append' : 'a t -> relative t -> 'a t
+  val last : _ t -> Module_name.t option
   val drop_last : 'a t -> 'a t option
   val drop_last_n_exn : 'a t -> int -> 'a t
   val split_last : 'a t -> ('a t * Module_name.t) option
@@ -150,6 +151,7 @@ end = struct
 
   let append = ( @ )
   let append' = ( @ )
+  let last = List.last
   let drop_last = List.drop_last
   let split_last = List.split_last
 

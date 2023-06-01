@@ -537,27 +537,36 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
         let%bind bindings = Map.find bindings.modules module_name in
         check_submodule bindings
     in
-    let find_type bindings path =
+    let find_type bindings path name =
       let%map entry = Map.find bindings.types name in
       resolve_type_or_import_with_path t (path, name) entry ~defs_only
     in
     let find_in_imported_submodule ~import_path =
       let bindings = resolve_absolute_path_exn t import_path ~defs_only in
+      let name =
+        (* Use the name of the imported module as the type name to look up. *)
+        match Module_path.last import_path with
+        | Some module_name ->
+          Module_name.to_ustring module_name |> Type_name.of_ustring_unchecked
+        | None ->
+          compiler_bug
+            [%message "Empty import path" (import_path : Module_path.Absolute.t)]
+      in
       match bindings with
-      | Sigs sigs -> find_type sigs import_path
-      | Defs defs -> find_type defs import_path
+      | Sigs sigs -> find_type sigs import_path name
+      | Defs defs -> find_type defs import_path name
     in
     match bindings with
     | Sigs sigs ->
       f sigs ~check_submodule:(function
-        | Local (None, sigs) -> find_type sigs path
+        | Local (None, sigs) -> find_type sigs path name
         | Local (Some _, _) -> .
         | Imported import_path -> find_in_imported_submodule ~import_path)
     | Defs defs ->
       f defs ~check_submodule:(function
-        | Local (None, defs) -> find_type defs path
+        | Local (None, defs) -> find_type defs path name
         | Local (Some sigs, defs) ->
-          if defs_only then find_type defs path else find_type sigs path
+          if defs_only then find_type defs path name else find_type sigs path name
         | Imported import_path -> find_in_imported_submodule ~import_path)
   and find_type_entry_with_path ?(defs_only = false) t name =
     find t name ~to_ustring:Type_name.Relative.to_ustring ~defs_only ~f:(f t ~defs_only)
@@ -577,18 +586,6 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
   in
   find_type_entry_with_path, find_absolute_type_entry_with_path
 ;;
-
-(* FIXME: Ideally we should have consistent behavior between all the absolutify functions,
-   which should include following imports all the way to a local name. I don't think that
-   is currently the case.
-   
-   I'm not sure if we want to follow all imports all the way, necessarily. We just need an
-   absolute path, so this is basically aesthetics. I think following imports 1 step is
-   probably good, since otherwise basically every path is from the current module, and
-   that way the imports don't get too far away.
-   
-   PROBLEM: Leaving imports in relative paths does work great because they don't end up
-   in the MIR context.*)
 
 let absolutify_path t (path : Module_path.Relative.t) =
   match Module_path.split_last path with
@@ -700,16 +697,12 @@ let import =
               Or_imported.Imported (Module_path.append path [ name ]))
         }
       in
-      (* FIXME: We can't just import everything and then un-import it. We'll still get
-         issues about importing things we shouldn't. *)
       merge_no_shadow acc bindings_to_import
     in
     match sigs_or_defs with
     | Sigs sigs -> import_from_bindings sigs
     | Defs defs -> import_from_bindings defs
   in
-  (* FIXME: Ok, how about this? We come up with all the bindings we need, then import them
-     all in one go?*)
   let exclude_imported_name acc path_so_far name =
     let name = Unidentified_name.to_ustring name in
     let value_name = Value_name.of_ustring_unchecked name in
