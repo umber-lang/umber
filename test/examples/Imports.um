@@ -9,8 +9,6 @@ import Std.Prelude.Int._
 import Std.Prelude.Operators.(*)
 import Std.Prelude.(List, Float.(pi, (+)))
 
-# TODO: Consider implementing the ability to import everything *except* some names
-
 module : {
   # Imports work in signatures as well
   import .A.Foo
