@@ -44,7 +44,12 @@ module : {
     val (*) (infixl 7) : Int, Int -> Int
     #val (/) (infixl 7) : Float, Float -> Float
     #val (//) (infixl 7) : Int, Int -> Int  # Same as quot (not div)
-    #val (%) (infixl 7) : Int, Int -> Int  # Same as rem (not mod)
+
+    # Remainder
+    val (%) (infixl 7) : Int, Int -> Int
+
+    # Euclidean modulus
+    val mod (infixl 7) : Int, Int -> Int
 
     val (+) (infixl 6) : Int, Int -> Int
     val (-) (infixl 6) : Int, Int -> Int
@@ -140,10 +145,12 @@ module Operators = {
   val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
   let (.) f g x = f (g x)
 
-  extern (^) (infixr 8) : Int, Int -> Int = "umber_int_pow"
-  extern (*) (infixl 7) : Int, Int -> Int = "umber_int_mul"
   extern (+) (infixl 6) : Int, Int -> Int = "umber_int_add"
   extern (-) (infixl 6) : Int, Int -> Int = "umber_int_sub"
+  extern (*) (infixl 7) : Int, Int -> Int = "umber_int_mul"
+  extern (%) (infixl 7) : Int, Int -> Int = "umber_int_rem"
+  extern mod (infixl 7) : Int, Int -> Int = "umber_int_mod"
+  extern (^) (infixr 8) : Int, Int -> Int = "umber_int_pow"
 
   extern (*.) (infixl 7) : Float, Float -> Float = "umber_float_mul"
   extern (+.) (infixl 6) : Float, Float -> Float = "umber_float_add"

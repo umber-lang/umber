@@ -36,7 +36,8 @@ let names = {|
           ((Prelude
             (Local
              ((((names
-                 ((* (Imported Std.Prelude.Operators.*))
+                 ((% (Imported Std.Prelude.Operators.%))
+                  (* (Imported Std.Prelude.Operators.*))
                   (+ (Imported Std.Prelude.Operators.+))
                   (- (Imported Std.Prelude.Operators.-))
                   (. (Imported Std.Prelude.Operators..))
@@ -57,6 +58,7 @@ let names = {|
                   (|> (Imported Std.Prelude.Operators.|>))
                   (|| (Imported Std.Prelude.Operators.||))
                   (Nil (Imported Std.Prelude.List.Nil))
+                  (mod (Imported Std.Prelude.Operators.mod))
                   (not (Imported Std.Prelude.Operators.not))
                   (Cons (Imported Std.Prelude.List.Cons))
                   (None (Imported Std.Prelude.Option.None))
@@ -192,7 +194,16 @@ let names = {|
                    (Local
                     (()
                      ((names
-                       ((*
+                       ((%
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Std.Prelude.Int ())
+                               (Type_app Std.Prelude.Int ()))
+                              (Type_app Std.Prelude.Int ()))))
+                           (fixity (Left 7)))))
+                        (*
                          (Local
                           ((typ
                             (Scheme
@@ -344,6 +355,15 @@ let names = {|
                               ((Type_app Bool ()) (Type_app Bool ()))
                               (Type_app Bool ()))))
                            (fixity (Left 2)))))
+                        (mod
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Std.Prelude.Int ())
+                               (Type_app Std.Prelude.Int ()))
+                              (Type_app Std.Prelude.Int ()))))
+                           (fixity (Left 7)))))
                         (not
                          (Local
                           ((typ
@@ -352,7 +372,8 @@ let names = {|
                               (Type_app Bool ())))))))))
                       (types ()) (modules ())))))))))
               ((names
-                ((* (Imported Std.Prelude.Operators.*))
+                ((% (Imported Std.Prelude.Operators.%))
+                 (* (Imported Std.Prelude.Operators.*))
                  (+ (Imported Std.Prelude.Operators.+))
                  (- (Imported Std.Prelude.Operators.-))
                  (. (Imported Std.Prelude.Operators..))
@@ -372,6 +393,7 @@ let names = {|
                  (>= (Imported Std.Prelude.Operators.>=))
                  (|> (Imported Std.Prelude.Operators.|>))
                  (|| (Imported Std.Prelude.Operators.||))
+                 (mod (Imported Std.Prelude.Operators.mod))
                  (not (Imported Std.Prelude.Operators.not))
                  (sqrt
                   (Local
@@ -514,7 +536,17 @@ let names = {|
                   (Local
                    (()
                     ((names
-                      ((*
+                      ((%
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Std.Prelude.Int ())
+                              (Type_app Std.Prelude.Int ()))
+                             (Type_app Std.Prelude.Int ()))))
+                          (type_source Extern_declared) (fixity (Left 7))
+                          (extern_name umber_int_rem))))
+                       (*
                         (Local
                          ((typ
                            (Scheme
@@ -678,6 +710,16 @@ let names = {|
                             (Function ((Type_app Bool ()) (Type_app Bool ()))
                              (Type_app Bool ()))))
                           (fixity (Left 2)))))
+                       (mod
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Std.Prelude.Int ())
+                              (Type_app Std.Prelude.Int ()))
+                             (Type_app Std.Prelude.Int ()))))
+                          (type_source Extern_declared) (fixity (Left 7))
+                          (extern_name umber_int_mod))))
                        (not
                         (Local
                          ((typ
@@ -778,22 +820,6 @@ entry:
   ret %umber_block* %fun_call1
 }
 
-define tailcc %umber_block* @"Std.Prelude.Operators.^"(%umber_block* %0, %umber_block* %1) {
-entry:
-  %fun_call = tail call %umber_block* @umber_int_pow(%umber_block* %0, %umber_block* %1)
-  ret %umber_block* %fun_call
-}
-
-declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
-
-define tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %0, %umber_block* %1) {
-entry:
-  %fun_call = tail call %umber_block* @umber_int_mul(%umber_block* %0, %umber_block* %1)
-  ret %umber_block* %fun_call
-}
-
-declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
-
 define tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %0, %umber_block* %1) {
 entry:
   %fun_call = tail call %umber_block* @umber_int_add(%umber_block* %0, %umber_block* %1)
@@ -809,6 +835,38 @@ entry:
 }
 
 declare %umber_block* @umber_int_sub(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_mul(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_int_mul(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.%"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_rem(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_int_rem(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @Std.Prelude.Operators.mod(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_mod(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_int_mod(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"Std.Prelude.Operators.^"(%umber_block* %0, %umber_block* %1) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_pow(%umber_block* %0, %umber_block* %1)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_int_pow(%umber_block*, %umber_block*)
 
 define tailcc %umber_block* @"Std.Prelude.Operators.*."(%umber_block* %0, %umber_block* %1) {
 entry:
