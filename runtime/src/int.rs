@@ -65,24 +65,34 @@ mod test {
     use super::*;
     use crate::{block::BlockPtr, gc::umber_gc_init};
 
+    fn check(f: extern "C" fn(BlockPtr, BlockPtr) -> BlockPtr, x: i64, y: i64, expect: i64) {
+        assert_eq!(
+            f(BlockPtr::new_int(x), BlockPtr::new_int(y)).as_int(),
+            expect
+        );
+    }
+
     #[test]
     fn basic_arithmetic() {
         unsafe { umber_gc_init() };
-        assert_eq!(
-            umber_int_add(BlockPtr::new_int(2), BlockPtr::new_int(3)).as_int(),
-            5
-        );
-        assert_eq!(
-            umber_int_sub(BlockPtr::new_int(0), BlockPtr::new_int(1)).as_int(),
-            -1
-        );
-        assert_eq!(
-            umber_int_mul(BlockPtr::new_int(5), BlockPtr::new_int(7)).as_int(),
-            35
-        );
-        assert_eq!(
-            umber_int_pow(BlockPtr::new_int(2), BlockPtr::new_int(6)).as_int(),
-            64
-        );
+        check(umber_int_add, 2, 3, 5);
+        check(umber_int_sub, 0, 1, -1);
+        check(umber_int_mul, 5, 7, 35);
+        check(umber_int_pow, 2, 6, 64);
+    }
+
+    #[test]
+    fn rem_and_mod() {
+        unsafe { umber_gc_init() };
+
+        check(umber_int_rem, 5, 4, 1);
+        check(umber_int_rem, -5, 4, -1);
+        check(umber_int_rem, 5, -4, 1);
+        check(umber_int_rem, -5, -4, -1);
+
+        check(umber_int_mod, 5, 4, 1);
+        check(umber_int_mod, -5, 4, 3);
+        check(umber_int_mod, 5, -4, 1);
+        check(umber_int_mod, -5, -4, 3);
     }
 }
