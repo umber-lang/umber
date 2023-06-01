@@ -26,8 +26,8 @@
     (()
      (Variants
       ((Point3
-        ((Type_app Basics.Int ()) (Type_app Basics.Int ())
-         (Type_app Basics.Int ()))))))))
+        ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ())
+         (Type_app Std.Prelude.Int.Int ()))))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (xyz))

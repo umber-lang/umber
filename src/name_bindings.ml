@@ -112,6 +112,8 @@ module Name_entry = struct
   ;;
 end
 
+(* TODO: Represent placeholder entries in `Type_entry.t` rather than as an extra `option`
+   in `bindings`. This will be easier to understand and more consistent with [Name_entry]. *)
 module Type_entry = struct
   module Id = Unique_id.Int ()
 
@@ -490,10 +492,9 @@ let find_absolute ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring 
 
 let find_entry_with_path, find_absolute_entry_with_path =
   let open Option.Let_syntax in
-  let rec f t current_path name bindings =
+  let rec f t path name bindings =
     let f bindings =
-      Map.find bindings.names name
-      >>| resolve_name_or_import_with_path t (current_path, name)
+      Map.find bindings.names name >>| resolve_name_or_import_with_path t (path, name)
     in
     match bindings with
     | Sigs sigs -> f sigs
@@ -502,19 +503,21 @@ let find_entry_with_path, find_absolute_entry_with_path =
     find t name ~to_ustring:Value_name.Relative.to_ustring ~f:(f t)
   and find_absolute_entry_with_path t (path, name) =
     find_absolute t (path, name) ~to_ustring:Value_name.Absolute.to_ustring ~f:(f t path)
-  and resolve_name_or_import_with_path t name = function
-    | Local entry -> name, entry
+  and resolve_name_or_import_with_path t path (entry : _ Or_imported.t) =
+    match entry with
+    | Local entry -> path, entry
     | Imported path_name -> find_absolute_entry_with_path t path_name
   in
   find_entry_with_path, find_absolute_entry_with_path
 ;;
 
-let rec find_entry t name = snd (find_entry_with_path t name)
-and find_absolute_entry t name = snd (find_absolute_entry_with_path t name)
+let find_entry t name = snd (find_entry_with_path t name)
+let find_absolute_entry t name = snd (find_absolute_entry_with_path t name)
 
-and resolve_name_or_import t = function
-  | Or_imported.Local entry -> entry
-  | Imported path_name -> find_absolute_entry t path_name
+let resolve_name_or_import t (entry : _ Or_imported.t) =
+  match entry with
+  | Local entry -> entry
+  | Imported path -> find_absolute_entry t path
 ;;
 
 let find_type t name = find_entry t name |> Name_entry.typ
@@ -523,43 +526,54 @@ let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity
 
 let find_type_entry_with_path, find_absolute_type_entry_with_path =
   let open Option.Let_syntax in
-  let f path name bindings =
+  let rec f t ~defs_only path name bindings =
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
-      | Some decl -> Some (path, decl)
+      | Some entry ->
+        Some (resolve_type_or_import_with_path t (path, name) entry ~defs_only)
       | None ->
         (* Allow type names like `List.List` to be found as just `List` *)
         let module_name = Type_name.to_ustring name |> Module_name.of_ustring_unchecked in
-        Map.find bindings.modules module_name >>= check_submodule
+        let%bind bindings = Map.find bindings.modules module_name in
+        check_submodule bindings
+    in
+    let find_type bindings path =
+      let%map entry = Map.find bindings.types name in
+      resolve_type_or_import_with_path t (path, name) entry ~defs_only
+    in
+    let find_in_imported_submodule ~import_path =
+      let bindings = resolve_absolute_path_exn t import_path ~defs_only in
+      match bindings with
+      | Sigs sigs -> find_type sigs import_path
+      | Defs defs -> find_type defs import_path
     in
     match bindings with
     | Sigs sigs ->
       f sigs ~check_submodule:(function
-        | Local (None, sigs) ->
-          let%map decl = Map.find sigs.types name in
-          path, decl
+        | Local (None, sigs) -> find_type sigs path
         | Local (Some _, _) -> .
-        | Imported import_path -> Some (path, Some (Imported (import_path, name))))
+        | Imported import_path -> find_in_imported_submodule ~import_path)
     | Defs defs ->
       f defs ~check_submodule:(function
-        | Local (None, defs) ->
-          let%map decl = Map.find defs.types name in
-          path, decl
-        | Local (Some sigs, _defs) ->
-          let%map decl = Map.find sigs.types name in
-          path, decl
-        | Imported import_path -> Some (path, Some (Imported (import_path, name))))
-  in
-  let find_type_entry_with_path ?defs_only t name =
-    find t name ~to_ustring:Type_name.Relative.to_ustring ?defs_only ~f
-  in
-  let find_absolute_type_entry_with_path ?defs_only t (path, name) =
+        | Local (None, defs) -> find_type defs path
+        | Local (Some sigs, defs) ->
+          if defs_only then find_type defs path else find_type sigs path
+        | Imported import_path -> find_in_imported_submodule ~import_path)
+  and find_type_entry_with_path ?(defs_only = false) t name =
+    find t name ~to_ustring:Type_name.Relative.to_ustring ~defs_only ~f:(f t ~defs_only)
+  and find_absolute_type_entry_with_path ?(defs_only = false) t (path, name) =
     find_absolute
       t
       (path, name)
       ~to_ustring:Type_name.Absolute.to_ustring
-      ?defs_only
-      ~f:(f path)
+      ~defs_only
+      ~f:(f t ~defs_only path)
+  and resolve_type_or_import_with_path ?defs_only t path (entry : _ Or_imported.t option) =
+    match entry with
+    | Some (Local decl) -> path, Some decl
+    | Some (Imported path_name) ->
+      find_absolute_type_entry_with_path ?defs_only t path_name
+    | None -> path, None
   in
   find_type_entry_with_path, find_absolute_type_entry_with_path
 ;;
@@ -571,7 +585,11 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
    I'm not sure if we want to follow all imports all the way, necessarily. We just need an
    absolute path, so this is basically aesthetics. I think following imports 1 step is
    probably good, since otherwise basically every path is from the current module, and
-   that way the imports don't get too far away. *)
+   that way the imports don't get too far away.
+   
+   PROBLEM: Leaving imports in relative paths does work great because they don't end up
+   in the MIR context.*)
+
 let absolutify_path t (path : Module_path.Relative.t) =
   match Module_path.split_last path with
   | None -> current_path t
@@ -581,9 +599,9 @@ let absolutify_path t (path : Module_path.Relative.t) =
       (path, name)
       ~f:(fun path module_name sigs_or_defs ->
         let check_bindings bindings =
-          if Map.mem bindings.modules module_name
-          then Some (Module_path.append path [ module_name ])
-          else None
+          match%map.Option Map.find bindings.modules module_name with
+          | Local _ -> Module_path.append path [ module_name ]
+          | Imported path -> path
         in
         match sigs_or_defs with
         | Sigs sigs -> check_bindings sigs
@@ -592,11 +610,8 @@ let absolutify_path t (path : Module_path.Relative.t) =
         Module_path.to_ustring (Module_path.append path [ name ]))
 ;;
 
-let absolutify_type_name t ((_, name) as path) =
-  fst (find_type_entry_with_path t path), name
-;;
-
-let absolutify_value_name t name = fst (find_entry_with_path t name)
+let absolutify_type_name t path = fst (find_type_entry_with_path t path)
+let absolutify_value_name t path = fst (find_entry_with_path t path)
 
 let bindings_are_empty { names; types; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty modules
@@ -958,22 +973,12 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let rec find_type_entry ?defs_only t type_name =
-  resolve_type_or_import
-    ?defs_only
-    t
-    (snd (find_type_entry_with_path ?defs_only t type_name))
+let find_type_entry ?defs_only t type_name =
+  snd (find_type_entry_with_path ?defs_only t type_name)
+;;
 
-and find_absolute_type_entry ?defs_only t type_name =
-  resolve_type_or_import
-    ?defs_only
-    t
-    (snd (find_absolute_type_entry_with_path ?defs_only t type_name))
-
-and resolve_type_or_import ?defs_only t = function
-  | Some (Or_imported.Local decl) -> Some decl
-  | Some (Imported path_name) -> find_absolute_type_entry ?defs_only t path_name
-  | None -> None
+let find_absolute_type_entry ?defs_only t type_name =
+  snd (find_absolute_type_entry_with_path ?defs_only t type_name)
 ;;
 
 let find_type_entry ?(defs_only = false) t type_name =
@@ -1000,13 +1005,16 @@ let find_absolute_type_decl ?defs_only t type_name =
   (find_absolute_type_entry ?defs_only t type_name).decl
 ;;
 
-let resolve_type_or_import t decl_or_import =
-  option_or_default (resolve_type_or_import t decl_or_import) ~f:(fun () ->
+let resolve_type_or_import t (decl_or_import : _ Or_imported.t option) =
+  match decl_or_import with
+  | Some (Local entry) -> entry
+  | Some (Imported path) -> find_absolute_type_entry t path
+  | None ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
           (decl_or_import : (Type_entry.t, Type_name.Absolute.t) Or_imported.t option)
-          (without_std t : t)])
+          (without_std t : t)]
 ;;
 
 let find_sigs_and_defs t path module_name =

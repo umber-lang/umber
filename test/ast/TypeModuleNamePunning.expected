@@ -2,12 +2,11 @@
  ((Module
    (Foo ()
     ((Common_def
-      (Type_decl Foo (() (Alias (Type_app TypeModuleNamePunning.Int ())))))
+      (Type_decl Foo (() (Alias (Type_app Std.Prelude.Int.Int ())))))
      (Module
       (Foo ()
        ((Common_def
-         (Type_decl Foo
-          (() (Alias (Type_app TypeModuleNamePunning.Float ())))))
+         (Type_decl Foo (() (Alias (Type_app Std.Prelude.Float.Float ())))))
         (Module
          (Foo ()
           ((Common_def (Type_decl Foo (() (Alias (Type_app String ()))))))))))))))

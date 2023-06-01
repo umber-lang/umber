@@ -1,10 +1,13 @@
 open Import
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
-     GADTs (local type equality/type narrowing)
-     Some of these features can make local let-generalization difficult, see:
-     https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf
-     for an argument for just abolishing local let-generalization *)
+   GADTs (local type equality/type narrowing)
+   Some of these features can make local let-generalization difficult, see:
+   https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf
+   for an argument for just abolishing local let-generalization *)
+
+(* TODO: Consider integrating source locations into stored types to give better type
+   errors. *)
 
 exception Type_error of Ustring.t * (Type.t * Type.t) option [@@deriving sexp]
 

@@ -93,11 +93,7 @@ let names = {|
                     (()
                      ((names ())
                       (types
-                       ((Int
-                         ((Local
-                           (()
-                            (Alias
-                             (Type_app Std.Prelude.Int.PrimitiveInt ()))))))
+                       ((Int ((Local (() (Alias (Type_app Int ()))))))
                         (PrimitiveInt ((Imported Int)))))
                       (modules ())))))
                   (List
@@ -169,11 +165,7 @@ let names = {|
                                (Type_app Std.Prelude.Float.Float ()))
                               (Type_app Std.Prelude.Float.Float ())))))))))
                       (types
-                       ((Float
-                         ((Local
-                           (()
-                            (Alias
-                             (Type_app Std.Prelude.Float.PrimitiveFloat ()))))))
+                       ((Float ((Local (() (Alias (Type_app Float ()))))))
                         (PrimitiveFloat ((Imported Float)))))
                       (modules ())))))
                   (Option
@@ -414,10 +406,7 @@ let names = {|
                    (()
                     ((names ())
                      (types
-                      ((Int
-                        ((Local
-                          (()
-                           (Alias (Type_app Std.Prelude.Int.PrimitiveInt ()))))))
+                      ((Int ((Local (() (Alias (Type_app Int ()))))))
                        (PrimitiveInt ((Imported Int)))))
                      (modules ())))))
                  (List
@@ -498,11 +487,7 @@ let names = {|
                           (type_source Extern_declared)
                           (extern_name umber_float_sin))))))
                      (types
-                      ((Float
-                        ((Local
-                          (()
-                           (Alias
-                            (Type_app Std.Prelude.Float.PrimitiveFloat ()))))))
+                      ((Float ((Local (() (Alias (Type_app Float ()))))))
                        (PrimitiveFloat ((Imported Float)))))
                      (modules ())))))
                  (Option

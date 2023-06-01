@@ -6,12 +6,13 @@
    ((Common_sig
      (Import
       ((kind (Relative (nth_parent 1))) (paths (Module B ((Name Bar)))))))
-    (Common_sig (Type_decl Foo (() (Alias (Type_app Imports.A.Bar ())))))))
+    (Common_sig (Type_decl Foo (() (Alias (Type_app Imports.B.Bar ())))))))
   (Module_sig B
    ((Common_sig
      (Import
       ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Int)))))))))
-    (Common_sig (Type_decl Bar (() (Alias (Type_app Imports.B.Int ())))))
+    (Common_sig
+     (Type_decl Bar (() (Alias (Type_app Std.Prelude.Int.Int ())))))
     (Module_sig C
      ((Common_sig
        (Import
@@ -41,7 +42,7 @@
     (()
      (Variants
       ((You_can_define_types_in_between_imports ((Tuple ())))
-       (Bad_style_though ((Type_app Imports.Option ((Tuple ()))))))))))
+       (Bad_style_though ((Type_app Std.Prelude.Option.Option ((Tuple ()))))))))))
   (Common_def
    (Import
     ((kind Absolute)
@@ -58,13 +59,14 @@
        ((Module Prelude ((Name List) (Module Float ((Name pi) (Name +)))))))))))
   (Module
    (A ()
-    ((Common_def (Type_decl Foo (() (Alias (Type_app Imports.A.Bar ())))))
+    ((Common_def (Type_decl Foo (() (Alias (Type_app Imports.B.Bar ())))))
      (Common_def
       (Import
        ((kind (Relative (nth_parent 1))) (paths (Module B ((Name Bar))))))))))
   (Module
    (B ()
-    ((Common_def (Type_decl Bar (() (Alias (Type_app Imports.B.Int ())))))
+    ((Common_def
+      (Type_decl Bar (() (Alias (Type_app Std.Prelude.Int.Int ())))))
      (Common_def
       (Import
        ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Int)))))))))

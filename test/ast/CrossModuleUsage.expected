@@ -39,9 +39,9 @@
             (((Name CrossModuleUsage.source) (Type_app String ()))))
            (Tuple ())))))
        (Function ((Tuple ())) (Tuple ())))))))
-  (Common_def (Val empty () (() (Type_app CrossModuleUsage.List ((Var a))))))
+  (Common_def (Val empty () (() (Type_app Std.Prelude.List.List ((Var a))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (empty))
       ((Name Std.Prelude.List.Nil)
-       (Type_app CrossModuleUsage.List ((Var a))))))))))
+       (Type_app Std.Prelude.List.List ((Var a))))))))))

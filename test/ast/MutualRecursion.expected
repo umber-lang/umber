@@ -74,7 +74,7 @@
    (Type_decl Forest
     ((a)
      (Alias
-      (Type_app MutualRecursion.List
+      (Type_app Std.Prelude.List.List
        ((Type_app MutualRecursion.Tree ((Var a)))))))))
   (Common_def
    (Type_decl Tree

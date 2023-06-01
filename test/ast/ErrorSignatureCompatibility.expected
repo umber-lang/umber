@@ -24,8 +24,8 @@
         (Incompatible
          ((typ
            (Scheme
-            (Function ((Type_app ErrorSignatureCompatibility.Int ()))
-             (Type_app ErrorSignatureCompatibility.Int ())))))
+            (Function ((Type_app Std.Prelude.Int.Int ()))
+             (Type_app Std.Prelude.Int.Int ())))))
          ((typ
            (Scheme
             (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
@@ -44,8 +44,8 @@
              (Incompatible
               (()
                (Variants
-                ((Int ((Type_app ErrorSignatureCompatibility.Int ())))
-                 (Float ((Type_app ErrorSignatureCompatibility.Float ()))))))
+                ((Int ((Type_app Std.Prelude.Int.Int ())))
+                 (Float ((Type_app Std.Prelude.Float.Float ()))))))
               (()
                (Variants
                 ((Int ((Type_app ErrorSignatureCompatibility.A.Int ())))

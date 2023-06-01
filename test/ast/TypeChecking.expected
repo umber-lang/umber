@@ -13,19 +13,19 @@
    (bindings
     (((Catch_all (id_for_ints))
       ((Lambda ((Catch_all (x))) (Name TypeChecking.x))
-       (Function ((Type_app TypeChecking.Int ()))
-        (Type_app TypeChecking.Int ())))))))
+       (Function ((Type_app Std.Prelude.Int.Int ()))
+        (Type_app Std.Prelude.Int.Int ())))))))
   (Common_def
    (Val id_for_floats ()
     (()
-     (Function ((Type_app TypeChecking.Float ()))
-      (Type_app TypeChecking.Float ())))))
+     (Function ((Type_app Std.Prelude.Float.Float ()))
+      (Type_app Std.Prelude.Float.Float ())))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (id_for_floats))
       ((Lambda ((Catch_all (x))) (Name TypeChecking.x))
-       (Function ((Type_app TypeChecking.Float ()))
-        (Type_app TypeChecking.Float ())))))))
+       (Function ((Type_app Std.Prelude.Float.Float ()))
+        (Type_app Std.Prelude.Float.Float ())))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (id_for_chars))

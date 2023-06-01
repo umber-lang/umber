@@ -6,7 +6,7 @@
     ((name_diff ((missing_function Missing_from_def)))
      (type_diff
       ((T
-        (Incompatible (() (Alias (Type_app ErrorIncompatibleSig.Int ())))
+        (Incompatible (() (Alias (Type_app Std.Prelude.Int.Int ())))
          (() (Alias (Type_app String ())))))
        (Weather
         (Incompatible (() (Variants ((Rainy ()) (Sunny ()))))
@@ -18,15 +18,15 @@
         (Incompatible
          ((a)
           (Alias
-           (Function ((Type_app ErrorIncompatibleSig.Int ()))
-            (Type_app ErrorIncompatibleSig.Int ()))))
+           (Function ((Type_app Std.Prelude.Int.Int ()))
+            (Type_app Std.Prelude.Int.Int ()))))
          ((a) (Alias (Function ((Var a)) (Var a))))))
        (MoreGeneral
         (Incompatible ((a) (Alias (Function ((Var a)) (Var a))))
          ((a)
           (Alias
-           (Function ((Type_app ErrorIncompatibleSig.Int ()))
-            (Type_app ErrorIncompatibleSig.Int ()))))))
+           (Function ((Type_app Std.Prelude.Int.Int ()))
+            (Type_app Std.Prelude.Int.Int ()))))))
        (DifferentArity
         (Incompatible ((a) Abstract) (() (Alias (Type_app String ())))))))
      (module_diff

@@ -11,4 +11,5 @@ module : {
   type D = ToplevelDefInt
 }
 
+# FIXME: The error is now pointing here instead of the sig, which seems wrong.
 type D = ToplevelDefInt
