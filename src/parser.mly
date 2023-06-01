@@ -259,7 +259,6 @@ n_periods:
 %inline unidentified_name:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
-(* FIXME: Probably put this back the way it was. *)
 import_paths_after_module:
   | paths = import_paths { [ paths ] }
   | paths = parens(separated_nonempty(COMMA, import_paths)) { paths }

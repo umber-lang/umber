@@ -1,8 +1,6 @@
 # Import from the prelude, hiding just these items to prevent a clash
 import Std.Prelude.(_, Option as _, None as _, Some as _)
 
-# FIXME: I should add another test showing the name clash error message
-
 module : {
   type Option a =
     | None
