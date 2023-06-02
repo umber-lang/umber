@@ -944,7 +944,7 @@ module Module = struct
       Ok (names, (module_name, sigs, defs))
     with
     | Compilation_error.Compilation_error error ->
-      Error { error with backtraces = Backtrace.Exn.most_recent () :: error.backtraces }
+      Error { error with backtrace = Some (Backtrace.Exn.most_recent ()) }
     | exn ->
       let kind : Compilation_error.Kind.t =
         match exn with
