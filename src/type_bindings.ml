@@ -96,7 +96,7 @@ let rec unify ~names ~types t1 t2 =
        unify ~names ~types (Var id') res;
        unify ~names ~types (Var id) (Partial_function (args2_trailing, id'))
      | Same_length -> unify ~names ~types (Var id) res)
-  | Function (args2, res), Partial_function (args1, id) ->
+  | Function (args1, res), Partial_function (args2, id) ->
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
      | Left_trailing args1_trailing ->
        let id' = Type.Var_id.create () in
