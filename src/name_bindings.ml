@@ -525,7 +525,6 @@ let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
 let find_type_entry_with_path, find_absolute_type_entry_with_path =
-  let open Option.Let_syntax in
   let rec f t ~defs_only path name bindings =
     let f bindings ~check_submodule =
       match Map.find bindings.types name with
@@ -534,11 +533,11 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
       | None ->
         (* Allow type names like `List.List` to be found as just `List` *)
         let module_name = Type_name.to_ustring name |> Module_name.of_ustring_unchecked in
-        let%bind bindings = Map.find bindings.modules module_name in
+        let%bind.Option bindings = Map.find bindings.modules module_name in
         check_submodule bindings
     in
     let find_type bindings path name =
-      let%map entry = Map.find bindings.types name in
+      let%map.Option entry = Map.find bindings.types name in
       resolve_type_or_import_with_path t (path, name) entry ~defs_only
     in
     let find_in_imported_submodule ~import_path =

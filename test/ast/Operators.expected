@@ -1,5 +1,8 @@
 (Operators
  ((Common_sig
+   (Import
+    ((kind Absolute) (paths (Module Std ((Module Prelude ((Name List)))))))))
+  (Common_sig
    (Val == ((Non_assoc 4))
     (() (Function ((Var a) (Var a)) (Type_app Bool ())))))
   (Module_sig Arith
@@ -18,7 +21,19 @@
     (()
      (Function ((Type_app List ((Var a))) (Type_app List ((Var b))))
       (Type_app List ((Tuple ((Var a) (Var b))))))))))
- ((Let (rec_ true)
+ ((Common_def
+   (Import
+    ((kind Absolute)
+     (paths
+      (Module Std
+       ((Module Prelude ((Name *) (Name ==) (Name ::) (Name Nil)))))))))
+  (Module
+   (Arith ()
+    ((Common_def
+      (Import
+       ((kind Absolute)
+        (paths (Module Std ((Module Prelude ((Name +) (Name mod))))))))))))
+  (Let (rec_ true)
    (bindings
     (((Catch_all ())
       (Qualified (Arith)
@@ -38,7 +53,8 @@
       (Op_tree (Arith.mod (((Literal (Int 5))) ((Literal (Int 2))))))))))
   (Let (rec_ true)
    (bindings
-    (((Catch_all (left_section)) (Fun_call (Name +) ((Literal (Int 2))))))))
+    (((Catch_all (left_section))
+      (Qualified (Arith) (Fun_call (Name +) ((Literal (Int 2)))))))))
   (Let (rec_ true)
    (bindings
     (((Catch_all (right_section))
@@ -49,7 +65,60 @@
     (((Catch_all (unicode_my_dudes))
       (Op_tree
        ("\195\151"
-        (((Seq_literal ((Literal (String damn)) (Literal (String ok)))))
-         ((Seq_literal
-           ((Literal (String cartesian)) (Literal (String product))
-            (Literal (String maybe?))))))))))))))
+        (((Op_tree
+           (::
+            ((:: (((Literal (String damn))) ((Literal (String ok)))))
+             ((Name Nil))))))
+         ((Op_tree
+           (::
+            ((::
+              ((::
+                (((Literal (String cartesian))) ((Literal (String product)))))
+               ((Literal (String maybe?)))))
+             ((Name Nil)))))))))))))
+  (Let (rec_ true)
+   (bindings
+    (((Catch_all ("\195\151"))
+      (Lambda ((Catch_all (xs)) (Catch_all (ys)))
+       (Fun_call (Name List.concat_map)
+        ((Name xs)
+         (Lambda ((Catch_all (x)))
+          (Fun_call (Name List.map)
+           ((Name ys) (Lambda ((Catch_all (y))) (Tuple ((Name x) (Name y))))))))))))))
+  (Module
+   (List ()
+    ((Common_def
+      (Import
+       ((kind Absolute)
+        (paths (Module Std ((Module Prelude ((Module List (All))))))))))
+     (Let (rec_ true)
+      (bindings
+       (((Catch_all (append))
+         (Lambda ((Catch_all (xs)) (Catch_all (ys)))
+          (Match (Tuple ((Name xs) (Name ys)))
+           (((Union (Tuple ((Cnstr_appl Nil ()) (Catch_all (res))))
+              (Tuple ((Catch_all (res)) (Cnstr_appl Nil ()))))
+             (Name res))
+            ((Tuple
+              ((Cnstr_appl Cons ((Catch_all (x)) (Catch_all (xs))))
+               (Catch_all (ys))))
+             (Fun_call (Name Cons)
+              ((Name x) (Fun_call (Name append) ((Name xs) (Name ys)))))))))))))
+     (Let (rec_ true)
+      (bindings
+       (((Catch_all (map))
+         (Lambda ((Catch_all (xs)) (Catch_all (f)))
+          (Match (Name xs)
+           (((Cnstr_appl Nil ()) (Name Nil))
+            ((Cnstr_appl Cons ((Catch_all (x)) (Catch_all (xs))))
+             (Fun_call (Name Cons)
+              ((Fun_call (Name f) ((Name x))) (Name xs)))))))))))
+     (Let (rec_ true)
+      (bindings
+       (((Catch_all (concat_map))
+         (Lambda ((Catch_all (xs)) (Catch_all (f)))
+          (Match (Name xs)
+           (((Cnstr_appl Nil ()) (Name Nil))
+            ((Cnstr_appl Cons ((Catch_all (x)) (Catch_all (xs))))
+             (Fun_call (Name append)
+              ((Fun_call (Name f) ((Name x))) (Name xs))))))))))))))))

@@ -1,4 +1,6 @@
 module : {
+  import Std.Prelude.List  
+
   val (==) (infix 4) : a, a -> Bool  # TODO: allow shadowing names
 
   module Arith : {
@@ -10,10 +12,42 @@ module : {
   val (×) : List a, List b -> List (a, b)
 }
 
+# FIXME: When you put this import here it takes the prelude import out of the sig.
+# This is just so unintuitive. Surely we can do better.
+# FIXME: This doesn't work if you write `import Std.Prelude as _`
+import Std.Prelude.((*), (==), (::), Nil)
+
+module Arith = {
+  import Std.Prelude.((+), mod)
+}
+
 let _ = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 
 
-let left_section = (2+)
+let left_section = Arith.((2+))
 let right_section = (*5)
-let unicode_my_dudes = ["damn", "ok"] × ["cartesian", "product", "maybe?"]
+let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?"::Nil)
+
+let (×) xs ys = List.concat_map xs (\x -> List.map ys (\y -> (x, y)))
+
+# FIXME: Write a test checking the parser error message for `match ... with`
+# TODO: Move these to the Prelude. Also, rewrite them to be tail-recursive.
+module List = {
+  import Std.Prelude.List._
+
+  let append xs ys =
+    match (xs, ys)
+    | (Nil, res) | (res, Nil) -> res
+    | (Cons x xs, ys) -> Cons x (append xs ys)
+
+  let map xs f =
+    match xs
+    | Nil -> Nil
+    | Cons x xs -> Cons (f x) xs
+
+  let concat_map xs f =
+    match xs
+    | Nil -> Nil
+    | Cons x xs -> append (f x) xs
+}

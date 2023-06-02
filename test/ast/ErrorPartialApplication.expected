@@ -2,7 +2,7 @@
  ((kind Type_error)
   (msg
    ("Function argument number mismatch"
-    (((Function ((Type_app Std.Prelude.Int ()) (Type_app Std.Prelude.Int ()))
-       (Type_app Std.Prelude.Int ()))
-      (Function ((Type_app Int ())) (Var a))))))
+    (((Function ((Type_app Int ())) (Var a))
+      (Function ((Type_app Std.Prelude.Int ()) (Type_app Std.Prelude.Int ()))
+       (Type_app Std.Prelude.Int ()))))))
   (filename ErrorPartialApplication.um)))
