@@ -4,18 +4,15 @@ open Parser
 
 let lexeme = lexeme >> Ustring.of_array_unchecked
 let lexeme_str = lexeme >> Ustring.to_string
-
-exception Syntax_error of Span.Pos.t * Ustring.t [@@deriving sexp]
-
 let span = Span.of_loc << lexing_positions
 
 let syntax_error ?msg lexbuf =
   let msg =
     match msg with
-    | None -> lexeme lexbuf
-    | Some str -> Ustring.of_string_exn (sprintf "%s after `%s`" str (lexeme_str lexbuf))
+    | None -> lexeme_str lexbuf
+    | Some str -> sprintf "%s after `%s`" str (lexeme_str lexbuf)
   in
-  raise (Syntax_error ((span lexbuf).start, msg))
+  Compilation_error.raise Syntax_error ~span:(span lexbuf) ~msg:[%message msg]
 ;;
 
 let digit = [%sedlex.regexp? '0' .. '9']

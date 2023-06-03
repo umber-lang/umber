@@ -310,16 +310,6 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_either_COLON_COLON_SPACED_ : unit nonterminal
 [@@deriving sexp_of]
 
-let handle_syntax_error f =
-  try Ok (f ()) with
-  | Lexer.Syntax_error (pos, msg) ->
-    Error
-      (Compilation_error.create
-         Syntax_error
-         ~span:(Span.of_pos pos)
-         ~msg:(Atom (Ustring.to_string msg)))
-;;
-
 let rec lex ~print_tokens_to lexbuf =
   let token = Lexer.read lexbuf in
   sexp_of_token token |> fprint_s ~out:print_tokens_to;
@@ -329,7 +319,7 @@ let rec lex ~print_tokens_to lexbuf =
 ;;
 
 let try_lex ~print_tokens_to lexbuf =
-  handle_syntax_error (fun () -> lex ~print_tokens_to lexbuf)
+  Compilation_error.try_with' (fun () -> lex ~print_tokens_to lexbuf)
 ;;
 
 let parse ?print_tokens_to lexbuf =
@@ -381,7 +371,7 @@ let parse ?print_tokens_to lexbuf =
 ;;
 
 let try_parse ?print_tokens_to lexbuf =
-  handle_syntax_error (fun () -> parse ?print_tokens_to lexbuf)
+  Compilation_error.try_with' (fun () -> parse ?print_tokens_to lexbuf)
 ;;
 
 let with_file filename ~f =

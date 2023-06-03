@@ -240,7 +240,9 @@ let on_error_raise ~filename stage error =
       "Compilation failed"
         (filename : Filename.t)
         (stage : Stage.t)
-        (error : Compilation_error.t)]
+        ~error:
+          ({ error with backtrace = Some (Backtrace.Exn.most_recent ()) }
+            : Compilation_error.t)]
 ;;
 
 let compile ?(no_std = false) ?parent ?on_error ~filename targets =
