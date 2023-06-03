@@ -1,4 +1,5 @@
 open Import
+open Names
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -9,10 +10,21 @@ open Import
 (* TODO: Consider integrating source locations into stored types to give better type
    errors. *)
 
-exception Type_error of Ustring.t * (Type.t * Type.t) option [@@deriving sexp]
+let type_error msg t1 t2 =
+  (* Prevent unstable Var_ids from appearing in test output *)
+  let env = Type.Param.Env_of_vars.create () in
+  let handle_var = Type.Param.Env_of_vars.find_or_add env in
+  let map_type t =
+    Type.Expr.map t ~var:handle_var ~pf:handle_var ~name:Fn.id
+    |> [%sexp_of:
+         (Type_param_name.t, Type_param_name.t, Module_path.absolute) Type.Expr.t]
+  in
+  Compilation_error.raise
+    Type_error
+    ~msg:[%message msg ~type1:(map_type t1 : Sexp.t) ~type2:(map_type t2 : Sexp.t)]
+;;
 
-let type_error s t1 t2 = raise (Type_error (Ustring.of_string_exn s, Some (t1, t2)))
-let type_error_msg s = raise (Type_error (Ustring.of_string_exn s, None))
+let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 
 type t = { vars : Type.t Type.Var_id.Table.t } [@@deriving sexp]
 

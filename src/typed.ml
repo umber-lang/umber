@@ -965,29 +965,5 @@ module Module = struct
     with
     | Compilation_error.Compilation_error error ->
       Error { error with backtrace = Some (Backtrace.Exn.most_recent ()) }
-    | exn ->
-      let kind : Compilation_error.Kind.t =
-        match exn with
-        | Type_bindings.Type_error _ -> Type_error
-        | _ -> Other
-      in
-      (* TODO: would be nice to transition to creating/raising compilation errors and
-         then doing this handling there *)
-      let msg : Sexp.t =
-        match exn with
-        | Type_bindings.Type_error (msg, Some (t1, t2)) ->
-          (* Prevent unstable Var_ids from appearing in test output *)
-          let env = Type.Param.Env_of_vars.create () in
-          let handle_var = Type.Param.Env_of_vars.find_or_add env in
-          let map_type t =
-            Type.Expr.map t ~var:handle_var ~pf:handle_var ~name:Fn.id
-            |> [%sexp_of:
-                 (Type_param_name.t, Type_param_name.t, Module_path.absolute) Type.Expr.t]
-          in
-          List
-            [ Atom (Ustring.to_string msg); List [ List [ map_type t1; map_type t2 ] ] ]
-        | _ -> sexp_of_exn exn
-      in
-      Error (Compilation_error.create ~msg ~exn kind)
   ;;
 end

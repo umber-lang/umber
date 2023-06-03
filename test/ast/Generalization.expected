@@ -1,5 +1,6 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ("Type application mismatch" (((Type_app Char ()) (Type_app Bool ())))))
-  (filename Generalization.um)))
+   ("Type application mismatch" (type1 (Type_app Char ()))
+    (type2 (Type_app Bool ()))))
+  (filename Generalization.um) (span 9:11-9:17)))

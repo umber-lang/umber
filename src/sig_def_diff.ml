@@ -41,7 +41,8 @@ exception Compatibility_error
 let no_errors f =
   match f () with
   | () -> true
-  | (exception Compatibility_error) | (exception Type_bindings.Type_error _) -> false
+  | (exception Compatibility_error)
+  | (exception Compilation_error.Compilation_error { kind = Type_error; _ }) -> false
 ;;
 
 let iter2 xs ys ~f =
