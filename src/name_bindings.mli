@@ -75,6 +75,8 @@ val merge_names
   -> combine:(Value_name.t -> Name_entry.t -> Name_entry.t -> Name_entry.t)
   -> t
 
+val find_absolute_entry : t -> Value_name.Absolute.t -> Name_entry.t
+
 (* TODO: removed the non-qualified version, since it's unused. *)
 
 (** Find a type declaration given a qualified name *)

@@ -208,15 +208,14 @@ end = struct
   end
 
   type t =
-    { names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Map.t
-    ; name_bindings : Name_bindings.t
-    ; name_table : Mir_name.Name_table.t
-    ; find_override : Value_name.Absolute.t -> Mir_name.t -> Mir_name.t option
+    { expr_local_names : Mir_name.t Value_name.Absolute.Map.t
+    ; toplevel_names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Table.t
+    ; name_bindings : (Name_bindings.t[@sexp.opaque])
+    ; name_table : (Mir_name.Name_table.t[@sexp.opaque])
+    ; find_override :
+        (Value_name.Absolute.t -> Mir_name.t -> Mir_name.t option[@sexp.opaque])
     }
-
-  let sexp_of_t t =
-    [%sexp (t.names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Map.t)]
-  ;;
+  [@@deriving sexp_of]
 
   let with_module t module_name ~f =
     let name_bindings =
@@ -226,18 +225,54 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
-  let add t name ~extern_info =
-    let mir_name = Mir_name.create_value_name t.name_table name in
-    { t with names = Map.set t.names ~key:name ~data:(mir_name, extern_info) }, mir_name
-  ;;
-
   let add_value_name t name =
     let path = Name_bindings.current_path t.name_bindings in
-    add t (path, name) ~extern_info:Local
+    let name = path, name in
+    let mir_name = Mir_name.create_value_name t.name_table name in
+    ( { t with expr_local_names = Map.set t.expr_local_names ~key:name ~data:mir_name }
+    , mir_name )
   ;;
 
   let copy_name t name = Mir_name.copy_name t.name_table name
-  let peek_value_name_internal t name = Map.find t.names name
+
+  let lookup_toplevel_name t name =
+    let entry = Name_bindings.find_absolute_entry t.name_bindings name in
+    let extern_name = Name_bindings.Name_entry.extern_name entry in
+    let external_ () : Extern_info.t =
+      let scheme =
+        Option.value_or_thunk (Name_bindings.Name_entry.scheme entry) ~default:(fun () ->
+          compiler_bug
+            [%message
+              "Didn't find type scheme for external name entry"
+                (name : Value_name.Absolute.t)
+                (entry : Name_bindings.Name_entry.t)])
+      in
+      External { arity = arity_of_type ~names:t.name_bindings scheme }
+    in
+    let extern_info : Extern_info.t =
+      match extern_name with
+      | None -> external_ ()
+      | Some extern_name ->
+        (match Extern_name.to_ustring extern_name |> Ustring.to_string with
+         | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
+         | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
+         | _ -> external_ ())
+    in
+    let mir_name = Mir_name.create_value_name t.name_table name in
+    mir_name, extern_info
+  ;;
+
+  let peek_value_name_internal t name : (Mir_name.t * Extern_info.t) option =
+    match Map.find t.expr_local_names name with
+    | Some mir_name -> Some (mir_name, Local)
+    | None ->
+      (try
+         Some
+           (Hashtbl.find_or_add t.toplevel_names name ~default:(fun () ->
+              lookup_toplevel_name t name))
+       with
+       | Compilation_error.Compilation_error { kind = Name_error; _ } -> None)
+  ;;
 
   let find_value_name t name : Mir_name.t * Extern_info.t =
     match peek_value_name_internal t name with
@@ -247,10 +282,7 @@ end = struct
        | None -> entry)
     | None ->
       compiler_bug
-        [%message
-          "Name missing from context"
-            (name : Value_name.Absolute.t)
-            (t.names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Map.t)]
+        [%message "Name missing from context" (name : Value_name.Absolute.t) (t : t)]
   ;;
 
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
@@ -277,51 +309,12 @@ end = struct
   ;;
 
   let create ~names:name_bindings ~name_table =
-    let t =
-      { names = Value_name.Absolute.Map.empty
-      ; name_bindings
-      ; name_table
-      ; find_override = (fun _ _ -> None)
-      }
-    in
-    let current_path = Name_bindings.current_path name_bindings in
-    Name_bindings.fold_local_names
-      name_bindings
-      ~init:t
-      ~f:(fun t ((path, _) as name) entry ->
-      (* TODO: This is kind of a gross way to avoid including names from the current
-         module (which would then be added again as we process their definitions). It
-         might make more sense if we did the name bindings lookups lazily as needed. *)
-      if Module_path.is_prefix path ~prefix:current_path
-      then t
-      else (
-        let extern_name = Name_bindings.Name_entry.extern_name entry in
-        let fallback_to_external () : Extern_info.t =
-          let scheme =
-            Option.value_or_thunk
-              (Name_bindings.Name_entry.scheme entry)
-              ~default:(fun () ->
-              compiler_bug
-                [%message
-                  "Didn't find type scheme for external name entry"
-                    (name : Value_name.Absolute.t)
-                    (entry : Name_bindings.Name_entry.t)])
-          in
-          External { arity = arity_of_type ~names:name_bindings scheme }
-        in
-        let extern_info : Extern_info.t =
-          match extern_name with
-          | None ->
-            if Module_path.is_prefix ~prefix:current_path path
-            then Local
-            else fallback_to_external ()
-          | Some extern_name ->
-            (match Extern_name.to_ustring extern_name |> Ustring.to_string with
-             | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
-             | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
-             | _ -> fallback_to_external ())
-        in
-        fst (add t name ~extern_info)))
+    { expr_local_names = Value_name.Absolute.Map.empty
+    ; toplevel_names = Value_name.Absolute.Table.create ()
+    ; name_bindings
+    ; name_table
+    ; find_override = (fun _ _ -> None)
+    }
   ;;
 
   let cnstr_info_lookup_failed type_ =

@@ -791,6 +791,8 @@ let add_val_or_extern
           | None ->
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
           | Some (Local existing_entry) ->
+            (* FIXME: The logic for checking val against inferred types is not working
+               properly.*)
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
             Local
               (Name_entry.merge
