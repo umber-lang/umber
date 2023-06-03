@@ -147,6 +147,9 @@ and combine_partial_functions types typ args id =
        Halt (Function (args, type_sub)))
 ;;
 
+(* TODO: We should probably have a notion of type variable scope so that the type
+   variables we introduce can be shared between multiple type expressions in the same
+   expresion/statement. *)
 let generalize types typ =
   let env = Type.Param.Env_of_vars.create () in
   Type.Expr.map

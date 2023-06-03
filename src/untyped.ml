@@ -123,6 +123,8 @@ module Expr = struct
     | _ :: _ -> Qualified (Module_path.Relative.of_ustrings_unchecked path, expr)
   ;;
 
+  (* FIXME: This doesn't have the expected evaluation semantics. It needs to evaluate the
+     argument, then construct the lambda. *)
   let op_section_right op expr =
     let op_span = Node.span op in
     let left_var = Value_name.empty in
@@ -138,6 +140,10 @@ module Expr = struct
           (Node.span expr) )
   ;;
 
+  (* FIXME: This will interact strangely with functions of unknown arity. The type
+     inference will assume they have arity 1. It should probably work similarly to
+     `op_section_right` and explicitly construct a lambda, rather than relying on 
+     the somewhat anemic partial application we currently have. *)
   let op_section_left expr op =
     Fun_call (Node.map op ~f:(name << Value_name.Relative.of_ustrings_unchecked), [ expr ])
   ;;

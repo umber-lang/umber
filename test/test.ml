@@ -7,7 +7,12 @@ let concat_current dir = Filename.(concat (concat current_dir_name dir))
    not yet been implemented. *)
 (* TODO: enable these tests for type-checking. *)
 let parse_only_tests =
-  [ "Operators" (* FIXME: Get this test working *); "Modules"; "Traits"; "Types" ]
+  [ (* "Operators" *)
+    (* FIXME: Get this test working *)
+    "Modules"
+  ; "Traits"
+  ; "Types"
+  ]
 ;;
 
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)

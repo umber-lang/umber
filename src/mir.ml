@@ -235,10 +235,10 @@ end = struct
 
   let copy_name t name = Mir_name.copy_name t.name_table name
 
-  let lookup_toplevel_name t name =
+  let lookup_toplevel_name t ((path, _) as name) =
     let entry = Name_bindings.find_absolute_entry t.name_bindings name in
     let extern_name = Name_bindings.Name_entry.extern_name entry in
-    let external_ () : Extern_info.t =
+    let fallback_to_external () : Extern_info.t =
       let scheme =
         Option.value_or_thunk (Name_bindings.Name_entry.scheme entry) ~default:(fun () ->
           compiler_bug
@@ -251,12 +251,15 @@ end = struct
     in
     let extern_info : Extern_info.t =
       match extern_name with
-      | None -> external_ ()
+      | None ->
+        if Module_path.is_prefix path ~prefix:(Name_bindings.current_path t.name_bindings)
+        then Local
+        else fallback_to_external ()
       | Some extern_name ->
         (match Extern_name.to_ustring extern_name |> Ustring.to_string with
          | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
          | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
-         | _ -> external_ ())
+         | _ -> fallback_to_external ())
     in
     let mir_name = Mir_name.create_value_name t.name_table name in
     mir_name, extern_info
@@ -916,6 +919,10 @@ module Expr = struct
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
       | Fun_call (fun_, args_and_types), body_type ->
+        (* FIXME: This will generate partially-applied function calls, which I don't think
+           the LLVM codegen handles correctly. It would need to sometimes create a
+           closure! Probably the best way to handle this is for the MIR to turn all partial
+           application into full application based on the type information we have. *)
         let fun_call fun_ =
           let arg_types = Nonempty.map ~f:snd args_and_types in
           let fun_type = Type.Expr.Function (arg_types, body_type) in

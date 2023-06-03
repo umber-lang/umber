@@ -21,6 +21,10 @@ module Arith = {
   import Std.Prelude.((+), mod)
 }
 
+# FIXME: mod has precedence level 7, where + is 6. Shouldn't this be:
+# `(2 + (11 :mod: 3)) == 4`? I think the `Op_tree` logic has had this bug for a long time
+# FIXME: Maybe we should add some automated validation of invariants in tests e.g.
+# we could check that the op tree is organized in the way it promises to be.
 let _ = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 
@@ -41,13 +45,16 @@ module List = {
     | (Nil, res) | (res, Nil) -> res
     | (Cons x xs, ys) -> Cons x (append xs ys)
 
+  # FIXME: I think adding this doesn't cause an error:
+  #val map : List a, (a -> a) -> List b
+  # So we aren't checking for val delaration consistency properly.
   let map xs f =
     match xs
     | Nil -> Nil
-    | Cons x xs -> Cons (f x) xs
+    | Cons x xs -> Cons (f x) (map xs f)
 
   let concat_map xs f =
     match xs
     | Nil -> Nil
-    | Cons x xs -> append (f x) xs
+    | Cons x xs -> append (f x) (concat_map xs f)
 }
