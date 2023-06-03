@@ -23,27 +23,21 @@ module Expr : sig
   type 'typ t =
     | Literal of Literal.t
     | Name of Value_name.Absolute.t
-    | Fun_call of 'typ t * ('typ t * 'typ) Nonempty.t
-    | Lambda of Pattern.t Nonempty.t * 'typ t
-    | Match of 'typ t * 'typ * (Pattern.t * 'typ t) Nonempty.t
+    | Fun_call of 'typ t Node.t * ('typ t Node.t * 'typ) Nonempty.t
+    | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
+    | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     (* TODO: consider replacing Tuple with some kind of built-in constructor
        e.g. _Tuple2, _Tuple3, depending on the length *)
-    | Tuple of 'typ t list
-    | Record_literal of (Value_name.t * 'typ t option) list
-    | Record_update of 'typ t * (Value_name.t * 'typ t option) list
-    | Record_field_access of 'typ t * Value_name.t
+    | Tuple of 'typ t Node.t list
+    | Record_literal of (Value_name.t * 'typ t Node.t option) list
+    | Record_update of 'typ t Node.t * (Value_name.t * 'typ t Node.t option) list
+    | Record_field_access of 'typ t Node.t * Value_name.t Node.t
   [@@deriving sexp]
 
   type generalized =
     Module_path.absolute Type.Scheme.t t * Module_path.absolute Type.Scheme.t
   [@@deriving sexp_of]
-
-  val of_untyped
-    :  names:Name_bindings.t
-    -> types:Type_bindings.t
-    -> Untyped.Expr.t
-    -> (Type.t * Pattern.Names.t) t * Type.t
 end
 
 module Module : sig

@@ -3,4 +3,4 @@
   (msg
    ("Recursive let bindings can only be used to define functions"
     (expr (Name ErrorLetRecExpression.b))))
-  (filename ErrorLetRecExpression.um) (span 1:5-1:10)))
+  (filename ErrorLetRecExpression.um) (span 1:9-1:10)))

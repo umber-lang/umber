@@ -758,9 +758,11 @@ module Expr = struct
   let rec check_rec_binding_expr expr =
     match (expr : _ Typed.Expr.t) with
     | Lambda _ -> ()
-    | Let { body; bindings = _; rec_ = _ } -> check_rec_binding_expr body
+    | Let { body; bindings = _; rec_ = _ } ->
+      Node.with_value body ~f:check_rec_binding_expr
     | Match (_, _, arms) ->
-      Nonempty.iter arms ~f:(fun (_, expr) -> check_rec_binding_expr expr)
+      Nonempty.iter arms ~f:(fun (_, expr) ->
+        Node.with_value expr ~f:check_rec_binding_expr)
     | Name _
     | Tuple _
     | Record_literal _
@@ -804,17 +806,17 @@ module Expr = struct
     =
     let ctx_for_body, bindings =
       Nonempty.fold_map bindings ~init:ctx ~f:(fun ctx_for_body binding ->
-        Node.with_value binding ~f:(fun binding ->
-          let pattern, _, _ = extract_binding binding in
-          let ctx_for_body, names_bound =
+        let pattern, _, _ = extract_binding binding in
+        let ctx_for_body, names_bound =
+          Node.with_value pattern ~f:(fun pattern ->
             Pattern.Names.fold
               pattern
               ~init:(ctx_for_body, Mir_name.Set.empty)
               ~f:(fun (ctx_for_body, names_bound) name ->
               let ctx, name = Context.add_value_name ctx_for_body name in
-              ctx, Set.add names_bound name)
-          in
-          ctx_for_body, (binding, names_bound)))
+              ctx, Set.add names_bound name))
+        in
+        ctx_for_body, (binding, names_bound))
     in
     let all_names_bound =
       lazy
@@ -830,12 +832,12 @@ module Expr = struct
       bindings
       ~init:(ctx_for_body, init)
       ~f:(fun (ctx_for_body, acc) (binding, names_bound) ->
-      let pat, typ, expr = extract_binding binding in
+      let pat, expr, typ = extract_binding binding in
       let just_bound : Just_bound.t =
         if rec_
         then (
-          check_rec_binding_expr expr;
-          check_rec_binding_pattern pat;
+          Node.with_value expr ~f:check_rec_binding_expr;
+          Node.with_value pat ~f:check_rec_binding_pattern;
           assert_or_compiler_bug ~here:[%here] (Set.length names_bound = 1);
           let this_name = Set.choose_exn names_bound in
           Rec { this_name; other_names = Set.remove (force all_names_bound) this_name })
@@ -844,20 +846,25 @@ module Expr = struct
       (* TODO: support unions in let bindings. For the non-rec case we should
          just be able to convert to a match *)
       let pat' =
-        Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"let bindings"
+        Node.with_value pat ~f:(fun pat ->
+          let pat' =
+            Simple_pattern.flatten_typed_pattern_no_unions pat ~label:"let bindings"
+          in
+          let missing_cases =
+            Simple_pattern.Coverage.(
+              of_pattern pat' |> missing_cases ~ctx ~input_type:typ)
+          in
+          if not (List.is_empty missing_cases)
+          then
+            Compilation_error.raise
+              Mir_error
+              ~msg:
+                [%message
+                  "The pattern in this let binding is not exhaustive"
+                    ~pattern:(pat : Typed.Pattern.t)
+                    (missing_cases : Simple_pattern.t list)];
+          pat')
       in
-      let missing_cases =
-        Simple_pattern.Coverage.(of_pattern pat' |> missing_cases ~ctx ~input_type:typ)
-      in
-      if not (List.is_empty missing_cases)
-      then
-        Compilation_error.raise
-          Mir_error
-          ~msg:
-            [%message
-              "The pattern in this let binding is not exhaustive"
-                ~pattern:(pat : Typed.Pattern.t)
-                (missing_cases : Simple_pattern.t list)];
       let acc, mir_expr = process_expr acc ~just_bound ~ctx expr typ in
       let add_name ctx name = ctx, Context.find_value_name_assert_local ctx name in
       let binding_name, add_binding_name =
@@ -866,23 +873,24 @@ module Expr = struct
         | Catch_all None -> Constant_names.underscore, Context.add_value_name
         | Constant _ | Cnstr_appl _ -> Constant_names.binding, Context.add_value_name
       in
-      let ctx_for_body, acc, mir_expr =
-        make_atomic
+      Node.with_value mir_expr ~f:(fun mir_expr ->
+        let ctx_for_body, acc, mir_expr =
+          make_atomic
+            ~ctx:ctx_for_body
+            ~default:acc
+            ~add_let:(fun name mir_expr -> add_let acc name mir_expr typ)
+            ~binding_name
+            ~add_name:add_binding_name
+            mir_expr
+        in
+        fold_pattern_bindings
           ~ctx:ctx_for_body
-          ~default:acc
-          ~add_let:(fun name mir_expr -> add_let acc name mir_expr typ)
-          ~binding_name
-          ~add_name:add_binding_name
+          pat'
           mir_expr
-      in
-      fold_pattern_bindings
-        ~ctx:ctx_for_body
-        pat'
-        mir_expr
-        typ
-        ~init:acc
-        ~add_let:(fun acc name mir_expr -> add_let acc name mir_expr typ)
-        ~add_name)
+          typ
+          ~init:acc
+          ~add_let:(fun acc name mir_expr -> add_let acc name mir_expr typ)
+          ~add_name))
   ;;
 
   let of_typed_expr
@@ -915,13 +923,13 @@ module Expr = struct
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
       | Fun_call (fun_, args_and_types), body_type ->
-        let fun_call () =
+        let fun_call fun_ =
           let arg_types = Nonempty.map ~f:snd args_and_types in
           let fun_type = Type.Expr.Function (arg_types, body_type) in
           let fun_ = of_typed_expr ~ctx fun_ fun_type in
           let args =
             Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
-              of_typed_expr ~ctx arg arg_type)
+              Node.with_value arg ~f:(fun arg -> of_typed_expr ~ctx arg arg_type))
           in
           match fun_ with
           | Name fun_name -> Fun_call (fun_name, args)
@@ -931,26 +939,29 @@ module Expr = struct
           | Primitive _ | Make_block _ ->
             compiler_bug [%message "Invalid function expression" (fun_ : t)]
         in
-        (match fun_ with
-         | Name (_, name) ->
-           (* TODO: I think there's no need for this special-casing actually: we can just
+        Node.with_value fun_ ~f:(fun fun_ ->
+          match fun_ with
+          | Name (_, name) ->
+            (* TODO: I think there's no need for this special-casing actually: we can just
               use the constructor functions directly. *)
-           (* Special-case constructor applications *)
-           (match Value_name.to_cnstr_name name with
-            | Ok cnstr_name ->
-              let cnstr_info = Context.find_cnstr_info ctx expr_type in
-              let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
-              let fields, field_types = List.unzip (Nonempty.to_list args_and_types) in
-              make_block ~ctx ~tag ~fields ~field_types
-            | Error _ -> fun_call ())
-         | _ -> fun_call ())
+            (* Special-case constructor applications *)
+            (match Value_name.to_cnstr_name name with
+             | Ok cnstr_name ->
+               let cnstr_info = Context.find_cnstr_info ctx expr_type in
+               let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
+               let fields, field_types = List.unzip (Nonempty.to_list args_and_types) in
+               make_block ~ctx ~tag ~fields ~field_types
+             | Error _ -> fun_call fun_)
+          | _ -> fun_call fun_)
       | Lambda (args, body), Function (arg_types, body_type) ->
         (* TODO: Still need to try and coalesce lambdas/other function expressions for
            function definitions which are partially applied. See example in
            test/ast/TypeChecking.expected. *)
         add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound
       | Match (expr, input_type, arms), output_type ->
-        let input_expr = of_typed_expr ~ctx expr input_type in
+        let input_expr =
+          Node.with_value expr ~f:(fun expr -> of_typed_expr ~ctx expr input_type)
+        in
         if is_atomic input_expr
         then
           (* Skip binding [match_expr_name] when matching on an atomic expression. *)
@@ -974,15 +985,18 @@ module Expr = struct
             ~add_let:
               (fun bindings name mir_expr (_ : Module_path.absolute Type.Scheme.t) ->
               (name, mir_expr) :: bindings)
-            ~extract_binding:(fun ((pat, typ), expr) -> pat, typ, expr)
+            ~extract_binding:(fun (pat_and_type, expr) ->
+              Node.map pat_and_type ~f:fst, expr, Node.with_value pat_and_type ~f:snd)
             ~process_expr:(fun bindings ~just_bound ~ctx expr typ ->
-              bindings, of_typed_expr ~just_bound ~ctx expr typ)
+              ( bindings
+              , Node.map expr ~f:(fun expr -> of_typed_expr ~just_bound ~ctx expr typ) ))
             bindings
         in
         let body =
           (* Pass through [just_bound] so it can apply through intermediate local let
              bindings in expressions. *)
-          of_typed_expr ?just_bound ~ctx body body_type
+          Node.with_value body ~f:(fun body ->
+            of_typed_expr ?just_bound ~ctx body body_type)
         in
         add_let_bindings ~bindings ~body
       | Tuple fields, Tuple field_types ->
@@ -1001,30 +1015,33 @@ module Expr = struct
       let (ctx, bindings), args =
         Nonempty.zip_exn args arg_types
         |> Nonempty.fold_map ~init:(ctx, []) ~f:(fun (ctx, bindings) (arg, arg_type) ->
-             let arg =
-               Simple_pattern.flatten_typed_pattern_no_unions
-                 arg
-                 ~label:"function argument patterns"
-             in
-             match arg with
-             | Catch_all (Some arg_name) ->
-               (* Special-case named catch-all patterns (the dominant case) to skip the
-                  [lambda_arg] step and use the name directly. *)
-               let ctx, arg_name = Context.add_value_name ctx arg_name in
-               (ctx, bindings), arg_name
-             | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
-               let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
-               let add_let acc name mir_expr = (name, mir_expr) :: acc in
-               let ctx, bindings =
-                 fold_pattern_bindings
-                   ~ctx
+             Node.with_value arg ~f:(fun arg ->
+               let arg =
+                 Simple_pattern.flatten_typed_pattern_no_unions
                    arg
-                   (Name arg_name)
-                   arg_type
-                   ~init:bindings
-                   ~add_let
+                   ~label:"function argument patterns"
                in
-               (ctx, bindings), arg_name)
+               match arg with
+               | Catch_all (Some arg_name) ->
+                 (* Special-case named catch-all patterns (the dominant case) to skip the
+                  [lambda_arg] step and use the name directly. *)
+                 let ctx, arg_name = Context.add_value_name ctx arg_name in
+                 (ctx, bindings), arg_name
+               | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
+                 let ctx, arg_name =
+                   Context.add_value_name ctx Constant_names.lambda_arg
+                 in
+                 let add_let acc name mir_expr = (name, mir_expr) :: acc in
+                 let ctx, bindings =
+                   fold_pattern_bindings
+                     ~ctx
+                     arg
+                     (Name arg_name)
+                     arg_type
+                     ~init:bindings
+                     ~add_let
+                 in
+                 (ctx, bindings), arg_name))
       in
       let recursively_bound_names =
         match just_bound with
@@ -1060,7 +1077,9 @@ module Expr = struct
           | `Newly_bound | `Recursively_bound | `From_toplevel -> None
           | `Closed_over_from_parent -> Some (close_over_name mir_name))
       in
-      let body = of_typed_expr ~ctx body body_type in
+      let body =
+        Node.with_value body ~f:(fun body -> of_typed_expr ~ctx body body_type)
+      in
       let body = add_let_bindings ~bindings ~body in
       (* TODO: Consider having closures share an environment instead of closing over other
          mutually recursive closures. *)
@@ -1115,11 +1134,15 @@ module Expr = struct
       add_fun_def fun_def;
       fun_or_closure
     and make_block ~ctx ~tag ~fields ~field_types =
-      let fields = List.map2_exn fields field_types ~f:(of_typed_expr ~ctx) in
+      let fields =
+        List.map2_exn fields field_types ~f:(fun field_expr field_type ->
+          Node.with_value field_expr ~f:(fun field_expr ->
+            of_typed_expr ~ctx field_expr field_type))
+      in
       Make_block { tag; fields }
     and handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms =
       let rec loop_one_arm ~pattern ~output_expr ~coverage arms =
-        let patterns = Simple_pattern.flatten_typed_pattern pattern in
+        let patterns = Node.with_value pattern ~f:Simple_pattern.flatten_typed_pattern in
         let coverage' = Simple_pattern.Coverage.of_patterns patterns in
         let coverage =
           match coverage with
@@ -1137,7 +1160,8 @@ module Expr = struct
           ~output_type
           ~fallback
           patterns
-      and loop ~coverage = function
+      and loop ~coverage arms =
+        match arms with
         | [] ->
           (match Simple_pattern.Coverage.missing_cases ~ctx ~input_type coverage with
            | [] ->
@@ -1177,7 +1201,10 @@ module Expr = struct
           ~binding_name:Constant_names.binding
           input_expr
       in
-      let body = of_typed_expr ~ctx output_expr output_type in
+      let body =
+        Node.with_value output_expr ~f:(fun output_expr ->
+          of_typed_expr ~ctx output_expr output_type)
+      in
       let fold_result =
         (* TODO: Consider writing this is a regular recursive function. It might actually
            be easier to understand that way, and this version duplicates work by always
@@ -1267,7 +1294,7 @@ let of_typed_module =
     ~stmts
     ~rec_
     ~fun_decls
-    (bindings : (Typed.Pattern.t * Typed.Expr.generalized) Node.t Nonempty.t)
+    (bindings : (Typed.Pattern.t Node.t * Typed.Expr.generalized Node.t) Nonempty.t)
     =
     let process_expr (stmts : Stmt.t list) ~just_bound ~ctx expr typ =
       let stmts = ref stmts in
@@ -1279,7 +1306,8 @@ let of_typed_module =
           stmts := Fun_decl fun_decl :: !stmts)
       in
       let expr =
-        Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def ~add_fun_decl expr typ
+        Node.map expr ~f:(fun expr ->
+          Expr.of_typed_expr ~just_bound ~ctx ~add_fun_def ~add_fun_decl expr typ)
       in
       !stmts, expr
     in
@@ -1314,7 +1342,8 @@ let of_typed_module =
       ~rec_
       ~init:stmts
       ~add_let
-      ~extract_binding:(fun (pat, (expr, typ)) -> pat, typ, expr)
+      ~extract_binding:(fun (pat, expr_and_type) ->
+        pat, Node.map expr_and_type ~f:fst, Node.with_value expr_and_type ~f:snd)
       ~process_expr
   in
   let generate_variant_constructor_values ~ctx ~stmts decl =

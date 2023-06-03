@@ -1,24 +1,33 @@
 open Import
 open Names
 
-type t = (Value_name.Relative.t, Untyped.Expr.t) Btree.t
+type t = (Value_name.Relative.t Node.t, Untyped.Expr.t Node.t) Btree.t
 
-let rec fix_precedence ~names = function
-  | Btree.Node (op_name, left_child, right_child) as root ->
+let rec fix_precedence ~names (t : t) : t =
+  match t with
+  | Node (op_name, left_child, right_child) as root ->
     let left_child = fix_precedence ~names left_child in
     let right_child = fix_precedence ~names right_child in
     let rotation =
       match left_child, right_child with
-      | Btree.Leaf _, Leaf _ -> None
+      | Leaf _, Leaf _ -> None
       | Node (left_name, ll_child, lr_child), Leaf _ ->
-        let _, left_level = Name_bindings.find_fixity names left_name in
+        let _, left_level =
+          Node.with_value left_name ~f:(Name_bindings.find_fixity names)
+        in
         Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
       | Leaf _, Node (right_name, rl_child, rr_child) ->
-        let _, right_level = Name_bindings.find_fixity names right_name in
+        let _, right_level =
+          Node.with_value right_name ~f:(Name_bindings.find_fixity names)
+        in
         Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
       | Node (left_name, ll_child, lr_child), Node (right_name, rl_child, rr_child) ->
-        let _, left_level = Name_bindings.find_fixity names left_name in
-        let _, right_level = Name_bindings.find_fixity names right_name in
+        let _, left_level =
+          Node.with_value left_name ~f:(Name_bindings.find_fixity names)
+        in
+        let _, right_level =
+          Node.with_value right_name ~f:(Name_bindings.find_fixity names)
+        in
         if Fixity.Level.(left_level <= right_level)
         then Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
         else Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
@@ -26,7 +35,7 @@ let rec fix_precedence ~names = function
     (match rotation with
      | None -> root
      | Some (level, rotation_info) ->
-       let _, op_level = Name_bindings.find_fixity names op_name in
+       let _, op_level = Node.with_value op_name ~f:(Name_bindings.find_fixity names) in
        if Fixity.Level.(level < op_level)
        then (
          match rotation_info with
@@ -53,9 +62,12 @@ let can_rotate op_level op_assoc child_level child_assoc =
   else false
 ;;
 
-let rec fix_associativity ~names = function
-  | Btree.Node (op_name, left_child, right_child) ->
-    let op_assoc, op_level = Name_bindings.find_fixity names op_name in
+let rec fix_associativity ~names (t : t) : t =
+  match t with
+  | Node (op_name, left_child, right_child) ->
+    let op_assoc, op_level =
+      Node.with_value op_name ~f:(Name_bindings.find_fixity names)
+    in
     handle_node ~names op_name op_assoc op_level left_child right_child
   | Leaf _ as leaf -> leaf
 
@@ -72,8 +84,10 @@ and handle_node ~names op_name op_assoc op_level left_child right_child =
 
 and turn_anticlockwise ~names op_name op_assoc op_level left_child right_child =
   match right_child with
-  | Btree.Node (right_name, rl_child, rr_child) ->
-    let right_assoc, right_level = Name_bindings.find_fixity names right_name in
+  | Node (right_name, rl_child, rr_child) ->
+    let right_assoc, right_level =
+      Node.with_value right_name ~f:(Name_bindings.find_fixity names)
+    in
     if can_rotate op_level op_assoc right_level right_assoc
     then (
       (* Keep trying to rotate anticlockwise *)
@@ -85,7 +99,9 @@ and turn_anticlockwise ~names op_name op_assoc op_level left_child right_child =
 and turn_clockwise ~names op_name op_assoc op_level left_child right_child =
   match left_child with
   | Btree.Node (left_name, ll_child, lr_child) ->
-    let left_assoc, left_level = Name_bindings.find_fixity names left_name in
+    let left_assoc, left_level =
+      Node.with_value left_name ~f:(Name_bindings.find_fixity names)
+    in
     if can_rotate op_level op_assoc left_level left_assoc
     then (
       (* Keep trying to rotate clockwise *)
@@ -96,18 +112,28 @@ and turn_clockwise ~names op_name op_assoc op_level left_child right_child =
 
 and handle_non_assoc ~names parent_level = function
   | Btree.Node (op_name, left_child, right_child) ->
-    let op_assoc, op_level = Name_bindings.find_fixity names op_name in
+    let op_assoc, op_level =
+      Node.with_value op_name ~f:(Name_bindings.find_fixity names)
+    in
     if Fixity.Level.(op_level = parent_level)
     then Type_bindings.type_error_msg "Associativity error"
     else handle_node ~names op_name op_assoc op_level left_child right_child
   | Leaf _ as leaf -> leaf
 ;;
 
-let rec to_untyped_expr = function
-  | Btree.Leaf expr -> expr
+let rec to_untyped_expr : t -> Untyped.Expr.t Node.t = function
+  | Leaf expr -> expr
   | Node (op_name, left_child, right_child) ->
     let left_arg, right_arg = to_untyped_expr left_child, to_untyped_expr right_child in
-    Untyped.Expr.Fun_call (Name op_name, [ left_arg; right_arg ])
+    let span =
+      Span.combine
+        (Node.span op_name)
+        (Span.combine (Node.span left_arg) (Node.span right_arg))
+    in
+    Node.create
+      (Untyped.Expr.Fun_call
+         (Node.map op_name ~f:Untyped.Expr.name, [ left_arg; right_arg ]))
+      span
 ;;
 
 let to_untyped_expr ~names =

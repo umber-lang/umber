@@ -40,7 +40,8 @@ module Import = struct
           ~name_excluded:(fun acc variant -> variant.constructor name :: acc)
       in
       print_s [%sexp (List.sort examples ~compare : t list)];
-      [%expect {|
+      [%expect
+        {|
         (All (Module ModuleName (All)) (Name name) (Name_as name name)
          (Name_excluded name)) |}]
     ;;
@@ -75,7 +76,7 @@ and ('pat, 'expr, 'name) def =
   | Module of ('pat, 'expr, 'name) t
   | Let of
       { rec_ : bool
-      ; bindings : ('pat * 'expr) Node.t Nonempty.t
+      ; bindings : ('pat Node.t * 'expr Node.t) Nonempty.t
       }
   | Trait of
       Trait_name.t
