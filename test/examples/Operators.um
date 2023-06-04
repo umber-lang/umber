@@ -48,6 +48,9 @@ module List = {
   # FIXME: I think adding this doesn't cause an error:
   #val map : List a, (a -> a) -> List b
   # So we aren't checking for val delaration consistency properly.
+  # FIXME: This is getting the MIR name `Operators.List.map.1`, but it needs to get one
+  # without a number suffix! Same for `concat_map` below. I should think more carefully
+  # about this invariant and maybe write a check enforcing it (at least in tests).
   let map xs f =
     match xs
     | Nil -> Nil
@@ -58,3 +61,5 @@ module List = {
     | Nil -> Nil
     | Cons x xs -> append (f x) (concat_map xs f)
 }
+
+# FIXME: Add some print tests e.g. `print unicode_my_dudes`
