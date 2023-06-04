@@ -1,0 +1,147 @@
+("Compilation error"
+ ((kind Codegen_error) (msg "LLVM codegen failed") (filename Operators.um)
+  (exn
+   (src/util.ml.Compiler_bug
+    ("Failed to find LLVM value for name" (name Operators.List.res.1)
+     (t
+      ((Std.Prelude.List.Nil
+        "@Std.Prelude.List.Nil = external global %umber_block*")
+       (Std.Prelude.Operators.*
+        "declare tailcc %umber_block* @\"Std.Prelude.Operators.*\"(%umber_block*, %umber_block*)\n")
+       (Std.Prelude.Operators.+
+        "declare tailcc %umber_block* @\"Std.Prelude.Operators.+\"(%umber_block*, %umber_block*)\n")
+       (Std.Prelude.Operators.::
+        "declare tailcc %umber_block* @\"Std.Prelude.Operators.::\"(%umber_block*, %umber_block*)\n")
+       (Std.Prelude.Operators.==
+        "declare tailcc %umber_block* @\"Std.Prelude.Operators.==\"(%umber_block*, %umber_block*)\n")
+       (Std.Prelude.Operators.mod
+        "declare tailcc %umber_block* @Std.Prelude.Operators.mod(%umber_block*, %umber_block*)\n")
+       (Operators..1 "%umber_block* %Operators..1")
+       (Operators._.1 "@Operators._.1 = global %umber_block* null")
+       (Operators.x.1 "%umber_block* %Operators.x.1")
+       (Operators.x.2
+        "  %block_field = inttoptr i64 %block_field_raw to %umber_block*")
+       (Operators.y.1 "%umber_block* %Operators.y.1")
+       ("Operators.\195\151"
+         "define tailcc %umber_block* @\"Operators.\\C3\\97\"(%umber_block* %Operators.xs.1, %umber_block* %Operators.ys.1) {\
+        \nentry:\
+        \n  %box = call i64* @umber_gc_alloc(i64 24)\
+        \n  %box1 = bitcast i64* %box to i16*\
+        \n  store i16 12289, i16* %box1, align 2\
+        \n  %box2 = getelementptr i16, i16* %box1, i32 1\
+        \n  store i16 2, i16* %box2, align 2\
+        \n  %box3 = bitcast i64* %box to %umber_block**\
+        \n  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1\
+        \n  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @\"Operators.*fun.2\" to %umber_block*), %umber_block** %box4, align 8\
+        \n  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2\
+        \n  store %umber_block* %Operators.ys.1, %umber_block** %box5, align 8\
+        \n  %box6 = bitcast %umber_block** %box3 to %umber_block*\
+        \n  %fun_call = tail call tailcc %umber_block* @Operators.List.concat_map(%umber_block* %Operators.xs.1, %umber_block* %box6)\
+        \n  ret %umber_block* %fun_call\
+        \n}\
+        \n")
+       (Operators.xs.1 "%umber_block* %Operators.xs.1")
+       (Operators.ys.1 "%umber_block* %Operators.ys.1")
+       (Operators.ys.2
+        "  %block_field = inttoptr i64 %block_field_raw to %umber_block*")
+       (Operators.one "@Operators.one = global %umber_block* null")
+       (Operators.*fun.1
+         "define tailcc %umber_block* @\"Operators.*fun.1\"(%umber_block* %\"Operators.*closure_env.1\", %umber_block* %Operators.y.1) {\
+        \nentry:\
+        \n  %block_field_gep = getelementptr %umber_block, %umber_block* %\"Operators.*closure_env.1\", i32 0, i32 1, i32 1\
+        \n  %block_field_raw = load i64, i64* %block_field_gep, align 8\
+        \n  %block_field = inttoptr i64 %block_field_raw to %umber_block*\
+        \n  %box = call i64* @umber_gc_alloc(i64 24)\
+        \n  %box1 = bitcast i64* %box to i16*\
+        \n  store i16 0, i16* %box1, align 2\
+        \n  %box2 = getelementptr i16, i16* %box1, i32 1\
+        \n  store i16 2, i16* %box2, align 2\
+        \n  %box3 = bitcast i64* %box to %umber_block**\
+        \n  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1\
+        \n  store %umber_block* %block_field, %umber_block** %box4, align 8\
+        \n  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2\
+        \n  store %umber_block* %Operators.y.1, %umber_block** %box5, align 8\
+        \n  %box6 = bitcast %umber_block** %box3 to %umber_block*\
+        \n  ret %umber_block* %box6\
+        \n}\
+        \n")
+       (Operators.*fun.2
+         "define tailcc %umber_block* @\"Operators.*fun.2\"(%umber_block* %\"Operators.*closure_env.2\", %umber_block* %Operators.x.1) {\
+        \nentry:\
+        \n  %block_field_gep = getelementptr %umber_block, %umber_block* %\"Operators.*closure_env.2\", i32 0, i32 1, i32 1\
+        \n  %block_field_raw = load i64, i64* %block_field_gep, align 8\
+        \n  %block_field = inttoptr i64 %block_field_raw to %umber_block*\
+        \n  %box = call i64* @umber_gc_alloc(i64 24)\
+        \n  %box1 = bitcast i64* %box to i16*\
+        \n  store i16 12289, i16* %box1, align 2\
+        \n  %box2 = getelementptr i16, i16* %box1, i32 1\
+        \n  store i16 2, i16* %box2, align 2\
+        \n  %box3 = bitcast i64* %box to %umber_block**\
+        \n  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1\
+        \n  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @\"Operators.*fun.1\" to %umber_block*), %umber_block** %box4, align 8\
+        \n  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2\
+        \n  store %umber_block* %Operators.x.1, %umber_block** %box5, align 8\
+        \n  %box6 = bitcast %umber_block** %box3 to %umber_block*\
+        \n  %fun_call = tail call tailcc %umber_block* @Operators.List.map(%umber_block* %block_field, %umber_block* %box6)\
+        \n  ret %umber_block* %fun_call\
+        \n}\
+        \n")
+       (Operators.arg0.1 "%umber_block* %Operators.arg0.1")
+       (Operators.four "@Operators.four = global %umber_block* null")
+       (Operators.*closure_env.1
+        "%umber_block* %\"Operators.*closure_env.1\"")
+       (Operators.*closure_env.2
+        "%umber_block* %\"Operators.*closure_env.2\"")
+       (Operators.left_section
+         "define tailcc %umber_block* @Operators.left_section(%umber_block* %Operators.arg0.1) {\
+        \nentry:\
+        \n  %Operators.left_section.1 = load %umber_block*, %umber_block** @Operators.left_section.1, align 8\
+        \n  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.left_section.1, %umber_block* %Operators.arg0.1)\
+        \n  ret %umber_block* %fun_call\
+        \n}\
+        \n")
+       (Operators.left_section.1
+        "@Operators.left_section.1 = global %umber_block* null")
+       (Operators.right_section
+         "define tailcc %umber_block* @Operators.right_section(%umber_block* %Operators..1) {\
+        \nentry:\
+        \n  %fun_call = tail call tailcc %umber_block* @\"Std.Prelude.Operators.*\"(%umber_block* %Operators..1, %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))\
+        \n  ret %umber_block* %fun_call\
+        \n}\
+        \n")
+       (Operators.unicode_my_dudes
+        "@Operators.unicode_my_dudes = global %umber_block* null")
+       (Operators.List.xs.1 "%umber_block* %Operators.List.xs.1")
+       (Operators.List.ys.1 "%umber_block* %Operators.List.ys.1")
+       (Operators.List.map
+         "define tailcc %umber_block* @Operators.List.map(%umber_block* %0, %umber_block* %1) {\
+        \nentry:\
+        \n}\
+        \n")
+       (Operators.List.match.1
+        "  %box6 = bitcast %umber_block** %box3 to %umber_block*")
+       (Operators.List.append
+         "define tailcc %umber_block* @Operators.List.append(%umber_block* %Operators.List.xs.1, %umber_block* %Operators.List.ys.1) {\
+        \nentry:\
+        \n  %box = call i64* @umber_gc_alloc(i64 24)\
+        \n  %box1 = bitcast i64* %box to i16*\
+        \n  store i16 0, i16* %box1, align 2\
+        \n  %box2 = getelementptr i16, i16* %box1, i32 1\
+        \n  store i16 2, i16* %box2, align 2\
+        \n  %box3 = bitcast i64* %box to %umber_block**\
+        \n  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1\
+        \n  store %umber_block* %Operators.List.xs.1, %umber_block** %box4, align 8\
+        \n  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2\
+        \n  store %umber_block* %Operators.List.ys.1, %umber_block** %box5, align 8\
+        \n  %box6 = bitcast %umber_block** %box3 to %umber_block*\
+        \n\
+        \ncond_binding_merge:                               ; No predecessors!\
+        \n  %cond_bindings = phi <1 x %umber_block*> \
+        \n  %Operators.List.res.1 = extractelement <1 x %umber_block*> %cond_bindings, i64 0\
+        \n}\
+        \n")
+       (Operators.List.concat_map
+         "define tailcc %umber_block* @Operators.List.concat_map(%umber_block* %0, %umber_block* %1) {\
+        \nentry:\
+        \n}\
+        \n"))))))))

@@ -751,7 +751,7 @@ entry:
   ret i32 0
 }
 
-define tailcc %umber_block* @Std.Prelude.Option.Some(%umber_block* %Std.Prelude.Option.arg0) {
+define tailcc %umber_block* @Std.Prelude.Option.Some(%umber_block* %Std.Prelude.Option.arg0.1) {
 entry:
   %box = call i64* @umber_gc_alloc(i64 16)
   %box1 = bitcast i64* %box to i16*
@@ -760,12 +760,12 @@ entry:
   store i16 1, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* %Std.Prelude.Option.arg0, %umber_block** %box4, align 8
+  store %umber_block* %Std.Prelude.Option.arg0.1, %umber_block** %box4, align 8
   %box5 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box5
 }
 
-define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %Std.Prelude.List.arg0, %umber_block* %Std.Prelude.List.arg1) {
+define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %Std.Prelude.List.arg0.1, %umber_block* %Std.Prelude.List.arg1.1) {
 entry:
   %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
@@ -774,9 +774,9 @@ entry:
   store i16 2, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* %Std.Prelude.List.arg0, %umber_block** %box4, align 8
+  store %umber_block* %Std.Prelude.List.arg0.1, %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
-  store %umber_block* %Std.Prelude.List.arg1, %umber_block** %box5, align 8
+  store %umber_block* %Std.Prelude.List.arg1.1, %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box6
 }
@@ -813,10 +813,10 @@ entry:
 
 declare %umber_block* @umber_float_cos(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @Std.Prelude.Operators..(%umber_block* %Std.Prelude.Operators.f, %umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x) {
+define tailcc %umber_block* @Std.Prelude.Operators..(%umber_block* %Std.Prelude.Operators.f.1, %umber_block* %Std.Prelude.Operators.g.1, %umber_block* %Std.Prelude.Operators.x.1) {
 entry:
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.g, %umber_block* %Std.Prelude.Operators.x)
-  %fun_call1 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f, %umber_block* %fun_call)
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.g.1, %umber_block* %Std.Prelude.Operators.x.1)
+  %fun_call1 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f.1, %umber_block* %fun_call)
   ret %umber_block* %fun_call1
 }
 
@@ -890,14 +890,14 @@ entry:
 
 declare %umber_block* @umber_float_sub(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %Std.Prelude.Operators.arg0, %umber_block* %Std.Prelude.Operators.arg1) {
+define tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %Std.Prelude.Operators.arg0.1, %umber_block* %Std.Prelude.Operators.arg1.1) {
 entry:
   %"Std.Prelude.Operators.::.1" = load %umber_block*, %umber_block** @"Std.Prelude.Operators.::.1", align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %"Std.Prelude.Operators.::.1", %umber_block* %Std.Prelude.Operators.arg0, %umber_block* %Std.Prelude.Operators.arg1)
+  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %"Std.Prelude.Operators.::.1", %umber_block* %Std.Prelude.Operators.arg0.1, %umber_block* %Std.Prelude.Operators.arg1.1)
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @Std.Prelude.Operators.not(%umber_block* %Std.Prelude.Operators.) {
+define tailcc %umber_block* @Std.Prelude.Operators.not(%umber_block* %Std.Prelude.Operators..1) {
 entry:
   br label %cond
 
@@ -905,8 +905,8 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %Std.Prelude.Operators.1 = ptrtoint %umber_block* %Std.Prelude.Operators. to i64
-  %equals = icmp eq i64 %Std.Prelude.Operators.1, 3
+  %Std.Prelude.Operators..11 = ptrtoint %umber_block* %Std.Prelude.Operators..1 to i64
+  %equals = icmp eq i64 %Std.Prelude.Operators..11, 3
   br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond
@@ -968,30 +968,7 @@ entry:
 
 declare %umber_block* @umber_gte(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"Std.Prelude.Operators.&&"(%umber_block* %Std.Prelude.Operators.a, %umber_block* %Std.Prelude.Operators.b) {
-entry:
-  br label %cond
-
-cond_binding_merge:                               ; preds = %cond_binding
-  br label %cond_otherwise_merge
-
-cond:                                             ; preds = %entry
-  %Std.Prelude.Operators.a1 = ptrtoint %umber_block* %Std.Prelude.Operators.a to i64
-  %equals = icmp eq i64 %Std.Prelude.Operators.a1, 3
-  br i1 %equals, label %cond_binding, label %cond_otherwise
-
-cond_binding:                                     ; preds = %cond
-  br label %cond_binding_merge
-
-cond_otherwise:                                   ; preds = %cond
-  br label %cond_otherwise_merge
-
-cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge2 = phi %umber_block* [ %Std.Prelude.Operators.b, %cond_binding_merge ], [ inttoptr (i64 1 to %umber_block*), %cond_otherwise ]
-  ret %umber_block* %cond_otherwise_merge2
-}
-
-define tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block* %Std.Prelude.Operators.a.1, %umber_block* %Std.Prelude.Operators.b.1) {
+define tailcc %umber_block* @"Std.Prelude.Operators.&&"(%umber_block* %Std.Prelude.Operators.a.1, %umber_block* %Std.Prelude.Operators.b.1) {
 entry:
   br label %cond
 
@@ -1010,19 +987,42 @@ cond_otherwise:                                   ; preds = %cond
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge2 = phi %umber_block* [ inttoptr (i64 3 to %umber_block*), %cond_binding_merge ], [ %Std.Prelude.Operators.b.1, %cond_otherwise ]
+  %cond_otherwise_merge2 = phi %umber_block* [ %Std.Prelude.Operators.b.1, %cond_binding_merge ], [ inttoptr (i64 1 to %umber_block*), %cond_otherwise ]
   ret %umber_block* %cond_otherwise_merge2
 }
 
-define tailcc %umber_block* @"Std.Prelude.Operators.|>"(%umber_block* %Std.Prelude.Operators.x.1, %umber_block* %Std.Prelude.Operators.f.1) {
+define tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block* %Std.Prelude.Operators.a.2, %umber_block* %Std.Prelude.Operators.b.2) {
 entry:
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f.1, %umber_block* %Std.Prelude.Operators.x.1)
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %Std.Prelude.Operators.a.21 = ptrtoint %umber_block* %Std.Prelude.Operators.a.2 to i64
+  %equals = icmp eq i64 %Std.Prelude.Operators.a.21, 3
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge2 = phi %umber_block* [ inttoptr (i64 3 to %umber_block*), %cond_binding_merge ], [ %Std.Prelude.Operators.b.2, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge2
+}
+
+define tailcc %umber_block* @"Std.Prelude.Operators.|>"(%umber_block* %Std.Prelude.Operators.x.2, %umber_block* %Std.Prelude.Operators.f.2) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.Operators.f.2, %umber_block* %Std.Prelude.Operators.x.2)
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %"Std.Prelude.Operators.*lambda_arg", %umber_block* %Std.Prelude.Operators.x.2) {
+define tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %"Std.Prelude.Operators.*lambda_arg.1", %umber_block* %Std.Prelude.Operators.x.3) {
 entry:
-  ret %umber_block* %Std.Prelude.Operators.x.2
+  ret %umber_block* %Std.Prelude.Operators.x.3
 }
 
 define tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* %0, %umber_block* %1) {

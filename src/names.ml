@@ -453,6 +453,7 @@ module Mir_name : sig
   end
 
   val create_value_name : Name_table.t -> Value_name.Absolute.t -> t
+  val create_exportable_name : Value_name.Absolute.t -> t
   val copy_name : Name_table.t -> t -> t
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
@@ -500,8 +501,10 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
+  let create_exportable_name value_name = value_name, 0
+
   let create_value_name name_table value_name =
-    let id = Option.value (Hashtbl.find name_table value_name) ~default:0 in
+    let id = Option.value (Hashtbl.find name_table value_name) ~default:1 in
     Hashtbl.set name_table ~key:value_name ~data:(id + 1);
     value_name, id
   ;;

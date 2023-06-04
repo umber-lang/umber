@@ -1,7 +1,7 @@
 ((Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.mod) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
- (Value_def Operators._
+ (Value_def Operators._.1
   (Fun_call Std.Prelude.Operators.==
    ((Fun_call Std.Prelude.Operators.mod
      ((Fun_call Std.Prelude.Operators.+
@@ -17,14 +17,14 @@
  (Value_def Operators.left_section.1
   (Fun_call Std.Prelude.Operators.+ ((Primitive (Int 2)))))
  (Fun_def
-  ((fun_name Operators.left_section) (args (Operators.arg0))
-   (body (Fun_call Operators.left_section.1 ((Name Operators.arg0))))))
+  ((fun_name Operators.left_section) (args (Operators.arg0.1))
+   (body (Fun_call Operators.left_section.1 ((Name Operators.arg0.1))))))
  (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_def
-  ((fun_name Operators.right_section) (args (Operators.))
+  ((fun_name Operators.right_section) (args (Operators..1))
    (body
     (Fun_call Std.Prelude.Operators.*
-     ((Name Operators.) (Primitive (Int 5)))))))
+     ((Name Operators..1) (Primitive (Int 5)))))))
  (Fun_decl ((name Std.Prelude.Operators.::) (arity 2)))
  (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
  (Value_def Operators.unicode_my_dudes
@@ -40,89 +40,93 @@
         (Fun_call Std.Prelude.Operators.::
          ((Primitive (String maybe?)) (Name Std.Prelude.List.Nil))))))))))
  (Fun_def
-  ((fun_name Operators.*fun) (args (Operators.*closure_env Operators.y))
+  ((fun_name Operators.*fun.1)
+   (args (Operators.*closure_env.1 Operators.y.1))
    (body
-    (Let Operators.x.1 (Get_block_field 1 (Name Operators.*closure_env))
-     (Make_block (tag 0) (fields ((Name Operators.x.1) (Name Operators.y))))))))
+    (Let Operators.x.2 (Get_block_field 1 (Name Operators.*closure_env.1))
+     (Make_block (tag 0)
+      (fields ((Name Operators.x.2) (Name Operators.y.1))))))))
  (Fun_def
-  ((fun_name Operators.*fun.1) (args (Operators.*closure_env.1 Operators.x))
+  ((fun_name Operators.*fun.2)
+   (args (Operators.*closure_env.2 Operators.x.1))
    (body
-    (Let Operators.ys.1 (Get_block_field 1 (Name Operators.*closure_env.1))
+    (Let Operators.ys.2 (Get_block_field 1 (Name Operators.*closure_env.2))
      (Fun_call Operators.List.map
-      ((Name Operators.ys.1)
+      ((Name Operators.ys.2)
        (Make_block (tag 12289)
-        (fields ((Name Operators.*fun) (Name Operators.x))))))))))
+        (fields ((Name Operators.*fun.1) (Name Operators.x.1))))))))))
  (Fun_def
-  ((fun_name "Operators.\195\151.1") (args (Operators.xs Operators.ys))
+  ((fun_name "Operators.\195\151") (args (Operators.xs.1 Operators.ys.1))
    (body
     (Fun_call Operators.List.concat_map
-     ((Name Operators.xs)
+     ((Name Operators.xs.1)
       (Make_block (tag 12289)
-       (fields ((Name Operators.*fun.1) (Name Operators.ys)))))))))
+       (fields ((Name Operators.*fun.2) (Name Operators.ys.1)))))))))
  (Fun_def
   ((fun_name Operators.List.append)
-   (args (Operators.List.xs Operators.List.ys))
+   (args (Operators.List.xs.1 Operators.List.ys.1))
    (body
-    (Let Operators.List.match
+    (Let Operators.List.match.1
      (Make_block (tag 0)
-      (fields ((Name Operators.List.xs) (Name Operators.List.ys))))
-     (Cond_assign (vars (Operators.List.res))
+      (fields ((Name Operators.List.xs.1) (Name Operators.List.ys.1))))
+     (Cond_assign (vars (Operators.List.res.1))
       (conds
-       (((And (Non_constant_tag_equals (Name Operators.List.match) 0)
+       (((And (Non_constant_tag_equals (Name Operators.List.match.1) 0)
           (Constant_tag_equals
-           (Get_block_field 0 (Name Operators.List.match)) 0))
-         ((Get_block_field 1 (Name Operators.List.match))))
-        ((And (Non_constant_tag_equals (Name Operators.List.match) 0)
+           (Get_block_field 0 (Name Operators.List.match.1)) 0))
+         ((Get_block_field 1 (Name Operators.List.match.1))))
+        ((And (Non_constant_tag_equals (Name Operators.List.match.1) 0)
           (Constant_tag_equals
-           (Get_block_field 1 (Name Operators.List.match)) 0))
-         ((Get_block_field 0 (Name Operators.List.match))))))
-      (body (Name Operators.List.res))
+           (Get_block_field 1 (Name Operators.List.match.1)) 0))
+         ((Get_block_field 0 (Name Operators.List.match.1))))))
+      (body (Name Operators.List.res.1))
       (if_none_matched
        (Otherwise
-        (Let Operators.List.ys.1
-         (Get_block_field 1 (Name Operators.List.match))
-         (Let Operators.List.xs.1
-          (Get_block_field 1 (Get_block_field 0 (Name Operators.List.match)))
-          (Let Operators.List.x
+        (Let Operators.List.ys.2
+         (Get_block_field 1 (Name Operators.List.match.1))
+         (Let Operators.List.xs.2
+          (Get_block_field 1
+           (Get_block_field 0 (Name Operators.List.match.1)))
+          (Let Operators.List.x.1
            (Get_block_field 0
-            (Get_block_field 0 (Name Operators.List.match)))
+            (Get_block_field 0 (Name Operators.List.match.1)))
            (Make_block (tag 0)
             (fields
-             ((Name Operators.List.x)
+             ((Name Operators.List.x.1)
               (Fun_call Operators.List.append
-               ((Name Operators.List.xs.1) (Name Operators.List.ys.1))))))))))))))))
+               ((Name Operators.List.xs.2) (Name Operators.List.ys.2))))))))))))))))
  (Fun_def
-  ((fun_name Operators.List.map.1)
-   (args (Operators.List.xs.2 Operators.List.f))
+  ((fun_name Operators.List.map)
+   (args (Operators.List.xs.3 Operators.List.f.1))
    (body
     (Cond_assign
-     (conds (((Constant_tag_equals (Name Operators.List.xs.2) 0) ())))
+     (conds (((Constant_tag_equals (Name Operators.List.xs.3) 0) ())))
      (body (Name Std.Prelude.List.Nil))
      (if_none_matched
       (Otherwise
-       (Let Operators.List.xs.3
-        (Get_block_field 1 (Name Operators.List.xs.2))
-        (Let Operators.List.x.1
-         (Get_block_field 0 (Name Operators.List.xs.2))
+       (Let Operators.List.xs.4
+        (Get_block_field 1 (Name Operators.List.xs.3))
+        (Let Operators.List.x.2
+         (Get_block_field 0 (Name Operators.List.xs.3))
          (Make_block (tag 0)
           (fields
-           ((Fun_call Operators.List.f ((Name Operators.List.x.1)))
-            (Fun_call Operators.List.map.1
-             ((Name Operators.List.xs.3) (Name Operators.List.f))))))))))))))
+           ((Fun_call Operators.List.f.1 ((Name Operators.List.x.2)))
+            (Fun_call Operators.List.map
+             ((Name Operators.List.xs.4) (Name Operators.List.f.1))))))))))))))
  (Fun_def
-  ((fun_name Operators.List.concat_map.1)
-   (args (Operators.List.xs.4 Operators.List.f.1))
+  ((fun_name Operators.List.concat_map)
+   (args (Operators.List.xs.5 Operators.List.f.2))
    (body
     (Cond_assign
-     (conds (((Constant_tag_equals (Name Operators.List.xs.4) 0) ())))
+     (conds (((Constant_tag_equals (Name Operators.List.xs.5) 0) ())))
      (body (Name Std.Prelude.List.Nil))
      (if_none_matched
       (Otherwise
-       (Let Operators.List.xs.5
-        (Get_block_field 1 (Name Operators.List.xs.4))
-        (Let Operators.List.x.2
-         (Get_block_field 0 (Name Operators.List.xs.4))
+       (Let Operators.List.xs.6
+        (Get_block_field 1 (Name Operators.List.xs.5))
+        (Let Operators.List.x.3
+         (Get_block_field 0 (Name Operators.List.xs.5))
          (Fun_call Operators.List.append
-          ((Fun_call Operators.List.f.1 ((Name Operators.List.x.2)))
-           (Fun_call Operators.List.concat_map.1
-            ((Name Operators.List.xs.5) (Name Operators.List.f.1))))))))))))))
+          ((Fun_call Operators.List.f.2 ((Name Operators.List.x.3)))
+           (Fun_call Operators.List.concat_map
+            ((Name Operators.List.xs.6) (Name Operators.List.f.2))))))))))))))

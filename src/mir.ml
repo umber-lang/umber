@@ -185,6 +185,7 @@ module Context : sig
 
   val find_value_name : t -> Value_name.Absolute.t -> Mir_name.t * Extern_info.t
   val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
+  val find_value_name_assert_external : t -> Value_name.t -> Mir_name.t
   val peek_value_name : t -> Value_name.Absolute.t -> Mir_name.t option
 
   type find_override := Value_name.Absolute.t -> Mir_name.t -> Mir_name.t option
@@ -225,14 +226,6 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
-  let add_value_name t name =
-    let path = Name_bindings.current_path t.name_bindings in
-    let name = path, name in
-    let mir_name = Mir_name.create_value_name t.name_table name in
-    ( { t with expr_local_names = Map.set t.expr_local_names ~key:name ~data:mir_name }
-    , mir_name )
-  ;;
-
   let copy_name t name = Mir_name.copy_name t.name_table name
 
   let lookup_toplevel_name t ((path, _) as name) =
@@ -261,20 +254,39 @@ end = struct
          | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }
          | _ -> fallback_to_external ())
     in
-    let mir_name = Mir_name.create_value_name t.name_table name in
+    let mir_name = Mir_name.create_exportable_name name in
     mir_name, extern_info
+  ;;
+
+  let peek_toplevel_name_internal t name =
+    try
+      Some
+        (Hashtbl.find_or_add t.toplevel_names name ~default:(fun () ->
+           lookup_toplevel_name t name))
+    with
+    | Compilation_error.Compilation_error { kind = Name_error; _ } -> None
   ;;
 
   let peek_value_name_internal t name : (Mir_name.t * Extern_info.t) option =
     match Map.find t.expr_local_names name with
     | Some mir_name -> Some (mir_name, Local)
-    | None ->
-      (try
-         Some
-           (Hashtbl.find_or_add t.toplevel_names name ~default:(fun () ->
-              lookup_toplevel_name t name))
-       with
-       | Compilation_error.Compilation_error { kind = Name_error; _ } -> None)
+    | None -> peek_toplevel_name_internal t name
+  ;;
+
+  (* FIXME: "expr-local" names still contain new names we mint e.g. extra functions, which
+     are not in toplevel_names. Is that okay? 
+     Wait, I think this won't work. It won't allow us to create local variables with the
+     same name as some other toplevel definitions. Write a test for that.
+     We need to actually just not call `add_value_name` for toplevel let bindings.
+     Alternatively, maybe only these original toplevel names (in the name bindings) get
+     id = 0, and it's reserved for them. All other names (newly added toplevel ones and
+     expr-local ones get ids starting from 1.) That would be easier to follow. *)
+  let add_value_name t name =
+    let path = Name_bindings.current_path t.name_bindings in
+    let name = path, name in
+    let mir_name = Mir_name.create_value_name t.name_table name in
+    ( { t with expr_local_names = Map.set t.expr_local_names ~key:name ~data:mir_name }
+    , mir_name )
   ;;
 
   let find_value_name t name : Mir_name.t * Extern_info.t =
@@ -290,15 +302,27 @@ end = struct
 
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
 
-  let find_value_name_assert_local t name =
+  let find_value_name_assert_internal t name ~extern_info_matches ~expected =
     let name, extern_info =
       find_value_name t (Name_bindings.current_path t.name_bindings, name)
     in
-    (match extern_info with
-     | Local | Bool_intrinsic _ -> ()
-     | External _ ->
-       compiler_bug [%message "Unexpected non-local value" (extern_info : Extern_info.t)]);
+    if not (extern_info_matches extern_info)
+    then
+      compiler_bug
+        [%message "Unexpected extern info value" (extern_info : Extern_info.t) expected];
     name
+  ;;
+
+  let find_value_name_assert_local =
+    find_value_name_assert_internal ~expected:"local" ~extern_info_matches:(function
+      | Local | Bool_intrinsic _ -> true
+      | External _ -> false)
+  ;;
+
+  let find_value_name_assert_external =
+    find_value_name_assert_internal ~expected:"external" ~extern_info_matches:(function
+      | External _ | Bool_intrinsic _ -> true
+      | Local -> false)
   ;;
 
   let with_find_override t ~f =
@@ -457,6 +481,12 @@ end = struct
     type simple_pattern = t
 
     type t =
+      (* TODO: We use `largest_seen` to keep track of an example of a literal value not
+         included in a union of literal patterns. But this won't work if you match on the
+         max value of an int and also match on the lowest value, since we will report
+         `Int.max_value + 1 == Int.min_value` as the not-covered value, even though it was
+         covered. There are similar issues for chars/floats. For ints/floats/chars, we
+         can probably do something like keep track of the covered ranges. *)
       | Inexhaustive : { largest_seen : Literal.t } -> t
       | Exhaustive
       | By_cnstr : t list Cnstr.Map.t -> t
@@ -683,18 +713,11 @@ module Expr = struct
           loop ~ctx ~add_let ~add_name acc arg arg_expr arg_type)
       | Constant _ -> ctx, acc
     in
-    fun ?(add_name = Context.add_value_name) ~ctx ~init:acc ~add_let pat mir_expr type_ ->
+    fun ~ctx ~init:acc ~add_name ~add_let pat mir_expr type_ ->
       loop ~ctx ~add_let ~add_name acc pat mir_expr type_
   ;;
 
-  let make_atomic
-    ?(add_name = Context.add_value_name)
-    ~ctx
-    ~default
-    ~add_let
-    ~binding_name
-    mir_expr
-    =
+  let make_atomic ~ctx ~default ~add_name ~add_let ~binding_name mir_expr =
     if is_atomic mir_expr
     then ctx, default, mir_expr
     else (
@@ -793,6 +816,7 @@ module Expr = struct
 
   let generate_let_bindings
     ~ctx
+    ~ctx_for_body
     ~rec_
     ~init
     ~add_let
@@ -800,20 +824,6 @@ module Expr = struct
     ~process_expr
     bindings
     =
-    let ctx_for_body, bindings =
-      Nonempty.fold_map bindings ~init:ctx ~f:(fun ctx_for_body binding ->
-        let pattern, _, _ = extract_binding binding in
-        let ctx_for_body, names_bound =
-          Node.with_value pattern ~f:(fun pattern ->
-            Pattern.Names.fold
-              pattern
-              ~init:(ctx_for_body, Mir_name.Set.empty)
-              ~f:(fun (ctx_for_body, names_bound) name ->
-              let ctx, name = Context.add_value_name ctx_for_body name in
-              ctx, Set.add names_bound name))
-        in
-        ctx_for_body, (binding, names_bound))
-    in
     let all_names_bound =
       lazy
         (Nonempty.fold
@@ -974,12 +984,26 @@ module Expr = struct
           in
           Let (match_expr_name, input_expr, body))
       | Let { rec_; bindings; body }, body_type ->
-        (* TODO: let statements in expressions should be able to be made into global
-           statements (e.g. to define static functions/values) - not all lets should be
-           global though e.g. for simple expressions like `let y = x + x; (y, y)` *)
+        let ctx_for_body, bindings =
+          Nonempty.fold_map
+            bindings
+            ~init:ctx
+            ~f:(fun ctx_for_body ((pat_and_type, _) as binding) ->
+            let ctx_for_body, names_bound =
+              Node.with_value pat_and_type ~f:(fun (pattern, _) ->
+                Pattern.Names.fold
+                  pattern
+                  ~init:(ctx_for_body, Mir_name.Set.empty)
+                  ~f:(fun (ctx_for_body, names_bound) name ->
+                  let ctx, name = Context.add_value_name ctx_for_body name in
+                  ctx, Set.add names_bound name))
+            in
+            ctx_for_body, (binding, names_bound))
+        in
         let ctx, bindings =
           generate_let_bindings
             ~ctx
+            ~ctx_for_body
             ~rec_
             ~init:[]
             ~add_let:
@@ -1040,6 +1064,7 @@ module Expr = struct
                      arg_type
                      ~init:bindings
                      ~add_let
+                     ~add_name:Context.add_value_name
                  in
                  (ctx, bindings), arg_name))
       in
@@ -1198,6 +1223,7 @@ module Expr = struct
           ~ctx
           ~default:None
           ~add_let:(fun name expr -> Some (name, expr))
+          ~add_name:Context.add_value_name
           ~binding_name:Constant_names.binding
           input_expr
       in
@@ -1336,9 +1362,22 @@ let of_typed_module =
           Fun_def { fun_name = name; args; body } :: Value_def (name', mir_expr) :: stmts)
         else Value_def (name, mir_expr) :: stmts
     in
+    let bindings =
+      Nonempty.map bindings ~f:(fun ((pattern, _) as binding) ->
+        let names_bound =
+          Node.with_value pattern ~f:(fun pattern ->
+            Pattern.Names.fold
+              pattern
+              ~init:Mir_name.Set.empty
+              ~f:(fun names_bound name ->
+              Set.add names_bound (Context.find_value_name_assert_local ctx name)))
+        in
+        binding, names_bound)
+    in
     Expr.generate_let_bindings
       bindings
       ~ctx
+      ~ctx_for_body:ctx
       ~rec_
       ~init:stmts
       ~add_let
@@ -1348,14 +1387,17 @@ let of_typed_module =
   in
   let generate_variant_constructor_values ~ctx ~stmts decl =
     match Context.find_cnstr_info_from_decl ctx decl ~follow_aliases:false with
-    | None -> ctx, stmts
+    | None -> stmts
     | Some cnstr_info ->
-      Cnstr_info.fold cnstr_info ~init:(ctx, stmts) ~f:(fun (ctx, stmts) cnstr tag args ->
+      Cnstr_info.fold cnstr_info ~init:stmts ~f:(fun stmts cnstr tag args ->
         match cnstr with
-        | Tuple -> ctx, stmts
+        | Tuple -> stmts
         | Named cnstr_name ->
-          let outer_ctx, name =
-            Context.add_value_name ctx (Value_name.of_cnstr_name cnstr_name)
+          let name =
+            (* FIXME: Doesn't this need to generate an exportable name? Hmm, it needs to
+               find the right name. I think this can get overwritten, so we actually
+               need to look up by absolute name and ignore expr-local names. *)
+            Context.find_value_name_assert_local ctx (Value_name.of_cnstr_name cnstr_name)
           in
           let stmt : Stmt.t =
             let arg_count = List.length args in
@@ -1374,7 +1416,7 @@ let of_typed_module =
                       { tag; fields = List.map arg_names ~f:(fun name -> Expr.Name name) }
                 })
           in
-          outer_ctx, stmt :: stmts)
+          stmt :: stmts)
   in
   let rec loop ~ctx ~names ~stmts ~fun_decls (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
@@ -1386,9 +1428,11 @@ let of_typed_module =
             loop ~ctx ~names ~stmts ~fun_decls defs)
         | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
         | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type.Decl.t))) ->
-          generate_variant_constructor_values ~ctx ~stmts decl
+          ctx, generate_variant_constructor_values ~ctx ~stmts decl
         | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
-          let ctx, name = Context.add_value_name ctx value_name in
+          (* FIXME: Can this get broken by looking up a local name overwritten by the
+             context? *)
+          let name = Context.find_value_name_assert_external ctx value_name in
           ( ctx
           , Extern_decl { name; extern_name; arity = arity_of_type ~names type_ } :: stmts
           )

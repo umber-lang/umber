@@ -1,30 +1,31 @@
 ((Fun_decl ((name Std.Prelude.Operators.<) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
  (Fun_def
-  ((fun_name Closures.*fun) (args (Closures.*closure_env Closures.current))
+  ((fun_name Closures.*fun.1)
+   (args (Closures.*closure_env.1 Closures.current.1))
    (body
-    (Let Closures.end_after.1
-     (Get_block_field 2 (Name Closures.*closure_env))
-     (Let Closures.count_by.1
-      (Get_block_field 1 (Name Closures.*closure_env))
-      (Let Closures.match
+    (Let Closures.end_after.2
+     (Get_block_field 2 (Name Closures.*closure_env.1))
+     (Let Closures.count_by.2
+      (Get_block_field 1 (Name Closures.*closure_env.1))
+      (Let Closures.match.1
        (Fun_call Std.Prelude.Operators.<
-        ((Name Closures.current) (Name Closures.end_after.1)))
+        ((Name Closures.current.1) (Name Closures.end_after.2)))
        (Cond_assign
-        (conds (((Constant_tag_equals (Name Closures.match) 1) ())))
+        (conds (((Constant_tag_equals (Name Closures.match.1) 1) ())))
         (body
-         (Fun_call Closures.*fun
-          ((Name Closures.*closure_env)
+         (Fun_call Closures.*fun.1
+          ((Name Closures.*closure_env.1)
            (Fun_call Std.Prelude.Operators.+
-            ((Name Closures.current) (Name Closures.count_by.1))))))
-        (if_none_matched (Otherwise (Name Closures.current))))))))))
+            ((Name Closures.current.1) (Name Closures.count_by.2))))))
+        (if_none_matched (Otherwise (Name Closures.current.1))))))))))
  (Fun_def
   ((fun_name Closures.count_up)
-   (args (Closures.start_at Closures.count_by Closures.end_after))
+   (args (Closures.start_at.1 Closures.count_by.1 Closures.end_after.1))
    (body
-    (Let Closures.loop
+    (Let Closures.loop.1
      (Make_block (tag 12289)
       (fields
-       ((Name Closures.*fun) (Name Closures.count_by)
-        (Name Closures.end_after))))
-     (Fun_call Closures.loop ((Name Closures.start_at))))))))
+       ((Name Closures.*fun.1) (Name Closures.count_by.1)
+        (Name Closures.end_after.1))))
+     (Fun_call Closures.loop.1 ((Name Closures.start_at.1))))))))
