@@ -358,29 +358,16 @@ let rec codegen_expr t expr =
   | Cond_assign { vars; conds; body; if_none_matched } ->
     let start_block = Llvm.insertion_block t.builder in
     let current_fun = Llvm.block_parent start_block in
-    let num_vars = List.length vars in
-    (* Set up a phi block to receive the variable bindings as a vector. *)
+    (* Set up a block with phi instructions to receive the variable bindings. *)
     let phi_block = Llvm.append_block t.context "cond_binding_merge" current_fun in
     Llvm.position_at_end phi_block t.builder;
-    let phi_value =
-      if num_vars = 0
-      then None
-      else (
+    let phi_values =
+      List.map vars ~f:(fun name ->
         let phi_value =
-          Llvm.build_empty_phi
-            (Llvm.vector_type (block_pointer_type t) num_vars)
-            "cond_bindings"
-            t.builder
+          Llvm.build_empty_phi (block_pointer_type t) "cond_bindings" t.builder
         in
-        (* Extract all the variables out of the vector in the phi. *)
-        List.iteri vars ~f:(fun i var ->
-          ignore_value
-            (Llvm.build_extractelement
-               phi_value
-               (Llvm.const_int (Llvm.i64_type t.context) i)
-               (Mir_name.to_string var)
-               t.builder));
-        Some phi_value)
+        Value_table.add t.values name phi_value;
+        phi_value)
     in
     let body_value = codegen_expr t body in
     let body_block_end = Llvm.insertion_block t.builder in
@@ -395,9 +382,8 @@ let rec codegen_expr t expr =
       in
       ignore_value (Llvm.build_br phi_block t.builder);
       let binding_block_end = Llvm.insertion_block t.builder in
-      Option.iter phi_value ~f:(fun phi_value ->
-        let binding_vector = Llvm.const_vector (List.to_array binding_values) in
-        Llvm.add_incoming (binding_vector, binding_block_end) phi_value);
+      List.iter2_exn phi_values binding_values ~f:(fun phi_value binding_value ->
+        Llvm.add_incoming (binding_value, binding_block_end) phi_value);
       binding_block
     in
     let conds =
@@ -416,9 +402,9 @@ let rec codegen_expr t expr =
       (let _, first_cond_block, _, _ = Nonempty.hd conds in
        Llvm.build_br first_cond_block t.builder);
     (* Have each condition block branch and break to either its binding block or the
-         next condition block. The last condition block goes to the [if_none_matched]
-         case, which either goes to another arbitrary expression, or runs the body with a
-         final set of bindings. *)
+       next condition block. The last condition block goes to the `if_none_matched`
+       case, which either goes to another arbitrary expression, or runs the body with a
+       final set of bindings. *)
     let rec associate_conds : _ Nonempty.t -> _ = function
       | [ (last_cond_value, _, last_cond_block_end, last_binding_block) ] ->
         let if_none_matched_block, final_value, final_block =
