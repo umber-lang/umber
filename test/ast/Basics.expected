@@ -32,6 +32,10 @@
    (bindings
     (((Catch_all (xyz))
       ((Fun_call (Name Basics.Point3)
+        (Function
+         ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ())
+          (Type_app Std.Prelude.Int.Int ()))
+         (Type_app Basics.Point3 ()))
         (((Literal (Int 1)) (Type_app Int ()))
          ((Literal (Int 2)) (Type_app Int ()))
          ((Literal (Int 3)) (Type_app Int ()))))

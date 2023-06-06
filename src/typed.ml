@@ -157,7 +157,7 @@ module Expr = struct
   type 'typ t =
     | Literal of Literal.t
     | Name of Value_name.Absolute.t
-    | Fun_call of 'typ t Node.t * ('typ t Node.t * 'typ) Nonempty.t
+    | Fun_call of 'typ t Node.t * 'typ * ('typ t Node.t * 'typ) Nonempty.t
     | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
     | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
@@ -200,7 +200,7 @@ module Expr = struct
             ~types
             fun_type
             (Partial_function (arg_types, result_var));
-          node (Fun_call (fun_, args)), Var result_var
+          node (Fun_call (fun_, (fun_type, Pattern.Names.empty), args)), Var result_var
         | Op_tree tree ->
           of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
         | Lambda (args, body) ->
@@ -355,13 +355,14 @@ module Expr = struct
          let body = map' body ~f ~f_type in
          Let { rec_; bindings; body }
        | (Literal _ | Name (_, _)) as expr -> expr
-       | Fun_call (fun_, args) ->
+       | Fun_call (fun_, fun_type, args) ->
          let fun_ = map' fun_ ~f ~f_type in
+         let fun_type = f_type fun_type in
          let args =
            Nonempty.map args ~f:(fun (arg, arg_type) ->
              map' arg ~f ~f_type, f_type arg_type)
          in
-         Fun_call (fun_, args)
+         Fun_call (fun_, fun_type, args)
        | Lambda (args, body) -> Lambda (args, map' body ~f ~f_type)
        | Match (expr, expr_type, branches) ->
          let expr = map' expr ~f ~f_type in

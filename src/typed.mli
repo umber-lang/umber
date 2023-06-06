@@ -23,7 +23,7 @@ module Expr : sig
   type 'typ t =
     | Literal of Literal.t
     | Name of Value_name.Absolute.t
-    | Fun_call of 'typ t Node.t * ('typ t Node.t * 'typ) Nonempty.t
+    | Fun_call of 'typ t Node.t * 'typ * ('typ t Node.t * 'typ) Nonempty.t
     | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
     | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t

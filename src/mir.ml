@@ -928,7 +928,7 @@ module Expr = struct
            add_fun_decl { name; arity };
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
-      | Fun_call (fun_, args_and_types), body_type ->
+      | Fun_call (fun_, _fun_type, args_and_types), body_type ->
         (* FIXME: This will generate partially-applied function calls, which I don't think
            the LLVM codegen handles correctly. It would need to sometimes create a
            closure! Probably the best way to handle this is for the MIR to turn all partial

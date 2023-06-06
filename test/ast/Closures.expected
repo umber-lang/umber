@@ -14,12 +14,22 @@
              (Lambda ((Catch_all (current)))
               (Match
                (Fun_call (Name Std.Prelude.Operators.<)
+                (Function
+                 ((Type_app Std.Prelude.Int ())
+                  (Type_app Std.Prelude.Int ()))
+                 (Type_app Bool ()))
                 (((Name Closures.current) (Type_app Std.Prelude.Int ()))
                  ((Name Closures.end_after) (Type_app Std.Prelude.Int ()))))
                (Type_app Bool ())
                (((Cnstr_appl True ())
                  (Fun_call (Name Closures.loop)
+                  (Function ((Type_app Std.Prelude.Int ()))
+                   (Type_app Std.Prelude.Int ()))
                   (((Fun_call (Name Std.Prelude.Operators.+)
+                     (Function
+                      ((Type_app Std.Prelude.Int ())
+                       (Type_app Std.Prelude.Int ()))
+                      (Type_app Std.Prelude.Int ()))
                      (((Name Closures.current) (Type_app Std.Prelude.Int ()))
                       ((Name Closures.count_by)
                        (Type_app Std.Prelude.Int ()))))
@@ -27,6 +37,8 @@
                 ((Cnstr_appl False ()) (Name Closures.current))))))))
           (body
            (Fun_call (Name Closures.loop)
+            (Function ((Type_app Std.Prelude.Int ()))
+             (Type_app Std.Prelude.Int ()))
             (((Name Closures.start_at) (Type_app Std.Prelude.Int ()))))))))
        (Function
         ((Type_app Std.Prelude.Int ()) (Type_app Std.Prelude.Int ())
