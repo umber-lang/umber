@@ -9,8 +9,9 @@
    (body (Name TypeChecking.x.3))))
  (Value_def TypeChecking.id_for_chars.1 (Name TypeChecking.id))
  (Fun_def
-  ((fun_name TypeChecking.id_for_chars) (args (TypeChecking.arg0.1))
-   (body (Fun_call TypeChecking.id_for_chars.1 ((Name TypeChecking.arg0.1))))))
+  ((fun_name TypeChecking.id_for_chars) (args (TypeChecking.*arg0.1))
+   (body
+    (Fun_call TypeChecking.id_for_chars.1 ((Name TypeChecking.*arg0.1))))))
  (Fun_def
   ((fun_name TypeChecking.id_for_bools) (args (TypeChecking.x.4))
    (body (Fun_call TypeChecking.id ((Name TypeChecking.x.4))))))

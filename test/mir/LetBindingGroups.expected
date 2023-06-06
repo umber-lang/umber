@@ -54,6 +54,6 @@
    (body (Fun_call LetBindingGroups.go_left.1 ((Primitive (Int 17)))))))
  (Value_def LetBindingGroups.bottom.1 (Name LetBindingGroups.bottom_again.1))
  (Fun_def
-  ((fun_name LetBindingGroups.bottom) (args (LetBindingGroups.arg0.1))
+  ((fun_name LetBindingGroups.bottom) (args (LetBindingGroups.*arg0.1))
    (body
-    (Fun_call LetBindingGroups.bottom.1 ((Name LetBindingGroups.arg0.1)))))))
+    (Fun_call LetBindingGroups.bottom.1 ((Name LetBindingGroups.*arg0.1)))))))

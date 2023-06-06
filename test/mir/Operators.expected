@@ -17,8 +17,8 @@
  (Value_def Operators.left_section.1
   (Fun_call Std.Prelude.Operators.+ ((Primitive (Int 2)))))
  (Fun_def
-  ((fun_name Operators.left_section) (args (Operators.arg0.1))
-   (body (Fun_call Operators.left_section.1 ((Name Operators.arg0.1))))))
+  ((fun_name Operators.left_section) (args (Operators.*arg0.1))
+   (body (Fun_call Operators.left_section.1 ((Name Operators.*arg0.1))))))
  (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_def
   ((fun_name Operators.right_section) (args (Operators..1))

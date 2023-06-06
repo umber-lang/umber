@@ -64,10 +64,10 @@
       \n\
       \ndeclare tailcc %umber_block* @\"Std.Prelude.Operators.+\"(%umber_block*, %umber_block*)\
       \n\
-      \ndefine tailcc %umber_block* @Operators.left_section(%umber_block* %Operators.arg0.1) {\
+      \ndefine tailcc %umber_block* @Operators.left_section(%umber_block* %\"Operators.*arg0.1\") {\
       \nentry:\
       \n  %Operators.left_section.1 = load %umber_block*, %umber_block** @Operators.left_section.1, align 8\
-      \n  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.left_section.1, %umber_block* %Operators.arg0.1)\
+      \n  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.left_section.1, %umber_block* %\"Operators.*arg0.1\")\
       \n  ret %umber_block* %fun_call\
       \n}\
       \n\

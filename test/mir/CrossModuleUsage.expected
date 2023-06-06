@@ -9,9 +9,9 @@
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Value_def CrossModuleUsage.A.print.1 (Name Std.Prelude.print))
  (Fun_def
-  ((fun_name CrossModuleUsage.A.print) (args (CrossModuleUsage.A.arg0.1))
+  ((fun_name CrossModuleUsage.A.print) (args (CrossModuleUsage.A.*arg0.1))
    (body
-    (Fun_call CrossModuleUsage.A.print.1 ((Name CrossModuleUsage.A.arg0.1))))))
+    (Fun_call CrossModuleUsage.A.print.1 ((Name CrossModuleUsage.A.*arg0.1))))))
  (Fun_def
   ((fun_name CrossModuleUsage.A.print_source)
    (args (CrossModuleUsage.A.*lambda_arg.3))

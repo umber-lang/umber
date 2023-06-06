@@ -85,10 +85,10 @@ entry:
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @LetBindingGroups.bottom(%umber_block* %LetBindingGroups.arg0.1) {
+define tailcc %umber_block* @LetBindingGroups.bottom(%umber_block* %"LetBindingGroups.*arg0.1") {
 entry:
   %LetBindingGroups.bottom.1 = load %umber_block*, %umber_block** @LetBindingGroups.bottom.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %LetBindingGroups.bottom.1, %umber_block* %LetBindingGroups.arg0.1)
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %LetBindingGroups.bottom.1, %umber_block* %"LetBindingGroups.*arg0.1")
   ret %umber_block* %fun_call
 }
 
