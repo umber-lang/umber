@@ -29,6 +29,9 @@ let _ = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 
 
+# FIXME: This should be getting an exportable mir name, but isn't.
+# It's probably an issue with creating closures? The later value actually needs to be the
+# one getting the exportable name, not the function def
 let left_section = Arith.((2+))
 let right_section = (*5)
 let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?"::Nil)
@@ -51,6 +54,8 @@ module List = {
   # FIXME: This is getting the MIR name `Operators.List.map.1`, but it needs to get one
   # without a number suffix! Same for `concat_map` below. I should think more carefully
   # about this invariant and maybe write a check enforcing it (at least in tests).
+  # Such a check could use the name bindings and assert that all local names are given a
+  # definition with a matching exportable mir name
   let map xs f =
     match xs
     | Nil -> Nil

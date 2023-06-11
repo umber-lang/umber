@@ -21,7 +21,6 @@ val append_list : 'a t -> 'a list -> 'a t
 val ( @ ) : 'a t -> 'a t -> 'a t
 val mem : 'a t -> 'a -> equal:('a -> 'a -> bool) -> bool
 val split_last : 'a t -> 'a list * 'a
-val zip : 'a t -> 'b t -> ('a * 'b) t
 val zip_strict : 'a t -> 'b t -> ('a * 'b) t List.Or_unequal_lengths.t
 val zip_exn : 'a t -> 'b t -> ('a * 'b) t
 val unzip : ('a * 'b) t -> 'a t * 'b t
@@ -49,6 +48,8 @@ module Fold2_result : sig
     | Right_trailing of 'b t
     | Same_length
 end
+
+val zip : 'a t -> 'b t -> ('a * 'b) t * ('a, 'b) Fold2_result.t
 
 val fold2
   :  'a t

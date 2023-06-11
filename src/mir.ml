@@ -192,6 +192,7 @@ module Context : sig
 
   val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
+  val current_path : t -> Module_path.Absolute.t
   val find_cnstr_info : t -> Module_path.absolute Type.Scheme.t -> Cnstr_info.t
 
   val find_cnstr_info_from_decl
@@ -226,6 +227,7 @@ end = struct
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
   ;;
 
+  let current_path t = Name_bindings.current_path t.name_bindings
   let copy_name t name = Mir_name.copy_name t.name_table name
 
   let lookup_toplevel_name t ((path, _) as name) =
@@ -674,6 +676,9 @@ module Expr = struct
     [@@deriving sexp_of]
   end
 
+  (** Atomic expressions are those that are syntactically guaranteed to have no
+      side-effects, not even allocating memory. This allows it to be safely duplicated
+      when processing the AST. *)
   let is_atomic : t -> bool = function
     | Primitive _ | Name _ | Make_block { tag = _; fields = [] } | Get_block_field _ ->
       true
@@ -899,6 +904,68 @@ module Expr = struct
           ~add_name))
   ;;
 
+  let try_rewriting_partial_application
+    ~fun_
+    ~(fun_type : _ Type.Scheme.t)
+    ~args_and_types
+    ~current_path
+    =
+    match fun_type with
+    | Type_app _ | Tuple _ | Var _ ->
+      compiler_bug [%message "Non-function type in function call"]
+    | Partial_function _ -> .
+    | Function (fun_arg_types, (_return_type : _ Type.Scheme.t)) ->
+      (match snd (Nonempty.zip fun_arg_types args_and_types) with
+       | Same_length -> `Already_fully_applied
+       | Right_trailing _ ->
+         compiler_bug [%message "Over-application of arguments to function"]
+       | Left_trailing unapplied_arg_types ->
+         (* FIXME: Clean up and reduce duplication. *)
+         let fun_name = Constant_names.fun_ in
+         let applied_args, bindings =
+           Nonempty.mapi args_and_types ~f:(fun i (arg_expr, arg_type) ->
+             let name = Constant_names.synthetic_arg i in
+             let arg_pat_and_type =
+               Node.dummy_span (Pattern.Catch_all (Some name), arg_type)
+             in
+             let arg_name = Node.dummy_span (Typed.Expr.Name (current_path, name)) in
+             (arg_name, arg_type), (arg_pat_and_type, arg_expr))
+           |> Nonempty.unzip
+         in
+         let bindings =
+           Nonempty.cons
+             (Node.dummy_span (Pattern.Catch_all (Some fun_name), fun_type), fun_)
+             bindings
+         in
+         let n_applied_args = Nonempty.length applied_args in
+         let unapplied_args, lambda_args =
+           Nonempty.mapi unapplied_arg_types ~f:(fun i arg_type ->
+             let i = i + n_applied_args in
+             let name = Constant_names.synthetic_arg i in
+             let arg_pattern = Node.dummy_span (Pattern.Catch_all (Some name)) in
+             let arg_name = Node.dummy_span (Typed.Expr.Name (current_path, name)) in
+             (arg_name, arg_type), arg_pattern)
+           |> Nonempty.unzip
+         in
+         let args = Nonempty.append applied_args unapplied_args in
+         let expr_as_lambda : _ Typed.Expr.t =
+           Let
+             { rec_ = false
+             ; bindings
+             ; body =
+                 Node.dummy_span
+                   (Typed.Expr.Lambda
+                      ( lambda_args
+                      , Node.dummy_span
+                          (Typed.Expr.Fun_call
+                             ( Node.dummy_span (Typed.Expr.Name (current_path, fun_name))
+                             , fun_type
+                             , args )) ))
+             }
+         in
+         `Rewritten_partial_application expr_as_lambda)
+  ;;
+
   let of_typed_expr
     ~just_bound:outer_just_bound
     ~ctx:outer_ctx
@@ -928,41 +995,53 @@ module Expr = struct
            add_fun_decl { name; arity };
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
-      | Fun_call (fun_, _fun_type, args_and_types), body_type ->
+      | Fun_call (fun_, fun_type, args_and_types), body_type ->
         (* FIXME: This will generate partially-applied function calls, which I don't think
            the LLVM codegen handles correctly. It would need to sometimes create a
            closure! Probably the best way to handle this is for the MIR to turn all partial
            application into full application based on the type information we have. *)
-        let fun_call fun_ =
-          let arg_types = Nonempty.map ~f:snd args_and_types in
-          let fun_type = Type.Expr.Function (arg_types, body_type) in
-          let fun_ = of_typed_expr ~ctx fun_ fun_type in
-          let args =
-            Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
-              Node.with_value arg ~f:(fun arg -> of_typed_expr ~ctx arg arg_type))
-          in
-          match fun_ with
-          | Name fun_name -> Fun_call (fun_name, args)
-          | Let _ | Fun_call _ | Get_block_field _ | Cond_assign _ ->
-            let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
-            Let (fun_name, fun_, Fun_call (fun_name, args))
-          | Primitive _ | Make_block _ ->
-            compiler_bug [%message "Invalid function expression" (fun_ : t)]
-        in
-        Node.with_value fun_ ~f:(fun fun_ ->
-          match fun_ with
-          | Name (_, name) ->
-            (* TODO: I think there's no need for this special-casing actually: we can just
-              use the constructor functions directly. *)
-            (* Special-case constructor applications *)
-            (match Value_name.to_cnstr_name name with
-             | Ok cnstr_name ->
-               let cnstr_info = Context.find_cnstr_info ctx expr_type in
-               let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
-               let fields, field_types = List.unzip (Nonempty.to_list args_and_types) in
-               make_block ~ctx ~tag ~fields ~field_types
-             | Error _ -> fun_call fun_)
-          | _ -> fun_call fun_)
+        (match
+           try_rewriting_partial_application
+             ~fun_
+             ~fun_type
+             ~args_and_types
+             ~current_path:(Context.current_path ctx)
+         with
+         | `Rewritten_partial_application expr_as_lambda ->
+           of_typed_expr ?just_bound ~ctx expr_as_lambda expr_type
+         | `Already_fully_applied ->
+           let fun_call fun_ =
+             let arg_types = Nonempty.map ~f:snd args_and_types in
+             let fun_type = Type.Expr.Function (arg_types, body_type) in
+             let fun_ = of_typed_expr ~ctx fun_ fun_type in
+             let args =
+               Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
+                 Node.with_value arg ~f:(fun arg -> of_typed_expr ~ctx arg arg_type))
+             in
+             match fun_ with
+             | Name fun_name -> Fun_call (fun_name, args)
+             | Let _ | Fun_call _ | Get_block_field _ | Cond_assign _ ->
+               let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
+               Let (fun_name, fun_, Fun_call (fun_name, args))
+             | Primitive _ | Make_block _ ->
+               compiler_bug [%message "Invalid function expression" (fun_ : t)]
+           in
+           Node.with_value fun_ ~f:(fun fun_ ->
+             match fun_ with
+             | Name (_, name) ->
+               (* TODO: I think there's no need for this special-casing actually: we can just
+                  use the constructor functions directly. *)
+               (* Special-case constructor applications *)
+               (match Value_name.to_cnstr_name name with
+                | Ok cnstr_name ->
+                  let cnstr_info = Context.find_cnstr_info ctx expr_type in
+                  let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
+                  let fields, field_types =
+                    List.unzip (Nonempty.to_list args_and_types)
+                  in
+                  make_block ~ctx ~tag ~fields ~field_types
+                | Error _ -> fun_call fun_)
+             | _ -> fun_call fun_))
       | Lambda (args, body), Function (arg_types, body_type) ->
         (* TODO: Still need to try and coalesce lambdas/other function expressions for
            function definitions which are partially applied. See example in
@@ -1048,7 +1127,7 @@ module Expr = struct
                match arg with
                | Catch_all (Some arg_name) ->
                  (* Special-case named catch-all patterns (the dominant case) to skip the
-                  [lambda_arg] step and use the name directly. *)
+                    [lambda_arg] step and use the name directly. *)
                  let ctx, arg_name = Context.add_value_name ctx arg_name in
                  (ctx, bindings), arg_name
                | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
@@ -1109,12 +1188,16 @@ module Expr = struct
       (* TODO: Consider having closures share an environment instead of closing over other
          mutually recursive closures. *)
       let fun_name =
+        (* FIXME: We can't take the pattern name as our name if binding a closure, since
+           we actually need to save that for the value def. Maybe we need to copy the name
+           here? Damn, we really just never exercised this code. *)
         (* If we are a closure, [fun_name] can't be the same as the name we bind, since we
            aren't returning [Name fun_name] and relying on the assignment getting elided. *)
         match just_bound with
         | Some (Rec { this_name; _ }) when Map.is_empty !closed_over -> this_name
         | Some (Nonrec { this_pattern_names }) when Set.length this_pattern_names = 1 ->
-          Set.choose_exn this_pattern_names
+          let name = Set.choose_exn this_pattern_names in
+          if Map.is_empty !closed_over then name else Context.copy_name ctx name
         | Some (Rec _ | Nonrec _) | None ->
           snd (Context.add_value_name ctx Constant_names.fun_)
       in
