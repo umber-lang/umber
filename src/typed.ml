@@ -900,29 +900,6 @@ module Module = struct
     =
     (* NOTE: As we disallow cross-module mutual recursion, binding groups will always be
        contained within a single module and can just be put back into the AST *)
-    (* FIXME: Ordering gets thrown out because of the hashtable here? No, we deliberately
-       sort them :/. Also this whole approach is questionable. Do we maybe need to break
-       up a module into multiple? Hmm, there's no mutual recursion between modules, but
-       there could still be dependencies going both ways.
-       
-       e.g.
-       ```
-       module A = {
-         let a1 = b1 ()
-       }
-       module B = {
-         let b1 () = ()
-         let b2 = a1 ()
-       }
-       ```
-
-       Then we get, in topological order:
-       B.b1
-       A.a1
-       B.b2
-       
-       Maybe we just let this happen, and define the same module multiple times? Or maybe
-       we don't care? Maybe Mir should just deal with this? *)
     let binding_table = Module_path.Absolute.Table.create () in
     List.iter binding_groups ~f:(fun (def, path) ->
       Hashtbl.add_multi binding_table ~key:path ~data:def);

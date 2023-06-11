@@ -29,9 +29,6 @@ let _ = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 
 
-# FIXME: This should be getting an exportable mir name, but isn't.
-# It's probably an issue with creating closures? The later value actually needs to be the
-# one getting the exportable name, not the function def
 let left_section = Arith.((2+))
 let right_section = (*5)
 let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?"::Nil)

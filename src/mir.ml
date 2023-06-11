@@ -275,14 +275,6 @@ end = struct
     | None -> peek_toplevel_name_internal t name
   ;;
 
-  (* FIXME: "expr-local" names still contain new names we mint e.g. extra functions, which
-     are not in toplevel_names. Is that okay? 
-     Wait, I think this won't work. It won't allow us to create local variables with the
-     same name as some other toplevel definitions. Write a test for that.
-     We need to actually just not call `add_value_name` for toplevel let bindings.
-     Alternatively, maybe only these original toplevel names (in the name bindings) get
-     id = 0, and it's reserved for them. All other names (newly added toplevel ones and
-     expr-local ones get ids starting from 1.) That would be easier to follow. *)
   let add_value_name t name =
     let path = Name_bindings.current_path t.name_bindings in
     let name = path, name in
@@ -996,10 +988,6 @@ module Expr = struct
            Name name
          | Bool_intrinsic { tag } -> Make_block { tag; fields = [] })
       | Fun_call (fun_, fun_type, args_and_types), body_type ->
-        (* FIXME: This will generate partially-applied function calls, which I don't think
-           the LLVM codegen handles correctly. It would need to sometimes create a
-           closure! Probably the best way to handle this is for the MIR to turn all partial
-           application into full application based on the type information we have. *)
         (match
            try_rewriting_partial_application
              ~fun_
@@ -1188,9 +1176,6 @@ module Expr = struct
       (* TODO: Consider having closures share an environment instead of closing over other
          mutually recursive closures. *)
       let fun_name =
-        (* FIXME: We can't take the pattern name as our name if binding a closure, since
-           we actually need to save that for the value def. Maybe we need to copy the name
-           here? Damn, we really just never exercised this code. *)
         (* If we are a closure, [fun_name] can't be the same as the name we bind, since we
            aren't returning [Name fun_name] and relying on the assignment getting elided. *)
         match just_bound with
