@@ -64,4 +64,6 @@ module List = {
     | Cons x xs -> append (f x) (concat_map xs f)
 }
 
-# FIXME: Add some print tests e.g. `print unicode_my_dudes`
+import Std.Prelude.((;), print)
+
+let _ = List.map unicode_my_dudes (\(x, y) -> print x; print y)

@@ -144,4 +144,17 @@
          (Fun_call Operators.List.append
           ((Fun_call Operators.List.f.2 ((Name Operators.List.x.3)))
            (Fun_call Operators.List.concat_map
-            ((Name Operators.List.xs.6) (Name Operators.List.f.2))))))))))))))
+            ((Name Operators.List.xs.6) (Name Operators.List.f.2)))))))))))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_def
+  ((fun_name Operators.*fun.5) (args (Operators.*lambda_arg.1))
+   (body
+    (Let Operators.x.3 (Get_block_field 0 (Name Operators.*lambda_arg.1))
+     (Let Operators.y.2 (Get_block_field 1 (Name Operators.*lambda_arg.1))
+      (Fun_call "Std.Prelude.Operators.;"
+       ((Fun_call Std.Prelude.print ((Name Operators.x.3)))
+        (Fun_call Std.Prelude.print ((Name Operators.y.2))))))))))
+ (Value_def Operators._.2
+  (Fun_call Operators.List.map
+   ((Name Operators.unicode_my_dudes) (Name Operators.*fun.5)))))

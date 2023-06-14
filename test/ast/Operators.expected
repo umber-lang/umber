@@ -285,4 +285,35 @@
           (Function
            ((Type_app Std.Prelude.List.List ((Var a)))
             (Function ((Var a)) (Type_app Std.Prelude.List.List ((Var b)))))
-           (Type_app Std.Prelude.List.List ((Var b))))))))))))))
+           (Type_app Std.Prelude.List.List ((Var b))))))))))))
+  (Common_def
+   (Import
+    ((kind Absolute)
+     (paths (Module Std ((Module Prelude ((Name ";") (Name print)))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ())
+      ((Fun_call (Name Operators.List.map)
+        (Function
+         ((Type_app Std.Prelude.List.List
+           ((Tuple ((Type_app String ()) (Type_app String ())))))
+          (Function ((Tuple ((Type_app String ()) (Type_app String ()))))
+           (Tuple ())))
+         (Type_app Std.Prelude.List.List ((Tuple ()))))
+        (((Name Operators.unicode_my_dudes)
+          (Type_app Std.Prelude.List.List
+           ((Tuple ((Type_app String ()) (Type_app String ()))))))
+         ((Lambda ((Tuple ((Catch_all (x)) (Catch_all (y)))))
+           (Fun_call (Name "Std.Prelude.Operators.;")
+            (Function ((Tuple ()) (Tuple ())) (Tuple ()))
+            (((Fun_call (Name Std.Prelude.print)
+               (Function ((Type_app String ())) (Tuple ()))
+               (((Name Operators.x) (Type_app String ()))))
+              (Tuple ()))
+             ((Fun_call (Name Std.Prelude.print)
+               (Function ((Type_app String ())) (Tuple ()))
+               (((Name Operators.y) (Type_app String ()))))
+              (Tuple ())))))
+          (Function ((Tuple ((Type_app String ()) (Type_app String ()))))
+           (Tuple ())))))
+       (Type_app Std.Prelude.List.List ((Tuple ()))))))))))
