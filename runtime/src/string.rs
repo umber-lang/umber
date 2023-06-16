@@ -39,9 +39,7 @@ impl BlockPtr {
         })
     }
 
-    // Currently only used in tests
-    #[cfg(test)]
-    fn new_string(str: &str) -> BlockPtr {
+    pub fn new_string(str: &str) -> BlockPtr {
         unsafe {
             Self::new_string_with_initializer(str.len(), |fields| {
                 copy_nonoverlapping(str.as_ptr(), fields, str.len())

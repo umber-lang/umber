@@ -18,6 +18,8 @@ module : {
   module Int : {
     import Int as PrimitiveInt
     type Int = PrimitiveInt
+
+    extern to_string : Int -> String = "umber_int_to_string"
   }
 
   module Float : {
@@ -125,6 +127,8 @@ module : {
 module Int = {
   import Int as PrimitiveInt
   type Int = PrimitiveInt
+
+  extern to_string : Int -> String = "umber_int_to_string"
 }
 
 module Float = {

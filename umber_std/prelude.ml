@@ -93,7 +93,15 @@ let names = {|
                  ((Int
                    (Local
                     (()
-                     ((names ())
+                     ((names
+                       ((to_string
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function ((Type_app Std.Prelude.Int.Int ()))
+                              (Type_app String ()))))
+                           (type_source Extern_declared)
+                           (extern_name umber_int_to_string))))))
                       (types
                        ((Int ((Local (() (Alias (Type_app Int ()))))))
                         (PrimitiveInt ((Imported Int)))))
@@ -426,7 +434,15 @@ let names = {|
                 ((Int
                   (Local
                    (()
-                    ((names ())
+                    ((names
+                      ((to_string
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function ((Type_app Std.Prelude.Int.Int ()))
+                             (Type_app String ()))))
+                          (type_source Extern_declared)
+                          (extern_name umber_int_to_string))))))
                      (types
                       ((Int ((Local (() (Alias (Type_app Int ()))))))
                        (PrimitiveInt ((Imported Int)))))
@@ -780,6 +796,14 @@ entry:
   %box6 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box6
 }
+
+define tailcc %umber_block* @Std.Prelude.Int.to_string(%umber_block* %0) {
+entry:
+  %fun_call = tail call %umber_block* @umber_int_to_string(%umber_block* %0)
+  ret %umber_block* %fun_call
+}
+
+declare %umber_block* @umber_int_to_string(%umber_block*)
 
 define tailcc %umber_block* @"Std.Prelude.Float.+"(%umber_block* %0, %umber_block* %1) {
 entry:

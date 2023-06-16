@@ -1,5 +1,7 @@
 use crate::block::{Block, BlockPtr, KnownTag};
+use core::fmt::Write;
 use core::mem;
+use heapless::String;
 
 impl Block {
     pub fn as_int(self) -> i64 {
@@ -60,6 +62,16 @@ pub extern "C" fn umber_int_mod(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     BlockPtr::new_int(r)
 }
 
+// The largest i64 has 19 decimal digits. The smallest i64 also has a "-" prefix.
+const MAX_INT_DIGITS: usize = 20;
+
+#[no_mangle]
+pub extern "C" fn umber_int_to_string(x: BlockPtr) -> BlockPtr {
+    let mut buf = String::<MAX_INT_DIGITS>::new();
+    write!(buf, "{}", x.as_int()).unwrap();
+    BlockPtr::new_string(&buf)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -94,5 +106,21 @@ mod test {
         check(umber_int_mod, -5, 4, 3);
         check(umber_int_mod, 5, -4, 1);
         check(umber_int_mod, -5, -4, 3);
+    }
+
+    #[test]
+    fn string_conversion() {
+        unsafe { umber_gc_init() };
+        assert_eq!(umber_int_to_string(BlockPtr::new_int(0)).as_str(), "0");
+        assert_eq!(umber_int_to_string(BlockPtr::new_int(-1)).as_str(), "-1");
+        assert_eq!(umber_int_to_string(BlockPtr::new_int(10)).as_str(), "10");
+        assert_eq!(
+            umber_int_to_string(BlockPtr::new_int(i64::MIN)).as_str(),
+            "-9223372036854775808"
+        );
+        assert_eq!(
+            umber_int_to_string(BlockPtr::new_int(i64::MAX)).as_str(),
+            "9223372036854775807"
+        );
     }
 }
