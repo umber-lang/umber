@@ -2,55 +2,67 @@ open! Import
 open Names
 
 type t = (Value_name.Relative.t Node.t, Untyped.Expr.t Node.t) Btree.t
+[@@deriving sexp_of]
 
+(* FIXME: cleanup *)
 let rec fix_precedence ~names (t : t) : t =
-  match t with
-  | Node (op_name, left_child, right_child) as root ->
-    let left_child = fix_precedence ~names left_child in
-    let right_child = fix_precedence ~names right_child in
-    let rotation =
-      match left_child, right_child with
-      | Leaf _, Leaf _ -> None
-      | Node (left_name, ll_child, lr_child), Leaf _ ->
-        let _, left_level =
-          Node.with_value left_name ~f:(Name_bindings.find_fixity names)
-        in
-        Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
-      | Leaf _, Node (right_name, rl_child, rr_child) ->
-        let _, right_level =
-          Node.with_value right_name ~f:(Name_bindings.find_fixity names)
-        in
-        Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
-      | Node (left_name, ll_child, lr_child), Node (right_name, rl_child, rr_child) ->
-        let _, left_level =
-          Node.with_value left_name ~f:(Name_bindings.find_fixity names)
-        in
-        let _, right_level =
-          Node.with_value right_name ~f:(Name_bindings.find_fixity names)
-        in
-        if Fixity.Level.(left_level <= right_level)
-        then Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
-        else Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
-    in
-    (match rotation with
-     | None -> root
-     | Some (level, rotation_info) ->
-       let _, op_level = Node.with_value op_name ~f:(Name_bindings.find_fixity names) in
-       if Fixity.Level.(level < op_level)
-       then (
-         match rotation_info with
-         | `Clockwise, left_name, ll_child, lr_child ->
-           Node
-             ( left_name
-             , ll_child
-             , fix_precedence ~names (Node (op_name, lr_child, right_child)) )
-         | `Anticlockwise, right_name, rl_child, rr_child ->
-           Node
-             ( right_name
-             , fix_precedence ~names (Node (op_name, left_child, rl_child))
-             , rr_child ))
-       else root)
-  | Leaf _ as leaf -> leaf
+  (* print_s [%message "start fix_precedence" ~input:(t : t)]; *)
+  let result =
+    match t with
+    | Leaf _ as leaf -> leaf
+    | Node (op_name, left_child, right_child) ->
+      let left_child = fix_precedence ~names left_child in
+      let right_child = fix_precedence ~names right_child in
+      (* print_s
+        [%message "fix_precedence node" ~input:(t : t) (left_child : t) (right_child : t)]; *)
+      let rotation =
+        match left_child, right_child with
+        | Leaf _, Leaf _ -> None
+        | Node (left_name, ll_child, lr_child), Leaf _ ->
+          let _, left_level =
+            Node.with_value left_name ~f:(Name_bindings.find_fixity names)
+          in
+          Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
+        | Leaf _, Node (right_name, rl_child, rr_child) ->
+          let _, right_level =
+            Node.with_value right_name ~f:(Name_bindings.find_fixity names)
+          in
+          Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
+        | Node (left_name, ll_child, lr_child), Node (right_name, rl_child, rr_child) ->
+          let _, left_level =
+            Node.with_value left_name ~f:(Name_bindings.find_fixity names)
+          in
+          let _, right_level =
+            Node.with_value right_name ~f:(Name_bindings.find_fixity names)
+          in
+          if Fixity.Level.(left_level <= right_level)
+          then Some (left_level, (`Clockwise, left_name, ll_child, lr_child))
+          else Some (right_level, (`Anticlockwise, right_name, rl_child, rr_child))
+      in
+      (match rotation with
+       | None -> Node (op_name, left_child, right_child)
+       | Some (level, rotation_info) ->
+         let _, op_level = Node.with_value op_name ~f:(Name_bindings.find_fixity names) in
+         if Fixity.Level.(level < op_level)
+         then (
+           (* FIXME: Do I really have to call fix_precedence again here? It traverses the
+             whole subtree again, which seems kinda crazy. (Although it shouldn't be
+             incorrect unless there's another bug somewhere.) *)
+           match rotation_info with
+           | `Clockwise, left_name, ll_child, lr_child ->
+             Node
+               ( left_name
+               , ll_child
+               , fix_precedence ~names (Node (op_name, lr_child, right_child)) )
+           | `Anticlockwise, right_name, rl_child, rr_child ->
+             Node
+               ( right_name
+               , fix_precedence ~names (Node (op_name, left_child, rl_child))
+               , rr_child ))
+         else Node (op_name, left_child, right_child))
+  in
+  (* print_s [%message "end fix_precedence" ~input:(t : t) (result : t)]; *)
+  result
 ;;
 
 let can_rotate op_level op_assoc child_level child_assoc =
@@ -147,12 +159,77 @@ let rec to_untyped_expr : t -> Untyped.Expr.t Node.t = function
        b. In the case of right associativity, rotating clockwise results in a tree
           which violates constraint 1.
        c. The case of no associativity is not allowed. *)
-
-(* TODO: Maybe only run this function during tests. *)
-let check_invariants _ = ()
+let rec check_invariants (t : t) ~names =
+  match t with
+  | Leaf _ -> true
+  | Node (op_name, left_child, right_child) ->
+    let op_assoc, op_level =
+      Node.with_value op_name ~f:(Name_bindings.find_fixity names)
+    in
+    let ( < ) = Fixity.Level.( < ) in
+    let ( = ) = Fixity.Level.( = ) in
+    let check_associativity
+      (left_op_assoc : Fixity.Assoc.t option)
+      (right_op_assoc : Fixity.Assoc.t option)
+      =
+      match op_assoc with
+      | Non_assoc -> false
+      | Left ->
+        (* FIXME: Also need to check that "rotating anticlockwise would violate constraint 1"
+           Rotating anticlockwise means:
+           
+              A          C
+             / \  -->   / \
+            B   C      A   E
+               / \    / \
+              D   E  B   D
+          So if the second tree breaks constraint 1 (but the first doesn't), that means
+          A.level > D.level. Not sure if this is actually the correct constraint.
+          Wait, but this doesn't make sense. We need to have A <= C <= D.
+        *)
+        (match left_op_assoc, right_op_assoc with
+         | (None | Some Left), (None | Some Left) -> true
+         | _ -> false)
+      | Right ->
+        (* FIXME: Also need to check that "rotating anticlockwise would violate constraint 1" *)
+        (match left_op_assoc, right_op_assoc with
+         | (None | Some Right), (None | Some Right) -> true
+         | _ -> false)
+    in
+    (* FIXME: code duplication *)
+    check_invariants left_child ~names
+    && check_invariants right_child ~names
+    &&
+    (match left_child, right_child with
+     | Leaf _, Leaf _ -> true
+     | Node (left_op_name, _, _), Leaf _ ->
+       let left_op_assoc, left_op_level =
+         Node.with_value left_op_name ~f:(Name_bindings.find_fixity names)
+       in
+       op_level < left_op_level
+       || (op_level = left_op_level && check_associativity (Some left_op_assoc) None)
+     | Leaf _, Node (right_op_name, _, _) ->
+       let right_op_assoc, right_op_level =
+         Node.with_value right_op_name ~f:(Name_bindings.find_fixity names)
+       in
+       op_level < right_op_level
+       || (op_level = right_op_level && check_associativity None (Some right_op_assoc))
+     | Node (left_op_name, _, _), Node (right_op_name, _, _) ->
+       let left_op_assoc, left_op_level =
+         Node.with_value left_op_name ~f:(Name_bindings.find_fixity names)
+       in
+       let right_op_assoc, right_op_level =
+         Node.with_value right_op_name ~f:(Name_bindings.find_fixity names)
+       in
+       (op_level < left_op_level
+       || (op_level = left_op_level && check_associativity (Some left_op_assoc) None))
+       && (op_level < right_op_level
+          || (op_level = right_op_level && check_associativity None (Some right_op_assoc))
+          ))
+;;
 
 let to_untyped_expr ~names t =
   let t = fix_precedence t ~names |> fix_associativity ~names in
-  check_invariants t;
+  assert_or_compiler_bug (check_invariants t ~names) ~here:[%here];
   to_untyped_expr t
 ;;

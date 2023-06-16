@@ -1,12 +1,12 @@
 ((Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
- (Fun_decl ((name Std.Prelude.Operators.mod) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.mod) (arity 2)))
  (Value_def Operators._.1
   (Fun_call Std.Prelude.Operators.==
-   ((Fun_call Std.Prelude.Operators.mod
-     ((Fun_call Std.Prelude.Operators.+
-       ((Primitive (Int 2)) (Primitive (Int 11))))
-      (Primitive (Int 3))))
+   ((Fun_call Std.Prelude.Operators.+
+     ((Primitive (Int 2))
+      (Fun_call Std.Prelude.Operators.mod
+       ((Primitive (Int 11)) (Primitive (Int 3))))))
     (Primitive (Int 4)))))
  (Value_def Operators.four
   (Fun_call Std.Prelude.Operators.+
