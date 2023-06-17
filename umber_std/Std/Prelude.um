@@ -15,11 +15,18 @@ module : {
 
   import .Option.(None, Some)
 
+  module Bool : {
+    import Bool as PrimitiveBool
+    type Bool = PrimitiveBool
+
+    val to_string : Bool -> String
+  }
+
   module Int : {
     import Int as PrimitiveInt
     type Int = PrimitiveInt
 
-    extern to_string : Int -> String = "umber_int_to_string"
+    val to_string : Int -> String
   }
 
   module Float : {
@@ -123,6 +130,15 @@ module : {
 # TODO: macro support
 
 # TODO: randomness
+
+module Bool = {
+  import Bool as PrimitiveBool
+  type Bool = PrimitiveBool
+
+  let to_string = match
+    | True -> "True"
+    | False -> "False"
+}
 
 module Int = {
   import Int as PrimitiveInt
