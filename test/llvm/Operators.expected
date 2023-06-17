@@ -8,7 +8,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block8b = type { %umber_header, [8 x i8] }
 %umber_block16b = type { %umber_header, [16 x i8] }
 
-@Operators.expr = global %umber_block* null
+@Operators.true = global %umber_block* null
 @Operators.four = global %umber_block* null
 @Operators.one = global %umber_block* null
 @Operators.left_section.2 = global %umber_block* null
@@ -27,7 +27,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @string.820363719 = constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"cartesian\00\00\00\00\00\00\06" }
 @string.287064846 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"product\00" }
 @string.582974379 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"maybe?\00\01" }
-@string.575499933 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"expr = \00" }
+@string.932615357 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"true = \00" }
 @string.992557751 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"four = \00" }
 
 define i32 @"umber_main:./examples/Operators.um"() {
@@ -35,7 +35,7 @@ entry:
   %fun_call = tail call tailcc %umber_block* @Std.Prelude.Operators.mod(%umber_block* bitcast (%umber_block1* @int.11 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.3 to %umber_block*))
   %fun_call1 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block* %fun_call)
   %fun_call2 = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* %fun_call1, %umber_block* bitcast (%umber_block1* @int.4 to %umber_block*))
-  store %umber_block* %fun_call2, %umber_block** @Operators.expr, align 8
+  store %umber_block* %fun_call2, %umber_block** @Operators.true, align 8
   %fun_call3 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
   store %umber_block* %fun_call3, %umber_block** @Operators.four, align 8
   %fun_call4 = tail call tailcc %umber_block* @Std.Prelude.Operators.mod(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
@@ -66,9 +66,9 @@ entry:
   %Operators.unicode_my_dudes = load %umber_block*, %umber_block** @Operators.unicode_my_dudes, align 8
   %fun_call19 = tail call tailcc %umber_block* @Operators.List.map(%umber_block* %Operators.unicode_my_dudes, %umber_block* bitcast (%umber_block* (%umber_block*)* @"Operators.*fun.5" to %umber_block*))
   store %umber_block* %fun_call19, %umber_block** @Operators._.1, align 8
-  %Operators.expr = load %umber_block*, %umber_block** @Operators.expr, align 8
-  %fun_call20 = tail call tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block* %Operators.expr)
-  %fun_call21 = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block8b* @string.575499933 to %umber_block*), %umber_block* %fun_call20)
+  %Operators.true = load %umber_block*, %umber_block** @Operators.true, align 8
+  %fun_call20 = tail call tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block* %Operators.true)
+  %fun_call21 = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block8b* @string.932615357 to %umber_block*), %umber_block* %fun_call20)
   %fun_call22 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call21)
   store %umber_block* %fun_call22, %umber_block** @"Operators.*binding.1", align 8
   %Operators.four = load %umber_block*, %umber_block** @Operators.four, align 8

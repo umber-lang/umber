@@ -468,7 +468,6 @@ let find =
   let rec loop t ((path, name) as input) ~at_path ~defs_only ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a
        matching name. *)
-    (* FIXME: Do we need to use the path here? *)
     let (_ : Module_path.Absolute.t), bindings_at_current =
       resolve_absolute_path_exn ~defs_only t at_path
     in

@@ -1,7 +1,7 @@
 ((Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.mod) (arity 2)))
- (Value_def Operators.expr
+ (Value_def Operators.true
   (Fun_call Std.Prelude.Operators.==
    ((Fun_call Std.Prelude.Operators.+
      ((Primitive (Int 2))
@@ -163,8 +163,8 @@
  (Value_def Operators.*binding.1
   (Fun_call Std.Prelude.print
    ((Fun_call Std.Prelude.Operators.++
-     ((Primitive (String "expr = "))
-      (Fun_call Std.Prelude.Bool.to_string ((Name Operators.expr))))))))
+     ((Primitive (String "true = "))
+      (Fun_call Std.Prelude.Bool.to_string ((Name Operators.true))))))))
  (Fun_decl ((name Std.Prelude.Int.to_string) (arity 1)))
  (Value_def Operators.*binding.2
   (Fun_call Std.Prelude.print

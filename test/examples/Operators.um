@@ -1,7 +1,7 @@
 module : {
   import Std.Prelude.List  
 
-  val (==) (infix 4) : a, a -> Bool  # TODO: allow shadowing names
+  val (==) (infix 4) : a, a -> Bool
 
   module Arith : {
     val (+) (infixl 6) : Int, Int -> Int
@@ -21,11 +21,9 @@ module Arith = {
   import Std.Prelude.((+), mod)
 }
 
-# FIXME: mod has precedence level 7, where + is 6. Shouldn't this be:
-# `(2 + (11 :mod: 3)) == 4`? I think the `Op_tree` logic has had this bug for a long time
 # FIXME: Maybe we should add some automated validation of invariants in tests e.g.
 # we could check that the op tree is organized in the way it promises to be.
-let expr = Arith.(2 + 11 :mod: 3 == 4)
+let true = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 
 
@@ -48,11 +46,6 @@ module List = {
   # FIXME: I think adding this doesn't cause an error:
   #val map : List a, (a -> a) -> List b
   # So we aren't checking for val delaration consistency properly.
-  # FIXME: This is getting the MIR name `Operators.List.map.1`, but it needs to get one
-  # without a number suffix! Same for `concat_map` below. I should think more carefully
-  # about this invariant and maybe write a check enforcing it (at least in tests).
-  # Such a check could use the name bindings and assert that all local names are given a
-  # definition with a matching exportable mir name
   let map xs f =
     match xs
     | Nil -> Nil
@@ -67,5 +60,5 @@ module List = {
 import Std.Prelude.((;), print, (++), Int, Bool)
 
 let _ = List.map unicode_my_dudes (\(x, y) -> print x; print y)
-let () = print ("expr = " ++ Bool.to_string expr)
+let () = print ("true = " ++ Bool.to_string true)
 let () = print ("four = " ++ Int.to_string four)

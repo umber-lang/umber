@@ -38,7 +38,7 @@
         (paths (Module Std ((Module Prelude ((Name +) (Name mod))))))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (expr))
+    (((Catch_all (true))
       ((Fun_call (Name Std.Prelude.Operators.==)
         (Function
          ((Type_app Std.Prelude.Int ()) (Type_app Std.Prelude.Int ()))
@@ -328,11 +328,11 @@
         (((Fun_call (Name Std.Prelude.Operators.++)
            (Function ((Type_app String ()) (Type_app String ()))
             (Type_app String ()))
-           (((Literal (String "expr = ")) (Type_app String ()))
+           (((Literal (String "true = ")) (Type_app String ()))
             ((Fun_call (Name Std.Prelude.Bool.to_string)
               (Function ((Type_app Std.Prelude.Bool.Bool ()))
                (Type_app String ()))
-              (((Name Operators.expr) (Type_app Std.Prelude.Bool ()))))
+              (((Name Operators.true) (Type_app Std.Prelude.Bool ()))))
              (Type_app String ()))))
           (Type_app String ()))))
        (Tuple ()))))))
