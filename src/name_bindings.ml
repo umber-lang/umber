@@ -393,17 +393,17 @@ let merge_no_shadow t1 t2 =
 
 let resolve_absolute_path =
   let open Option.Let_syntax in
-  let rec loop_sigs t path sigs =
-    match path with
-    | [] -> Some (Sigs sigs)
+  let rec loop_sigs t ~path_to_return ~path_to_follow sigs =
+    match path_to_follow with
+    | [] -> Some (path_to_return, Sigs sigs)
     | module_name :: rest ->
       (match%bind Map.find sigs.modules module_name with
-       | Local (None, sigs) -> loop_sigs t rest sigs
+       | Local (None, sigs) -> loop_sigs t ~path_to_return ~path_to_follow:rest sigs
        | Local (Some _, _) -> .
        | Imported path -> resolve_absolute_path t path ~defs_only:false)
-  and loop_defs t current_path path defs =
-    match path with
-    | [] -> Some (Defs defs)
+  and loop_defs t ~path_to_return ~current_path ~path_to_follow defs =
+    match path_to_follow with
+    | [] -> Some (path_to_return, Defs defs)
     | module_name :: rest ->
       (match%bind Map.find defs.modules module_name with
        | Local (sigs, defs) ->
@@ -416,20 +416,32 @@ let resolve_absolute_path =
              else None, `Sig
          in
          (match go_into, sigs with
-          | `Sig, Some sigs -> loop_sigs t rest sigs
-          | `Sig, None | `Def, _ -> loop_defs t current_path rest defs)
+          | `Sig, Some sigs -> loop_sigs t ~path_to_return ~path_to_follow:rest sigs
+          | `Sig, None | `Def, _ ->
+            loop_defs t ~path_to_return ~current_path ~path_to_follow:rest defs)
        | Imported path -> resolve_absolute_path t path ~defs_only:false)
-  and loop_defs_only t path defs =
-    match path with
-    | [] -> Some (Defs defs)
+  and loop_defs_only t ~path_to_return ~path_to_follow defs =
+    match path_to_follow with
+    | [] -> Some (path_to_return, Defs defs)
     | module_name :: rest ->
       (match%bind Map.find defs.modules module_name with
-       | Local (_, defs) -> loop_defs_only t rest defs
+       | Local (_, defs) -> loop_defs_only t ~path_to_return ~path_to_follow:rest defs
        | Imported path -> resolve_absolute_path t path ~defs_only:true)
   and resolve_absolute_path t (path : Module_path.Absolute.t) ~defs_only =
     if defs_only
-    then loop_defs_only t (path :> Module_name.t list) t.toplevel
-    else loop_defs t (Some t.current_path) (path :> Module_name.t list) t.toplevel
+    then
+      loop_defs_only
+        t
+        ~path_to_return:path
+        ~path_to_follow:(path :> Module_name.t list)
+        t.toplevel
+    else
+      loop_defs
+        t
+        ~path_to_return:path
+        ~current_path:(Some t.current_path)
+        ~path_to_follow:(path :> Module_name.t list)
+        t.toplevel
   in
   resolve_absolute_path
 ;;
@@ -456,14 +468,17 @@ let find =
   let rec loop t ((path, name) as input) ~at_path ~defs_only ~f ~to_ustring =
     (* Try looking at the current scope, then travel up to parent scopes to find a
        matching name. *)
-    let bindings_at_current = resolve_absolute_path_exn ~defs_only t at_path in
+    (* FIXME: Do we need to use the path here? *)
+    let (_ : Module_path.Absolute.t), bindings_at_current =
+      resolve_absolute_path_exn ~defs_only t at_path
+    in
     match List.hd (path : Module_path.Relative.t :> Module_name.t list) with
     | Some first_module ->
       let full_path = Module_path.append' at_path path in
       let f bindings =
         if Map.mem bindings.modules first_module
         then (
-          let bindings = resolve_absolute_path_exn ~defs_only t full_path in
+          let full_path, bindings = resolve_absolute_path_exn ~defs_only t full_path in
           option_or_default (f full_path name bindings) ~f:(fun () ->
             name_error ~msg:"Couldn't find name" (to_ustring input)))
         else check_parent t ~at_path input ~defs_only ~f ~to_ustring
@@ -485,7 +500,7 @@ let find =
 ;;
 
 let find_absolute ?(defs_only = false) t ((path, name) as input) ~f ~to_ustring =
-  match f name (resolve_absolute_path_exn t path ~defs_only) with
+  match f name (snd (resolve_absolute_path_exn t path ~defs_only)) with
   | Some result -> result
   | None -> name_error ~msg:"Couldn't find name" (to_ustring input)
 ;;
@@ -541,7 +556,7 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
       resolve_type_or_import_with_path t (path, name) entry ~defs_only
     in
     let find_in_imported_submodule ~import_path =
-      let bindings = resolve_absolute_path_exn t import_path ~defs_only in
+      let bindings = snd (resolve_absolute_path_exn t import_path ~defs_only) in
       let name =
         (* Use the name of the imported module as the type name to look up. *)
         match Module_path.last import_path with
@@ -747,7 +762,7 @@ let import =
       | Absolute -> Module_path.Absolute.empty
       | Relative { nth_parent } -> Module_path.drop_last_n_exn (current_path t) nth_parent
     in
-    let import_bindings = resolve_absolute_path_exn t src_path ~defs_only:false in
+    let import_bindings = snd (resolve_absolute_path_exn t src_path ~defs_only:false) in
     let bindings_to_import =
       loop empty_bindings import_bindings paths ~path_so_far:src_path
     in
@@ -1083,12 +1098,14 @@ module Sigs_or_defs = struct
     match bindings with
     | Sigs bindings ->
       (match%bind Map.find bindings.modules module_name with
-       | Imported path -> resolve_absolute_path t path ~defs_only:false
+       | Imported path ->
+         resolve_absolute_path t path ~defs_only:false |> Option.map ~f:snd
        | Local (None, sigs) -> Some (Sigs sigs)
        | Local (Some _, _) -> .)
     | Defs bindings ->
       (match%bind Map.find bindings.modules module_name with
-       | Imported path -> resolve_absolute_path t path ~defs_only:false
+       | Imported path ->
+         resolve_absolute_path t path ~defs_only:false |> Option.map ~f:snd
        | Local (Some sigs, _) -> Some (Sigs sigs)
        | Local (None, defs) -> Some (Defs defs))
   ;;
