@@ -25,7 +25,7 @@ module Arith = {
 # `(2 + (11 :mod: 3)) == 4`? I think the `Op_tree` logic has had this bug for a long time
 # FIXME: Maybe we should add some automated validation of invariants in tests e.g.
 # we could check that the op tree is organized in the way it promises to be.
-let _ = Arith.(2 + 11 :mod: 3 == 4)
+let expr = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 
 
@@ -64,6 +64,8 @@ module List = {
     | Cons x xs -> append (f x) (concat_map xs f)
 }
 
-import Std.Prelude.((;), print)
+import Std.Prelude.((;), print, (++), Int, Bool)
 
 let _ = List.map unicode_my_dudes (\(x, y) -> print x; print y)
+let () = print ("expr = " ++ Bool.to_string expr)
+let () = print ("four = " ++ Int.to_string four)

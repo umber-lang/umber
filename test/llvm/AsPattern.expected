@@ -5,6 +5,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 %umber_block1 = type { %umber_header, [1 x i64] }
+%umber_block8b = type { %umber_header, [8 x i8] }
 
 @AsPattern.pair = global %umber_block* null
 @AsPattern.one = global %umber_block* null
@@ -13,9 +14,9 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @"AsPattern.*binding.1" = global %umber_block* null
 @int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
-@string.763646369 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"foo\00\00\00\00\04" }
-@string.993717661 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"bar\00\00\00\00\04" }
-@string.927989409 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"baz\00\00\00\00\04" }
+@string.763646369 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"foo\00\00\00\00\04" }
+@string.993717661 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"bar\00\00\00\00\04" }
+@string.927989409 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"baz\00\00\00\00\04" }
 
 define i32 @"umber_main:./examples/AsPattern.um"() {
 entry:
@@ -49,7 +50,7 @@ entry:
   store i16 2, i16* %box13, align 2
   %box14 = bitcast i64* %box11 to %umber_block**
   %box15 = getelementptr %umber_block*, %umber_block** %box14, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.927989409 to %umber_block*), %umber_block** %box15, align 8
+  store %umber_block* bitcast (%umber_block8b* @string.927989409 to %umber_block*), %umber_block** %box15, align 8
   %box16 = getelementptr %umber_block*, %umber_block** %box14, i32 2
   store %umber_block* %Std.Prelude.List.Nil, %umber_block** %box16, align 8
   %box17 = bitcast %umber_block** %box14 to %umber_block*
@@ -60,7 +61,7 @@ entry:
   store i16 2, i16* %box20, align 2
   %box21 = bitcast i64* %box18 to %umber_block**
   %box22 = getelementptr %umber_block*, %umber_block** %box21, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.993717661 to %umber_block*), %umber_block** %box22, align 8
+  store %umber_block* bitcast (%umber_block8b* @string.993717661 to %umber_block*), %umber_block** %box22, align 8
   %box23 = getelementptr %umber_block*, %umber_block** %box21, i32 2
   store %umber_block* %box17, %umber_block** %box23, align 8
   %box24 = bitcast %umber_block** %box21 to %umber_block*
@@ -71,7 +72,7 @@ entry:
   store i16 2, i16* %box27, align 2
   %box28 = bitcast i64* %box25 to %umber_block**
   %box29 = getelementptr %umber_block*, %umber_block** %box28, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.763646369 to %umber_block*), %umber_block** %box29, align 8
+  store %umber_block* bitcast (%umber_block8b* @string.763646369 to %umber_block*), %umber_block** %box29, align 8
   %box30 = getelementptr %umber_block*, %umber_block** %box28, i32 2
   store %umber_block* %box24, %umber_block** %box30, align 8
   %box31 = bitcast %umber_block** %box28 to %umber_block*

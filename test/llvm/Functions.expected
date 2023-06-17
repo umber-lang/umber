@@ -5,6 +5,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 %umber_block1 = type { %umber_header, [1 x i64] }
+%umber_block8b = type { %umber_header, [8 x i8] }
 
 @Functions.zero = constant %umber_block* bitcast (%umber_block1* @float.0. to %umber_block*)
 @Functions.still_zero_wow = global %umber_block* null
@@ -13,7 +14,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
 @float.10000000000000. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 1.000000e+13 }
 @int.-89 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 -89 }
-@string.1948248 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"huh\00\00\00\00\04" }
+@string.1948248 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"huh\00\00\00\00\04" }
 @char.c = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 99 }
 
 define i32 @"umber_main:./examples/Functions.um"() {
@@ -21,7 +22,7 @@ entry:
   %Functions.zero = load %umber_block*, %umber_block** @Functions.zero, align 8
   %fun_call = tail call tailcc %umber_block* @Functions.id(%umber_block* %Functions.zero)
   store %umber_block* %fun_call, %umber_block** @Functions.still_zero_wow, align 8
-  %fun_call1 = tail call tailcc %umber_block* @Functions.lots_of_args(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @float.10000000000000. to %umber_block*), %umber_block* bitcast (%umber_block1* @int.-89 to %umber_block*), %umber_block* bitcast (%umber_block1* @string.1948248 to %umber_block*), %umber_block* bitcast (%umber_block1* @char.c to %umber_block*))
+  %fun_call1 = tail call tailcc %umber_block* @Functions.lots_of_args(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @float.10000000000000. to %umber_block*), %umber_block* bitcast (%umber_block1* @int.-89 to %umber_block*), %umber_block* bitcast (%umber_block8b* @string.1948248 to %umber_block*), %umber_block* bitcast (%umber_block1* @char.c to %umber_block*))
   store %umber_block* %fun_call1, %umber_block** @"Functions.*binding.1", align 8
   ret i32 0
 }

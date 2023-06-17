@@ -175,7 +175,8 @@
       ((Lambda ((Catch_all (x)))
         (Match
          (Fun_call (Name Std.Prelude.Operators.==)
-          (Function ((Type_app Int ()) (Type_app Int ())) (Type_app Bool ()))
+          (Function ((Type_app Int ()) (Type_app Int ()))
+           (Type_app Std.Prelude.Bool ()))
           (((Name MutualRecursion.x) (Type_app Int ()))
            ((Literal (Int 0)) (Type_app Int ()))))
          (Type_app Bool ())
@@ -195,7 +196,8 @@
       ((Lambda ((Catch_all (x)))
         (Match
          (Fun_call (Name Std.Prelude.Operators.==)
-          (Function ((Type_app Int ()) (Type_app Int ())) (Type_app Bool ()))
+          (Function ((Type_app Int ()) (Type_app Int ()))
+           (Type_app Std.Prelude.Bool ()))
           (((Name MutualRecursion.x) (Type_app Int ()))
            ((Literal (Int 0)) (Type_app Int ()))))
          (Type_app Bool ())

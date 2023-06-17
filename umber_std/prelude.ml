@@ -804,14 +804,14 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
-%umber_block1 = type { %umber_header, [1 x i64] }
+%umber_block8b = type { %umber_header, [8 x i8] }
 
 @Std.Prelude.Option.None = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Std.Prelude.List.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Std.Prelude.Float.pi = external global %umber_block*
 @"Std.Prelude.Operators.::.1" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons to %umber_block*)
-@string.954397288 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"True\00\00\00\03" }
-@string.570553153 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"False\00\00\02" }
+@string.954397288 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"True\00\00\00\03" }
+@string.570553153 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"False\00\00\02" }
 
 define i32 @"umber_main:Std/Prelude.um"() {
 entry:
@@ -867,7 +867,7 @@ cond_otherwise:                                   ; preds = %cond
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge2 = phi %umber_block* [ bitcast (%umber_block1* @string.954397288 to %umber_block*), %cond_binding_merge ], [ bitcast (%umber_block1* @string.570553153 to %umber_block*), %cond_otherwise ]
+  %cond_otherwise_merge2 = phi %umber_block* [ bitcast (%umber_block8b* @string.954397288 to %umber_block*), %cond_binding_merge ], [ bitcast (%umber_block8b* @string.570553153 to %umber_block*), %cond_otherwise ]
   ret %umber_block* %cond_otherwise_merge2
 }
 

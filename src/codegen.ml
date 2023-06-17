@@ -71,15 +71,26 @@ let block_header_type t =
     typ)
 ;;
 
-let block_fields_type context ~len = Llvm.array_type (Llvm.i64_type context) len
-
-let block_type ?(len = 0) t =
-  let name = if len = 0 then "umber_block" else "umber_block" ^ Int.to_string len in
+let block_type ?(len = 0) ?(field_kind = `Word) t =
+  let name =
+    let prefix = if len = 0 then "umber_block" else "umber_block" ^ Int.to_string len in
+    let suffix =
+      match field_kind with
+      | `Word -> ""
+      | `Byte -> "b"
+    in
+    prefix ^ suffix
+  in
   with_type_memo t ~name ~f:(fun () ->
     let block_type = Llvm.named_struct_type t.context name in
+    let field_type =
+      match field_kind with
+      | `Word -> Llvm.i64_type t.context
+      | `Byte -> Llvm.i8_type t.context
+    in
     Llvm.struct_set_body
       block_type
-      [| block_header_type t; block_fields_type t.context ~len |]
+      [| block_header_type t; Llvm.array_type field_type len |]
       false;
     block_type)
 ;;
@@ -121,12 +132,10 @@ let const_block_header t ~tag ~len =
     |]
 ;;
 
-let constant_block t ~tag ~len ~type_ ~name constant_value =
+let constant_block t ~tag ~len ~type_ ~type_name ~name constant_value =
   let block_header = const_block_header t ~tag ~len in
-  let value =
-    Llvm.const_named_struct (block_type t ~len) [| block_header; constant_value |]
-  in
-  let global_name = [%string "%{type_}.%{name}"] in
+  let value = Llvm.const_named_struct type_ [| block_header; constant_value |] in
+  let global_name = [%string "%{type_name}.%{name}"] in
   let global = Llvm.define_global global_name value t.module_ in
   Llvm.set_global_constant true global;
   global
@@ -142,7 +151,8 @@ let codegen_literal t literal =
         t
         ~tag:Cnstr_tag.int
         ~len:1
-        ~type_:"int"
+        ~type_:(block_type t ~len:1)
+        ~type_name:"int"
         ~name
         (Llvm.const_int type_ i)
     | Float x ->
@@ -152,7 +162,8 @@ let codegen_literal t literal =
         t
         ~tag:Cnstr_tag.float
         ~len:1
-        ~type_:"float"
+        ~type_:(block_type t ~len:1)
+        ~type_name:"float"
         ~name
         (Llvm.const_float type_ x)
     | Char c ->
@@ -163,7 +174,8 @@ let codegen_literal t literal =
         t
         ~tag:Cnstr_tag.char
         ~len:1
-        ~type_:"char"
+        ~type_:(block_type t ~len:1)
+        ~type_name:"char"
         ~name
         (Llvm.const_int type_ c)
     | String s ->
@@ -183,7 +195,14 @@ let codegen_literal t literal =
           Llvm.const_int (Llvm.i8_type t.context) byte)
       in
       let value = Llvm.const_array (Llvm.i8_type t.context) packed_char_array in
-      constant_block t ~tag:Cnstr_tag.string ~len:n_words ~type_:"string" ~name value)
+      constant_block
+        t
+        ~tag:Cnstr_tag.string
+        ~len:n_words
+        ~type_:(block_type t ~len:(n_words * 8) ~field_kind:`Byte)
+        ~type_name:"string"
+        ~name
+        value)
 ;;
 
 let get_block_tag t value =

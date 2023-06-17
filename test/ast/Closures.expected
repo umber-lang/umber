@@ -17,7 +17,7 @@
                 (Function
                  ((Type_app Std.Prelude.Int ())
                   (Type_app Std.Prelude.Int ()))
-                 (Type_app Bool ()))
+                 (Type_app Std.Prelude.Bool ()))
                 (((Name Closures.current) (Type_app Std.Prelude.Int ()))
                  ((Name Closures.end_after) (Type_app Std.Prelude.Int ()))))
                (Type_app Bool ())

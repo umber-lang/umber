@@ -38,11 +38,11 @@
         (paths (Module Std ((Module Prelude ((Name +) (Name mod))))))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all (expr))
       ((Fun_call (Name Std.Prelude.Operators.==)
         (Function
          ((Type_app Std.Prelude.Int ()) (Type_app Std.Prelude.Int ()))
-         (Type_app Bool ()))
+         (Type_app Std.Prelude.Bool ()))
         (((Fun_call (Name Std.Prelude.Operators.+)
            (Function
             ((Type_app Std.Prelude.Int ()) (Type_app Std.Prelude.Int ()))
@@ -57,7 +57,7 @@
              (Type_app Std.Prelude.Int ()))))
           (Type_app Std.Prelude.Int ()))
          ((Literal (Int 4)) (Type_app Int ()))))
-       (Type_app Bool ()))))))
+       (Type_app Std.Prelude.Bool ()))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (four))
@@ -289,7 +289,10 @@
   (Common_def
    (Import
     ((kind Absolute)
-     (paths (Module Std ((Module Prelude ((Name ";") (Name print)))))))))
+     (paths
+      (Module Std
+       ((Module Prelude
+         ((Name ";") (Name print) (Name ++) (Name Int) (Name Bool)))))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all ())
@@ -316,4 +319,36 @@
               (Tuple ())))))
           (Function ((Tuple ((Type_app String ()) (Type_app String ()))))
            (Tuple ())))))
-       (Type_app Std.Prelude.List.List ((Tuple ()))))))))))
+       (Type_app Std.Prelude.List.List ((Tuple ()))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Tuple ())
+      ((Fun_call (Name Std.Prelude.print)
+        (Function ((Type_app String ())) (Tuple ()))
+        (((Fun_call (Name Std.Prelude.Operators.++)
+           (Function ((Type_app String ()) (Type_app String ()))
+            (Type_app String ()))
+           (((Literal (String "expr = ")) (Type_app String ()))
+            ((Fun_call (Name Operators.Bool.to_string)
+              (Function ((Type_app Std.Prelude.Bool.Bool ()))
+               (Type_app String ()))
+              (((Name Operators.expr) (Type_app Std.Prelude.Bool ()))))
+             (Type_app String ()))))
+          (Type_app String ()))))
+       (Tuple ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Tuple ())
+      ((Fun_call (Name Std.Prelude.print)
+        (Function ((Type_app String ())) (Tuple ()))
+        (((Fun_call (Name Std.Prelude.Operators.++)
+           (Function ((Type_app String ()) (Type_app String ()))
+            (Type_app String ()))
+           (((Literal (String "four = ")) (Type_app String ()))
+            ((Fun_call (Name Operators.Int.to_string)
+              (Function ((Type_app Std.Prelude.Int.Int ()))
+               (Type_app String ()))
+              (((Name Operators.four) (Type_app Std.Prelude.Int ()))))
+             (Type_app String ()))))
+          (Type_app String ()))))
+       (Tuple ()))))))))
