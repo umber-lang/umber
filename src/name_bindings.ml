@@ -548,7 +548,7 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
         (* Allow type names like `List.List` to be found as just `List` *)
         let module_name = Type_name.to_ustring name |> Module_name.of_ustring_unchecked in
         let%bind.Option bindings = Map.find bindings.modules module_name in
-        check_submodule bindings
+        check_submodule bindings (Module_path.append path [ module_name ])
     in
     let find_type bindings path name =
       let%map.Option entry = Map.find bindings.types name in
@@ -571,12 +571,14 @@ let find_type_entry_with_path, find_absolute_type_entry_with_path =
     in
     match bindings with
     | Sigs sigs ->
-      f sigs ~check_submodule:(function
+      f sigs ~check_submodule:(fun bindings path ->
+        match bindings with
         | Local (None, sigs) -> find_type sigs path name
         | Local (Some _, _) -> .
         | Imported import_path -> find_in_imported_submodule ~import_path)
     | Defs defs ->
-      f defs ~check_submodule:(function
+      f defs ~check_submodule:(fun bindings path ->
+        match bindings with
         | Local (None, defs) -> find_type defs path name
         | Local (Some sigs, defs) ->
           if defs_only then find_type defs path name else find_type sigs path name
@@ -620,9 +622,6 @@ let absolutify_path t (path : Module_path.Relative.t) =
         Module_path.to_ustring (Module_path.append path [ name ]))
 ;;
 
-(* FIXME: Sometimes this absolutifies `List` to `Std.Prelude.List.List` and sometimes it
-   does `Std.Prelude.List`. It should be consistent, and be the former for correctness,
-   since I don't think we banned making both types exist and be different. *)
 let absolutify_type_name t path = fst (find_type_entry_with_path t path)
 let absolutify_value_name t path = fst (find_entry_with_path t path)
 

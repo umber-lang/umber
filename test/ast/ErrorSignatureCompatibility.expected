@@ -17,8 +17,8 @@
         (Incompatible ((typ (Scheme (Function ((Var a)) (Var a)))))
          ((typ
            (Scheme
-            (Function ((Type_app Std.Prelude.Int ()))
-             (Type_app Std.Prelude.Int ()))))
+            (Function ((Type_app Std.Prelude.Int.Int ()))
+             (Type_app Std.Prelude.Int.Int ()))))
           (type_source Let_inferred))))
        (plus_one'
         (Incompatible

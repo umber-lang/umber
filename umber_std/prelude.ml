@@ -67,8 +67,8 @@ let names = {|
                    (Local
                     ((typ
                       (Scheme
-                       (Function ((Type_app Std.Prelude.Float ()))
-                        (Type_app Std.Prelude.Float ())))))))
+                       (Function ((Type_app Std.Prelude.Float.Float ()))
+                        (Type_app Std.Prelude.Float.Float ())))))))
                   (print
                    (Local
                     ((typ
@@ -79,14 +79,16 @@ let names = {|
                    (Local
                     ((typ
                       (Scheme
-                       (Function ((Type_app Std.Prelude.Int ())) (Tuple ()))))
+                       (Function ((Type_app Std.Prelude.Int.Int ()))
+                        (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_int))))
                   (print_bool
                    (Local
                     ((typ
                       (Scheme
-                       (Function ((Type_app Std.Prelude.Bool ())) (Tuple ()))))
+                       (Function ((Type_app Std.Prelude.Bool.Bool ()))
+                        (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_bool))))))
                 (types ())
@@ -252,36 +254,36 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Int ())
-                               (Type_app Std.Prelude.Int ()))
-                              (Type_app Std.Prelude.Int ()))))
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              (Type_app Std.Prelude.Int.Int ()))))
                            (fixity (Left 7)))))
                         (*
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Int ())
-                               (Type_app Std.Prelude.Int ()))
-                              (Type_app Std.Prelude.Int ()))))
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              (Type_app Std.Prelude.Int.Int ()))))
                            (fixity (Left 7)))))
                         (+
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Int ())
-                               (Type_app Std.Prelude.Int ()))
-                              (Type_app Std.Prelude.Int ()))))
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              (Type_app Std.Prelude.Int.Int ()))))
                            (fixity (Left 6)))))
                         (-
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Int ())
-                               (Type_app Std.Prelude.Int ()))
-                              (Type_app Std.Prelude.Int ()))))
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              (Type_app Std.Prelude.Int.Int ()))))
                            (fixity (Left 6)))))
                         (.
                          (Local
@@ -302,48 +304,48 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function ((Var a) (Var a))
-                              (Type_app Std.Prelude.Bool ()))))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (>
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Var a) (Var a))
-                              (Type_app Std.Prelude.Bool ()))))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (^
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Int ())
-                               (Type_app Std.Prelude.Int ()))
-                              (Type_app Std.Prelude.Int ()))))
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              (Type_app Std.Prelude.Int.Int ()))))
                            (fixity (Right 8)))))
                         (!=
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Var a) (Var a))
-                              (Type_app Std.Prelude.Bool ()))))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (&&
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Bool ())
-                               (Type_app Std.Prelude.Bool ()))
-                              (Type_app Std.Prelude.Bool ()))))
+                              ((Type_app Std.Prelude.Bool.Bool ())
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Left 3)))))
                         (*.
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Float ())
-                               (Type_app Std.Prelude.Float ()))
-                              (Type_app Std.Prelude.Float ()))))
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              (Type_app Std.Prelude.Float.Float ()))))
                            (fixity (Left 7)))))
                         (++
                          (Local
@@ -358,47 +360,48 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Float ())
-                               (Type_app Std.Prelude.Float ()))
-                              (Type_app Std.Prelude.Float ()))))
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              (Type_app Std.Prelude.Float.Float ()))))
                            (fixity (Left 6)))))
                         (-.
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Float ())
-                               (Type_app Std.Prelude.Float ()))
-                              (Type_app Std.Prelude.Float ()))))
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              (Type_app Std.Prelude.Float.Float ()))))
                            (fixity (Left 6)))))
                         (::
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Var a) (Type_app Std.Prelude.List ((Var a))))
-                              (Type_app Std.Prelude.List ((Var a))))))
+                              ((Var a)
+                               (Type_app Std.Prelude.List.List ((Var a))))
+                              (Type_app Std.Prelude.List.List ((Var a))))))
                            (fixity (Right 5)))))
                         (<=
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Var a) (Var a))
-                              (Type_app Std.Prelude.Bool ()))))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (==
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Var a) (Var a))
-                              (Type_app Std.Prelude.Bool ()))))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (>=
                          (Local
                           ((typ
                             (Scheme
                              (Function ((Var a) (Var a))
-                              (Type_app Std.Prelude.Bool ()))))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Non_assoc 4)))))
                         (|>
                          (Local
@@ -412,25 +415,25 @@ let names = {|
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Bool ())
-                               (Type_app Std.Prelude.Bool ()))
-                              (Type_app Std.Prelude.Bool ()))))
+                              ((Type_app Std.Prelude.Bool.Bool ())
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Std.Prelude.Bool.Bool ()))))
                            (fixity (Left 2)))))
                         (mod
                          (Local
                           ((typ
                             (Scheme
                              (Function
-                              ((Type_app Std.Prelude.Int ())
-                               (Type_app Std.Prelude.Int ()))
-                              (Type_app Std.Prelude.Int ()))))
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              (Type_app Std.Prelude.Int.Int ()))))
                            (fixity (Left 7)))))
                         (not
                          (Local
                           ((typ
                             (Scheme
-                             (Function ((Type_app Std.Prelude.Bool ()))
-                              (Type_app Std.Prelude.Bool ())))))))))
+                             (Function ((Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Std.Prelude.Bool.Bool ())))))))))
                       (types ()) (modules ())))))))))
               ((names
                 ((% (Imported Std.Prelude.Operators.%))
@@ -460,8 +463,8 @@ let names = {|
                   (Local
                    ((typ
                      (Scheme
-                      (Function ((Type_app Std.Prelude.Float ()))
-                       (Type_app Std.Prelude.Float ()))))
+                      (Function ((Type_app Std.Prelude.Float.Float ()))
+                       (Type_app Std.Prelude.Float.Float ()))))
                     (type_source Extern_declared)
                     (extern_name umber_float_sqrt))))
                  (print
@@ -474,14 +477,16 @@ let names = {|
                   (Local
                    ((typ
                      (Scheme
-                      (Function ((Type_app Std.Prelude.Int ())) (Tuple ()))))
+                      (Function ((Type_app Std.Prelude.Int.Int ()))
+                       (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_int))))
                  (print_bool
                   (Local
                    ((typ
                      (Scheme
-                      (Function ((Type_app Std.Prelude.Bool ())) (Tuple ()))))
+                      (Function ((Type_app Std.Prelude.Bool.Bool ()))
+                       (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_bool))))))
                (types ())
@@ -533,7 +538,7 @@ let names = {|
                             (Function
                              ((Type_app Std.Prelude.List.List ((Var a)))
                               (Function ((Var a)) (Var b)))
-                             (Type_app Std.Prelude.List ((Var b))))))
+                             (Type_app Std.Prelude.List.List ((Var b))))))
                           (type_source Let_inferred))))
                        (Cons
                         (Local
@@ -549,8 +554,8 @@ let names = {|
                            (Scheme
                             (Function
                              ((Type_app Std.Prelude.List.List ((Var a)))
-                              (Type_app Std.Prelude.List ((Var a))))
-                             (Type_app Std.Prelude.List ((Var a))))))
+                              (Type_app Std.Prelude.List.List ((Var a))))
+                             (Type_app Std.Prelude.List.List ((Var a))))))
                           (type_source Let_inferred))))
                        (reverse
                         (Local
@@ -558,7 +563,7 @@ let names = {|
                            (Scheme
                             (Function
                              ((Type_app Std.Prelude.List.List ((Var a))))
-                             (Type_app Std.Prelude.List ((Var a))))))
+                             (Type_app Std.Prelude.List.List ((Var a))))))
                           (type_source Let_inferred))))
                        (concat_map
                         (Local
@@ -568,7 +573,7 @@ let names = {|
                              ((Type_app Std.Prelude.List.List ((Var a)))
                               (Function ((Var a))
                                (Type_app Std.Prelude.List.List ((Var b)))))
-                             (Type_app Std.Prelude.List ((Var b))))))
+                             (Type_app Std.Prelude.List.List ((Var b))))))
                           (type_source Let_inferred))))
                        (rev_append
                         (Local
@@ -576,8 +581,8 @@ let names = {|
                            (Scheme
                             (Function
                              ((Type_app Std.Prelude.List.List ((Var a)))
-                              (Type_app Std.Prelude.List ((Var a))))
-                             (Type_app Std.Prelude.List ((Var a))))))
+                              (Type_app Std.Prelude.List.List ((Var a))))
+                             (Type_app Std.Prelude.List.List ((Var a))))))
                           (type_source Let_inferred))))))
                      (types
                       ((List
@@ -672,9 +677,9 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Int ())
-                              (Type_app Std.Prelude.Int ()))
-                             (Type_app Std.Prelude.Int ()))))
+                             ((Type_app Std.Prelude.Int.Int ())
+                              (Type_app Std.Prelude.Int.Int ()))
+                             (Type_app Std.Prelude.Int.Int ()))))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_rem))))
                        (*
@@ -682,9 +687,9 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Int ())
-                              (Type_app Std.Prelude.Int ()))
-                             (Type_app Std.Prelude.Int ()))))
+                             ((Type_app Std.Prelude.Int.Int ())
+                              (Type_app Std.Prelude.Int.Int ()))
+                             (Type_app Std.Prelude.Int.Int ()))))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_mul))))
                        (+
@@ -692,9 +697,9 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Int ())
-                              (Type_app Std.Prelude.Int ()))
-                             (Type_app Std.Prelude.Int ()))))
+                             ((Type_app Std.Prelude.Int.Int ())
+                              (Type_app Std.Prelude.Int.Int ()))
+                             (Type_app Std.Prelude.Int.Int ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_add))))
                        (-
@@ -702,9 +707,9 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Int ())
-                              (Type_app Std.Prelude.Int ()))
-                             (Type_app Std.Prelude.Int ()))))
+                             ((Type_app Std.Prelude.Int.Int ())
+                              (Type_app Std.Prelude.Int.Int ()))
+                             (Type_app Std.Prelude.Int.Int ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_sub))))
                        (.
@@ -726,7 +731,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a))
-                             (Type_app Std.Prelude.Bool ()))))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lt))))
                        (>
@@ -734,7 +739,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a))
-                             (Type_app Std.Prelude.Bool ()))))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gt))))
                        (^
@@ -742,9 +747,9 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Int ())
-                              (Type_app Std.Prelude.Int ()))
-                             (Type_app Std.Prelude.Int ()))))
+                             ((Type_app Std.Prelude.Int.Int ())
+                              (Type_app Std.Prelude.Int.Int ()))
+                             (Type_app Std.Prelude.Int.Int ()))))
                           (type_source Extern_declared) (fixity (Right 8))
                           (extern_name umber_int_pow))))
                        (!=
@@ -752,7 +757,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a))
-                             (Type_app Std.Prelude.Bool ()))))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_neq))))
                        (&&
@@ -760,18 +765,18 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Bool ())
-                              (Type_app Std.Prelude.Bool ()))
-                             (Type_app Std.Prelude.Bool ()))))
+                             ((Type_app Std.Prelude.Bool.Bool ())
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (fixity (Left 3)))))
                        (*.
                         (Local
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Float ())
-                              (Type_app Std.Prelude.Float ()))
-                             (Type_app Std.Prelude.Float ()))))
+                             ((Type_app Std.Prelude.Float.Float ())
+                              (Type_app Std.Prelude.Float.Float ()))
+                             (Type_app Std.Prelude.Float.Float ()))))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_float_mul))))
                        (++
@@ -788,9 +793,9 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Float ())
-                              (Type_app Std.Prelude.Float ()))
-                             (Type_app Std.Prelude.Float ()))))
+                             ((Type_app Std.Prelude.Float.Float ())
+                              (Type_app Std.Prelude.Float.Float ()))
+                             (Type_app Std.Prelude.Float.Float ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_add))))
                        (-.
@@ -798,9 +803,9 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Float ())
-                              (Type_app Std.Prelude.Float ()))
-                             (Type_app Std.Prelude.Float ()))))
+                             ((Type_app Std.Prelude.Float.Float ())
+                              (Type_app Std.Prelude.Float.Float ()))
+                             (Type_app Std.Prelude.Float.Float ()))))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_sub))))
                        (::
@@ -808,15 +813,16 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Var a) (Type_app Std.Prelude.List ((Var a))))
-                             (Type_app Std.Prelude.List ((Var a))))))
+                             ((Var a)
+                              (Type_app Std.Prelude.List.List ((Var a))))
+                             (Type_app Std.Prelude.List.List ((Var a))))))
                           (fixity (Right 5)))))
                        (<=
                         (Local
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a))
-                             (Type_app Std.Prelude.Bool ()))))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lte))))
                        (==
@@ -824,7 +830,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a))
-                             (Type_app Std.Prelude.Bool ()))))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_eq))))
                        (>=
@@ -832,7 +838,7 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function ((Var a) (Var a))
-                             (Type_app Std.Prelude.Bool ()))))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gte))))
                        (|>
@@ -847,18 +853,18 @@ let names = {|
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Bool ())
-                              (Type_app Std.Prelude.Bool ()))
-                             (Type_app Std.Prelude.Bool ()))))
+                             ((Type_app Std.Prelude.Bool.Bool ())
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             (Type_app Std.Prelude.Bool.Bool ()))))
                           (fixity (Left 2)))))
                        (mod
                         (Local
                          ((typ
                            (Scheme
                             (Function
-                             ((Type_app Std.Prelude.Int ())
-                              (Type_app Std.Prelude.Int ()))
-                             (Type_app Std.Prelude.Int ()))))
+                             ((Type_app Std.Prelude.Int.Int ())
+                              (Type_app Std.Prelude.Int.Int ()))
+                             (Type_app Std.Prelude.Int.Int ()))))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_mod))))
                        (not

@@ -13,7 +13,7 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all (int))
-      ((Literal (Int 5)) (Type_app TypeModuleNamePunning.Foo ()))))))
+      ((Literal (Int 5)) (Type_app TypeModuleNamePunning.Foo.Foo ()))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (int'))

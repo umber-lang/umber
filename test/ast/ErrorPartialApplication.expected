@@ -4,6 +4,7 @@
    ("Function argument number mismatch"
     (type1 (Function ((Type_app Int ())) (Var a)))
     (type2
-     (Function ((Type_app Std.Prelude.Int ()) (Type_app Std.Prelude.Int ()))
-      (Type_app Std.Prelude.Int ())))))
+     (Function
+      ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ()))
+      (Type_app Std.Prelude.Int.Int ())))))
   (filename ErrorPartialApplication.um) (span 18:9-18:24)))
