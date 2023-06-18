@@ -145,9 +145,21 @@ module Pattern = struct
   let generalize ~names ~types pat_names typ =
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
-        Name_bindings.Name_entry.typ entry
-        |> Type_bindings.generalize types
-        |> Name_bindings.set_inferred_scheme names name)
+        let inferred_scheme =
+          Type_bindings.generalize types (Name_bindings.Name_entry.typ entry)
+        in
+        Name_bindings.set_inferred_scheme
+          names
+          name
+          inferred_scheme
+          ~check_existing:(fun existing_entry ->
+          match Name_bindings.Name_entry.scheme existing_entry with
+          | None -> ()
+          | Some existing_scheme ->
+            Sig_def_diff.check_val_scheme_vs_inferred_scheme
+              ~names
+              ~val_scheme:existing_scheme
+              ~inferred_scheme))
     in
     names, Type_bindings.generalize types typ
   ;;

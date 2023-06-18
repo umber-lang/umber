@@ -283,6 +283,36 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorInconsistentValType.expected
+    tokens/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorInconsistentValType.expected
+    ast/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorInconsistentValType.expected
+    mir/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorInconsistentValType.expected
+    llvm/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorInconsistentValType.expected
+    output/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorInexhaustivePattern.expected
     tokens/ErrorInexhaustivePattern.out))))
 

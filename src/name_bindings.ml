@@ -805,8 +805,6 @@ let add_val_or_extern
           | None ->
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
           | Some (Local existing_entry) ->
-            (* FIXME: The logic for checking val against inferred types is not working
-               properly.*)
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
             Local
               (Name_entry.merge
@@ -886,7 +884,7 @@ let add_type_decl t type_name decl =
   update_current t ~f:{ f }
 ;;
 
-let set_inferred_scheme t name scheme =
+let set_inferred_scheme t name scheme ~check_existing =
   let f bindings =
     let inferred_entry : Name_entry.t =
       { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
@@ -901,6 +899,7 @@ let set_inferred_scheme t name scheme =
         Map.update bindings.names name ~f:(function
           | None -> Local inferred_entry
           | Some (Local existing_entry) ->
+            check_existing existing_entry;
             Local (Name_entry.merge existing_entry inferred_entry)
           | Some (Imported _) ->
             (* TODO: Think about the exact semantics of this. I think we want to disallow

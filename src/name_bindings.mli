@@ -58,7 +58,14 @@ val find_entry_with_path
 val find_type : t -> Value_name.Relative.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Relative.t -> Type.t
 val find_fixity : t -> Value_name.Relative.t -> Fixity.t
-val set_inferred_scheme : t -> Value_name.t -> Module_path.absolute Type.Scheme.t -> t
+
+val set_inferred_scheme
+  :  t
+  -> Value_name.t
+  -> Module_path.absolute Type.Scheme.t
+  -> check_existing:(Name_entry.t -> unit)
+  -> t
+
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_decl_placeholder : t -> Type_name.t -> Module_path.relative Type.Decl.t -> t
 

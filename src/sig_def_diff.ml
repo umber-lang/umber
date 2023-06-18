@@ -54,7 +54,7 @@ let iter2 xs ys ~f =
 (** Skolemization means replacing all type variables in a type expression with fresh
     abstract types. e.g. `a -> b -> c` becomes something like `A -> B -> C` where `A`,
     `B`, and `C` are fresh abstract types. *)
-let skomelize ~names scheme : Name_bindings.t * Type.t =
+let skolemize ~names scheme : Name_bindings.t * Type.t =
   Name_bindings.with_path_into_defs names Module_path.Absolute.empty ~f:(fun names ->
     let names = ref names in
     let types_by_param = Type.Param.Table.create () in
@@ -81,7 +81,7 @@ let skomelize ~names scheme : Name_bindings.t * Type.t =
     signature is a "more specific" version of the defintion. We can check this by
     skolemizing the signature, instatiating the defintion, and then unifying the two. *)
 let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
-  let names, sig_type = skomelize ~names sig_scheme in
+  let names, sig_type = skolemize ~names sig_scheme in
   let def_type = Type.Scheme.instantiate def_scheme in
   let types = Type_bindings.create () in
   Type_bindings.unify ~names ~types sig_type def_type
@@ -238,3 +238,17 @@ let raise_if_nonempty t ~module_name =
 ;;
 
 let check ~names module_name = create ~names module_name |> raise_if_nonempty ~module_name
+
+let check_val_scheme_vs_inferred_scheme ~names ~val_scheme ~inferred_scheme =
+  if not
+       (no_errors (fun () ->
+          check_val_type_schemes ~names { sig_ = val_scheme; def = inferred_scheme }))
+  then
+    Compilation_error.raise
+      Type_error
+      ~msg:
+        [%message
+          "Type mismatch"
+            ~expected:(val_scheme : Module_path.absolute Type.Scheme.t)
+            ~inferred:(inferred_scheme : Module_path.absolute Type.Scheme.t)]
+;;

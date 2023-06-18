@@ -43,9 +43,6 @@ module List = {
     | (Nil, res) | (res, Nil) -> res
     | (Cons x xs, ys) -> Cons x (append xs ys)
 
-  # FIXME: I think adding this doesn't cause an error:
-  #val map : List a, (a -> a) -> List b
-  # So we aren't checking for val delaration consistency properly.
   let map xs f =
     match xs
     | Nil -> Nil
