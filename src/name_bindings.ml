@@ -656,6 +656,11 @@ let import =
        | Some sigs -> Sigs sigs
        | None -> Defs defs)
   in
+  let import_not_found path name =
+    name_error
+      (Ustring.concat [ Module_path.to_ustring path; Ustring.of_string_exn "."; name ])
+      ~msg:"Import not found"
+  in
   let import_name acc sigs_or_defs path name ~as_:as_name =
     let name = Unidentified_name.to_ustring name in
     let as_name = Unidentified_name.to_ustring as_name in
@@ -686,12 +691,7 @@ let import =
               (fun name -> Or_imported.Imported (Module_path.append path [ name ]))
         }
       in
-      if bindings_are_empty bindings_to_import
-      then
-        name_error
-          (Ustring.concat
-             [ Module_path.to_ustring path; Ustring.of_string_exn "."; name ])
-          ~msg:"Import not found";
+      if bindings_are_empty bindings_to_import then import_not_found path name;
       merge_no_shadow acc bindings_to_import
     in
     match sigs_or_defs with
@@ -718,16 +718,21 @@ let import =
     | Sigs sigs -> import_from_bindings sigs
     | Defs defs -> import_from_bindings defs
   in
-  let exclude_imported_name acc path_so_far name =
+  let exclude_imported_name acc import_bindings path_so_far name =
     let name = Unidentified_name.to_ustring name in
     let value_name = Value_name.of_ustring_unchecked name in
     let type_name = Type_name.of_ustring_unchecked name in
     let module_name = Module_name.of_ustring_unchecked name in
-    if not
-         (Map.mem acc.names value_name
-         || Map.mem acc.types type_name
-         || Map.mem acc.modules module_name)
-    then name_error_path (Module_path.append path_so_far [ module_name ]);
+    let ensure_imported_name_exists bindings =
+      if not
+           (Map.mem bindings.names value_name
+           || Map.mem bindings.types type_name
+           || Map.mem bindings.modules module_name)
+      then import_not_found path_so_far name
+    in
+    (match import_bindings with
+     | Sigs sigs -> ensure_imported_name_exists sigs
+     | Defs defs -> ensure_imported_name_exists defs);
     { names = Map.remove acc.names value_name
     ; types = Map.remove acc.types type_name
     ; modules = Map.remove acc.modules module_name
@@ -748,7 +753,7 @@ let import =
           ~path_so_far:(Module_path.append path_so_far [ module_name ]))
     | Name name -> import_name acc import_bindings path_so_far name ~as_:name
     | Name_as (name, as_) -> import_name acc import_bindings path_so_far name ~as_
-    | Name_excluded name -> exclude_imported_name acc path_so_far name
+    | Name_excluded name -> exclude_imported_name acc import_bindings path_so_far name
     | All -> import_all acc import_bindings path_so_far
   in
   fun t ({ kind; paths } : Module.Import.t) ->
@@ -763,10 +768,10 @@ let import =
       | Absolute -> Module_path.Absolute.empty
       | Relative { nth_parent } -> Module_path.drop_last_n_exn (current_path t) nth_parent
     in
-    let import_bindings = snd (resolve_absolute_path_exn t src_path ~defs_only:false) in
-    let bindings_to_import =
-      loop empty_bindings import_bindings paths ~path_so_far:src_path
+    let path_so_far, import_bindings =
+      resolve_absolute_path_exn t src_path ~defs_only:false
     in
+    let bindings_to_import = loop empty_bindings import_bindings paths ~path_so_far in
     let f bindings = merge_no_shadow bindings bindings_to_import in
     update_current t ~f:{ f }
 ;;

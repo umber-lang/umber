@@ -14,7 +14,6 @@ module : {
 
 # FIXME: When you put this import here it takes the prelude import out of the sig.
 # This is just so unintuitive. Surely we can do better.
-# FIXME: This doesn't work if you write `import Std.Prelude as _`
 import Std.Prelude.((*), (==), List, (::), Nil)
 
 module Arith = {
@@ -32,8 +31,6 @@ let right_section = (*5)
 let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?"::Nil)
 
 let (×) xs ys = List.concat_map xs (\x -> List.map ys (\y -> (x, y)))
-
-# FIXME: Write a test checking the parser error message for `match ... with`
 
 import Std.Prelude.((;), print, (++), Int, Bool)
 
