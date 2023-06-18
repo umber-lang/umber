@@ -29,7 +29,8 @@
     ((kind Absolute)
      (paths
       (Module Std
-       ((Module Prelude ((Name *) (Name ==) (Name ::) (Name Nil)))))))))
+       ((Module Prelude
+         ((Name *) (Name ==) (Name List) (Name ::) (Name Nil)))))))))
   (Module
    (Arith ()
     ((Common_def
@@ -154,7 +155,7 @@
    (bindings
     (((Catch_all ("\195\151"))
       ((Lambda ((Catch_all (xs)) (Catch_all (ys)))
-        (Fun_call (Name Operators.List.concat_map)
+        (Fun_call (Name Std.Prelude.List.concat_map)
          (Function
           ((Type_app Std.Prelude.List.List ((Var a)))
            (Function ((Var a))
@@ -162,7 +163,7 @@
           (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))
          (((Name Operators.xs) (Type_app Std.Prelude.List.List ((Var a))))
           ((Lambda ((Catch_all (x)))
-            (Fun_call (Name Operators.List.map)
+            (Fun_call (Name Std.Prelude.List.map)
              (Function
               ((Type_app Std.Prelude.List.List ((Var a)))
                (Function ((Var a)) (Tuple ((Var b) (Var a)))))
@@ -178,114 +179,6 @@
         ((Type_app Std.Prelude.List.List ((Var a)))
          (Type_app Std.Prelude.List.List ((Var b))))
         (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b)))))))))))
-  (Module
-   (List ()
-    ((Common_def
-      (Import
-       ((kind Absolute)
-        (paths (Module Std ((Module Prelude ((Module List (All))))))))))
-     (Let (rec_ true)
-      (bindings
-       (((Catch_all (append))
-         ((Lambda ((Catch_all (xs)) (Catch_all (ys)))
-           (Match (Tuple ((Name Operators.List.xs) (Name Operators.List.ys)))
-            (Tuple
-             ((Type_app Std.Prelude.List.List ((Var a)))
-              (Type_app Std.Prelude.List.List ((Var a)))))
-            (((Union
-               (Tuple
-                ((Cnstr_appl Std.Prelude.List.Nil ()) (Catch_all (res))))
-               (Tuple
-                ((Catch_all (res)) (Cnstr_appl Std.Prelude.List.Nil ()))))
-              (Name Operators.List.res))
-             ((Tuple
-               ((Cnstr_appl Std.Prelude.List.Cons
-                 ((Catch_all (x)) (Catch_all (xs))))
-                (Catch_all (ys))))
-              (Fun_call (Name Std.Prelude.List.Cons)
-               (Function ((Var a) (Type_app Std.Prelude.List.List ((Var a))))
-                (Type_app Std.Prelude.List.List ((Var a))))
-               (((Name Operators.List.x) (Var a))
-                ((Fun_call (Name Operators.List.append)
-                  (Function
-                   ((Type_app Std.Prelude.List.List ((Var a)))
-                    (Type_app Std.Prelude.List.List ((Var a))))
-                   (Type_app Std.Prelude.List.List ((Var a))))
-                  (((Name Operators.List.xs)
-                    (Type_app Std.Prelude.List.List ((Var a))))
-                   ((Name Operators.List.ys)
-                    (Type_app Std.Prelude.List.List ((Var a))))))
-                 (Type_app Std.Prelude.List.List ((Var a))))))))))
-          (Function
-           ((Type_app Std.Prelude.List.List ((Var a)))
-            (Type_app Std.Prelude.List.List ((Var a))))
-           (Type_app Std.Prelude.List.List ((Var a)))))))))
-     (Let (rec_ true)
-      (bindings
-       (((Catch_all (map))
-         ((Lambda ((Catch_all (xs)) (Catch_all (f)))
-           (Match (Name Operators.List.xs)
-            (Type_app Std.Prelude.List.List ((Var a)))
-            (((Cnstr_appl Std.Prelude.List.Nil ())
-              (Name Std.Prelude.List.Nil))
-             ((Cnstr_appl Std.Prelude.List.Cons
-               ((Catch_all (x)) (Catch_all (xs))))
-              (Fun_call (Name Std.Prelude.List.Cons)
-               (Function ((Var a) (Type_app Std.Prelude.List.List ((Var a))))
-                (Type_app Std.Prelude.List.List ((Var a))))
-               (((Fun_call (Name Operators.List.f)
-                  (Function ((Var a)) (Var b))
-                  (((Name Operators.List.x) (Var a))))
-                 (Var a))
-                ((Fun_call (Name Operators.List.map)
-                  (Function
-                   ((Type_app Std.Prelude.List.List ((Var a)))
-                    (Function ((Var a)) (Var b)))
-                   (Type_app Std.Prelude.List.List ((Var b))))
-                  (((Name Operators.List.xs)
-                    (Type_app Std.Prelude.List.List ((Var a))))
-                   ((Name Operators.List.f) (Function ((Var a)) (Var b)))))
-                 (Type_app Std.Prelude.List.List ((Var a))))))))))
-          (Function
-           ((Type_app Std.Prelude.List.List ((Var a)))
-            (Function ((Var a)) (Var b)))
-           (Type_app Std.Prelude.List.List ((Var b)))))))))
-     (Let (rec_ true)
-      (bindings
-       (((Catch_all (concat_map))
-         ((Lambda ((Catch_all (xs)) (Catch_all (f)))
-           (Match (Name Operators.List.xs)
-            (Type_app Std.Prelude.List.List ((Var a)))
-            (((Cnstr_appl Std.Prelude.List.Nil ())
-              (Name Std.Prelude.List.Nil))
-             ((Cnstr_appl Std.Prelude.List.Cons
-               ((Catch_all (x)) (Catch_all (xs))))
-              (Fun_call (Name Operators.List.append)
-               (Function
-                ((Type_app Std.Prelude.List.List ((Var a)))
-                 (Type_app Std.Prelude.List.List ((Var a))))
-                (Type_app Std.Prelude.List.List ((Var a))))
-               (((Fun_call (Name Operators.List.f)
-                  (Function ((Var a))
-                   (Type_app Std.Prelude.List.List ((Var b))))
-                  (((Name Operators.List.x) (Var a))))
-                 (Type_app Std.Prelude.List.List ((Var a))))
-                ((Fun_call (Name Operators.List.concat_map)
-                  (Function
-                   ((Type_app Std.Prelude.List.List ((Var a)))
-                    (Function ((Var a))
-                     (Type_app Std.Prelude.List.List ((Var b)))))
-                   (Type_app Std.Prelude.List.List ((Var b))))
-                  (((Name Operators.List.xs)
-                    (Type_app Std.Prelude.List.List ((Var a))))
-                   ((Name Operators.List.f)
-                    (Function ((Var a))
-                     (Type_app Std.Prelude.List.List ((Var b)))))))
-                 (Type_app Std.Prelude.List.List ((Var a))))))))))
-          (Function
-           ((Type_app Std.Prelude.List.List ((Var a)))
-            (Function ((Var a)) (Type_app Std.Prelude.List.List ((Var b)))))
-           (Type_app Std.Prelude.List.List ((Var b))))))))))))
   (Common_def
    (Import
     ((kind Absolute)
@@ -296,7 +189,7 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all ())
-      ((Fun_call (Name Operators.List.map)
+      ((Fun_call (Name Std.Prelude.List.map)
         (Function
          ((Type_app Std.Prelude.List.List
            ((Tuple ((Type_app String ()) (Type_app String ())))))

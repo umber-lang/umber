@@ -212,6 +212,7 @@ end = struct
   type t =
     { expr_local_names : Mir_name.t Value_name.Absolute.Map.t
     ; toplevel_names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Table.t
+    ; module_path : Module_path.Absolute.t
     ; name_bindings : (Name_bindings.t[@sexp.opaque])
     ; name_table : (Mir_name.Name_table.t[@sexp.opaque])
     ; find_override :
@@ -247,7 +248,7 @@ end = struct
     let extern_info : Extern_info.t =
       match extern_name with
       | None ->
-        if Module_path.is_prefix path ~prefix:(Name_bindings.current_path t.name_bindings)
+        if Module_path.is_prefix path ~prefix:t.module_path
         then Local
         else fallback_to_external ()
       | Some extern_name ->
@@ -303,7 +304,11 @@ end = struct
     if not (extern_info_matches extern_info)
     then
       compiler_bug
-        [%message "Unexpected extern info value" (extern_info : Extern_info.t) expected];
+        [%message
+          "Unexpected extern info value"
+            (name : Mir_name.t)
+            (extern_info : Extern_info.t)
+            (expected : string)];
     name
   ;;
 
@@ -332,6 +337,7 @@ end = struct
   let create ~names:name_bindings ~name_table =
     { expr_local_names = Value_name.Absolute.Map.empty
     ; toplevel_names = Value_name.Absolute.Table.create ()
+    ; module_path = Name_bindings.current_path name_bindings
     ; name_bindings
     ; name_table
     ; find_override = (fun _ _ -> None)

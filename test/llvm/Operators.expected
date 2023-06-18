@@ -64,7 +64,7 @@ entry:
   %fun_call18 = tail call tailcc %umber_block* @"Operators.\C3\97"(%umber_block* %fun_call13, %umber_block* %fun_call17)
   store %umber_block* %fun_call18, %umber_block** @Operators.unicode_my_dudes, align 8
   %Operators.unicode_my_dudes = load %umber_block*, %umber_block** @Operators.unicode_my_dudes, align 8
-  %fun_call19 = tail call tailcc %umber_block* @Operators.List.map(%umber_block* %Operators.unicode_my_dudes, %umber_block* bitcast (%umber_block* (%umber_block*)* @"Operators.*fun.5" to %umber_block*))
+  %fun_call19 = tail call tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %Operators.unicode_my_dudes, %umber_block* bitcast (%umber_block* (%umber_block*)* @"Operators.*fun.5" to %umber_block*))
   store %umber_block* %fun_call19, %umber_block** @Operators._.1, align 8
   %Operators.true = load %umber_block*, %umber_block** @Operators.true, align 8
   %fun_call20 = tail call tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block* %Operators.true)
@@ -114,6 +114,10 @@ entry:
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block*, %umber_block*)
 
+declare tailcc %umber_block* @Std.Prelude.List.concat_map(%umber_block*, %umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.List.map(%umber_block*, %umber_block*)
+
 define tailcc %umber_block* @"Operators.*fun.3"(%umber_block* %"Operators.*closure_env.2", %umber_block* %Operators.y.1) {
 entry:
   %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*closure_env.2", i32 0, i32 1, i32 1
@@ -149,7 +153,7 @@ entry:
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* %Operators.x.1, %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @Operators.List.map(%umber_block* %block_field, %umber_block* %box6)
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %block_field, %umber_block* %box6)
   ret %umber_block* %fun_call
 }
 
@@ -166,174 +170,8 @@ entry:
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* %Operators.ys.1, %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @Operators.List.concat_map(%umber_block* %Operators.xs.1, %umber_block* %box6)
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.concat_map(%umber_block* %Operators.xs.1, %umber_block* %box6)
   ret %umber_block* %fun_call
-}
-
-define tailcc %umber_block* @Operators.List.append(%umber_block* %Operators.List.xs.1, %umber_block* %Operators.List.ys.1) {
-entry:
-  %box = call i64* @umber_gc_alloc(i64 24)
-  %box1 = bitcast i64* %box to i16*
-  store i16 0, i16* %box1, align 2
-  %box2 = getelementptr i16, i16* %box1, i32 1
-  store i16 2, i16* %box2, align 2
-  %box3 = bitcast i64* %box to %umber_block**
-  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* %Operators.List.xs.1, %umber_block** %box4, align 8
-  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
-  store %umber_block* %Operators.List.ys.1, %umber_block** %box5, align 8
-  %box6 = bitcast %umber_block** %box3 to %umber_block*
-  br label %cond
-
-cond_binding_merge:                               ; preds = %cond_binding22, %cond_binding
-  %cond_bindings = phi %umber_block* [ %Operators.List.res.1, %cond_binding ], [ %Operators.List.res.126, %cond_binding22 ]
-  br label %cond_otherwise_merge
-
-cond:                                             ; preds = %entry
-  %block_field_gep = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 1, i32 0
-  %block_field_raw = load i64, i64* %block_field_gep, align 8
-  %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field7 = ptrtoint %umber_block* %block_field to i64
-  %equals = icmp eq i64 %block_field7, 1
-  %tag_gep = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 0, i32 0
-  %tag = load i16, i16* %tag_gep, align 2
-  %equals8 = icmp eq i16 %tag, 0
-  %cond_and = and i1 %equals8, %equals
-  br i1 %cond_and, label %cond_binding, label %cond12
-
-cond_binding:                                     ; preds = %cond
-  %block_field_gep9 = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 1, i32 1
-  %block_field_raw10 = load i64, i64* %block_field_gep9, align 8
-  %Operators.List.res.1 = inttoptr i64 %block_field_raw10 to %umber_block*
-  br label %cond_binding_merge
-
-cond12:                                           ; preds = %cond
-  %block_field_gep13 = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 1, i32 1
-  %block_field_raw14 = load i64, i64* %block_field_gep13, align 8
-  %block_field15 = inttoptr i64 %block_field_raw14 to %umber_block*
-  %block_field1516 = ptrtoint %umber_block* %block_field15 to i64
-  %equals17 = icmp eq i64 %block_field1516, 1
-  %tag_gep18 = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 0, i32 0
-  %tag19 = load i16, i16* %tag_gep18, align 2
-  %equals20 = icmp eq i16 %tag19, 0
-  %cond_and21 = and i1 %equals20, %equals17
-  br i1 %cond_and21, label %cond_binding22, label %cond_otherwise
-
-cond_binding22:                                   ; preds = %cond12
-  %block_field_gep23 = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 1, i32 0
-  %block_field_raw24 = load i64, i64* %block_field_gep23, align 8
-  %Operators.List.res.126 = inttoptr i64 %block_field_raw24 to %umber_block*
-  br label %cond_binding_merge
-
-cond_otherwise:                                   ; preds = %cond12
-  %block_field_gep27 = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 1, i32 1
-  %block_field_raw28 = load i64, i64* %block_field_gep27, align 8
-  %block_field29 = inttoptr i64 %block_field_raw28 to %umber_block*
-  %block_field_gep30 = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 1, i32 0
-  %block_field_raw31 = load i64, i64* %block_field_gep30, align 8
-  %block_field32 = inttoptr i64 %block_field_raw31 to %umber_block*
-  %block_field_gep33 = getelementptr %umber_block, %umber_block* %block_field32, i32 0, i32 1, i32 1
-  %block_field_raw34 = load i64, i64* %block_field_gep33, align 8
-  %block_field35 = inttoptr i64 %block_field_raw34 to %umber_block*
-  %block_field_gep36 = getelementptr %umber_block, %umber_block* %box6, i32 0, i32 1, i32 0
-  %block_field_raw37 = load i64, i64* %block_field_gep36, align 8
-  %block_field38 = inttoptr i64 %block_field_raw37 to %umber_block*
-  %block_field_gep39 = getelementptr %umber_block, %umber_block* %block_field38, i32 0, i32 1, i32 0
-  %block_field_raw40 = load i64, i64* %block_field_gep39, align 8
-  %block_field41 = inttoptr i64 %block_field_raw40 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @Operators.List.append(%umber_block* %block_field35, %umber_block* %block_field29)
-  %box42 = call i64* @umber_gc_alloc(i64 24)
-  %box43 = bitcast i64* %box42 to i16*
-  store i16 0, i16* %box43, align 2
-  %box44 = getelementptr i16, i16* %box43, i32 1
-  store i16 2, i16* %box44, align 2
-  %box45 = bitcast i64* %box42 to %umber_block**
-  %box46 = getelementptr %umber_block*, %umber_block** %box45, i32 1
-  store %umber_block* %block_field41, %umber_block** %box46, align 8
-  %box47 = getelementptr %umber_block*, %umber_block** %box45, i32 2
-  store %umber_block* %fun_call, %umber_block** %box47, align 8
-  %box48 = bitcast %umber_block** %box45 to %umber_block*
-  br label %cond_otherwise_merge
-
-cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge49 = phi %umber_block* [ %cond_bindings, %cond_binding_merge ], [ %box48, %cond_otherwise ]
-  ret %umber_block* %cond_otherwise_merge49
-}
-
-define tailcc %umber_block* @Operators.List.map(%umber_block* %Operators.List.xs.3, %umber_block* %Operators.List.f.1) {
-entry:
-  br label %cond
-
-cond_binding_merge:                               ; preds = %cond_binding
-  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
-  br label %cond_otherwise_merge
-
-cond:                                             ; preds = %entry
-  %Operators.List.xs.31 = ptrtoint %umber_block* %Operators.List.xs.3 to i64
-  %equals = icmp eq i64 %Operators.List.xs.31, 1
-  br i1 %equals, label %cond_binding, label %cond_otherwise
-
-cond_binding:                                     ; preds = %cond
-  br label %cond_binding_merge
-
-cond_otherwise:                                   ; preds = %cond
-  %block_field_gep = getelementptr %umber_block, %umber_block* %Operators.List.xs.3, i32 0, i32 1, i32 1
-  %block_field_raw = load i64, i64* %block_field_gep, align 8
-  %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep2 = getelementptr %umber_block, %umber_block* %Operators.List.xs.3, i32 0, i32 1, i32 0
-  %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
-  %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.List.f.1, %umber_block* %block_field4)
-  %fun_call5 = tail call tailcc %umber_block* @Operators.List.map(%umber_block* %block_field, %umber_block* %Operators.List.f.1)
-  %box = call i64* @umber_gc_alloc(i64 24)
-  %box6 = bitcast i64* %box to i16*
-  store i16 0, i16* %box6, align 2
-  %box7 = getelementptr i16, i16* %box6, i32 1
-  store i16 2, i16* %box7, align 2
-  %box8 = bitcast i64* %box to %umber_block**
-  %box9 = getelementptr %umber_block*, %umber_block** %box8, i32 1
-  store %umber_block* %fun_call, %umber_block** %box9, align 8
-  %box10 = getelementptr %umber_block*, %umber_block** %box8, i32 2
-  store %umber_block* %fun_call5, %umber_block** %box10, align 8
-  %box11 = bitcast %umber_block** %box8 to %umber_block*
-  br label %cond_otherwise_merge
-
-cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge12 = phi %umber_block* [ %Std.Prelude.List.Nil, %cond_binding_merge ], [ %box11, %cond_otherwise ]
-  ret %umber_block* %cond_otherwise_merge12
-}
-
-define tailcc %umber_block* @Operators.List.concat_map(%umber_block* %Operators.List.xs.5, %umber_block* %Operators.List.f.2) {
-entry:
-  br label %cond
-
-cond_binding_merge:                               ; preds = %cond_binding
-  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
-  br label %cond_otherwise_merge
-
-cond:                                             ; preds = %entry
-  %Operators.List.xs.51 = ptrtoint %umber_block* %Operators.List.xs.5 to i64
-  %equals = icmp eq i64 %Operators.List.xs.51, 1
-  br i1 %equals, label %cond_binding, label %cond_otherwise
-
-cond_binding:                                     ; preds = %cond
-  br label %cond_binding_merge
-
-cond_otherwise:                                   ; preds = %cond
-  %block_field_gep = getelementptr %umber_block, %umber_block* %Operators.List.xs.5, i32 0, i32 1, i32 1
-  %block_field_raw = load i64, i64* %block_field_gep, align 8
-  %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep2 = getelementptr %umber_block, %umber_block* %Operators.List.xs.5, i32 0, i32 1, i32 0
-  %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
-  %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.List.f.2, %umber_block* %block_field4)
-  %fun_call5 = tail call tailcc %umber_block* @Operators.List.concat_map(%umber_block* %block_field, %umber_block* %Operators.List.f.2)
-  %fun_call6 = tail call tailcc %umber_block* @Operators.List.append(%umber_block* %fun_call, %umber_block* %fun_call5)
-  br label %cond_otherwise_merge
-
-cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge7 = phi %umber_block* [ %Std.Prelude.List.Nil, %cond_binding_merge ], [ %fun_call6, %cond_otherwise ]
-  ret %umber_block* %cond_otherwise_merge7
 }
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_block*)

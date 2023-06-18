@@ -620,6 +620,9 @@ let absolutify_path t (path : Module_path.Relative.t) =
         Module_path.to_ustring (Module_path.append path [ name ]))
 ;;
 
+(* FIXME: Sometimes this absolutifies `List` to `Std.Prelude.List.List` and sometimes it
+   does `Std.Prelude.List`. It should be consistent, and be the former for correctness,
+   since I don't think we banned making both types exist and be different. *)
 let absolutify_type_name t path = fst (find_type_entry_with_path t path)
 let absolutify_value_name t path = fst (find_entry_with_path t path)
 

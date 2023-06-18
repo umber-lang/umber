@@ -128,6 +128,14 @@ let names = {|
                           ((typ
                             (Scheme
                              (Type_app Std.Prelude.List.List ((Var a))))))))
+                        (map
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Std.Prelude.List.List ((Var a)))
+                               (Function ((Var a)) (Var b)))
+                              (Type_app Std.Prelude.List.List ((Var b)))))))))
                         (Cons
                          (Local
                           ((typ
@@ -135,7 +143,31 @@ let names = {|
                              (Function
                               ((Var a)
                                (Type_app Std.Prelude.List.List ((Var a))))
-                              (Type_app Std.Prelude.List.List ((Var a)))))))))))
+                              (Type_app Std.Prelude.List.List ((Var a)))))))))
+                        (append
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Std.Prelude.List.List ((Var a)))
+                               (Type_app Std.Prelude.List.List ((Var a))))
+                              (Type_app Std.Prelude.List.List ((Var a)))))))))
+                        (reverse
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Std.Prelude.List.List ((Var a))))
+                              (Type_app Std.Prelude.List.List ((Var a)))))))))
+                        (concat_map
+                         (Local
+                          ((typ
+                            (Scheme
+                             (Function
+                              ((Type_app Std.Prelude.List.List ((Var a)))
+                               (Function ((Var a))
+                                (Type_app Std.Prelude.List.List ((Var b)))))
+                              (Type_app Std.Prelude.List.List ((Var b)))))))))))
                       (types
                        ((List
                          ((Local
@@ -494,6 +526,15 @@ let names = {|
                          ((typ
                            (Scheme
                             (Type_app Std.Prelude.List.List ((Var a))))))))
+                       (map
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Std.Prelude.List.List ((Var a)))
+                              (Function ((Var a)) (Var b)))
+                             (Type_app Std.Prelude.List ((Var b))))))
+                          (type_source Let_inferred))))
                        (Cons
                         (Local
                          ((typ
@@ -501,7 +542,43 @@ let names = {|
                             (Function
                              ((Var a)
                               (Type_app Std.Prelude.List.List ((Var a))))
-                             (Type_app Std.Prelude.List.List ((Var a)))))))))))
+                             (Type_app Std.Prelude.List.List ((Var a)))))))))
+                       (append
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Std.Prelude.List.List ((Var a)))
+                              (Type_app Std.Prelude.List ((Var a))))
+                             (Type_app Std.Prelude.List ((Var a))))))
+                          (type_source Let_inferred))))
+                       (reverse
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Std.Prelude.List.List ((Var a))))
+                             (Type_app Std.Prelude.List ((Var a))))))
+                          (type_source Let_inferred))))
+                       (concat_map
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Std.Prelude.List.List ((Var a)))
+                              (Function ((Var a))
+                               (Type_app Std.Prelude.List.List ((Var b)))))
+                             (Type_app Std.Prelude.List ((Var b))))))
+                          (type_source Let_inferred))))
+                       (rev_append
+                        (Local
+                         ((typ
+                           (Scheme
+                            (Function
+                             ((Type_app Std.Prelude.List.List ((Var a)))
+                              (Type_app Std.Prelude.List ((Var a))))
+                             (Type_app Std.Prelude.List ((Var a))))))
+                          (type_source Let_inferred))))))
                      (types
                       ((List
                         ((Local
@@ -807,8 +884,8 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block8b = type { %umber_header, [8 x i8] }
 
 @Std.Prelude.Option.None = constant %umber_block* inttoptr (i64 1 to %umber_block*)
-@Std.Prelude.List.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Std.Prelude.Float.pi = external global %umber_block*
+@Std.Prelude.List.Nil = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @"Std.Prelude.Operators.::.1" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @Std.Prelude.List.Cons to %umber_block*)
 @string.954397288 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"True\00\00\00\03" }
 @string.570553153 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"False\00\00\02" }
@@ -830,22 +907,6 @@ entry:
   store %umber_block* %"Std.Prelude.Option.*arg0.1", %umber_block** %box4, align 8
   %box5 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box5
-}
-
-define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %"Std.Prelude.List.*arg0.1", %umber_block* %"Std.Prelude.List.*arg1.1") {
-entry:
-  %box = call i64* @umber_gc_alloc(i64 24)
-  %box1 = bitcast i64* %box to i16*
-  store i16 0, i16* %box1, align 2
-  %box2 = getelementptr i16, i16* %box1, i32 1
-  store i16 2, i16* %box2, align 2
-  %box3 = bitcast i64* %box to %umber_block**
-  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* %"Std.Prelude.List.*arg0.1", %umber_block** %box4, align 8
-  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
-  store %umber_block* %"Std.Prelude.List.*arg1.1", %umber_block** %box5, align 8
-  %box6 = bitcast %umber_block** %box3 to %umber_block*
-  ret %umber_block* %box6
 }
 
 define tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block* %Std.Prelude.Bool..1) {
@@ -910,6 +971,147 @@ entry:
 }
 
 declare %umber_block* @umber_float_cos(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @Std.Prelude.List.Cons(%umber_block* %"Std.Prelude.List.*arg0.1", %umber_block* %"Std.Prelude.List.*arg1.1") {
+entry:
+  %box = call i64* @umber_gc_alloc(i64 24)
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i32 1
+  store i16 2, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
+  store %umber_block* %"Std.Prelude.List.*arg0.1", %umber_block** %box4, align 8
+  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
+  store %umber_block* %"Std.Prelude.List.*arg1.1", %umber_block** %box5, align 8
+  %box6 = bitcast %umber_block** %box3 to %umber_block*
+  ret %umber_block* %box6
+}
+
+define tailcc %umber_block* @Std.Prelude.List.rev_append(%umber_block* %Std.Prelude.List.xs.1, %umber_block* %Std.Prelude.List.ys.1) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %Std.Prelude.List.xs.11 = ptrtoint %umber_block* %Std.Prelude.List.xs.1 to i64
+  %equals = icmp eq i64 %Std.Prelude.List.xs.11, 1
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  %block_field_gep = getelementptr %umber_block, %umber_block* %Std.Prelude.List.xs.1, i32 0, i32 1, i32 1
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %Std.Prelude.List.xs.1, i32 0, i32 1, i32 0
+  %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
+  %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %block_field4, %umber_block* %Std.Prelude.List.ys.1)
+  %fun_call5 = tail call tailcc %umber_block* @Std.Prelude.List.rev_append(%umber_block* %block_field, %umber_block* %fun_call)
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge6 = phi %umber_block* [ %Std.Prelude.List.ys.1, %cond_binding_merge ], [ %fun_call5, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge6
+}
+
+define tailcc %umber_block* @Std.Prelude.List.reverse(%umber_block* %Std.Prelude.List.xs.3) {
+entry:
+  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.rev_append(%umber_block* %Std.Prelude.List.xs.3, %umber_block* %Std.Prelude.List.Nil)
+  ret %umber_block* %fun_call
+}
+
+define tailcc %umber_block* @Std.Prelude.List.append(%umber_block* %Std.Prelude.List.xs.4, %umber_block* %Std.Prelude.List.ys.2) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.reverse(%umber_block* %Std.Prelude.List.xs.4)
+  %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.List.rev_append(%umber_block* %fun_call, %umber_block* %Std.Prelude.List.ys.2)
+  ret %umber_block* %fun_call1
+}
+
+define tailcc %umber_block* @Std.Prelude.List.loop.1(%umber_block* %Std.Prelude.List.acc.1, %umber_block* %Std.Prelude.List.xs.6, %umber_block* %Std.Prelude.List.f.2) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.reverse(%umber_block* %Std.Prelude.List.acc.1)
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %Std.Prelude.List.xs.61 = ptrtoint %umber_block* %Std.Prelude.List.xs.6 to i64
+  %equals = icmp eq i64 %Std.Prelude.List.xs.61, 1
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  %block_field_gep = getelementptr %umber_block, %umber_block* %Std.Prelude.List.xs.6, i32 0, i32 1, i32 1
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %Std.Prelude.List.xs.6, i32 0, i32 1, i32 0
+  %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
+  %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
+  %fun_call5 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.List.f.2, %umber_block* %block_field4)
+  %fun_call6 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %fun_call5, %umber_block* %Std.Prelude.List.acc.1)
+  %fun_call7 = tail call tailcc %umber_block* @Std.Prelude.List.loop.1(%umber_block* %fun_call6, %umber_block* %block_field, %umber_block* %Std.Prelude.List.f.2)
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge8 = phi %umber_block* [ %fun_call, %cond_binding_merge ], [ %fun_call7, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge8
+}
+
+define tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %Std.Prelude.List.xs.5, %umber_block* %Std.Prelude.List.f.1) {
+entry:
+  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.loop.1(%umber_block* %Std.Prelude.List.Nil, %umber_block* %Std.Prelude.List.xs.5, %umber_block* %Std.Prelude.List.f.1)
+  ret %umber_block* %fun_call
+}
+
+define tailcc %umber_block* @Std.Prelude.List.loop.2(%umber_block* %Std.Prelude.List.acc.2, %umber_block* %Std.Prelude.List.xs.9, %umber_block* %Std.Prelude.List.f.4) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.reverse(%umber_block* %Std.Prelude.List.acc.2)
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %Std.Prelude.List.xs.91 = ptrtoint %umber_block* %Std.Prelude.List.xs.9 to i64
+  %equals = icmp eq i64 %Std.Prelude.List.xs.91, 1
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  %block_field_gep = getelementptr %umber_block, %umber_block* %Std.Prelude.List.xs.9, i32 0, i32 1, i32 1
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %Std.Prelude.List.xs.9, i32 0, i32 1, i32 0
+  %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
+  %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
+  %fun_call5 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Std.Prelude.List.f.4, %umber_block* %block_field4)
+  %fun_call6 = tail call tailcc %umber_block* @Std.Prelude.List.rev_append(%umber_block* %fun_call5, %umber_block* %Std.Prelude.List.acc.2)
+  %fun_call7 = tail call tailcc %umber_block* @Std.Prelude.List.loop.2(%umber_block* %fun_call6, %umber_block* %block_field, %umber_block* %Std.Prelude.List.f.4)
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge8 = phi %umber_block* [ %fun_call, %cond_binding_merge ], [ %fun_call7, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge8
+}
+
+define tailcc %umber_block* @Std.Prelude.List.concat_map(%umber_block* %Std.Prelude.List.xs.8, %umber_block* %Std.Prelude.List.f.3) {
+entry:
+  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.loop.2(%umber_block* %Std.Prelude.List.Nil, %umber_block* %Std.Prelude.List.xs.8, %umber_block* %Std.Prelude.List.f.3)
+  ret %umber_block* %fun_call
+}
 
 define tailcc %umber_block* @Std.Prelude.Operators..(%umber_block* %Std.Prelude.Operators.f.1, %umber_block* %Std.Prelude.Operators.g.1, %umber_block* %Std.Prelude.Operators.x.1) {
 entry:

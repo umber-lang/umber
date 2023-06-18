@@ -3,6 +3,11 @@ module : {
     type List a =
       | Nil
       | Cons a (List a)
+
+    val reverse : List a -> List a
+    val append : List a, List a -> List a
+    val map : List a, (a -> b) -> List b
+    val concat_map : List a, (a -> List b) -> List b
   }
 
   import .List.(Nil, Cons)
@@ -156,6 +161,34 @@ module Float = {
   extern sin : Float, Float -> Float = "umber_float_sin"
   extern cos : Float, Float -> Float = "umber_float_cos"
   extern pi : Float = "umber_float_pi"
+}
+
+module List = {
+  # `rev_append xs ys` reveres `xs` and concatenates it with `ys`
+  let rev_append xs ys =
+    match xs
+    | Nil -> ys
+    | Cons x xs -> rev_append xs (x :: ys) 
+
+  let reverse xs = rev_append xs Nil
+
+  let append xs ys = rev_append (reverse xs) ys
+
+  let map xs f =
+    let loop acc xs f =
+      match xs
+      | Nil -> reverse acc
+      | Cons x xs -> loop (f x :: acc) xs f
+    in
+    loop Nil xs f
+
+  let concat_map xs f =
+    let loop acc xs f =
+      match xs
+      | Nil -> reverse acc
+      | Cons x xs -> loop (rev_append (f x) acc) xs f
+    in
+    loop Nil xs f
 }
 
 module Operators = {
