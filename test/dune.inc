@@ -802,6 +802,31 @@
  (action (no-infer (diff output/Option.expected output/Option.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/OverlappingImports.expected tokens/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/OverlappingImports.expected ast/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/OverlappingImports.expected mir/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/OverlappingImports.expected llvm/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/OverlappingImports.expected output/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Paths.expected tokens/Paths.out))))
 
 (rule (alias runtest) (deps test.dummy)

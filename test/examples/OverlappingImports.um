@@ -1,0 +1,7 @@
+# Current behavior is that `as _` imports will not remove names imported by other import
+# statements. This means that although imports are processed sequentially in order, this
+# is an implementation detail -- the order you write imports doesn't matter.
+import Std.Prelude._
+import Std.Prelude.Float as _
+
+let _ = Float.abs
