@@ -1,6 +1,8 @@
 open! Import
 open Names
 
+(* TODO: Consider fuzz-testing this module using quickcheck. *)
+
 type t = (Value_name.Relative.t Node.t, Untyped.Expr.t Node.t) Btree.t
 [@@deriving sexp_of]
 
@@ -45,20 +47,11 @@ let rec fix_precedence ~names (t : t) : t =
          let _, op_level = Node.with_value op_name ~f:(Name_bindings.find_fixity names) in
          if Fixity.Level.(level < op_level)
          then (
-           (* FIXME: Do I really have to call fix_precedence again here? It traverses the
-             whole subtree again, which seems kinda crazy. (Although it shouldn't be
-             incorrect unless there's another bug somewhere.) *)
            match rotation_info with
            | `Clockwise, left_name, ll_child, lr_child ->
-             Node
-               ( left_name
-               , ll_child
-               , fix_precedence ~names (Node (op_name, lr_child, right_child)) )
+             Node (left_name, ll_child, Node (op_name, lr_child, right_child))
            | `Anticlockwise, right_name, rl_child, rr_child ->
-             Node
-               ( right_name
-               , fix_precedence ~names (Node (op_name, left_child, rl_child))
-               , rr_child ))
+             Node (right_name, Node (op_name, left_child, rl_child), rr_child))
          else Node (op_name, left_child, right_child))
   in
   (* print_s [%message "end fix_precedence" ~input:(t : t) (result : t)]; *)
@@ -148,88 +141,54 @@ let rec to_untyped_expr : t -> Untyped.Expr.t Node.t = function
       span
 ;;
 
-(* FIXME: cleanup comment and implement checking *)
-(** Re-associate the operator tree through tree rotations.
-    These constraints hold on the finished tree:
-    1. Every node has precedence less than or equal to both its childrens' precedence.
-    2. When a node has precedence equal to that some of its children,
-       it and those children all share the same associativity:
-       a. In the case of left associativity, rotating anticlockwise results in a tree
-          which violates constraint 1.
-       b. In the case of right associativity, rotating clockwise results in a tree
-          which violates constraint 1.
-       c. The case of no associativity is not allowed. *)
 let rec check_invariants (t : t) ~names =
   match t with
-  | Leaf _ -> true
+  | Leaf _ -> ()
   | Node (op_name, left_child, right_child) ->
     let op_assoc, op_level =
       Node.with_value op_name ~f:(Name_bindings.find_fixity names)
     in
-    let ( < ) = Fixity.Level.( < ) in
-    let ( = ) = Fixity.Level.( = ) in
-    let check_associativity
-      (left_op_assoc : Fixity.Assoc.t option)
-      (right_op_assoc : Fixity.Assoc.t option)
-      =
+    let upholds_invariant =
+      let check_left_or_right ~same_side_child ~opposite_side_child =
+        (match opposite_side_child with
+         | None -> true
+         | Some (_, child_op_level) -> Fixity.Level.( < ) op_level child_op_level)
+        &&
+        match same_side_child with
+        | None -> true
+        | Some (child_op_assoc, child_op_level) ->
+          Fixity.Level.( < ) op_level child_op_level
+          || (Fixity.Level.( = ) op_level child_op_level
+             && Fixity.Assoc.equal op_assoc child_op_assoc)
+      in
+      let convert_child (child : t) =
+        match child with
+        | Leaf _ -> None
+        | Node (child_op_name, _, _) ->
+          Some (Node.with_value child_op_name ~f:(Name_bindings.find_fixity names))
+      in
+      let left_child = convert_child left_child in
+      let right_child = convert_child right_child in
       match op_assoc with
-      | Non_assoc -> false
+      | Non_assoc ->
+        let strictly_lower_level (_, child_level) =
+          Fixity.Level.( < ) op_level child_level
+        in
+        Option.for_all left_child ~f:strictly_lower_level
+        && Option.for_all right_child ~f:strictly_lower_level
       | Left ->
-        (* FIXME: Also need to check that "rotating anticlockwise would violate constraint 1"
-           Rotating anticlockwise means:
-           
-              A          C
-             / \  -->   / \
-            B   C      A   E
-               / \    / \
-              D   E  B   D
-          So if the second tree breaks constraint 1 (but the first doesn't), that means
-          A.level > D.level. Not sure if this is actually the correct constraint.
-          Wait, but this doesn't make sense. We need to have A <= C <= D.
-        *)
-        (match left_op_assoc, right_op_assoc with
-         | (None | Some Left), (None | Some Left) -> true
-         | _ -> false)
+        check_left_or_right ~same_side_child:left_child ~opposite_side_child:right_child
       | Right ->
-        (* FIXME: Also need to check that "rotating anticlockwise would violate constraint 1" *)
-        (match left_op_assoc, right_op_assoc with
-         | (None | Some Right), (None | Some Right) -> true
-         | _ -> false)
+        check_left_or_right ~same_side_child:right_child ~opposite_side_child:left_child
     in
-    (* FIXME: code duplication *)
-    check_invariants left_child ~names
-    && check_invariants right_child ~names
-    &&
-    (match left_child, right_child with
-     | Leaf _, Leaf _ -> true
-     | Node (left_op_name, _, _), Leaf _ ->
-       let left_op_assoc, left_op_level =
-         Node.with_value left_op_name ~f:(Name_bindings.find_fixity names)
-       in
-       op_level < left_op_level
-       || (op_level = left_op_level && check_associativity (Some left_op_assoc) None)
-     | Leaf _, Node (right_op_name, _, _) ->
-       let right_op_assoc, right_op_level =
-         Node.with_value right_op_name ~f:(Name_bindings.find_fixity names)
-       in
-       op_level < right_op_level
-       || (op_level = right_op_level && check_associativity None (Some right_op_assoc))
-     | Node (left_op_name, _, _), Node (right_op_name, _, _) ->
-       let left_op_assoc, left_op_level =
-         Node.with_value left_op_name ~f:(Name_bindings.find_fixity names)
-       in
-       let right_op_assoc, right_op_level =
-         Node.with_value right_op_name ~f:(Name_bindings.find_fixity names)
-       in
-       (op_level < left_op_level
-       || (op_level = left_op_level && check_associativity (Some left_op_assoc) None))
-       && (op_level < right_op_level
-          || (op_level = right_op_level && check_associativity None (Some right_op_assoc))
-          ))
+    if not upholds_invariant
+    then compiler_bug [%message "Operator precedence tree violates invariants" (t : t)];
+    check_invariants left_child ~names;
+    check_invariants right_child ~names
 ;;
 
 let to_untyped_expr ~names t =
   let t = fix_precedence t ~names |> fix_associativity ~names in
-  assert_or_compiler_bug (check_invariants t ~names) ~here:[%here];
+  check_invariants t ~names;
   to_untyped_expr t
 ;;
