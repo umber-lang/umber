@@ -20,8 +20,6 @@ module Arith = {
   import Std.Prelude.((+), mod)
 }
 
-# FIXME: Maybe we should add some automated validation of invariants in tests e.g.
-# we could check that the op tree is organized in the way it promises to be.
 let true = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 

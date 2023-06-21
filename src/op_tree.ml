@@ -1,12 +1,11 @@
 open! Import
 open Names
+open Fixity.Level.O
 
 type t = (Value_name.Relative.t Node.t, Untyped.Expr.t Node.t) Btree.t
 [@@deriving equal, sexp_of]
 
 let rec fix_precedence ~names (t : t) : t =
-  (* FIXME: Just put this open at toplevel *)
-  let open Fixity.Level.O in
   match t with
   | Leaf _ as leaf -> leaf
   | Node (op_name, left_child, right_child) ->
@@ -47,7 +46,7 @@ let rec fix_precedence ~names (t : t) : t =
      | None -> Node (op_name, left_child, right_child)
      | Some (level, rotation_info) ->
        let _, op_level = Node.with_value op_name ~f:(Name_bindings.find_fixity names) in
-       if Fixity.Level.(level < op_level)
+       if level < op_level
        then (
          match rotation_info with
          | `Clockwise, left_name, ll_child, lr_child ->
@@ -64,7 +63,7 @@ let rec fix_precedence ~names (t : t) : t =
 ;;
 
 let can_rotate op_level op_assoc child_level child_assoc =
-  Fixity.Level.(child_level = op_level) && Fixity.Assoc.compatible child_assoc op_assoc
+  child_level = op_level && Fixity.Assoc.compatible child_assoc op_assoc
 ;;
 
 let rec fix_associativity ~names (t : t) : t =
@@ -81,11 +80,8 @@ and handle_node ~names op_name op_assoc op_level left_child right_child =
   | Left -> turn_anticlockwise ~names op_name op_assoc op_level left_child right_child
   | Right -> turn_clockwise ~names op_name op_assoc op_level left_child right_child
   | Non_assoc ->
-    (* Forbid children to have the same level *)
     Node
-      ( op_name
-      , handle_non_assoc ~names op_level left_child
-      , handle_non_assoc ~names op_level right_child )
+      (op_name, fix_associativity ~names left_child, fix_associativity ~names right_child)
 
 and turn_anticlockwise ~names op_name op_assoc op_level left_child right_child =
   match right_child with
@@ -126,15 +122,6 @@ and turn_clockwise ~names op_name op_assoc op_level left_child right_child =
   | Leaf _ ->
     Node
       (op_name, fix_associativity ~names left_child, fix_associativity ~names right_child)
-
-(* FIXME: Maybe we don't need this function? *)
-and handle_non_assoc ~names _parent_level = function
-  | Btree.Node (op_name, left_child, right_child) ->
-    let op_assoc, op_level =
-      Node.with_value op_name ~f:(Name_bindings.find_fixity names)
-    in
-    handle_node ~names op_name op_assoc op_level left_child right_child
-  | Leaf _ as leaf -> leaf
 ;;
 
 let rec to_untyped_expr : t -> Untyped.Expr.t Node.t = function
@@ -187,8 +174,8 @@ let rec check_invariants (t : t) ~names =
         match opposite_side_child with
         | None -> true
         | Some (child_op_assoc, child_op_level) ->
-          Fixity.Level.( < ) op_level child_op_level
-          || (Fixity.Level.( = ) op_level child_op_level
+          op_level < child_op_level
+          || (op_level = child_op_level
              && not (Fixity.Assoc.equal op_assoc child_op_assoc))
       in
       let convert_child (child : t) =
@@ -259,7 +246,7 @@ let%test_module _ =
       Quickcheck.test generator ~sexp_of:sexp_of_t ~shrinker ~f:(fun t ->
         match fix_precedence_and_associativity t ~names with
         | t' ->
-          if Btree.length t <> Btree.length t'
+          if not (Int.equal (Btree.length t) (Btree.length t'))
           then
             compiler_bug
               [%message
