@@ -918,7 +918,6 @@ module Expr = struct
        | Right_trailing _ ->
          compiler_bug [%message "Over-application of arguments to function"]
        | Left_trailing unapplied_arg_types ->
-         (* FIXME: Clean up and reduce duplication. *)
          let fun_name = Constant_names.fun_ in
          let applied_args, bindings =
            Nonempty.mapi args_and_types ~f:(fun i (arg_expr, arg_type) ->

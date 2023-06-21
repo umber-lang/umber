@@ -772,6 +772,26 @@
    (diff output/MutualRecursion.expected output/MutualRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff tokens/OpSectionRight.expected tokens/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/OpSectionRight.expected ast/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff mir/OpSectionRight.expected mir/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff llvm/OpSectionRight.expected llvm/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/OpSectionRight.expected output/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Operators.expected tokens/Operators.out))))
 
 (rule (alias runtest) (deps test.dummy)

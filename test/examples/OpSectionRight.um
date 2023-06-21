@@ -1,0 +1,7 @@
+let (~+~) x y = print_int (x + y)
+
+# FIXME: The side effects don't occur in the right order.
+let () = 
+  let lambda = (~+~ (print "arg"; 5)) in
+  print "between";
+  lambda 6

@@ -1,0 +1,23 @@
+((Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_def
+  ((fun_name OpSectionRight.~+~)
+   (args (OpSectionRight.x.1 OpSectionRight.y.1))
+   (body
+    (Fun_call Std.Prelude.print_int
+     ((Fun_call Std.Prelude.Operators.+
+       ((Name OpSectionRight.x.1) (Name OpSectionRight.y.1))))))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_def
+  ((fun_name OpSectionRight.lambda.1) (args (OpSectionRight..1))
+   (body
+    (Fun_call OpSectionRight.~+~
+     ((Name OpSectionRight..1)
+      (Fun_call "Std.Prelude.Operators.;"
+       ((Fun_call Std.Prelude.print ((Primitive (String arg))))
+        (Primitive (Int 5)))))))))
+ (Value_def OpSectionRight.*binding.1
+  (Fun_call "Std.Prelude.Operators.;"
+   ((Fun_call Std.Prelude.print ((Primitive (String between))))
+    (Fun_call OpSectionRight.lambda.1 ((Primitive (Int 6))))))))
