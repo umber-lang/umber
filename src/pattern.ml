@@ -15,7 +15,7 @@ type ('typ, 'name) t =
   | Record of (Value_name.t * ('typ, 'name) t option) Nonempty.t
   | Union of ('typ, 'name) t * ('typ, 'name) t
   | Type_annotation of ('typ, 'name) t * 'typ
-[@@deriving sexp, variants]
+[@@deriving equal, sexp, variants]
 
 let rec fold pat ~init ~f =
   let retry init pat = fold pat ~init ~f in

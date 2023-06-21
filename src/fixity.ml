@@ -6,10 +6,12 @@ module Level = struct
   end
 
   include T
-  include Comparable.Infix (T)
+  module O = Comparable.Infix (T)
+  include O
 
   let min = 0
   let max = 9
+  let all = List.range ~start:`inclusive ~stop:`inclusive min max
 
   let of_int_exn n =
     if min <= n && n <= max
@@ -26,7 +28,7 @@ module Assoc = struct
     | Non_assoc
     | Left
     | Right
-  [@@deriving compare, equal, hash, sexp]
+  [@@deriving compare, equal, hash, sexp, enumerate]
 
   let compatible t1 t2 =
     match t1, t2 with
@@ -35,7 +37,7 @@ module Assoc = struct
   ;;
 end
 
-type t = Assoc.t * Level.t [@@deriving compare, equal, hash, sexp]
+type t = Assoc.t * Level.t [@@deriving compare, equal, hash, sexp, enumerate]
 
 (* TODO: maybe the default should be no associativity and unknown precedence *)
 let default = Assoc.Non_assoc, 9

@@ -13,4 +13,3 @@ val generalize : t -> Type.t -> Module_path.absolute Type.Scheme.t
    TODO: look to Elm, Rust, etc. for error message inspiration
    Not all errors fit this mold exactly - probably need a proper dedicated type. *)
 val type_error : string -> Type.t -> Type.t -> _
-val type_error_msg : string -> _

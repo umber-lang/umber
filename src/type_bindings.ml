@@ -24,8 +24,6 @@ let type_error msg t1 t2 =
     ~msg:[%message msg ~type1:(map_type t1 : Sexp.t) ~type2:(map_type t2 : Sexp.t)]
 ;;
 
-let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
-
 type t = { vars : Type.t Type.Var_id.Table.t } [@@deriving sexp]
 
 let create () = { vars = Type.Var_id.Table.create () }

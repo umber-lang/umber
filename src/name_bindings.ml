@@ -1115,3 +1115,11 @@ module Sigs_or_defs = struct
        | Local (None, defs) -> Some (Defs defs))
   ;;
 end
+
+module For_testing = struct
+  let create ~names =
+    { core with
+      toplevel = { core.toplevel with names = Map.map names ~f:Or_imported.local }
+    }
+  ;;
+end

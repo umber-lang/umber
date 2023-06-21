@@ -8,7 +8,7 @@ module Pattern = struct
   include Pattern
 
   type nonrec t = (Module_path.relative Type.Scheme.Bounded.t, Module_path.relative) t
-  [@@deriving sexp]
+  [@@deriving equal, sexp]
 end
 
 module Expr = struct
@@ -28,7 +28,7 @@ module Expr = struct
     | Record_update of t Node.t * (Value_name.t * t Node.t option) Nonempty.t
     | Record_field_access of t Node.t * Value_name.t Node.t
     | Type_annotation of t Node.t * Module_path.relative Type.Scheme.Bounded.t Node.t
-  [@@deriving sexp, variants]
+  [@@deriving equal, sexp, variants]
 
   (** Get all the external names referenced by an expression. Names local to the
       expression (e.g. those bound by match expressions or lambdas) are not included. *)

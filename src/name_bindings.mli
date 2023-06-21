@@ -186,3 +186,7 @@ val find_sigs_and_defs
   -> Module_path.Relative.t
   -> Module_name.t
   -> Sigs_or_defs.t option * Sigs_or_defs.t
+
+module For_testing : sig
+  val create : names:Name_entry.t Value_name.Map.t -> t
+end

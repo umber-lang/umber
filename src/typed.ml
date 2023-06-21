@@ -1,7 +1,7 @@
 open Import
 open Names
 
-let type_error_msg = Type_bindings.type_error_msg
+let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 
 module Pattern = struct
   include Pattern
