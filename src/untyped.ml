@@ -154,11 +154,6 @@ module Expr = struct
   ;;
 
   let op_section_right op expr = op_section_internal ~op ~expr ~side:`Right
-
-  (* FIXME: This will interact strangely with functions of unknown arity. The type
-     inference will assume they have arity 1. It should probably work similarly to
-     `op_section_right` and explicitly construct a lambda, rather than relying on 
-     the somewhat anemic partial application we currently have. *)
   let op_section_left expr op = op_section_internal ~op ~expr ~side:`Left
 end
 
