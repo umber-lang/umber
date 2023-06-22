@@ -752,11 +752,13 @@ module Expr = struct
     List.fold bindings ~init:body ~f:(fun body (name, mir_expr) ->
       match mir_expr with
       | Name name' when Mir_name.equal name name' ->
-        (* FIXME: Probably get rid of name eliding. It is super hacky and seems crazy
-           hard to maintain and likely to introduce a lot of bugs. Maybe just cop the
-           more verbose MIR. Actually, how about this: prepend the original part of the
-           name to the *fun. Well, that wouldn't help with function-value-function name
-           punning. *)
+        (* TODO: Consider getting rid of this name eliding logic. We do it to give
+           functions in MIR more readable names, and to avoid extra indirection from
+           defining a function with a name like `Foo.*fun.1` and then having to define
+           a value `Foo.foo.1` and a function `Foo.foo` to call it. There's got to be a
+           better way than passing down the names we bind and them sometimes returning one
+           of them back to elide the let binding though. The current setup is quite
+           fragile and hard to maintain. *)
         (* Avoid genereating code that looks like let x.0 = x.0 *)
         body
       | _ -> Let (name, mir_expr, body))
