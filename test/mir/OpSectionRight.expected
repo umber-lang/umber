@@ -10,14 +10,21 @@
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Fun_def
-  ((fun_name OpSectionRight.lambda.1) (args (OpSectionRight..1))
+  ((fun_name OpSectionRight.*fun.1)
+   (args (OpSectionRight.*closure_env.1 OpSectionRight.*arg0.1))
    (body
-    (Fun_call OpSectionRight.~+~
-     ((Name OpSectionRight..1)
-      (Fun_call "Std.Prelude.Operators.;"
-       ((Fun_call Std.Prelude.print ((Primitive (String arg))))
-        (Primitive (Int 5)))))))))
+    (Let OpSectionRight.*arg1.2
+     (Get_block_field 1 (Name OpSectionRight.*closure_env.1))
+     (Fun_call OpSectionRight.~+~
+      ((Name OpSectionRight.*arg0.1) (Name OpSectionRight.*arg1.2)))))))
  (Value_def OpSectionRight.*binding.1
-  (Fun_call "Std.Prelude.Operators.;"
-   ((Fun_call Std.Prelude.print ((Primitive (String between))))
-    (Fun_call OpSectionRight.lambda.1 ((Primitive (Int 6))))))))
+  (Let OpSectionRight.lambda.1
+   (Let OpSectionRight.*arg1.1
+    (Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call Std.Prelude.print ((Primitive (String arg))))
+      (Primitive (Int 5))))
+    (Make_block (tag 12289)
+     (fields ((Name OpSectionRight.*fun.1) (Name OpSectionRight.*arg1.1)))))
+   (Fun_call "Std.Prelude.Operators.;"
+    ((Fun_call Std.Prelude.print ((Primitive (String between))))
+     (Fun_call OpSectionRight.lambda.1 ((Primitive (Int 6)))))))))

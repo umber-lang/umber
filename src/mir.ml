@@ -26,26 +26,6 @@ end = struct
   let to_int = Fn.id
 end
 
-module Constant_names : sig
-  val binding : Value_name.t
-  val fun_ : Value_name.t
-  val match_ : Value_name.t
-  val lambda_arg : Value_name.t
-  val underscore : Value_name.t
-  val closure_env : Value_name.t
-  val synthetic_arg : int -> Value_name.t
-end = struct
-  (* NOTE: none of these can be valid value names a user could enter. *)
-
-  let binding = Value_name.of_string_unchecked "*binding"
-  let fun_ = Value_name.of_string_unchecked "*fun"
-  let match_ = Value_name.of_string_unchecked "match"
-  let lambda_arg = Value_name.of_string_unchecked "*lambda_arg"
-  let underscore = Value_name.of_string_unchecked "_"
-  let closure_env = Value_name.of_string_unchecked "*closure_env"
-  let synthetic_arg i = Value_name.of_string_unchecked [%string "*arg%{i#Int}"]
-end
-
 module Cnstr_info : sig
   type t [@@deriving sexp_of]
 
@@ -772,6 +752,11 @@ module Expr = struct
     List.fold bindings ~init:body ~f:(fun body (name, mir_expr) ->
       match mir_expr with
       | Name name' when Mir_name.equal name name' ->
+        (* FIXME: Probably get rid of name eliding. It is super hacky and seems crazy
+           hard to maintain and likely to introduce a lot of bugs. Maybe just cop the
+           more verbose MIR. Actually, how about this: prepend the original part of the
+           name to the *fun. Well, that wouldn't help with function-value-function name
+           punning. *)
         (* Avoid genereating code that looks like let x.0 = x.0 *)
         body
       | _ -> Let (name, mir_expr, body))
@@ -1089,8 +1074,20 @@ module Expr = struct
             bindings
         in
         let body =
-          (* Pass through [just_bound] so it can apply through intermediate local let
-             bindings in expressions. *)
+          (* Pass through [just_bound], but only if we generated no bindings. It 
+             wouldn't be correct to use it otherwise, as we might not be able to elide
+             the resulting binding if it is inside some nested `let` bindings. *)
+          let just_bound =
+            match just_bound with
+            | None -> None
+            | Some _ ->
+              if List.for_all bindings ~f:(fun (name, mir_expr) ->
+                   match mir_expr with
+                   | Name mir_name -> Mir_name.equal name mir_name
+                   | _ -> false)
+              then just_bound
+              else None
+          in
           Node.with_value body ~f:(fun body ->
             of_typed_expr ?just_bound ~ctx body body_type)
         in

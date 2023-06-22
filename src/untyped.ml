@@ -127,17 +127,26 @@ module Expr = struct
      argument, then construct the lambda. *)
   let op_section_right op expr =
     let op_span = Node.span op in
-    let left_var = Value_name.empty in
-    let left_var_qualified =
-      Value_name.Relative.with_path Module_path.Relative.empty left_var
-    in
-    Lambda
-      ( [ Node.create (Catch_all (Some left_var) : Pattern.t) op_span ]
-      , Node.create
-          (Fun_call
-             ( Node.map op ~f:(name << Value_name.Relative.of_ustrings_unchecked)
-             , [ Node.create (Name left_var_qualified) op_span; expr ] ))
-          (Node.span expr) )
+    let expr_span = Node.span expr in
+    let left_var = Constant_names.synthetic_arg 0 in
+    let right_var = Constant_names.synthetic_arg 1 in
+    let qualified = Value_name.Relative.with_path Module_path.Relative.empty in
+    Let
+      { rec_ = false
+      ; bindings = [ Node.create (Pattern.catch_all (Some right_var)) expr_span, expr ]
+      ; body =
+          Node.create
+            (Lambda
+               ( [ Node.create (Pattern.catch_all (Some left_var)) op_span ]
+               , Node.create
+                   (Fun_call
+                      ( Node.map op ~f:(name << Value_name.Relative.of_ustrings_unchecked)
+                      , [ Node.create (Name (qualified left_var)) op_span
+                        ; Node.create (Name (qualified right_var)) expr_span
+                        ] ))
+                   expr_span ))
+            (Span.combine op_span expr_span)
+      }
   ;;
 
   (* FIXME: This will interact strangely with functions of unknown arity. The type
