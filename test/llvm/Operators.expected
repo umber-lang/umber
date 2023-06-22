@@ -41,54 +41,52 @@ entry:
   store %umber_block* %fun_call3, %umber_block** @Operators.four, align 8
   %fun_call4 = tail call tailcc %umber_block* @Std.Prelude.Operators.mod(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*))
   store %umber_block* %fun_call4, %umber_block** @Operators.one, align 8
-  %box = call i64* @umber_gc_alloc(i64 32)
+  %box = call i64* @umber_gc_alloc(i64 24)
   %box5 = bitcast i64* %box to i16*
   store i16 12289, i16* %box5, align 2
   %box6 = getelementptr i16, i16* %box5, i32 1
-  store i16 3, i16* %box6, align 2
+  store i16 2, i16* %box6, align 2
   %box7 = bitcast i64* %box to %umber_block**
   %box8 = getelementptr %umber_block*, %umber_block** %box7, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.3" to %umber_block*), %umber_block** %box8, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.1" to %umber_block*), %umber_block** %box8, align 8
   %box9 = getelementptr %umber_block*, %umber_block** %box7, i32 2
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Std.Prelude.Operators.+" to %umber_block*), %umber_block** %box9, align 8
-  %box10 = getelementptr %umber_block*, %umber_block** %box7, i32 3
-  store %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block** %box10, align 8
-  %box11 = bitcast %umber_block** %box7 to %umber_block*
-  store %umber_block* %box11, %umber_block** @Operators.left_section.1, align 8
-  %box12 = call i64* @umber_gc_alloc(i64 24)
-  %box13 = bitcast i64* %box12 to i16*
-  store i16 12289, i16* %box13, align 2
-  %box14 = getelementptr i16, i16* %box13, i32 1
-  store i16 2, i16* %box14, align 2
-  %box15 = bitcast i64* %box12 to %umber_block**
-  %box16 = getelementptr %umber_block*, %umber_block** %box15, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.4" to %umber_block*), %umber_block** %box16, align 8
-  %box17 = getelementptr %umber_block*, %umber_block** %box15, i32 2
-  store %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block** %box17, align 8
-  %box18 = bitcast %umber_block** %box15 to %umber_block*
-  store %umber_block* %box18, %umber_block** @Operators.right_section.1, align 8
+  store %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block** %box9, align 8
+  %box10 = bitcast %umber_block** %box7 to %umber_block*
+  store %umber_block* %box10, %umber_block** @Operators.left_section.1, align 8
+  %box11 = call i64* @umber_gc_alloc(i64 24)
+  %box12 = bitcast i64* %box11 to i16*
+  store i16 12289, i16* %box12, align 2
+  %box13 = getelementptr i16, i16* %box12, i32 1
+  store i16 2, i16* %box13, align 2
+  %box14 = bitcast i64* %box11 to %umber_block**
+  %box15 = getelementptr %umber_block*, %umber_block** %box14, i32 1
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.2" to %umber_block*), %umber_block** %box15, align 8
+  %box16 = getelementptr %umber_block*, %umber_block** %box14, i32 2
+  store %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block** %box16, align 8
+  %box17 = bitcast %umber_block** %box14 to %umber_block*
+  store %umber_block* %box17, %umber_block** @Operators.right_section.1, align 8
   %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
-  %fun_call19 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.266074759 to %umber_block*), %umber_block* %Std.Prelude.List.Nil)
-  %fun_call20 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.6954503 to %umber_block*), %umber_block* %fun_call19)
-  %Std.Prelude.List.Nil21 = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
-  %fun_call22 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.582974379 to %umber_block*), %umber_block* %Std.Prelude.List.Nil21)
-  %fun_call23 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.287064846 to %umber_block*), %umber_block* %fun_call22)
-  %fun_call24 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block16b* @string.820363719 to %umber_block*), %umber_block* %fun_call23)
-  %fun_call25 = tail call tailcc %umber_block* @"Operators.\C3\97"(%umber_block* %fun_call20, %umber_block* %fun_call24)
-  store %umber_block* %fun_call25, %umber_block** @Operators.unicode_my_dudes, align 8
+  %fun_call18 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.266074759 to %umber_block*), %umber_block* %Std.Prelude.List.Nil)
+  %fun_call19 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.6954503 to %umber_block*), %umber_block* %fun_call18)
+  %Std.Prelude.List.Nil20 = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %fun_call21 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.582974379 to %umber_block*), %umber_block* %Std.Prelude.List.Nil20)
+  %fun_call22 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.287064846 to %umber_block*), %umber_block* %fun_call21)
+  %fun_call23 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block16b* @string.820363719 to %umber_block*), %umber_block* %fun_call22)
+  %fun_call24 = tail call tailcc %umber_block* @"Operators.\C3\97"(%umber_block* %fun_call19, %umber_block* %fun_call23)
+  store %umber_block* %fun_call24, %umber_block** @Operators.unicode_my_dudes, align 8
   %Operators.unicode_my_dudes = load %umber_block*, %umber_block** @Operators.unicode_my_dudes, align 8
-  %fun_call26 = tail call tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %Operators.unicode_my_dudes, %umber_block* bitcast (%umber_block* (%umber_block*)* @"Operators.*fun.7" to %umber_block*))
-  store %umber_block* %fun_call26, %umber_block** @Operators._.1, align 8
+  %fun_call25 = tail call tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %Operators.unicode_my_dudes, %umber_block* bitcast (%umber_block* (%umber_block*)* @"Operators.*fun.5" to %umber_block*))
+  store %umber_block* %fun_call25, %umber_block** @Operators._.1, align 8
   %Operators.true = load %umber_block*, %umber_block** @Operators.true, align 8
-  %fun_call27 = tail call tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block* %Operators.true)
-  %fun_call28 = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block8b* @string.932615357 to %umber_block*), %umber_block* %fun_call27)
-  %fun_call29 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call28)
-  store %umber_block* %fun_call29, %umber_block** @"Operators.*binding.1", align 8
+  %fun_call26 = tail call tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block* %Operators.true)
+  %fun_call27 = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block8b* @string.932615357 to %umber_block*), %umber_block* %fun_call26)
+  %fun_call28 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call27)
+  store %umber_block* %fun_call28, %umber_block** @"Operators.*binding.1", align 8
   %Operators.four = load %umber_block*, %umber_block** @Operators.four, align 8
-  %fun_call30 = tail call tailcc %umber_block* @Std.Prelude.Int.to_string(%umber_block* %Operators.four)
-  %fun_call31 = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block8b* @string.992557751 to %umber_block*), %umber_block* %fun_call30)
-  %fun_call32 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call31)
-  store %umber_block* %fun_call32, %umber_block** @"Operators.*binding.2", align 8
+  %fun_call29 = tail call tailcc %umber_block* @Std.Prelude.Int.to_string(%umber_block* %Operators.four)
+  %fun_call30 = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block8b* @string.992557751 to %umber_block*), %umber_block* %fun_call29)
+  %fun_call31 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call30)
+  store %umber_block* %fun_call31, %umber_block** @"Operators.*binding.2", align 8
   ret i32 0
 }
 
@@ -98,15 +96,12 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block*, %umber_bl
 
 declare tailcc %umber_block* @Std.Prelude.Operators.mod(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"Operators.*fun.3"(%umber_block* %"Operators.*closure_env.1", %umber_block* %"Operators.*arg1.1") {
+define tailcc %umber_block* @"Operators.*fun.1"(%umber_block* %"Operators.*closure_env.1", %umber_block* %"Operators.*arg1.1") {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*closure_env.1", i32 0, i32 1, i32 2
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*closure_env.1", i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"Operators.*closure_env.1", i32 0, i32 1, i32 1
-  %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
-  %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %block_field3, %umber_block* %block_field, %umber_block* %"Operators.*arg1.1")
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %block_field, %umber_block* %"Operators.*arg1.1")
   ret %umber_block* %fun_call
 }
 
@@ -119,7 +114,7 @@ entry:
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"Operators.*fun.4"(%umber_block* %"Operators.*closure_env.2", %umber_block* %"Operators.*arg0.4") {
+define tailcc %umber_block* @"Operators.*fun.2"(%umber_block* %"Operators.*closure_env.2", %umber_block* %"Operators.*arg0.4") {
 entry:
   %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*closure_env.2", i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
@@ -141,7 +136,7 @@ declare tailcc %umber_block* @Std.Prelude.List.concat_map(%umber_block*, %umber_
 
 declare tailcc %umber_block* @Std.Prelude.List.map(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"Operators.*fun.5"(%umber_block* %"Operators.*closure_env.3", %umber_block* %Operators.y.1) {
+define tailcc %umber_block* @"Operators.*fun.3"(%umber_block* %"Operators.*closure_env.3", %umber_block* %Operators.y.1) {
 entry:
   %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*closure_env.3", i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
@@ -160,7 +155,7 @@ entry:
   ret %umber_block* %box6
 }
 
-define tailcc %umber_block* @"Operators.*fun.6"(%umber_block* %"Operators.*closure_env.4", %umber_block* %Operators.x.1) {
+define tailcc %umber_block* @"Operators.*fun.4"(%umber_block* %"Operators.*closure_env.4", %umber_block* %Operators.x.1) {
 entry:
   %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*closure_env.4", i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
@@ -172,7 +167,7 @@ entry:
   store i16 2, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.5" to %umber_block*), %umber_block** %box4, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.3" to %umber_block*), %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* %Operators.x.1, %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
@@ -189,7 +184,7 @@ entry:
   store i16 2, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.6" to %umber_block*), %umber_block** %box4, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Operators.*fun.4" to %umber_block*), %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* %Operators.ys.1, %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
@@ -201,7 +196,7 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_bl
 
 declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
-define tailcc %umber_block* @"Operators.*fun.7"(%umber_block* %"Operators.*lambda_arg.1") {
+define tailcc %umber_block* @"Operators.*fun.5"(%umber_block* %"Operators.*lambda_arg.1") {
 entry:
   %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*lambda_arg.1", i32 0, i32 1, i32 0
   %block_field_raw = load i64, i64* %block_field_gep, align 8
@@ -220,30 +215,6 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block*, %umber_b
 declare tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block*)
 
 declare tailcc %umber_block* @Std.Prelude.Int.to_string(%umber_block*)
-
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
-entry:
-  %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
-  br i1 %is_on_heap, label %closure_call, label %regular_call
-
-closure_call:                                     ; preds = %entry
-  %closure_gep = getelementptr %umber_block, %umber_block* %0, i32 0, i32 1, i32 0
-  %closure_gep_raw = load i64, i64* %closure_gep, align 8
-  %closure_fun = inttoptr i64 %closure_gep_raw to %umber_block* (%umber_block*, %umber_block*, %umber_block*)*
-  %closure_call1 = tail call tailcc %umber_block* %closure_fun(%umber_block* %0, %umber_block* %1, %umber_block* %2)
-  br label %call_phi
-
-regular_call:                                     ; preds = %entry
-  %calling_fun = bitcast %umber_block* %0 to %umber_block* (%umber_block*, %umber_block*)*
-  %regular_call2 = tail call tailcc %umber_block* %calling_fun(%umber_block* %1, %umber_block* %2)
-  br label %call_phi
-
-call_phi:                                         ; preds = %regular_call, %closure_call
-  %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
-  ret %umber_block* %call_phi3
-}
-
-declare i1 @umber_gc_is_on_heap(%umber_block*)
 
 declare i64* @umber_gc_alloc(i64)
 
@@ -268,4 +239,6 @@ call_phi:                                         ; preds = %regular_call, %clos
   %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
   ret %umber_block* %call_phi3
 }
+
+declare i1 @umber_gc_is_on_heap(%umber_block*)
 

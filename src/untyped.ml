@@ -123,37 +123,43 @@ module Expr = struct
     | _ :: _ -> Qualified (Module_path.Relative.of_ustrings_unchecked path, expr)
   ;;
 
-  let op_section_right op expr =
+  let op_section_internal ~op ~expr ~side =
     let op_span = Node.span op in
     let expr_span = Node.span expr in
     let left_var = Constant_names.synthetic_arg 0 in
     let right_var = Constant_names.synthetic_arg 1 in
+    let applied_arg_var, unapplied_arg_var, left_var_span, right_var_span =
+      match side with
+      | `Left -> left_var, right_var, expr_span, op_span
+      | `Right -> right_var, left_var, op_span, expr_span
+    in
     let qualified = Value_name.Relative.with_path Module_path.Relative.empty in
     Let
       { rec_ = false
-      ; bindings = [ Node.create (Pattern.catch_all (Some right_var)) expr_span, expr ]
+      ; bindings =
+          [ Node.create (Pattern.catch_all (Some applied_arg_var)) expr_span, expr ]
       ; body =
           Node.create
             (Lambda
-               ( [ Node.create (Pattern.catch_all (Some left_var)) op_span ]
+               ( [ Node.create (Pattern.catch_all (Some unapplied_arg_var)) op_span ]
                , Node.create
                    (Fun_call
                       ( Node.map op ~f:(name << Value_name.Relative.of_ustrings_unchecked)
-                      , [ Node.create (Name (qualified left_var)) op_span
-                        ; Node.create (Name (qualified right_var)) expr_span
+                      , [ Node.create (Name (qualified left_var)) left_var_span
+                        ; Node.create (Name (qualified right_var)) right_var_span
                         ] ))
                    expr_span ))
-            (Span.combine op_span expr_span)
+            (Span.combine left_var_span right_var_span)
       }
   ;;
+
+  let op_section_right op expr = op_section_internal ~op ~expr ~side:`Right
 
   (* FIXME: This will interact strangely with functions of unknown arity. The type
      inference will assume they have arity 1. It should probably work similarly to
      `op_section_right` and explicitly construct a lambda, rather than relying on 
      the somewhat anemic partial application we currently have. *)
-  let op_section_left expr op =
-    Fun_call (Node.map op ~f:(name << Value_name.Relative.of_ustrings_unchecked), [ expr ])
-  ;;
+  let op_section_left expr op = op_section_internal ~op ~expr ~side:`Left
 end
 
 module Module = struct

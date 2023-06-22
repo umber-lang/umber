@@ -87,12 +87,19 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all (left_section))
-      ((Fun_call (Name Std.Prelude.Operators.+)
-        (Function
-         ((Type_app Std.Prelude.Int.Int ())
-          (Type_app Std.Prelude.Int.Int ()))
-         (Type_app Std.Prelude.Int.Int ()))
-        (((Literal (Int 2)) (Type_app Int ()))))
+      ((Let
+        ((rec_ false)
+         (bindings
+          ((((Catch_all (*arg0)) (Type_app Int ())) (Literal (Int 2)))))
+         (body
+          (Lambda ((Catch_all (*arg1)))
+           (Fun_call (Name Std.Prelude.Operators.+)
+            (Function
+             ((Type_app Std.Prelude.Int.Int ())
+              (Type_app Std.Prelude.Int.Int ()))
+             (Type_app Std.Prelude.Int.Int ()))
+            (((Name Operators.*arg0) (Type_app Int ()))
+             ((Name Operators.*arg1) (Type_app Std.Prelude.Int.Int ()))))))))
        (Function ((Type_app Std.Prelude.Int.Int ()))
         (Type_app Std.Prelude.Int.Int ())))))))
   (Let (rec_ false)
