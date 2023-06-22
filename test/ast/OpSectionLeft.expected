@@ -1,0 +1,7 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("Function argument number mismatch"
+    (type1 (Function ((Type_app String ())) (Var a)))
+    (type2 (Function ((Type_app String ()) (Type_app String ())) (Tuple ())))))
+  (filename OpSectionLeft.um) (span 6:11-6:21)))

@@ -1,0 +1,9 @@
+let (:/) x y = print (x ++ " is mid. I prefer " ++ y)
+
+let apply f = ((print "called apply"; "lasagna") :f:)
+
+let () = 
+  # FIXME: This doesn't work because `f` gets inferred to have arity 1, not 2
+  let g = apply (:/) in
+  print "between";
+  g "penne"

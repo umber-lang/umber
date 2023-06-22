@@ -773,6 +773,24 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action
+  (no-infer (diff tokens/OpSectionLeft.expected tokens/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/OpSectionLeft.expected ast/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/OpSectionLeft.expected mir/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff llvm/OpSectionLeft.expected llvm/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/OpSectionLeft.expected output/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
   (no-infer (diff tokens/OpSectionRight.expected tokens/OpSectionRight.out))))
 
 (rule (alias runtest) (deps test.dummy)
