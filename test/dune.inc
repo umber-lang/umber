@@ -60,6 +60,23 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action
+  (no-infer (diff tokens/Constructors.expected tokens/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Constructors.expected ast/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/Constructors.expected mir/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff llvm/Constructors.expected llvm/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/Constructors.expected output/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
   (no-infer
    (diff tokens/CrossModuleUsage.expected tokens/CrossModuleUsage.out))))
 
