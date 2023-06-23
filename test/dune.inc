@@ -225,6 +225,36 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorDuplicateTypeParameter.expected
+    tokens/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorDuplicateTypeParameter.expected
+    ast/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorDuplicateTypeParameter.expected
+    mir/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorDuplicateTypeParameter.expected
+    llvm/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorDuplicateTypeParameter.expected
+    output/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorDuplicateVal.expected tokens/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)

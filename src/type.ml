@@ -55,6 +55,8 @@ module Param = struct
   end
 end
 
+(* TODO: Type declarations/expressions should have spans like other parts of the AST do. *)
+
 module Expr = struct
   type ('v, 'pf, 'n) t =
     | Var of 'v
