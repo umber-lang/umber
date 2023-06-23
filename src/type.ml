@@ -183,9 +183,10 @@ module Decl = struct
     | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type 'n t = Type_param_name.t list * 'n decl [@@deriving compare, equal, hash, sexp]
+  type 'n t = Type_param_name.t Unique_list.t * 'n decl
+  [@@deriving compare, equal, hash, sexp]
 
-  let arity (params, _) = List.length params
+  let arity ((params, _) : _ t) = List.length (params :> Type_param_name.t list)
 
   let map_exprs (params, decl) ~f =
     ( params
@@ -208,8 +209,10 @@ module Decl = struct
   let iter_exprs decl ~f = fold_exprs decl ~init:() ~f:(fun () -> f)
 
   let no_free_params =
-    let check_params params typ =
-      Expr.for_all_vars typ ~f:(List.mem params ~equal:Type_param_name.equal)
+    let check_params (params : Type_param_name.t Unique_list.t) typ =
+      Expr.for_all_vars
+        typ
+        ~f:(List.mem (params :> Type_param_name.t list) ~equal:Type_param_name.equal)
     in
     fun (params, decl) ->
       match decl with
@@ -220,5 +223,14 @@ module Decl = struct
           List.for_all args ~f:(check_params params))
       | Record fields ->
         Nonempty.for_all fields ~f:(fun (_, field) -> check_params params field)
+  ;;
+
+  let params_of_list params =
+    match Unique_list.of_list params ~compare:[%compare: Type_param_name.t] with
+    | Ok params -> params
+    | Error duplicate ->
+      Compilation_error.raise
+        Name_error
+        ~msg:[%message "Duplicate type parameter name" (duplicate : Type_param_name.t)]
   ;;
 end

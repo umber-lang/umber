@@ -1466,9 +1466,6 @@ let of_typed_module =
         | Tuple -> stmts
         | Named cnstr_name ->
           let name =
-            (* FIXME: Doesn't this need to generate an exportable name? Hmm, it needs to
-               find the right name. I think this can get overwritten, so we actually
-               need to look up by absolute name and ignore expr-local names. *)
             Context.find_value_name_assert_local ctx (Value_name.of_cnstr_name cnstr_name)
           in
           let stmt : Stmt.t =
@@ -1502,8 +1499,6 @@ let of_typed_module =
         | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type.Decl.t))) ->
           ctx, generate_variant_constructor_values ~ctx ~stmts decl
         | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
-          (* FIXME: Can this get broken by looking up a local name overwritten by the
-             context? *)
           let name = Context.find_value_name_assert_external ctx value_name in
           ( ctx
           , Extern_decl { name; extern_name; arity = arity_of_type ~names type_ } :: stmts

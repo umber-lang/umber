@@ -14,6 +14,9 @@ module : {
       | Int Int
       | Float Float
   }
+
+  type InconsistentVarUse a b =
+    | Foo (a -> b)
 }
 
 val id : a -> a
@@ -21,7 +24,7 @@ let id x = x
 
 type Foo b a = | Bar b | Baz a
 
-type Tuple a a = (a, a)
+type Tuple a b = (a, a)
 
 let plus_one x = x + 1
 
@@ -47,3 +50,7 @@ module A : {
 let plus_one' = A.plus_one
 let double = A.double
 let double' = A.double_int
+
+# FIXME: Need to skolemize at the level of a type declaration
+type InconsistentVarUse a b =
+  | Foo (b -> a)

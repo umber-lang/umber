@@ -50,10 +50,11 @@ let rec unify ~names ~types t1 t2 =
     | Ok () -> ()
     | Unequal_lengths -> type_error "Type item length mismatch" t1 t2
   in
-  let instantiate_alias param_list expr =
+  let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     let params = Type.Param.Env_to_vars.create () in
-    List.iter param_list ~f:(fun p ->
-      ignore (Type.Param.Env_to_vars.find_or_add params p : Type.Var_id.t));
+    List.iter
+      (param_list :> Type_param_name.t list)
+      ~f:(fun p -> ignore (Type.Param.Env_to_vars.find_or_add params p : Type.Var_id.t));
     Type.Scheme.instantiate expr ~params
   in
   let lookup_type names name args =

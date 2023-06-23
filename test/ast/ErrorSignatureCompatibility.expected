@@ -34,7 +34,11 @@
      (type_diff
       ((Tuple
         (Incompatible ((a b) (Alias (Tuple ((Var a) (Var b)))))
-         ((a a) (Alias (Tuple ((Var a) (Var a)))))))))
+         ((a b) (Alias (Tuple ((Var a) (Var a)))))))
+       (InconsistentVarUse
+        (Incompatible
+         ((a b) (Variants ((Foo ((Function ((Var a)) (Var b)))))))
+         ((a b) (Variants ((Foo ((Function ((Var b)) (Var a)))))))))))
      (module_diff
       ((A
         (Module_diff

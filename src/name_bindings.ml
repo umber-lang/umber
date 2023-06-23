@@ -874,7 +874,7 @@ let add_type_decl t type_name decl =
            (* Add constructors as functions to the namespace *)
            let result_type : _ Type.Scheme.t =
              let path = current_path t in
-             let params = List.map params ~f:Type.Expr.var in
+             let params = List.map (params :> Type_param_name.t list) ~f:Type.Expr.var in
              Type_app ((path, type_name), params)
            in
            List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->

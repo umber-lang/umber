@@ -308,7 +308,7 @@ stmt_common:
   | TYPE; name = UPPER_NAME; params = type_params; decl = preceded(EQUALS, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
-        (params, Option.value decl ~default:Abstract)) }
+        (Type.Decl.params_of_list params, Option.value decl ~default:Abstract)) }
   | import = import_stmt { Module.Import import }
 
 stmt_sig_:
