@@ -50,8 +50,6 @@ module Cnstr_info : sig
   val of_variants : (Cnstr_name.t * Module_path.absolute Type.Scheme.t list) list -> t
   val of_tuple : Module_path.absolute Type.Scheme.t list -> t
 end = struct
-  (* TODO: The constant/non-constant split might not be that useful really. Probably get
-     rid of it. *)
   type t =
     | Variants of
         { constant_cnstrs : Cnstr_name.t list
@@ -404,18 +402,6 @@ end = struct
     fun t -> loop Value_name.Set.empty t
   ;;
 
-  (* TODO: remove or make into a proper thing *)
-  (*let tuple_cnstr_name arity = Cnstr_name.of_string_unchecked (sprintf "Tuple/%d" arity)
-
-  let record_cnstr_name field_names =
-    let buf = Buffer.create (5 * Set.length field_names) in
-    Buffer.add_string buf "Record";
-    Set.iter field_names ~f:(fun name ->
-      Buffer.add_char buf '/';
-      Ustring.add_to_buffer buf (Value_name.to_ustring name));
-    Cnstr_name.of_string_unchecked (Buffer.contents buf)
-  ;;*)
-
   let flatten_typed_pattern pattern =
     let rec loop : Typed.Pattern.t -> t Nonempty.t = function
       | Constant lit -> [ Constant lit ]
@@ -579,16 +565,6 @@ end = struct
 end
 
 module Expr = struct
-  (* TODO: can put tags in the pointer to the block e.g. constructor tag,
-     see https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/haskell-execution/pointer-tagging
-     GHC uses 3 bits (on 64-bit architectures) to store up to 7 constructors (0-6). 
-     The highest tag value (7) indicates that the constructor tag must be looked up from
-     the info table. Not sure if we want to have info tables, so in that case maybe it
-     should be another field on the object. We could also do what OCaml does and take up
-     some bits in the block header.
-
-     For now, lets just store tags in the block itself as another field
-     Later, we can store them in the pointer or block header *)
   type t =
     | Primitive of Literal.t
     | Name of Mir_name.t
@@ -674,12 +650,7 @@ module Expr = struct
   let fold_pattern_bindings =
     let rec loop ~ctx ~add_let ~add_name acc pat mir_expr type_ =
       match (pat : Simple_pattern.t) with
-      | Catch_all None ->
-        (* TODO: Don't elide unused expressions, since they may have side effects. This
-           can happen if there is a [Catch_all None] pattern at toplevel.
-           Once there's a proper effect system and we can tell if an expression is pure,
-           we can instead elide the expressions and emit a warning about it being unused. *)
-        ctx, acc
+      | Catch_all None -> ctx, acc
       | Catch_all (Some name) ->
         let ctx, name = add_name ctx name in
         ctx, add_let acc name mir_expr
@@ -735,8 +706,6 @@ module Expr = struct
      See:
      - https://github.com/ocaml/ocaml/blob/trunk/lambda/matching.ml
      - https://www.researchgate.net/publication/2840783_Optimizing_Pattern_Matching  *)
-
-  (* TODO: add tests for/consider supporting local let generalization (?) *)
 
   module Just_bound = struct
     type t =
@@ -1009,9 +978,9 @@ module Expr = struct
            Node.with_value fun_ ~f:(fun fun_ ->
              match fun_ with
              | Name (_, name) ->
-               (* TODO: I think there's no need for this special-casing actually: we can just
-                  use the constructor functions directly. *)
-               (* Special-case constructor applications *)
+               (* TODO: I think there's no need for this special-casing actually: we can
+                  just use the constructor functions directly. *)
+               (* Special-case constructor applications to make use of [Make_block]. *)
                (match Value_name.to_cnstr_name name with
                 | Ok cnstr_name ->
                   let cnstr_info = Context.find_cnstr_info ctx expr_type in
@@ -1023,9 +992,6 @@ module Expr = struct
                 | Error _ -> fun_call fun_)
              | _ -> fun_call fun_))
       | Lambda (args, body), Function (arg_types, body_type) ->
-        (* TODO: Still need to try and coalesce lambdas/other function expressions for
-           function definitions which are partially applied. See example in
-           test/ast/TypeChecking.expected. *)
         add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound
       | Match (expr, input_type, arms), output_type ->
         let input_expr =
@@ -1361,7 +1327,7 @@ module Expr = struct
           add_last_unconditional_bindings ~conds ~last_bindings
         | Stop (last_bindings, conds), _ ->
           (* Found an unconditional pattern. *)
-          (* TODO: Warn if [fallback] is [Some], since we ignoring following match arms. *)
+          (* TODO: Warn if [fallback] is [Some], since we're ignoring following match arms. *)
           add_last_unconditional_bindings ~conds ~last_bindings
       in
       match wrapping_binding with

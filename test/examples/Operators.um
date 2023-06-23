@@ -12,8 +12,6 @@ module : {
   val (×) : List a, List b -> List (a, b)
 }
 
-# FIXME: When you put this import here it takes the prelude import out of the sig.
-# This is just so unintuitive. Surely we can do better.
 import Std.Prelude.((*), (==), List, (::), Nil)
 
 module Arith = {

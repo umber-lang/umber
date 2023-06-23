@@ -3,10 +3,6 @@ open Names
 module Var_id = Unique_id.Int ()
 
 module Param = struct
-  (* TODO: need variance for type parameters (e.g. covariant, contravariant)
-     Can probably wait a bit though -- it's needed for subtyping
-     Variance can maybe be added as constraints on the type scheme *)
-
   module T = Type_param_name
   include T
   include Comparable.Make_plain (T)
