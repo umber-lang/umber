@@ -32,8 +32,6 @@ module Name_entry = struct
 
   module Id = Unique_id.Int ()
 
-  (* TODO: Consider having this type be responsible for assigning/tracking unique names,
-     rather than doing it in the MIR. *)
   type t =
     { ids : Id.Set.t
          [@default Id.Set.singleton (Id.create ())] [@sexp_drop_default fun _ _ -> true]
@@ -133,7 +131,6 @@ module Type_entry = struct
   let create decl = { id = Id.create (); decl }
 end
 
-(* TODO: probably just make 'path the variable so we don't have to put unit for module paths *)
 module Or_imported = struct
   type ('entry, 'path) t =
     | Local of 'entry
