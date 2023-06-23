@@ -6,4 +6,3 @@ val of_list : 'a list -> compare:('a -> 'a -> int) -> ('a t, 'a) result
 val of_list_exn : 'a list -> compare:('a -> 'a -> int) -> 'a t
 val empty : _ t
 val singleton : 'a -> 'a t
-val map_exn : 'a t -> f:('a -> 'b) -> compare:('b -> 'b -> int) -> 'b t

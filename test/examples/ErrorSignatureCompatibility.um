@@ -51,6 +51,5 @@ let plus_one' = A.plus_one
 let double = A.double
 let double' = A.double_int
 
-# FIXME: Need to skolemize at the level of a type declaration
 type InconsistentVarUse a b =
   | Foo (b -> a)

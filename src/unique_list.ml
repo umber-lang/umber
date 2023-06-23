@@ -26,6 +26,3 @@ let t_of_sexp a_of_sexp (sexp : Sexp.t) =
 
 let empty = []
 let singleton x = [ x ]
-let map_exn t ~f ~compare = of_list_exn (List.map t ~f) ~compare
-
-(* FIXME: Get rid of unused functions *)

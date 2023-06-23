@@ -5,9 +5,6 @@
 # generalizaed partial function types e.g. `apply_arg : (Int, .. -> a) -> a`. This would
 # have to create a closure over the applied arguments.
 
-# FIXME: I think we are probably not handling closure allocation for regular partial
-# application correctly.
-
 let apply_arg f = f 1
 
 let foo x = x * 2

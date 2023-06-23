@@ -118,10 +118,6 @@ let check_val_type_schemes ~names schemes =
       : Type.t)
 ;;
 
-(* FIXME: Do we need to skolemize at the level of type declarations rather than individual
-   schemes? Not sure if "mutating" the name bindings makes things go wrong.
-   Yes, we need to skolemize at a higher level using the variables from the type decl. *)
-
 (** Type definitions in a signature an defintion are compatible if they are the same
     modulo type aliases and type variable renamings. Unlike for `val`s, the compatibility
     is symmetrical. *)
