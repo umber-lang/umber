@@ -444,25 +444,6 @@ module Module = struct
       List.fold defs ~init:names ~f)
   ;;
 
-  (* Name/type resolution steps
-     0. Copy type/module declarations in sigs to defs when they are missing.
-     1. Read all bound names in the module and submodules, and assign them fresh type variables
-        - This doesn't require knowing anything - just read all the Catch_all names
-        - Also read the types in somehow with placeholder values
-        - This allows local imports to check properly
-        - (* TODO: really only need to do sigs, and then defs if there are no sigs *)
-        - (* TODO: is this needed for values anymore? Let re-grouping should put things in
-             dependency order *)
-     2. Read imports
-        - Don't copy anything - use Imported_from
-     3. Read type/trait declarations
-     4. (not yet (?)) Look for trait impls (just the fact they exist)
-        - Needs to be done after knowing about types/traits 
-     5. Handle val/let bindings
-     6. Handle let/impl expressions
-        - Need to re-order and re-group bindings by their dependencies
-        - After re-ordering, type each expression and generalize each binding group *)
-
   module Sig_data : sig
     (** Represents data from a module signature that might want to be copied to its
         definition. Currently we only copy type definitions, but you could imagine copying
@@ -511,7 +492,10 @@ module Module = struct
      that they might refer to different things due to imports. It's also just kind of
      re-implementing the features of [Name_bindings]. Doing the checks at the lookup stage
      does seem like a recipe for pain though. Maybe we could do this step *after*
-     resolving imports and absolutifying everything? *)
+     resolving imports and absolutifying everything? Actually, that would mess with our
+     ability to know what names exist where before resolving imports, so it wouldn't
+     quite work. Maybe we could include the values as placeholders in the def, and then
+      fill their actual values in after resolving imports? Pretty complicated. *)
   let rec copy_some_sigs_to_defs sigs defs =
     let rec gather_decls ~sig_map sigs =
       List.fold sigs ~init:sig_map ~f:(fun sig_map sig_ ->
@@ -816,8 +800,6 @@ module Module = struct
           | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls")))
   ;;
 
-  (* TODO: add type annotations to these functions *)
-
   (** Re-group and re-order toplevel let bindings so that each group is mutually
       recursive, and the groups are given in an order appropriate for generalization.
       This is done by topologically sorting the strongly-connected components of the call
@@ -884,8 +866,6 @@ module Module = struct
           pat, Pattern.generalize ~names ~types pat_names pat_type)
       in
       (* Generalize local let bindings just after the parent binding *)
-      (* TODO: Look into the concept of type variable scope - parent variables are
-         getting generalized here as well, which is probably wrong *)
       let expr_and_scheme =
         Node.map expr ~f:(fun expr ->
           let expr = Expr.generalize_let_bindings expr ~names ~types in
@@ -968,7 +948,7 @@ module Module = struct
       let names = gather_type_decls ~names module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
-      (* TODO: should check every [Val] has a corresponding [Let]. *)
+      (* FIXME: should check every [Val] has a corresponding [Let]. *)
       Sig_def_diff.check ~names module_name;
       Ok (names, (module_name, sigs, defs))
     with
