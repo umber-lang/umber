@@ -162,11 +162,6 @@ module Concrete = struct
   let cast t =
     Expr.map t ~var:Nothing.unreachable_code ~pf:Nothing.unreachable_code ~name:Fn.id
   ;;
-
-  let of_polymorphic_exn t =
-    let fail _ = compiler_bug [%message "Type.Concrete.of_polymorphic_exn: found var"] in
-    Expr.map t ~var:fail ~pf:fail ~name:Fn.id
-  ;;
 end
 
 module Decl = struct
