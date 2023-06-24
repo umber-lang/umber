@@ -123,7 +123,7 @@ let check_type_decl_schemes
 
 let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
   let get_scheme entry =
-    option_or_default (Name_bindings.Name_entry.scheme entry) ~f:(fun () ->
+    Option.value_or_thunk (Name_bindings.Name_entry.scheme entry) ~default:(fun () ->
       compiler_bug
         [%message
           "Type binding not generalized when diffing sigs/defs"

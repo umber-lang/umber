@@ -103,13 +103,6 @@ end = struct
   ;;
 end
 
-(* TODO: This should be replaced with [Option.value_or_thunk] *)
-let option_or_default x ~f =
-  match x with
-  | Some x -> x
-  | None -> f ()
-;;
-
 exception Compiler_bug of Sexp.t [@@deriving sexp_of]
 
 let compiler_bug msg = raise (Compiler_bug msg)

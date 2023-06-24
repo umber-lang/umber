@@ -470,7 +470,7 @@ let find =
         if Map.mem bindings.modules first_module
         then (
           let full_path, bindings = resolve_absolute_path_exn ~defs_only t full_path in
-          option_or_default (f full_path name bindings) ~f:(fun () ->
+          Option.value_or_thunk (f full_path name bindings) ~default:(fun () ->
             name_error ~msg:"Couldn't find name" (to_ustring input)))
         else check_parent t ~at_path input ~defs_only ~f ~to_ustring
       in
@@ -478,7 +478,7 @@ let find =
        | Sigs sigs -> f sigs
        | Defs defs -> f defs)
     | None ->
-      option_or_default (f at_path name bindings_at_current) ~f:(fun () ->
+      Option.value_or_thunk (f at_path name bindings_at_current) ~default:(fun () ->
         check_parent t ~at_path input ~defs_only ~f ~to_ustring)
   and check_parent t ~at_path:current_path input ~defs_only ~f ~to_ustring =
     (* Recursively check the parent. *)
@@ -1002,7 +1002,9 @@ let find_absolute_type_entry ?defs_only t type_name =
 ;;
 
 let find_absolute_type_entry ?(defs_only = false) t type_name =
-  option_or_default (find_absolute_type_entry ~defs_only t type_name) ~f:(fun () ->
+  Option.value_or_thunk
+    (find_absolute_type_entry ~defs_only t type_name)
+    ~default:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
@@ -1078,9 +1080,9 @@ module Sigs_or_defs = struct
   ;;
 
   let make_find ~into_bindings ~resolve t bindings name =
-    option_or_default
+    Option.value_or_thunk
       (Map.find (into_bindings bindings) name)
-      ~f:(fun () ->
+      ~default:(fun () ->
         compiler_bug [%message "Sigs_or_defs.find failed" (bindings : sigs_or_defs)])
     |> resolve t
   ;;

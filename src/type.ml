@@ -133,7 +133,7 @@ module Scheme = struct
   end
 
   let instantiate ?params typ =
-    let params = option_or_default params ~f:Param.Env_to_vars.create in
+    let params = Option.value_or_thunk params ~default:Param.Env_to_vars.create in
     Expr.map
       typ
       ~var:(Param.Env_to_vars.find_or_add params)

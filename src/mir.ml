@@ -350,7 +350,7 @@ end = struct
   ;;
 
   let find_cnstr_info t type_ =
-    option_or_default (find_cnstr_info_internal t type_) ~f:(fun () ->
+    Option.value_or_thunk (find_cnstr_info_internal t type_) ~default:(fun () ->
       compiler_bug
         [%message
           "Constructor info lookup failed" (type_ : Module_path.absolute Type.Scheme.t)])
