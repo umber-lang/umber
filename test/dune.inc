@@ -466,6 +466,36 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorNameClashExternVal.expected
+    tokens/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorNameClashExternVal.expected
+    ast/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorNameClashExternVal.expected
+    mir/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorNameClashExternVal.expected
+    llvm/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorNameClashExternVal.expected
+    output/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorNameClashWithImport.expected
     tokens/ErrorNameClashWithImport.out))))
 

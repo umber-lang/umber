@@ -1,5 +1,5 @@
-# FIXME: This gives a unification error if the types don't match.
+# TODO: Awkwardly, this gives a unification error if the types don't match.
 
-extern foo : Int, Int -> Int = "umber_int_add"
+extern foo : Int, Int -> Int = ""
 
 let foo = (-)

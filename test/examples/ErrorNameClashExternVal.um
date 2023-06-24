@@ -1,0 +1,3 @@
+extern foo : Int, Int -> Int = ""
+
+val foo : Int -> Int
