@@ -48,8 +48,6 @@ val prelude : t Lazy.t
 val without_std : t -> t
 
 (* Querying/updating names *)
-val find_entry : t -> Value_name.Relative.t -> Name_entry.t
-
 val find_entry_with_path
   :  t
   -> Value_name.Relative.t
@@ -84,15 +82,6 @@ val merge_names
 
 val find_absolute_entry : t -> Value_name.Absolute.t -> Name_entry.t
 
-(* TODO: removed the non-qualified version, since it's unused. *)
-
-(** Find a type declaration given a qualified name *)
-val find_type_decl
-  :  ?defs_only:bool
-  -> t
-  -> Type_name.Relative.t
-  -> Module_path.absolute Type.Decl.t
-
 (** Find a type declaration given an absolute qualified name *)
 val find_absolute_type_decl
   :  ?defs_only:bool
@@ -123,8 +112,6 @@ val absolutify_type_decl
 val current_path : t -> Module_path.Absolute.t
 val into_module : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
 val into_parent : t -> t
-
-(* TODO: maybe the interface should be ~f_sigs ~f_defs ? *)
 val with_submodule : t -> place:[ `Sig | `Def ] -> Module_name.t -> f:(t -> t) -> t
 
 val with_submodule'

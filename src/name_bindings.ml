@@ -984,21 +984,8 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let find_type_entry ?defs_only t type_name =
-  snd (find_type_entry_with_path ?defs_only t type_name)
-;;
-
 let find_absolute_type_entry ?defs_only t type_name =
   snd (find_absolute_type_entry_with_path ?defs_only t type_name)
-;;
-
-let find_type_entry ?(defs_only = false) t type_name =
-  option_or_default (find_type_entry ~defs_only t type_name) ~f:(fun () ->
-    compiler_bug
-      [%message
-        "Placeholder decl not replaced"
-          (type_name : Type_name.Relative.t)
-          (without_std t : t)])
 ;;
 
 let find_absolute_type_entry ?(defs_only = false) t type_name =
@@ -1009,8 +996,6 @@ let find_absolute_type_entry ?(defs_only = false) t type_name =
           (type_name : Type_name.Absolute.t)
           (without_std t : t)])
 ;;
-
-let find_type_decl ?defs_only t type_name = (find_type_entry ?defs_only t type_name).decl
 
 let find_absolute_type_decl ?defs_only t type_name =
   (find_absolute_type_entry ?defs_only t type_name).decl
