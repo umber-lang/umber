@@ -946,8 +946,6 @@ module Module = struct
       names, defs)
   ;;
 
-  (* FIXME: Test we don't allow an extern declaration to coexist with let or val. *)
-
   let rec check_every_val_is_defined ~names module_name (defs : def Node.t list) =
     let names = Name_bindings.into_module names ~place:`Def module_name in
     List.iter defs ~f:(fun def ->

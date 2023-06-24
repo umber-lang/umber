@@ -27,8 +27,6 @@ module Expr : sig
     | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
     | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
-    (* TODO: consider replacing Tuple with some kind of built-in constructor
-       e.g. _Tuple2, _Tuple3, depending on the length *)
     | Tuple of 'typ t Node.t list
     | Record_literal of (Value_name.t * 'typ t Node.t option) list
     | Record_update of 'typ t Node.t * (Value_name.t * 'typ t Node.t option) list

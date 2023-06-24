@@ -1,8 +1,8 @@
 open Import
 open Names
 
-(* TODO: Make this a CST, with it precisely representing the syntax written.
-   This should involving adding spans (Node-ifying the tree). *)
+(* TODO: Make this a CST, with it precisely representing the syntax written (including
+   comments). This will be helpful for writing an auto-formatter. *)
 
 module Pattern = struct
   include Pattern
