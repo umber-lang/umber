@@ -4,13 +4,22 @@ open Names
 module Name_entry : sig
   type t [@@deriving equal, sexp]
 
+  module Type_source : sig
+    type t =
+      | Placeholder
+      | Let_inferred
+      | Val_declared
+      | Val_and_let
+      | Extern_declared
+    [@@deriving compare, enumerate, equal, sexp, variants]
+  end
+
   val typ : t -> Type.t
   val scheme : t -> Module_path.absolute Type.Scheme.t option
-  val is_placeholder : t -> bool
-  val is_val_without_let : t -> bool
+  val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
-  val let_inferred : ?fixity:Fixity.t -> Type.t -> t
+  val create : ?fixity:Fixity.t -> type_source:Type_source.t -> Type.t -> t
   val merge : t -> t -> t
   val identical : t -> t -> bool
 end
@@ -53,6 +62,7 @@ val set_inferred_scheme
   :  t
   -> Value_name.t
   -> Module_path.absolute Type.Scheme.t
+  -> shadowing_allowed:bool
   -> check_existing:(Name_entry.t -> unit)
   -> t
 

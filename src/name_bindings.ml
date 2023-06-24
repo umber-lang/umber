@@ -57,18 +57,6 @@ module Name_entry = struct
     | Type _ -> None
   ;;
 
-  let is_placeholder t =
-    match t.type_source with
-    | Placeholder -> true
-    | Let_inferred | Val_declared | Val_and_let | Extern_declared -> false
-  ;;
-
-  let is_val_without_let t =
-    match t.type_source with
-    | Val_declared -> true
-    | Let_inferred | Val_and_let | Extern_declared | Placeholder -> false
-  ;;
-
   let val_declared ?fixity ?extern_name typ =
     { ids = Id.Set.singleton (Id.create ())
     ; type_source = Val_declared
@@ -78,25 +66,16 @@ module Name_entry = struct
     }
   ;;
 
-  (* TODO: Probably stop exposing let_inferred, just use types inside pattern names, and
-     don't merge names entries, etc. *)
-  let let_inferred ?fixity typ =
+  let create ?fixity ~type_source typ =
     { ids = Id.Set.singleton (Id.create ())
-    ; type_source = Let_inferred
+    ; type_source
     ; typ = Type typ
     ; fixity
     ; extern_name = None
     }
   ;;
 
-  let placeholder () =
-    { ids = Id.Set.singleton (Id.create ())
-    ; type_source = Placeholder
-    ; typ = Scheme (Var Type.Param.dummy)
-    ; fixity = None
-    ; extern_name = None
-    }
-  ;;
+  let placeholder () = create ~type_source:Placeholder (Type.fresh_var ())
 
   let merge entry entry' =
     let preferred, typ, other =
@@ -384,9 +363,7 @@ let merge_no_shadow t1 t2 =
         t1.names
         t2.names
         ~combine:
-          (err
-             Value_name.to_ustring
-             [%sexp_of: (Name_entry.t, Value_name.Absolute.t) Or_imported.t])
+          (err Value_name.to_ustring [%sexp_of: (_, Value_name.Absolute.t) Or_imported.t])
   ; types =
       Map.merge_skewed
         t1.types
@@ -827,6 +804,12 @@ let add_val_or_extern
           | None ->
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
           | Some (Local existing_entry) ->
+            (match existing_entry.type_source with
+             | Placeholder | Let_inferred -> ()
+             | Val_declared | Val_and_let | Extern_declared ->
+               Compilation_error.raise
+                 Name_error
+                 ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
             Local
               (Name_entry.merge
@@ -906,7 +889,7 @@ let add_type_decl t type_name decl =
   update_current t ~f:{ f }
 ;;
 
-let set_inferred_scheme t name scheme ~check_existing =
+let set_inferred_scheme t name scheme ~shadowing_allowed ~check_existing =
   let f bindings =
     let inferred_entry : Name_entry.t =
       { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
@@ -921,6 +904,16 @@ let set_inferred_scheme t name scheme ~check_existing =
         Map.update bindings.names name ~f:(function
           | None -> Local inferred_entry
           | Some (Local existing_entry) ->
+            let multiple_definitions () =
+              Compilation_error.raise
+                Name_error
+                ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]
+            in
+            (match existing_entry.type_source with
+             | Placeholder | Val_declared -> ()
+             | Extern_declared -> multiple_definitions ()
+             | Let_inferred | Val_and_let ->
+               if not shadowing_allowed then multiple_definitions ());
             check_existing existing_entry;
             Local (Name_entry.merge existing_entry inferred_entry)
           | Some (Imported _) ->
@@ -937,10 +930,12 @@ let set_inferred_scheme t name scheme ~check_existing =
 
 let add_name_placeholder_internal names name =
   Map.update names name ~f:(function
-    | None -> Local (Name_entry.placeholder ())
-    | Some (Or_imported.Local { Name_entry.type_source = Let_inferred; _ } as entry) ->
-      entry
-    | _ -> name_error ~msg:"Duplicate name" (Value_name.to_ustring name))
+    | None -> Or_imported.Local (Name_entry.placeholder ())
+    | Some existing_entry ->
+      (* This can happen in normal cases if we have both `val` and `let` statements for a
+         name. It can also happen in error cases where there are duplicate defintions of a
+         name. We handle those errors later. *)
+      existing_entry)
 ;;
 
 let add_name_placeholder t name =

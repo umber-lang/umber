@@ -176,7 +176,7 @@ let rec check_invariants (t : t) ~names =
         | Some (child_op_assoc, child_op_level) ->
           op_level < child_op_level
           || (op_level = child_op_level
-             && not (Fixity.Assoc.equal op_assoc child_op_assoc))
+              && not (Fixity.Assoc.equal op_assoc child_op_assoc))
       in
       let convert_child (child : t) =
         match child with
@@ -214,7 +214,8 @@ let%test_module _ =
         let op_name =
           Value_name.of_string_unchecked (Sexp.to_string [%sexp (fixity : Fixity.t)])
         in
-        op_name, Name_bindings.Name_entry.let_inferred ~fixity dummy_type)
+        ( op_name
+        , Name_bindings.Name_entry.create ~fixity ~type_source:Let_inferred dummy_type ))
       |> Value_name.Map.of_alist_exn
     ;;
 
@@ -223,7 +224,7 @@ let%test_module _ =
     let op_name_generator =
       Quickcheck.Generator.of_list
         (Map.keys operators
-        |> List.map ~f:(fun name -> Node.dummy_span (Module_path.Relative.empty, name)))
+         |> List.map ~f:(fun name -> Node.dummy_span (Module_path.Relative.empty, name)))
     ;;
 
     let dummy_expr_generator =

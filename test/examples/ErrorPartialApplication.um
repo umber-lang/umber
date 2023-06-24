@@ -11,5 +11,9 @@ let foo x = x * 2
 let bar x y = x + y
 
 let _ = apply_arg foo
+
+# FIXME: It seems to be non-deterministic (or at least unstable) which of the following
+# two lines are the cause of the error. Maybe it depends on the ordering of type variables
+# or something?
 let _ = apply_arg bar
 let _ = (apply_arg bar) 7

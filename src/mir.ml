@@ -1031,8 +1031,7 @@ module Expr = struct
             ~ctx_for_body
             ~rec_
             ~init:[]
-            ~add_let:
-              (fun bindings name mir_expr (_ : Module_path.absolute Type.Scheme.t) ->
+            ~add_let:(fun bindings name mir_expr (_ : Module_path.absolute Type.Scheme.t) ->
               (name, mir_expr) :: bindings)
             ~extract_binding:(fun (pat_and_type, expr) ->
               Node.map pat_and_type ~f:fst, expr, Node.with_value pat_and_type ~f:snd)
@@ -1294,7 +1293,9 @@ module Expr = struct
             (* Bindings must be sorted by their names to match up with [vars] above. This
                relies on the [Value_name.t]s and [Mir_name.t]s having the same ordering
                due to the former being a prefix of the latter. *)
-            (* TODO: This ordering is fragile. Come up with a more reliable approach. *)
+            (* FIXME: Actually I think this might just be wrong since the default string
+               comparison is by length first rather than lexigraphic. Come up with a
+               better approach. *)
             List.sort bindings ~compare:[%compare: Mir_name.t * _] |> List.map ~f:snd
           in
           match cond with

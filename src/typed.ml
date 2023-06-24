@@ -18,7 +18,8 @@ module Pattern = struct
       | Catch_all name ->
         let pat_names, typ =
           match name with
-          | Some name -> Pattern.Names.add_fresh_name pat_names name
+          | Some name ->
+            Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder
           | None -> pat_names, Type.fresh_var ()
         in
         pat_names, (Catch_all name, typ)
@@ -110,7 +111,9 @@ module Pattern = struct
         pat_names1, (Union (pat1, pat2), typ1)
       | As (pat, name) ->
         let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
-        let pat_names = Pattern.Names.add_name pat_names name typ in
+        let pat_names =
+          Pattern.Names.add_name pat_names name typ ~type_source:Placeholder
+        in
         pat_names, (As (pat, name), typ)
       | Type_annotation (pat, typ) ->
         let typ1 =
@@ -140,7 +143,7 @@ module Pattern = struct
     names, pat
   ;;
 
-  let generalize ~names ~types pat_names typ =
+  let generalize ~names ~types pat_names typ ~shadowing_allowed =
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let inferred_scheme =
@@ -150,6 +153,7 @@ module Pattern = struct
           names
           name
           inferred_scheme
+          ~shadowing_allowed
           ~check_existing:(fun existing_entry ->
           match Name_bindings.Name_entry.scheme existing_entry with
           | None -> ()
@@ -390,6 +394,8 @@ module Expr = struct
 
   and map' expr ~f ~f_type = Node.map expr ~f:(map ~f ~f_type)
 
+  (* FIXME: Is this supposed to be generalizing local let bindings in expressions? If so,
+     it doesn't seem to work, according to the Generalization.um test. *)
   let rec generalize_let_bindings ~names ~types =
     map
       ~f_type:(fun (typ, _) -> Type_bindings.generalize types typ)
@@ -400,7 +406,13 @@ module Expr = struct
               let pat_span = Node.span pattern_etc in
               let pat, (names, scheme) =
                 Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-                  pat, Pattern.generalize ~names ~types pat_names pat_type)
+                  ( pat
+                  , Pattern.generalize
+                      ~names
+                      ~types
+                      pat_names
+                      pat_type
+                      ~shadowing_allowed:true ))
               in
               ( Node.create (pat, scheme) pat_span
               , Node.map expr ~f:(generalize_let_bindings ~names ~types) ))
@@ -589,14 +601,8 @@ module Module = struct
             Node.with_value pat ~f:(fun pat ->
               Name_bindings.merge_names
                 names
-                (Pattern.Names.gather pat)
-                ~combine:(fun name entry entry' ->
-                if Name_bindings.Name_entry.is_placeholder entry
-                then entry'
-                else
-                  Name_bindings.name_error
-                    ~msg:"Duplicate name"
-                    (Value_name.to_ustring name))))
+                (Pattern.Names.gather pat ~type_source:Placeholder)
+                ~combine:(fun _ _ entry' -> entry')))
         | Module (module_name, sigs, defs) ->
           gather_name_placeholders ~names module_name sigs defs
         | Common_def common -> f_common names common
@@ -863,7 +869,8 @@ module Module = struct
       let pat_span = Node.span pattern_etc in
       let pat, (names, scheme) =
         Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-          pat, Pattern.generalize ~names ~types pat_names pat_type)
+          ( pat
+          , Pattern.generalize ~names ~types pat_names pat_type ~shadowing_allowed:false ))
       in
       (* Generalize local let bindings just after the parent binding *)
       let expr_and_scheme =
@@ -951,11 +958,18 @@ module Module = struct
               names
               (Name_bindings.current_path names, name)
           in
-          if Name_bindings.Name_entry.is_val_without_let entry
-          then
-            Compilation_error.raise
-              Name_error
-              ~msg:[%message "No definition for val declaration"]
+          (match Name_bindings.Name_entry.type_source entry with
+           | Val_and_let -> ()
+           | Val_declared ->
+             Compilation_error.raise
+               Name_error
+               ~msg:[%message "No definition for val declaration"]
+           | Placeholder | Let_inferred | Extern_declared ->
+             compiler_bug
+               [%message
+                 "Unexpected type source for val entry"
+                   (name : Value_name.t)
+                   (entry : Name_bindings.Name_entry.t)])
         | Module (module_name, _sigs, defs) ->
           check_every_val_is_defined ~names module_name defs
         | Common_def (Extern _ | Type_decl _ | Trait_sig _ | Import _)
