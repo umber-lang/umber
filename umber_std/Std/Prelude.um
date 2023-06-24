@@ -105,8 +105,6 @@ module : {
   extern print_bool : Bool -> () = "umber_print_bool"
 }
 
-# TODO: implement public/private distinction for modules
-
 # TODO: need some kind of syntax for re-exporting things easily
 # Idea: just put the imports inside `module :` (could work)
 # Perhaps nicer: just use `include` instead of `import`
