@@ -97,40 +97,28 @@ let skolemize ~names ~types_by_param scheme =
   !names, type_
 ;;
 
-let check_type_schemes
-  ~names
-  ~types
-  ~sig_params
-  ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t)
-  =
-  let names, sig_type = skolemize ~names ~types_by_param:sig_params sig_scheme in
-  let def_type = Type.Scheme.instantiate def_scheme in
-  Type_bindings.unify ~names ~types sig_type def_type;
-  sig_type
-;;
-
 (** A `val` item in a signature is compatible with a `let` in a defintion if the
     signature is a "more specific" version of the defintion. We can check this by
     skolemizing the signature, instatiating the defintion, and then unifying the two. *)
-let check_val_type_schemes ~names schemes =
-  ignore
-    (check_type_schemes ~names ~types:(Type_bindings.create ()) ~sig_params:None schemes
-      : Type.t)
+let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
+  let names, sig_type = skolemize ~names sig_scheme ~types_by_param:None in
+  let def_type = Type.Scheme.instantiate def_scheme in
+  let types = Type_bindings.create () in
+  Type_bindings.unify ~names ~types sig_type def_type
 ;;
 
 (** Type definitions in a signature an defintion are compatible if they are the same
     modulo type aliases and type variable renamings. Unlike for `val`s, the compatibility
     is symmetrical. *)
-let check_type_decl_schemes ~names ~sig_params ~def_params (schemes : _ By_kind.t) =
+let check_type_decl_schemes
+  ~names
+  ~sig_params
+  ~def_params
+  ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t)
+  =
   let types = Type_bindings.create () in
-  let sig_type = check_type_schemes ~names ~types ~sig_params:(Some sig_params) schemes in
-  let def_type =
-    check_type_schemes
-      ~names
-      ~types
-      ~sig_params:(Some def_params)
-      { sig_ = schemes.def; def = schemes.sig_ }
-  in
+  let names, sig_type = skolemize ~names ~types_by_param:(Some sig_params) sig_scheme in
+  let names, def_type = skolemize ~names ~types_by_param:(Some def_params) def_scheme in
   Type_bindings.unify ~names ~types sig_type def_type
 ;;
 
