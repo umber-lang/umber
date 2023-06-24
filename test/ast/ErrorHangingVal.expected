@@ -1,0 +1,2 @@
+(ErrorHangingVal ()
+ ((Common_def (Val a () (() (Type_app Std.Prelude.Int.Int ()))))))

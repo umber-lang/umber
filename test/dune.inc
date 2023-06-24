@@ -278,6 +278,28 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorHangingVal.expected tokens/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/ErrorHangingVal.expected ast/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff mir/ErrorHangingVal.expected mir/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff llvm/ErrorHangingVal.expected llvm/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorHangingVal.expected output/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorImportOfImport.expected tokens/ErrorImportOfImport.out))))
 
 (rule (alias runtest) (deps test.dummy)
