@@ -720,12 +720,12 @@ let names = {|
                              ((Function ((Var b)) (Var c))
                               (Function ((Var a)) (Var b)) (Var a))
                              (Var c))))
-                          (fixity (Right 9)))))
+                          (type_source Val_and_let) (fixity (Right 9)))))
                        (";"
                         (Local
                          ((typ
                            (Scheme (Function ((Tuple ()) (Var a)) (Var a))))
-                          (fixity (Left 0)))))
+                          (type_source Val_and_let) (fixity (Left 0)))))
                        (<
                         (Local
                          ((typ
@@ -768,7 +768,7 @@ let names = {|
                              ((Type_app Std.Prelude.Bool.Bool ())
                               (Type_app Std.Prelude.Bool.Bool ()))
                              (Type_app Std.Prelude.Bool.Bool ()))))
-                          (fixity (Left 3)))))
+                          (type_source Val_and_let) (fixity (Left 3)))))
                        (*.
                         (Local
                          ((typ
@@ -816,7 +816,7 @@ let names = {|
                              ((Var a)
                               (Type_app Std.Prelude.List.List ((Var a))))
                              (Type_app Std.Prelude.List.List ((Var a))))))
-                          (fixity (Right 5)))))
+                          (type_source Val_and_let) (fixity (Right 5)))))
                        (<=
                         (Local
                          ((typ
@@ -847,7 +847,7 @@ let names = {|
                            (Scheme
                             (Function ((Var a) (Function ((Var a)) (Var b)))
                              (Var b))))
-                          (fixity (Left 0)))))
+                          (type_source Val_and_let) (fixity (Left 0)))))
                        (||
                         (Local
                          ((typ
@@ -856,7 +856,7 @@ let names = {|
                              ((Type_app Std.Prelude.Bool.Bool ())
                               (Type_app Std.Prelude.Bool.Bool ()))
                              (Type_app Std.Prelude.Bool.Bool ()))))
-                          (fixity (Left 2)))))
+                          (type_source Val_and_let) (fixity (Left 2)))))
                        (mod
                         (Local
                          ((typ

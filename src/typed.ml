@@ -591,9 +591,9 @@ module Module = struct
                 names
                 (Pattern.Names.gather pat)
                 ~combine:(fun name entry entry' ->
-                match Name_bindings.Name_entry.type_source entry with
-                | Placeholder -> entry'
-                | Let_inferred | Val_declared | Extern_declared ->
+                if Name_bindings.Name_entry.is_placeholder entry
+                then entry'
+                else
                   Name_bindings.name_error
                     ~msg:"Duplicate name"
                     (Value_name.to_ustring name))))
@@ -939,6 +939,29 @@ module Module = struct
       names, defs)
   ;;
 
+  (* FIXME: Test we don't allow an extern declaration to coexist with let or val. *)
+
+  let rec check_every_val_is_defined ~names module_name (defs : def Node.t list) =
+    let names = Name_bindings.into_module names ~place:`Def module_name in
+    List.iter defs ~f:(fun def ->
+      Node.with_value def ~f:(function
+        | Common_def (Val (name, _, _)) ->
+          let entry =
+            Name_bindings.find_absolute_entry
+              names
+              (Name_bindings.current_path names, name)
+          in
+          if Name_bindings.Name_entry.is_val_without_let entry
+          then
+            Compilation_error.raise
+              Name_error
+              ~msg:[%message "No definition for val declaration"]
+        | Module (module_name, _sigs, defs) ->
+          check_every_val_is_defined ~names module_name defs
+        | Common_def (Extern _ | Type_decl _ | Trait_sig _ | Import _)
+        | Let _ | Trait _ | Impl _ -> ()))
+  ;;
+
   let of_untyped ~names ~types ~include_std (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
@@ -948,7 +971,7 @@ module Module = struct
       let names = gather_type_decls ~names module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
-      (* FIXME: should check every [Val] has a corresponding [Let]. *)
+      check_every_val_is_defined ~names module_name defs;
       Sig_def_diff.check ~names module_name;
       Ok (names, (module_name, sigs, defs))
     with

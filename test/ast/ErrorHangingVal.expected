@@ -1,2 +1,3 @@
-(ErrorHangingVal ()
- ((Common_def (Val a () (() (Type_app Std.Prelude.Int.Int ()))))))
+("Compilation error"
+ ((kind Name_error) (msg "No definition for val declaration")
+  (filename ErrorHangingVal.um) (span 1:1-1:12)))

@@ -8,6 +8,7 @@ module Name_entry = struct
         | Placeholder
         | Let_inferred
         | Val_declared
+        | Val_and_let
         | Extern_declared
       [@@deriving compare, enumerate, equal, sexp, variants]
     end
@@ -19,7 +20,7 @@ module Name_entry = struct
       List.equal
         equal
         (List.sort ~compare all)
-        [ Placeholder; Let_inferred; Val_declared; Extern_declared ]
+        [ Placeholder; Let_inferred; Val_declared; Val_and_let; Extern_declared ]
     ;;
   end
 
@@ -54,6 +55,18 @@ module Name_entry = struct
     match entry.typ with
     | Scheme scheme -> Some scheme
     | Type _ -> None
+  ;;
+
+  let is_placeholder t =
+    match t.type_source with
+    | Placeholder -> true
+    | Let_inferred | Val_declared | Val_and_let | Extern_declared -> false
+  ;;
+
+  let is_val_without_let t =
+    match t.type_source with
+    | Val_declared -> true
+    | Let_inferred | Val_and_let | Extern_declared | Placeholder -> false
   ;;
 
   let val_declared ?fixity ?extern_name typ =
@@ -100,10 +113,15 @@ module Name_entry = struct
         in
         entry', typ, entry
     in
+    let type_source : Type_source.t =
+      match preferred.type_source, other.type_source with
+      | Val_declared, Let_inferred | Let_inferred, Val_declared -> Val_and_let
+      | _ -> preferred.type_source
+    in
     let pick getter = Option.first_some (getter preferred) (getter other) in
     { ids = Set.union entry.ids entry'.ids
     ; typ
-    ; type_source = preferred.type_source
+    ; type_source
     ; fixity = pick fixity
     ; extern_name = pick extern_name
     }

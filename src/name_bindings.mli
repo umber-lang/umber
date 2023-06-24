@@ -2,20 +2,12 @@ open Import
 open Names
 
 module Name_entry : sig
-  module Type_source : sig
-    type t =
-      | Placeholder
-      | Let_inferred
-      | Val_declared
-      | Extern_declared
-    [@@deriving equal, sexp]
-  end
-
   type t [@@deriving equal, sexp]
 
   val typ : t -> Type.t
   val scheme : t -> Module_path.absolute Type.Scheme.t option
-  val type_source : t -> Type_source.t
+  val is_placeholder : t -> bool
+  val is_val_without_let : t -> bool
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
   val let_inferred : ?fixity:Fixity.t -> Type.t -> t
