@@ -537,6 +537,29 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorShadowedBool.expected tokens/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/ErrorShadowedBool.expected ast/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff mir/ErrorShadowedBool.expected mir/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorShadowedBool.expected llvm/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorShadowedBool.expected output/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorSignatureCompatibility.expected
     tokens/ErrorSignatureCompatibility.out))))
 

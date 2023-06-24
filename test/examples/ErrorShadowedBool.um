@@ -1,0 +1,5 @@
+# Test that you can't get custom behavior out of `if` expressions by shadowing `Bool`
+
+type Bool = | Foo | Bar
+
+let _ = if Foo then 1 else 2
