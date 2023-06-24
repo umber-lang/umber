@@ -7,4 +7,4 @@
      (Function
       ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ()))
       (Type_app Std.Prelude.Int.Int ())))))
-  (filename ErrorPartialApplication.um) (span 17:9-17:22)))
+  (filename ErrorPartialApplication.um) (span 14:9-14:22)))
