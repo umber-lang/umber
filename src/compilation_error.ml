@@ -38,6 +38,7 @@ let try_with' f =
     Error { error with backtrace = Some (Backtrace.Exn.most_recent ()) }
 ;;
 
-let raise ?filename ?span ?exn ~msg kind =
-  raise (Compilation_error { kind; msg; filename; span; exn; backtrace = None })
+let raise ?span ~msg kind =
+  raise
+    (Compilation_error { kind; msg; span; filename = None; exn = None; backtrace = None })
 ;;

@@ -67,12 +67,12 @@ module Name_entry = struct
 
   (* TODO: Probably stop exposing let_inferred, just use types inside pattern names, and
      don't merge names entries, etc. *)
-  let let_inferred ?fixity ?extern_name typ =
+  let let_inferred ?fixity typ =
     { ids = Id.Set.singleton (Id.create ())
     ; type_source = Let_inferred
     ; typ = Type typ
     ; fixity
-    ; extern_name
+    ; extern_name = None
     }
   ;;
 
@@ -723,8 +723,8 @@ let import =
     let ensure_imported_name_exists bindings =
       if not
            (Map.mem bindings.names value_name
-           || Map.mem bindings.types type_name
-           || Map.mem bindings.modules module_name)
+            || Map.mem bindings.types type_name
+            || Map.mem bindings.modules module_name)
       then import_not_found path_so_far name
     in
     (match import_bindings with
@@ -842,7 +842,7 @@ let add_extern t name fixity typ extern_name ~unify =
 
 let absolutify_type_decl t = Type.Decl.map_exprs ~f:(absolutify_type_expr t)
 
-let add_to_types ?(err_msg = "Type name clash") types name decl =
+let add_to_types types name decl ~err_msg =
   Map.update types name ~f:(function
     | None | Some None -> decl
     | Some _ -> name_error ~msg:err_msg (Type_name.to_ustring name))
@@ -1018,25 +1018,24 @@ let find_sigs_and_defs t path module_name =
     find
       t
       (path, module_name)
-      ~f:
-        (fun absolute_path module_name -> function
-          | Sigs _ ->
-            compiler_bug
-              [%message
-                "Name_bindings.find_sigs_and_defs found only sigs"
-                  ~relative_path:(path : Module_path.Relative.t)
-                  (module_name : Module_name.t)
-                  (absolute_path : Module_path.Absolute.t)
-                  (t : t)]
-          | Defs bindings ->
-            (match%bind.Option Map.find bindings.modules module_name with
-             | Imported path ->
-               let%bind.Option path, module_name =
-                 List.split_last (path :> Module_name.t list)
-               in
-               let path = Module_path.Relative.of_module_names path in
-               Some (loop t path module_name)
-             | Local sigs_and_defs -> Some sigs_and_defs))
+      ~f:(fun absolute_path module_name -> function
+           | Sigs _ ->
+             compiler_bug
+               [%message
+                 "Name_bindings.find_sigs_and_defs found only sigs"
+                   ~relative_path:(path : Module_path.Relative.t)
+                   (module_name : Module_name.t)
+                   (absolute_path : Module_path.Absolute.t)
+                   (t : t)]
+           | Defs bindings ->
+             (match%bind.Option Map.find bindings.modules module_name with
+              | Imported path ->
+                let%bind.Option path, module_name =
+                  List.split_last (path :> Module_name.t list)
+                in
+                let path = Module_path.Relative.of_module_names path in
+                Some (loop t path module_name)
+              | Local sigs_and_defs -> Some sigs_and_defs))
       ~to_ustring:(fun (path, module_name) ->
         Module_path.to_ustring (Module_path.append path [ module_name ]))
   in

@@ -25,7 +25,7 @@ module T = struct
 
   let sexp_of_t t = Sexp.Atom (to_string t)
 
-  let of_gen_exn ?capacity s =
+  let of_gen_exn s =
     let rec loop s q =
       match Uchar.of_gen_exn s with
       | Some c ->
@@ -33,7 +33,7 @@ module T = struct
         loop s q
       | None -> ()
     in
-    let q = Queue.create ?capacity () in
+    let q = Queue.create () in
     loop s q;
     Queue.to_array q
   ;;
