@@ -88,9 +88,6 @@ module Concrete : sig
 
   val cast : (Nothing.t, Nothing.t, 'n) Expr.t -> ('v, 'pf, 'n) Expr.t
 
-  (* TODO: Consider deleting this. Do we need it? *)
-  val of_polymorphic_exn : ('v, 'pf, Module_path.absolute) Expr.t -> t
-
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 end

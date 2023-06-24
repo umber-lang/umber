@@ -51,11 +51,6 @@
 %token <Ustring.t> STRING
 
 %token UNDERSCORE
-(* TODO: prevent underscore being used as a variable with a name_error, and create patterns
-   using a new catch_all creator. Want to be able to parse it as a LOWER_NAME to use as 
-   the previous evaluated thing in the interpreter (as seen in Python, or similar to
-   `it` in ghci)
-   Another option: could just use `it` for the previous purpose and use `_` for gaps (partial application) *)
 %token <Ustring.t> LOWER_NAME
 %token <Ustring.t> UPPER_NAME
 %token <Ustring.t> OPERATOR
@@ -82,7 +77,6 @@ literal:
   | c = CHAR { Literal.Char c }
   | s = STRING { Literal.String s }
 
-(* TODO: probably get rid of this and make undescore its own thing at some point *)
 pattern_name:
   | name = val_name { Some (Value_name.of_ustring_unchecked name) }
   | UNDERSCORE { None }
@@ -101,7 +95,6 @@ pattern_term:
 pattern:
   | p = pattern_term { p }
   | cnstr = qualified(UPPER_NAME); args = nonempty(pattern_term)
-    (* TODO: Make the `Cnstr_appl` type take a `Nonempty` argument. *)
     { Pattern.Cnstr_appl (
         Cnstr_name.Relative.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
   | left = pattern; PIPE; right = pattern { Pattern.Union (left, right) }

@@ -84,15 +84,14 @@ let skolemize ~names ~types_by_param scheme =
       ~var:(fun var -> compiler_bug [%message "Unskolemized var" (var : Type.Param.t)])
       ~pf:Nothing.unreachable_code
       ~name:Fn.id
-      ~f:
-        (function
-         | Var param ->
-           Halt
-             (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
-                let names', type_ = create_skolemized_type ~names:!names in
-                names := names';
-                type_))
-         | type_ -> Defer type_)
+      ~f:(function
+        | Var param ->
+          Halt
+            (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
+               let names', type_ = create_skolemized_type ~names:!names in
+               names := names';
+               type_))
+        | type_ -> Defer type_)
   in
   !names, type_
 ;;
@@ -149,11 +148,15 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
       { sig_ = get_scheme sig_entry; def = get_scheme def_entry };
     if not
          (compatible_fixities sig_entry def_entry
-         && compatible_extern_names sig_entry def_entry)
+          && compatible_extern_names sig_entry def_entry)
     then raise Compatibility_error)
 ;;
 
-(* TODO: test/look at this for correctness, there are probably bugs here *)
+(* TODO: test/look at this for correctness, there are probably bugs here. Could we maybe
+   run quickcheck on the AST types? It might be hard to express all the constraints
+   guaranteed by previous modules. Maybe we could just check that compilation never
+   crashes. *)
+
 let compatible_type_decls
   ~names
   ~sig_:((sig_param_list, sig_type) : _ Type.Decl.t)

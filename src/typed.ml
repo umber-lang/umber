@@ -8,8 +8,6 @@ module Pattern = struct
 
   type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
 
-  (* TODO: either split up Untyped/Typed patterns into different types or stop returning
-     a pattern from these functions *)
   let of_untyped_with_names ~names ~types (pat : Untyped.Pattern.t)
     : Names.t * (t * Type.t)
     =
@@ -236,8 +234,8 @@ module Expr = struct
           in
           Type_bindings.unify ~names ~types then_type else_type;
           (* TODO: should really be referring to Bool as a primitive of some kind since
-           otherwise you could shadow it. Could have it be qualified like
-           `_Primitives.Bool` *)
+             otherwise you could shadow it. Could have it be qualified like
+             `_Primitives.Bool` *)
           let branch name expr =
             Node.create (Cnstr_appl (name, []) : Pattern.t) (Node.span expr), expr
           in
@@ -398,22 +396,21 @@ module Expr = struct
   let rec generalize_let_bindings ~names ~types =
     map
       ~f_type:(fun (typ, _) -> Type_bindings.generalize types typ)
-      ~f:
-        (function
-         | Let { rec_; bindings; body } ->
-           let bindings =
-             Nonempty.map bindings ~f:(fun (pattern_etc, expr) ->
-               let pat_span = Node.span pattern_etc in
-               let pat, (names, scheme) =
-                 Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-                   pat, Pattern.generalize ~names ~types pat_names pat_type)
-               in
-               ( Node.create (pat, scheme) pat_span
-               , Node.map expr ~f:(generalize_let_bindings ~names ~types) ))
-           in
-           let body = Node.map body ~f:(generalize_let_bindings ~names ~types) in
-           `Halt (Let { rec_; bindings; body })
-         | expr -> `Defer expr)
+      ~f:(function
+        | Let { rec_; bindings; body } ->
+          let bindings =
+            Nonempty.map bindings ~f:(fun (pattern_etc, expr) ->
+              let pat_span = Node.span pattern_etc in
+              let pat, (names, scheme) =
+                Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
+                  pat, Pattern.generalize ~names ~types pat_names pat_type)
+              in
+              ( Node.create (pat, scheme) pat_span
+              , Node.map expr ~f:(generalize_let_bindings ~names ~types) ))
+          in
+          let body = Node.map body ~f:(generalize_let_bindings ~names ~types) in
+          `Halt (Let { rec_; bindings; body })
+        | expr -> `Defer expr)
   ;;
 end
 
