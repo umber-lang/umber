@@ -1,10 +1,6 @@
 open Import
 open Names
 
-(* TODO: should make this more robust - it's not sufficient for compiler internals to
-   refer to types like Int as Std.Prelude.Int since Std could be shadowed - they need a
-   special primitive representation *)
-
 let std_module_name = Module_name.of_string_unchecked "Std"
 let prelude_module_name = Module_name.of_string_unchecked "Prelude"
 

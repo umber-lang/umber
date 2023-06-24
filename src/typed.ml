@@ -233,9 +233,6 @@ module Expr = struct
             of_untyped ~names ~types ~f_name then_, of_untyped ~names ~types ~f_name else_
           in
           Type_bindings.unify ~names ~types then_type else_type;
-          (* TODO: should really be referring to Bool as a primitive of some kind since
-             otherwise you could shadow it. Could have it be qualified like
-             `_Primitives.Bool` *)
           let branch name expr =
             Node.create (Cnstr_appl (name, []) : Pattern.t) (Node.span expr), expr
           in
