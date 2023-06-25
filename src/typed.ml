@@ -842,9 +842,7 @@ module Module = struct
         | Trait _ | Impl _ -> failwith "TODO: traits/impls")
     in
     let other_defs, bindings = gather_bindings_in_defs ~names defs ([], []) in
-    let binding_groups =
-      Call_graph.of_bindings bindings |> Call_graph.to_regrouped_bindings
-    in
+    let binding_groups = Call_graph.regroup_bindings bindings in
     other_defs, binding_groups
   ;;
 

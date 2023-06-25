@@ -10,7 +10,23 @@ module Binding = struct
   [@@deriving fields, sexp]
 end
 
-module Binding_id = Unique_id.Int ()
+module Binding_id : sig
+  type t [@@deriving compare, equal, hash]
+
+  include Hashable.S with type t := t
+
+  val make_creator : unit -> (unit -> t) Staged.t
+end = struct
+  include Int
+
+  let make_creator () =
+    let current = ref (-1) in
+    stage (fun () ->
+      incr current;
+      !current)
+  ;;
+end
+
 module G = Graph.Imperative.Digraph.Concrete (Binding_id)
 
 (* NOTE: scc gives components numbered in topological order! *)
@@ -19,12 +35,18 @@ module Topologically_sorted_components = Graph.Components.Make (G)
 type 'a t =
   { graph : G.t
   ; binding_table : ('a Binding.t * Module_path.Absolute.t) Binding_id.Table.t
+  ; create_binding : unit -> Binding_id.t
   }
 
-let create () = { graph = G.create (); binding_table = Binding_id.Table.create () }
+let create () =
+  { graph = G.create ()
+  ; binding_table = Binding_id.Table.create ()
+  ; create_binding = unstage (Binding_id.make_creator ())
+  }
+;;
 
 let add_binding t new_binding new_path =
-  let new_id = Binding_id.create () in
+  let new_id = t.create_binding () in
   Hashtbl.set t.binding_table ~key:new_id ~data:(new_binding, new_path);
   G.add_vertex t.graph new_id;
   G.iter_vertex
@@ -76,3 +98,5 @@ let to_regrouped_bindings t =
          in
          Nonempty.(binding :: bindings), path)
 ;;
+
+let regroup_bindings bindings = of_bindings bindings |> to_regrouped_bindings

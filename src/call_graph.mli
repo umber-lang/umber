@@ -12,10 +12,6 @@ module Binding : sig
   [@@deriving fields, sexp]
 end
 
-type 'a t
-
-val of_bindings : ('a Binding.t * Module_path.Absolute.t) list -> 'a t
-
-val to_regrouped_bindings
-  :  'a t
+val regroup_bindings
+  :  ('a Binding.t * Module_path.Absolute.t) list
   -> ('a Binding.t Nonempty.t * Module_path.Absolute.t) list
