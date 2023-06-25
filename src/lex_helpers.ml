@@ -16,12 +16,6 @@ let lex_upper_name lexbuf =
   | _ -> error_s [%message "Invalid upper name" ~_:(lexeme lexbuf : Ustring.t)]
 ;;
 
-let lex_eof lexbuf =
-  match%sedlex lexbuf with
-  | eof -> true
-  | _ -> false
-;;
-
 let lex_place lexbuf =
   match%sedlex lexbuf with
   | "(s)" -> Some `Sig

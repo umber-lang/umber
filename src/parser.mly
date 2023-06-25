@@ -15,7 +15,6 @@
 %token IN
 %token MATCH
 %token WITH
-%token WITHOUT
 %token AS
 %token TYPE
 %token VAL
@@ -35,8 +34,6 @@
 %token COLON_SPACED
 %token COMMA
 %token BACKSLASH
-%token ASTERISK
-%token PERIOD
 %token ARROW
 %token FAT_ARROW
 %token L_PAREN
@@ -45,18 +42,15 @@
 %token R_BRACKET
 %token L_BRACE
 %token R_BRACE
+%token PERIOD
 
+%token <int> N_PERIODS
 %token <int> INT
 %token <float> FLOAT
 %token <Uchar.t> CHAR
 %token <Ustring.t> STRING
 
 %token UNDERSCORE
-(* TODO: prevent underscore being used as a variable with a name_error, and create patterns
-   using a new catch_all creator. Want to be able to parse it as a LOWER_NAME to use as 
-   the previous evaluated thing in the interpreter (as seen in Python, or similar to
-   `it` in ghci)
-   Another option: could just use `it` for the previous purpose and use `_` for gaps (partial application) *)
 %token <Ustring.t> LOWER_NAME
 %token <Ustring.t> UPPER_NAME
 %token <Ustring.t> OPERATOR
@@ -68,7 +62,7 @@
 
 val_operator:
   | op = OPERATOR { op }
-  | ASTERISK { Ustring.of_string_exn "*" }
+  | n = N_PERIODS { Ustring.make n (Uchar.of_char '.') }
 
 operator:
   | COLON; name = qualified(val_name); colon { name }
@@ -83,7 +77,6 @@ literal:
   | c = CHAR { Literal.Char c }
   | s = STRING { Literal.String s }
 
-(* TODO: probably get rid of this and make undescore its own thing at some point *)
 pattern_name:
   | name = val_name { Some (Value_name.of_ustring_unchecked name) }
   | UNDERSCORE { None }
@@ -108,19 +101,25 @@ pattern:
   | pat = pattern; AS; name = val_name
     { Pattern.As (pat, Value_name.of_ustring_unchecked name) }
   | annot = type_annot_bounded(pattern)
-    { Pattern.Type_annotation (fst annot, snd annot) }
+    { Pattern.Type_annotation (fst annot, Node.with_value (snd annot) ~f:Fn.id) }
 
 op_section:
-  | op = operator; e = expr_op_term { Expr.op_section_right op e }
-  | e = expr_op_term; op = operator { Expr.op_section_left e op }
+  | op = with_loc(operator); e = with_loc(expr_op_term) { Expr.op_section_right op e }
+  | e = with_loc(expr_op_term); op = with_loc(operator) { Expr.op_section_left e op }
 
 expr_term:
-  | e = qualified(tuple(expr))
-    { Expr.qualified (fst e, single_or_list Expr.tuple (snd e)) }
+  | e = qualified(with_loc(tuple(expr)))
+    { let path, exprs = e in
+      let exprs, exprs_span = Node.with_value exprs ~f:Fn.id, Node.span exprs in
+      Expr.qualified
+        path
+        (single_or_list (fun es -> Node.create (Expr.Tuple es) exprs_span) exprs) }
   | op = qualified(parens(operator))
     { let path1, (path2, op) = op in
       Expr.Name (Value_name.Relative.of_ustrings_unchecked (path1 @ path2, op)) }
-  | op_section = qualified(parens(op_section)) { Expr.qualified op_section }
+  | op_section = qualified(parens(with_loc(op_section)))
+    { let path, expr = op_section in
+      Expr.qualified path expr }
   | name = qualified(either(LOWER_NAME, UPPER_NAME))
     { Expr.Name (Value_name.Relative.of_ustrings_unchecked name) }
   | l = literal { Expr.Literal l }
@@ -135,25 +134,35 @@ expr_term:
     Maybe this could be covered instead (or accompanying) a good lenses/accessor library. *)
   | L_BRACE; record = expr; WITH; fields = record_literal_fields(expr); R_BRACE
     { Expr.Record_update (record, fields) }
-  | record = expr_term; PERIOD; field = LOWER_NAME
-    { Expr.Record_field_access (record, Value_name.of_ustring_unchecked field) }
+  | record = with_loc(expr_term); PERIOD; field = with_loc(LOWER_NAME)
+    { Expr.Record_field_access (record, Node.map ~f:Value_name.of_ustring_unchecked field) }
 
 expr_op_term:
-  | f = expr_term; args = nonempty(expr_term) { Expr.Fun_call (f, args) }
+  | f = with_loc(expr_term); args = nonempty(with_loc(expr_term))
+    { Expr.Fun_call (f, args) }
   | e = expr_term { e }
 
 (* Expressions with binary operators are first parsed as if all operators were
    left-associative with the same precedence. This operator tree is later re-associated. *)
 expr_op_tree:
-  | left = expr_op_term; op = operator; right = expr_op_term
-    { Btree.Node (Value_name.Relative.of_ustrings_unchecked op, Leaf left, Leaf right) }
-  | left = expr_op_tree; op = operator; right = expr_op_term
-    { Btree.Node (Value_name.Relative.of_ustrings_unchecked op, left, Leaf right) }
+  | left = with_loc(expr_op_term); op = with_loc(operator); right = with_loc(expr_op_term)
+    { Btree.Node (
+        Node.map op ~f:Value_name.Relative.of_ustrings_unchecked,
+        Leaf left,
+        Leaf right) }
+  | left = expr_op_tree; op = with_loc(operator); right = with_loc(expr_op_term)
+    { Btree.Node (
+        Node.map op ~f:Value_name.Relative.of_ustrings_unchecked,
+        left,
+        Leaf right) }
 
 match_branch:
-  | branch = separated_pair(pattern, ARROW, expr) { branch }
+  | branch = separated_pair(with_loc(pattern), ARROW, expr) { branch }
   | left = pattern; PIPE; right = match_branch
-    { Pattern.union left (fst right), snd right }
+    { let right, expr = right in 
+      let right, right_span = Node.with_value right ~f:Fn.id, Node.span right in
+      let span = Span.combine (Span.of_loc $loc(left)) right_span in
+      Node.create (Pattern.union left right) span, expr }
 
 match_branches:
   | PIPE; branches = separated_nonempty(PIPE, match_branch) { branches }
@@ -162,24 +171,31 @@ let_rec:
   | LET { true }
   | LET_NONREC { false }
 
-let_binding_:
-  | pat = pattern; EQUALS; expr = expr { pat, expr }
-  | fun_name = pattern_name; args = nonempty(pattern_term); EQUALS; body = expr
-    { Pattern.Catch_all fun_name, Expr.Lambda (args, body) }
+let_binding:
+  | pat = with_loc(pattern); EQUALS; expr = expr { pat, expr }
+  | fun_name = with_loc(pattern_name); args = nonempty(with_loc(pattern_term));
+    EQUALS; body = expr
+    { Node.map fun_name ~f:Pattern.catch_all,
+      Node.create (Expr.Lambda (args, body)) (Span.of_loc ($startpos(args), $endpos(body))) }
 
-let_binding: b = with_loc(let_binding_) { b }
-
-expr:
+expr_:
   | op_tree = expr_op_tree { Expr.Op_tree op_tree }
   | e = expr_op_term { e }
-  | BACKSLASH; args = nonempty(pattern_term); ARROW; body = expr
+  | BACKSLASH; args = nonempty(with_loc(pattern_term)); ARROW; body = expr
     { Expr.Lambda (args, body) }
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
+  (* TODO: Allow the OCaml-like `match ... with` syntax to reduce surprise. *)
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
-  | MATCH; branches = match_branches { Expr.match_function branches }
+  | _m = MATCH; branches = match_branches
+    { Expr.match_function
+        ~match_keyword_span:(Span.of_loc $loc(_m))
+        ~branches_span:(Span.of_loc $loc(branches))
+        branches }
   | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding); IN; body = expr
     { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
+
+%inline expr: e = with_loc(expr_) { e }
 
 type_record:
   (* TODO Support function types directly as record fields *)
@@ -251,22 +267,29 @@ fixity:
   | INFIXL; n = INT { Fixity.(of_decl_exn Left n) }
   | INFIXR; n = INT { Fixity.(of_decl_exn Right n) }
 
-%inline import_module_path:
-  | IMPORT; path = separated_nonempty(PERIOD, UPPER_NAME)
-    { Module_path.Relative.of_ustrings_unchecked (Nonempty.to_list path) }
+n_periods:
+  | { 0 }
+  | PERIOD { 1 }
+  | n = N_PERIODS { n }
 
-%inline import_item:
+%inline unidentified_name:
   | name = either(val_name, UPPER_NAME) { Unidentified_name.of_ustring name }
 
-%inline import_items: items = flexible_nonempty(COMMA, import_item) { items }
+import_paths_after_module:
+  | paths = import_paths { [ paths ] }
+  | paths = parens(separated_nonempty(COMMA, import_paths)) { paths }
+
+import_paths:
+  | module_name = UPPER_NAME; PERIOD; paths = import_paths_after_module
+    { Module.Import.Paths.Module (Module_name.of_ustring_unchecked module_name, paths) }
+  | name = unidentified_name { Name name }
+  | UNDERSCORE { All }
+  | name = unidentified_name; AS; as_name = unidentified_name { Name_as (name, as_name) }
+  | name = unidentified_name; AS; UNDERSCORE { Name_excluded name }
 
 import_stmt:
-  | IMPORT; name = UPPER_NAME { Module.Import (Module_name.of_ustring_unchecked name) }
-  | path = import_module_path; WITH; ASTERISK { Module.Import_with (path, []) }
-  | path = import_module_path; WITH; items = import_items
-    { Module.Import_with (path, Nonempty.to_list items) }
-  | path = import_module_path; WITHOUT; items = import_items
-    { Module.Import_without (path, items) }
+  | IMPORT; n_periods = n_periods; paths = import_paths
+    { { Module.Import.kind = Module.Import.Kind.of_n_periods n_periods ; paths } }
 
 stmt_common:
   | VAL; name = val_name; fix = parens(fixity)?; colon; t = type_expr_bounded
@@ -278,8 +301,8 @@ stmt_common:
   | TYPE; name = UPPER_NAME; params = type_params; decl = preceded(EQUALS, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
-        (params, Option.value decl ~default:Abstract)) }
-  | import = import_stmt { import }
+        (Type.Decl.params_of_list params, Option.value decl ~default:Abstract)) }
+  | import = import_stmt { Module.Import import }
 
 stmt_sig_:
   | s = stmt_common { Module.Common_sig s }
@@ -321,7 +344,7 @@ prog:
 %inline type_annot(X): a = separated_pair(X, colon, type_expr) { a }
 %inline type_annot_non_fun(X): a = separated_pair(X, colon, type_non_fun) { a }
 %inline type_annot_bounded(X):
-  | a = separated_pair(X, colon, type_expr_bounded) { a }
+  | a = separated_pair(X, colon, with_loc(type_expr_bounded)) { a }
 
 %inline record_field_EQUALS(X):
   | field = LOWER_NAME; x = preceded(EQUALS, X)?

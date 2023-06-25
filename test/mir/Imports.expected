@@ -1,0 +1,7 @@
+((Fun_def
+  ((fun_name Imports.You_can_define_types_in_between_imports)
+   (args (Imports.*arg0.1))
+   (body (Make_block (tag 0) (fields ((Name Imports.*arg0.1)))))))
+ (Fun_def
+  ((fun_name Imports.Bad_style_though) (args (Imports.*arg0.2))
+   (body (Make_block (tag 1) (fields ((Name Imports.*arg0.2))))))))

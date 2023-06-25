@@ -2,23 +2,24 @@ open Import
 open Names
 
 module Name_entry : sig
+  type t [@@deriving equal, sexp]
+
   module Type_source : sig
     type t =
       | Placeholder
       | Let_inferred
       | Val_declared
+      | Val_and_let
       | Extern_declared
-    [@@deriving equal, sexp]
+    [@@deriving compare, enumerate, equal, sexp, variants]
   end
-
-  type t [@@deriving equal, sexp]
 
   val typ : t -> Type.t
   val scheme : t -> Module_path.absolute Type.Scheme.t option
   val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
-  val let_inferred : ?fixity:Fixity.t -> ?extern_name:Extern_name.t -> Type.t -> t
+  val create : ?fixity:Fixity.t -> type_source:Type_source.t -> Type.t -> t
   val merge : t -> t -> t
   val identical : t -> t -> bool
 end
@@ -29,7 +30,7 @@ module Type_entry : sig
   module Id : sig
     type t [@@deriving equal, compare, hash, sexp_of]
 
-    include Hashable.S_plain with type t := t
+    include Comparable.S_plain with type t := t
   end
 
   val decl : t -> Module_path.absolute Type.Decl.t
@@ -48,12 +49,23 @@ val prelude : t Lazy.t
 val without_std : t -> t
 
 (* Querying/updating names *)
-val find_entry : t -> Value_name.Relative.t -> Name_entry.t
-val find_entry' : t -> Value_name.Relative.t -> Value_name.Absolute.t * Name_entry.t
+val find_entry_with_path
+  :  t
+  -> Value_name.Relative.t
+  -> Value_name.Absolute.t * Name_entry.t
+
 val find_type : t -> Value_name.Relative.t -> Type.t
 val find_cnstr_type : t -> Cnstr_name.Relative.t -> Type.t
 val find_fixity : t -> Value_name.Relative.t -> Fixity.t
-val set_inferred_scheme : t -> Value_name.t -> Module_path.absolute Type.Scheme.t -> t
+
+val set_inferred_scheme
+  :  t
+  -> Value_name.t
+  -> Module_path.absolute Type.Scheme.t
+  -> shadowing_allowed:bool
+  -> check_existing:(Name_entry.t -> unit)
+  -> t
+
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_decl_placeholder : t -> Type_name.t -> Module_path.relative Type.Decl.t -> t
 
@@ -70,14 +82,7 @@ val merge_names
   -> combine:(Value_name.t -> Name_entry.t -> Name_entry.t -> Name_entry.t)
   -> t
 
-(* TODO: removed the non-qualified version, since it's unused. *)
-
-(** Find a type declaration given a qualified name *)
-val find_type_decl
-  :  ?defs_only:bool
-  -> t
-  -> Type_name.Relative.t
-  -> Module_path.absolute Type.Decl.t
+val find_absolute_entry : t -> Value_name.Absolute.t -> Name_entry.t
 
 (** Find a type declaration given an absolute qualified name *)
 val find_absolute_type_decl
@@ -109,8 +114,6 @@ val absolutify_type_decl
 val current_path : t -> Module_path.Absolute.t
 val into_module : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
 val into_parent : t -> t
-
-(* TODO: maybe the interface should be ~f_sigs ~f_defs ? *)
 val with_submodule : t -> place:[ `Sig | `Def ] -> Module_name.t -> f:(t -> t) -> t
 
 val with_submodule'
@@ -123,12 +126,9 @@ val with_submodule'
 val with_path_into_defs : t -> Module_path.Absolute.t -> f:(t -> t * 'a) -> t * 'a
 
 (* AST handling *)
-(* TODO: rename the existing module Import to Common, and split into Import.t with:
-   `val import : t -> Import.t -> t` *)
-val import : t -> Module_name.t -> t
-val import_with : t -> Module_path.Relative.t -> Unidentified_name.t list -> t
+val import : t -> Module.Import.t -> t
 val import_all : t -> Module_path.Relative.t -> t
-val import_without : t -> Module_path.Relative.t -> Unidentified_name.t Nonempty.t -> t
+val import_all_absolute : t -> Module_path.Absolute.t -> t
 
 val add_val
   :  t
@@ -175,3 +175,7 @@ val find_sigs_and_defs
   -> Module_path.Relative.t
   -> Module_name.t
   -> Sigs_or_defs.t option * Sigs_or_defs.t
+
+module For_testing : sig
+  val create : names:Name_entry.t Value_name.Map.t -> t
+end

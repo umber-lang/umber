@@ -15,7 +15,7 @@ type ('typ, 'name) t =
   | Record of (Value_name.t * ('typ, 'name) t option) Nonempty.t
   | Union of ('typ, 'name) t * ('typ, 'name) t
   | Type_annotation of ('typ, 'name) t * 'typ
-[@@deriving sexp, variants]
+[@@deriving equal, sexp, variants]
 
 let rec fold pat ~init ~f =
   let retry init pat = fold pat ~init ~f in
@@ -43,9 +43,8 @@ module Names = struct
 
   let empty = Value_name.Map.empty
 
-  (* TODO: consider making this a map to types directly, since let_inferred is always used *)
-  let add_name pat_names name typ =
-    let name_entry = Name_bindings.Name_entry.let_inferred typ in
+  let add_name pat_names name typ ~type_source =
+    let name_entry = Name_bindings.Name_entry.create typ ~type_source in
     match Map.add pat_names ~key:name ~data:name_entry with
     | `Ok pat_names -> pat_names
     | `Duplicate ->
@@ -54,9 +53,9 @@ module Names = struct
         (Value_name.to_ustring name)
   ;;
 
-  let add_fresh_name pat_names name =
+  let add_fresh_name pat_names name ~type_source =
     let var = Type.fresh_var () in
-    add_name pat_names name var, var
+    add_name pat_names name var ~type_source, var
   ;;
 
   let fold pat ~init ~f =
@@ -77,9 +76,9 @@ module Names = struct
     loop init ~f pat
   ;;
 
-  let gather =
-    fold ~init:Value_name.Map.empty ~f:(fun pat_names name ->
-      fst (add_fresh_name pat_names name))
+  let gather pat ~type_source =
+    fold pat ~init:Value_name.Map.empty ~f:(fun pat_names name ->
+      fst (add_fresh_name pat_names name ~type_source))
   ;;
 
   let find = Map.find

@@ -1,3 +1,13 @@
-("Compilation error"
- ((kind Name_error) (msg ("Name clashes with import" Std.Prelude.Option))
-  (filename Option.um) (span 9:3-11:13)))
+(Option
+ ((Common_sig
+   (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a)))))))))
+ ((Common_def
+   (Import
+    ((kind Absolute)
+     (paths
+      (Module Std
+       ((Module Prelude
+         (All (Name_excluded Option) (Name_excluded None)
+          (Name_excluded Some)))))))))
+  (Common_def
+   (Type_decl Option ((a) (Variants ((None ()) (Some ((Var a))))))))))

@@ -2,54 +2,55 @@
  (Value_def MutualRecursion.f (Name Std.Prelude.List.Nil))
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
  (Fun_def
-  ((fun_name MutualRecursion.loop)
-   (args (MutualRecursion.acc MutualRecursion.forest))
+  ((fun_name MutualRecursion.loop.1)
+   (args (MutualRecursion.acc.1 MutualRecursion.forest.1))
    (body
     (Cond_assign
-     (conds (((Constant_tag_equals (Name MutualRecursion.forest) 0) ())))
-     (body (Name MutualRecursion.acc))
+     (conds (((Constant_tag_equals (Name MutualRecursion.forest.1) 0) ())))
+     (body (Name MutualRecursion.acc.1))
      (if_none_matched
       (Otherwise
-       (Let MutualRecursion.trees
-        (Get_block_field 1 (Name MutualRecursion.forest))
-        (Let MutualRecursion.tree
-         (Get_block_field 0 (Name MutualRecursion.forest))
-         (Fun_call MutualRecursion.loop
+       (Let MutualRecursion.trees.1
+        (Get_block_field 1 (Name MutualRecursion.forest.1))
+        (Let MutualRecursion.tree.1
+         (Get_block_field 0 (Name MutualRecursion.forest.1))
+         (Fun_call MutualRecursion.loop.1
           ((Fun_call Std.Prelude.Operators.+
-            ((Name MutualRecursion.acc)
+            ((Name MutualRecursion.acc.1)
              (Fun_call MutualRecursion.sum_tree
-              ((Name MutualRecursion.tree)))))
-           (Name MutualRecursion.trees)))))))))))
+              ((Name MutualRecursion.tree.1)))))
+           (Name MutualRecursion.trees.1)))))))))))
  (Fun_def
-  ((fun_name MutualRecursion.sum_forest) (args (MutualRecursion.forest.1))
+  ((fun_name MutualRecursion.sum_forest) (args (MutualRecursion.forest.2))
    (body
-    (Fun_call MutualRecursion.loop
-     ((Primitive (Int 0)) (Name MutualRecursion.forest.1))))))
+    (Fun_call MutualRecursion.loop.1
+     ((Primitive (Int 0)) (Name MutualRecursion.forest.2))))))
  (Fun_def
-  ((fun_name MutualRecursion.sum_tree) (args (MutualRecursion.))
+  ((fun_name MutualRecursion.sum_tree) (args (MutualRecursion..1))
    (body
     (Cond_assign
-     (conds (((Constant_tag_equals (Name MutualRecursion.) 0) ())))
+     (conds (((Constant_tag_equals (Name MutualRecursion..1) 0) ())))
      (body (Primitive (Int 0)))
      (if_none_matched
       (Otherwise
-       (Let MutualRecursion.forest.2
-        (Get_block_field 1 (Name MutualRecursion.))
-        (Let MutualRecursion.x (Get_block_field 0 (Name MutualRecursion.))
+       (Let MutualRecursion.forest.3
+        (Get_block_field 1 (Name MutualRecursion..1))
+        (Let MutualRecursion.x.1
+         (Get_block_field 0 (Name MutualRecursion..1))
          (Fun_call Std.Prelude.Operators.+
-          ((Name MutualRecursion.x)
+          ((Name MutualRecursion.x.1)
            (Fun_call MutualRecursion.sum_forest
-            ((Name MutualRecursion.forest.2)))))))))))))
+            ((Name MutualRecursion.forest.3)))))))))))))
  (Value_def MutualRecursion.Leaf (Make_block (tag 0)))
  (Fun_def
   ((fun_name MutualRecursion.Node)
-   (args (MutualRecursion.arg0 MutualRecursion.arg1))
+   (args (MutualRecursion.*arg0.1 MutualRecursion.*arg1.1))
    (body
     (Make_block (tag 0)
-     (fields ((Name MutualRecursion.arg0) (Name MutualRecursion.arg1)))))))
+     (fields ((Name MutualRecursion.*arg0.1) (Name MutualRecursion.*arg1.1)))))))
  (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
- (Value_def MutualRecursion.*binding
-  (Let MutualRecursion.tree.1
+ (Value_def MutualRecursion.*binding.1
+  (Let MutualRecursion.tree.2
    (Make_block (tag 0)
     (fields
      ((Primitive (Int 1))
@@ -62,37 +63,37 @@
              (fields ((Primitive (Int 17)) (Name Std.Prelude.List.Nil))))
             (Name Std.Prelude.List.Nil))))))))))
    (Fun_call Std.Prelude.print_int
-    ((Fun_call MutualRecursion.sum_tree ((Name MutualRecursion.tree.1)))))))
+    ((Fun_call MutualRecursion.sum_tree ((Name MutualRecursion.tree.2)))))))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_def
-  ((fun_name MutualRecursion.even) (args (MutualRecursion.x.1))
-   (body
-    (Let MutualRecursion.match
-     (Fun_call Std.Prelude.Operators.==
-      ((Name MutualRecursion.x.1) (Primitive (Int 0))))
-     (Cond_assign
-      (conds (((Constant_tag_equals (Name MutualRecursion.match) 1) ())))
-      (body (Make_block (tag 1)))
-      (if_none_matched
-       (Otherwise
-        (Fun_call MutualRecursion.odd
-         ((Fun_call Std.Prelude.Operators.-
-           ((Name MutualRecursion.x.1) (Primitive (Int 1)))))))))))))
- (Fun_def
-  ((fun_name MutualRecursion.odd) (args (MutualRecursion.x.2))
+  ((fun_name MutualRecursion.even) (args (MutualRecursion.x.2))
    (body
     (Let MutualRecursion.match.1
      (Fun_call Std.Prelude.Operators.==
       ((Name MutualRecursion.x.2) (Primitive (Int 0))))
      (Cond_assign
       (conds (((Constant_tag_equals (Name MutualRecursion.match.1) 1) ())))
+      (body (Make_block (tag 1)))
+      (if_none_matched
+       (Otherwise
+        (Fun_call MutualRecursion.odd
+         ((Fun_call Std.Prelude.Operators.-
+           ((Name MutualRecursion.x.2) (Primitive (Int 1)))))))))))))
+ (Fun_def
+  ((fun_name MutualRecursion.odd) (args (MutualRecursion.x.3))
+   (body
+    (Let MutualRecursion.match.2
+     (Fun_call Std.Prelude.Operators.==
+      ((Name MutualRecursion.x.3) (Primitive (Int 0))))
+     (Cond_assign
+      (conds (((Constant_tag_equals (Name MutualRecursion.match.2) 1) ())))
       (body (Make_block (tag 0)))
       (if_none_matched
        (Otherwise
         (Fun_call MutualRecursion.even
          ((Fun_call Std.Prelude.Operators.-
-           ((Name MutualRecursion.x.2) (Primitive (Int 1)))))))))))))
+           ((Name MutualRecursion.x.3) (Primitive (Int 1)))))))))))))
  (Value_def MutualRecursion.number
   (Let MutualRecursion.number.1 (Primitive (Int 5))
    (Let MutualRecursion.number.2

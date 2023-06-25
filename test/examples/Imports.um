@@ -1,15 +1,53 @@
-import Math
-import Math with abs
+import Std.Prelude.Float
+import Std.Prelude.(Int, Option)
+import Std.Prelude.Float.abs
+import Std.Prelude.Float.(sin, cos)
 type Cool =
   | You_can_define_types_in_between_imports ()
   | Bad_style_though (Option ())
-import Number.Int with *
-import Number.Float without pi
-import Number with (*)
+import Std.Prelude.Int._
+import Std.Prelude.Operators.(*)
+import Std.Prelude.(List, Float.(pi, (+)))
 
 module : {
-  val (*) : (Num a) => a, a -> a
+  # Imports work in signatures as well
+  import .A.Foo
+
+  module A : {
+    import ..B.Bar # Not needed since `B.Bar` is already in scope, but allowed
+
+    type Foo = Bar
+  }
+
+  module B : {
+    import Std.Prelude.Int
+
+    type Bar = Int
+
+    module C : {
+      import ...A.Foo
+    }
+  }
+
+  val (*) (infixl 7) : Int, Int -> Int
 }
+
+
+# TODO: These are needed because the type declaration from the signature uses an import.
+# We should probably find a way to fix that quirk.
+module A = {
+  import ..B.Bar
+}
+module B = {
+  import Std.Prelude.Int
+
+  module C = {
+    import ...A.Foo
+  }
+}
+
+import .A.Foo
+
 
 # TODO: should the value (*) automatically get re-exported or do you have to write this:
 # Maybe there could be a compiler directive at the top of the file to switch re-exports
@@ -21,4 +59,4 @@ module : {
 # - When there is a `module :`, imports are re-exported if listed in the signature
 # What about something like the Prelude?
 # Maybe something like `import@export`?
-let (*) = (*)
+#let (*) = (*)

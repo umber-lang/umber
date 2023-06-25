@@ -4,13 +4,13 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
-%umber_block4 = type { %umber_header, [4 x i64] }
+%umber_block32b = type { %umber_header, [32 x i8] }
 
-@CrossModuleUsage.source = constant %umber_block* bitcast (%umber_block4* @string.619126749 to %umber_block*)
+@CrossModuleUsage.source = constant %umber_block* bitcast (%umber_block32b* @string.619126749 to %umber_block*)
 @CrossModuleUsage.A.print.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @Std.Prelude.print to %umber_block*)
 @Std.Prelude.List.Nil = external global %umber_block*
 @CrossModuleUsage.empty = global %umber_block* null
-@string.619126749 = constant %umber_block4 { %umber_header { i16 -32764, i16 4, i32 0 }, [32 x i8] c"everything depends on me\00\00\00\00\00\00\00\07" }
+@string.619126749 = constant %umber_block32b { %umber_header { i16 -32764, i16 4, i32 0 }, [32 x i8] c"everything depends on me\00\00\00\00\00\00\00\07" }
 
 define i32 @"umber_main:./examples/CrossModuleUsage.um"() {
 entry:
@@ -19,13 +19,13 @@ entry:
   ret i32 0
 }
 
-define tailcc %umber_block* @CrossModuleUsage.A.a(%umber_block* %"CrossModuleUsage.A.*lambda_arg") {
+define tailcc %umber_block* @CrossModuleUsage.A.a(%umber_block* %"CrossModuleUsage.A.*lambda_arg.1") {
 entry:
   %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.b(%umber_block* inttoptr (i64 1 to %umber_block*))
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @CrossModuleUsage.A.b(%umber_block* %"CrossModuleUsage.A.*lambda_arg.1") {
+define tailcc %umber_block* @CrossModuleUsage.A.b(%umber_block* %"CrossModuleUsage.A.*lambda_arg.2") {
 entry:
   %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.a(%umber_block* inttoptr (i64 1 to %umber_block*))
   ret %umber_block* %fun_call
@@ -33,14 +33,14 @@ entry:
 
 declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
-define tailcc %umber_block* @CrossModuleUsage.A.print(%umber_block* %CrossModuleUsage.A.arg0) {
+define tailcc %umber_block* @CrossModuleUsage.A.print(%umber_block* %"CrossModuleUsage.A.*arg0.1") {
 entry:
   %CrossModuleUsage.A.print.1 = load %umber_block*, %umber_block** @CrossModuleUsage.A.print.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %CrossModuleUsage.A.print.1, %umber_block* %CrossModuleUsage.A.arg0)
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %CrossModuleUsage.A.print.1, %umber_block* %"CrossModuleUsage.A.*arg0.1")
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @CrossModuleUsage.A.print_source(%umber_block* %"CrossModuleUsage.A.*lambda_arg.2") {
+define tailcc %umber_block* @CrossModuleUsage.A.print_source(%umber_block* %"CrossModuleUsage.A.*lambda_arg.3") {
 entry:
   %CrossModuleUsage.source = load %umber_block*, %umber_block** @CrossModuleUsage.source, align 8
   %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.print(%umber_block* %CrossModuleUsage.source)
@@ -49,7 +49,7 @@ entry:
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @CrossModuleUsage.print_source(%umber_block* %"CrossModuleUsage.*lambda_arg") {
+define tailcc %umber_block* @CrossModuleUsage.print_source(%umber_block* %"CrossModuleUsage.*lambda_arg.1") {
 entry:
   %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.print_source(%umber_block* inttoptr (i64 1 to %umber_block*))
   %CrossModuleUsage.source = load %umber_block*, %umber_block** @CrossModuleUsage.source, align 8

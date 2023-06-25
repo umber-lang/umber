@@ -2,9 +2,10 @@ open Import
 
 module Level : sig
   (** A number from 0-9 representing the precedence level (higher is tighter) *)
-  type t = private int [@@deriving compare, equal, hash, sexp]
+  type t = private int [@@deriving compare, equal, hash, sexp, enumerate]
 
-  include Comparable.Infix with type t := t
+  module O : Comparable.Infix with type t := t
+  include module type of O
 
   val min : t
   val max : t
@@ -18,12 +19,12 @@ module Assoc : sig
     | Non_assoc
     | Left
     | Right
-  [@@deriving compare, equal, hash, sexp]
+  [@@deriving compare, equal, hash, sexp, enumerate]
 
   val compatible : t -> t -> bool
 end
 
-type t = Assoc.t * Level.t [@@deriving compare, equal, hash, sexp]
+type t = Assoc.t * Level.t [@@deriving compare, equal, hash, sexp, enumerate]
 
 val default : t
 val of_decl_exn : Assoc.t -> int -> t

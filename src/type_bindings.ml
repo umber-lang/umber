@@ -1,15 +1,28 @@
 open Import
+open Names
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
-     GADTs (local type equality/type narrowing)
-     Some of these features can make local let-generalization difficult, see:
-     https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf
-     for an argument for just abolishing local let-generalization *)
+   GADTs (local type equality/type narrowing)
+   Some of these features can make local let-generalization difficult, see:
+   https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/tldi10-vytiniotis.pdf
+   for an argument for just abolishing local let-generalization *)
 
-exception Type_error of Ustring.t * (Type.t * Type.t) option [@@deriving sexp]
+(* TODO: Consider integrating source locations into stored types to give better type
+   errors. *)
 
-let type_error s t1 t2 = raise (Type_error (Ustring.of_string_exn s, Some (t1, t2)))
-let type_error_msg s = raise (Type_error (Ustring.of_string_exn s, None))
+let type_error msg t1 t2 =
+  (* Prevent unstable Var_ids from appearing in test output *)
+  let env = Type.Param.Env_of_vars.create () in
+  let handle_var = Type.Param.Env_of_vars.find_or_add env in
+  let map_type t =
+    Type.Expr.map t ~var:handle_var ~pf:handle_var ~name:Fn.id
+    |> [%sexp_of:
+         (Type_param_name.t, Type_param_name.t, Module_path.absolute) Type.Expr.t]
+  in
+  Compilation_error.raise
+    Type_error
+    ~msg:[%message msg ~type1:(map_type t1 : Sexp.t) ~type2:(map_type t2 : Sexp.t)]
+;;
 
 type t = { vars : Type.t Type.Var_id.Table.t } [@@deriving sexp]
 
@@ -37,10 +50,11 @@ let rec unify ~names ~types t1 t2 =
     | Ok () -> ()
     | Unequal_lengths -> type_error "Type item length mismatch" t1 t2
   in
-  let instantiate_alias param_list expr =
+  let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     let params = Type.Param.Env_to_vars.create () in
-    List.iter param_list ~f:(fun p ->
-      ignore (Type.Param.Env_to_vars.find_or_add params p : Type.Var_id.t));
+    List.iter
+      (param_list :> Type_param_name.t list)
+      ~f:(fun p -> ignore (Type.Param.Env_to_vars.find_or_add params p : Type.Var_id.t));
     Type.Scheme.instantiate expr ~params
   in
   let lookup_type names name args =
@@ -93,7 +107,7 @@ let rec unify ~names ~types t1 t2 =
        unify ~names ~types (Var id') res;
        unify ~names ~types (Var id) (Partial_function (args2_trailing, id'))
      | Same_length -> unify ~names ~types (Var id) res)
-  | Function (args2, res), Partial_function (args1, id) ->
+  | Function (args1, res), Partial_function (args2, id) ->
     (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
      | Left_trailing args1_trailing ->
        let id' = Type.Var_id.create () in
@@ -132,6 +146,9 @@ and combine_partial_functions types typ args id =
        Halt (Function (args, type_sub)))
 ;;
 
+(* TODO: We should probably have a notion of type variable scope so that the type
+   variables we introduce can be shared between multiple type expressions in the same
+   expresion/statement. *)
 let generalize types typ =
   let env = Type.Param.Env_of_vars.create () in
   Type.Expr.map

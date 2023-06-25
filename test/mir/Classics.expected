@@ -1,44 +1,44 @@
 ((Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fact) (args (Classics.))
+  ((fun_name Classics.fact) (args (Classics..1))
    (body
     (Cond_assign
      (conds
-      (((Equals (Name Classics.) (Int 0)) ())
-       ((Equals (Name Classics.) (Int 1)) ())))
+      (((Equals (Name Classics..1) (Int 0)) ())
+       ((Equals (Name Classics..1) (Int 1)) ())))
      (body (Primitive (Int 1)))
      (if_none_matched
       (Otherwise
-       (Let Classics.n (Name Classics.)
+       (Let Classics.n.1 (Name Classics..1)
         (Fun_call Std.Prelude.Operators.*
-         ((Name Classics.n)
+         ((Name Classics.n.1)
           (Fun_call Classics.fact
            ((Fun_call Std.Prelude.Operators.-
-             ((Name Classics.n) (Primitive (Int 1)))))))))))))))
+             ((Name Classics.n.1) (Primitive (Int 1)))))))))))))))
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fib) (args (Classics.n.1))
+  ((fun_name Classics.fib) (args (Classics.n.2))
    (body
     (Cond_assign
      (conds
-      (((Equals (Name Classics.n.1) (Int 0)) ())
-       ((Equals (Name Classics.n.1) (Int 1)) ())))
+      (((Equals (Name Classics.n.2) (Int 0)) ())
+       ((Equals (Name Classics.n.2) (Int 1)) ())))
      (body (Primitive (Int 1)))
      (if_none_matched
       (Otherwise
-       (Let Classics.n.2 (Name Classics.n.1)
+       (Let Classics.n.3 (Name Classics.n.2)
         (Fun_call Std.Prelude.Operators.+
          ((Fun_call Classics.fib
            ((Fun_call Std.Prelude.Operators.-
-             ((Name Classics.n.2) (Primitive (Int 1))))))
+             ((Name Classics.n.3) (Primitive (Int 1))))))
           (Fun_call Classics.fib
            ((Fun_call Std.Prelude.Operators.-
-             ((Name Classics.n.2) (Primitive (Int 2)))))))))))))))
+             ((Name Classics.n.3) (Primitive (Int 2)))))))))))))))
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
- (Value_def Classics.*binding
+ (Value_def Classics.*binding.1
   (Fun_call "Std.Prelude.Operators.;"
    ((Fun_call "Std.Prelude.Operators.;"
      ((Fun_call Std.Prelude.print ((Primitive (String "5! is:"))))

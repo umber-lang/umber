@@ -1,0 +1,8 @@
+let (:/) x y = print (x ++ " is mid. I prefer " ++ y)
+
+let apply f = ((print "called apply"; "lasagna") :f:)
+
+let () = 
+  let g = apply (:/) in
+  print "between";
+  g "penne"

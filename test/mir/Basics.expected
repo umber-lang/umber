@@ -1,6 +1,6 @@
 ((Value_def Basics.false (Make_block (tag 0)))
  (Value_def Basics.true (Make_block (tag 1)))
- (Value_def Basics._
+ (Value_def Basics._.1
   (Cond_assign (conds (((Constant_tag_equals (Name Basics.false) 1) ())))
    (body (Primitive (Float 1)))
    (if_none_matched (Otherwise (Primitive (Float 2.5))))))
@@ -10,16 +10,18 @@
  (Value_def Basics.Yellow (Make_block (tag 1)))
  (Value_def Basics.Purple (Make_block (tag 2)))
  (Fun_def
-  ((fun_name Basics.Regular) (args (Basics.arg0))
-   (body (Make_block (tag 0) (fields ((Name Basics.arg0)))))))
+  ((fun_name Basics.Regular) (args (Basics.*arg0.1))
+   (body (Make_block (tag 0) (fields ((Name Basics.*arg0.1)))))))
  (Fun_def
-  ((fun_name Basics.Expanded) (args (Basics.arg0.1))
-   (body (Make_block (tag 1) (fields ((Name Basics.arg0.1)))))))
+  ((fun_name Basics.Expanded) (args (Basics.*arg0.2))
+   (body (Make_block (tag 1) (fields ((Name Basics.*arg0.2)))))))
  (Fun_def
-  ((fun_name Basics.Point3) (args (Basics.arg0.2 Basics.arg1 Basics.arg2))
+  ((fun_name Basics.Point3)
+   (args (Basics.*arg0.3 Basics.*arg1.1 Basics.*arg2.1))
    (body
     (Make_block (tag 0)
-     (fields ((Name Basics.arg0.2) (Name Basics.arg1) (Name Basics.arg2)))))))
+     (fields
+      ((Name Basics.*arg0.3) (Name Basics.*arg1.1) (Name Basics.*arg2.1)))))))
  (Value_def Basics.xyz
   (Make_block (tag 0)
    (fields ((Primitive (Int 1)) (Primitive (Int 2)) (Primitive (Int 3)))))))

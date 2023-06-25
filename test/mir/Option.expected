@@ -1,0 +1,4 @@
+((Value_def Option.None (Make_block (tag 0)))
+ (Fun_def
+  ((fun_name Option.Some) (args (Option.*arg0.1))
+   (body (Make_block (tag 0) (fields ((Name Option.*arg0.1))))))))

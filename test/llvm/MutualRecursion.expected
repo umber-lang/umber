@@ -9,7 +9,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Std.Prelude.List.Nil = external global %umber_block*
 @MutualRecursion.f = global %umber_block* null
 @MutualRecursion.Leaf = constant %umber_block* inttoptr (i64 1 to %umber_block*)
-@"MutualRecursion.*binding" = global %umber_block* null
+@"MutualRecursion.*binding.1" = global %umber_block* null
 @MutualRecursion.number = global %umber_block* null
 @int.0 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 0 }
 @int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
@@ -69,7 +69,7 @@ entry:
   %box29 = bitcast %umber_block** %box26 to %umber_block*
   %fun_call = tail call tailcc %umber_block* @MutualRecursion.sum_tree(%umber_block* %box29)
   %fun_call30 = tail call tailcc %umber_block* @Std.Prelude.print_int(%umber_block* %fun_call)
-  store %umber_block* %fun_call30, %umber_block** @"MutualRecursion.*binding", align 8
+  store %umber_block* %fun_call30, %umber_block** @"MutualRecursion.*binding.1", align 8
   %fun_call31 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
   store %umber_block* %fun_call31, %umber_block** @MutualRecursion.number, align 8
   ret i32 0
@@ -77,7 +77,7 @@ entry:
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @MutualRecursion.loop(%umber_block* %MutualRecursion.acc, %umber_block* %MutualRecursion.forest) {
+define tailcc %umber_block* @MutualRecursion.loop.1(%umber_block* %MutualRecursion.acc.1, %umber_block* %MutualRecursion.forest.1) {
 entry:
   br label %cond
 
@@ -85,37 +85,37 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %MutualRecursion.forest1 = ptrtoint %umber_block* %MutualRecursion.forest to i64
-  %equals = icmp eq i64 %MutualRecursion.forest1, 1
+  %MutualRecursion.forest.11 = ptrtoint %umber_block* %MutualRecursion.forest.1 to i64
+  %equals = icmp eq i64 %MutualRecursion.forest.11, 1
   br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond
-  %block_field_gep = getelementptr %umber_block, %umber_block* %MutualRecursion.forest, i32 0, i32 1, i32 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %MutualRecursion.forest.1, i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep2 = getelementptr %umber_block, %umber_block* %MutualRecursion.forest, i32 0, i32 1, i32 0
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %MutualRecursion.forest.1, i32 0, i32 1, i32 0
   %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
   %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
   %fun_call = tail call tailcc %umber_block* @MutualRecursion.sum_tree(%umber_block* %block_field4)
-  %fun_call5 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %MutualRecursion.acc, %umber_block* %fun_call)
-  %fun_call6 = tail call tailcc %umber_block* @MutualRecursion.loop(%umber_block* %fun_call5, %umber_block* %block_field)
+  %fun_call5 = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %MutualRecursion.acc.1, %umber_block* %fun_call)
+  %fun_call6 = tail call tailcc %umber_block* @MutualRecursion.loop.1(%umber_block* %fun_call5, %umber_block* %block_field)
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge7 = phi %umber_block* [ %MutualRecursion.acc, %cond_binding_merge ], [ %fun_call6, %cond_otherwise ]
+  %cond_otherwise_merge7 = phi %umber_block* [ %MutualRecursion.acc.1, %cond_binding_merge ], [ %fun_call6, %cond_otherwise ]
   ret %umber_block* %cond_otherwise_merge7
 }
 
-define tailcc %umber_block* @MutualRecursion.sum_forest(%umber_block* %MutualRecursion.forest.1) {
+define tailcc %umber_block* @MutualRecursion.sum_forest(%umber_block* %MutualRecursion.forest.2) {
 entry:
-  %fun_call = tail call tailcc %umber_block* @MutualRecursion.loop(%umber_block* bitcast (%umber_block1* @int.0 to %umber_block*), %umber_block* %MutualRecursion.forest.1)
+  %fun_call = tail call tailcc %umber_block* @MutualRecursion.loop.1(%umber_block* bitcast (%umber_block1* @int.0 to %umber_block*), %umber_block* %MutualRecursion.forest.2)
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @MutualRecursion.sum_tree(%umber_block* %MutualRecursion.) {
+define tailcc %umber_block* @MutualRecursion.sum_tree(%umber_block* %MutualRecursion..1) {
 entry:
   br label %cond
 
@@ -123,18 +123,18 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %MutualRecursion.1 = ptrtoint %umber_block* %MutualRecursion. to i64
-  %equals = icmp eq i64 %MutualRecursion.1, 1
+  %MutualRecursion..11 = ptrtoint %umber_block* %MutualRecursion..1 to i64
+  %equals = icmp eq i64 %MutualRecursion..11, 1
   br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond
-  %block_field_gep = getelementptr %umber_block, %umber_block* %MutualRecursion., i32 0, i32 1, i32 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %MutualRecursion..1, i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep2 = getelementptr %umber_block, %umber_block* %MutualRecursion., i32 0, i32 1, i32 0
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %MutualRecursion..1, i32 0, i32 1, i32 0
   %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
   %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
   %fun_call = tail call tailcc %umber_block* @MutualRecursion.sum_forest(%umber_block* %block_field)
@@ -146,7 +146,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   ret %umber_block* %cond_otherwise_merge6
 }
 
-define tailcc %umber_block* @MutualRecursion.Node(%umber_block* %MutualRecursion.arg0, %umber_block* %MutualRecursion.arg1) {
+define tailcc %umber_block* @MutualRecursion.Node(%umber_block* %"MutualRecursion.*arg0.1", %umber_block* %"MutualRecursion.*arg1.1") {
 entry:
   %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
@@ -155,9 +155,9 @@ entry:
   store i16 2, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* %MutualRecursion.arg0, %umber_block** %box4, align 8
+  store %umber_block* %"MutualRecursion.*arg0.1", %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
-  store %umber_block* %MutualRecursion.arg1, %umber_block** %box5, align 8
+  store %umber_block* %"MutualRecursion.*arg1.1", %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
   ret %umber_block* %box6
 }
@@ -168,33 +168,7 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block*, %umber_b
 
 declare tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @MutualRecursion.even(%umber_block* %MutualRecursion.x.1) {
-entry:
-  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* %MutualRecursion.x.1, %umber_block* bitcast (%umber_block1* @int.0 to %umber_block*))
-  br label %cond
-
-cond_binding_merge:                               ; preds = %cond_binding
-  br label %cond_otherwise_merge
-
-cond:                                             ; preds = %entry
-  %fun_call1 = ptrtoint %umber_block* %fun_call to i64
-  %equals = icmp eq i64 %fun_call1, 3
-  br i1 %equals, label %cond_binding, label %cond_otherwise
-
-cond_binding:                                     ; preds = %cond
-  br label %cond_binding_merge
-
-cond_otherwise:                                   ; preds = %cond
-  %fun_call2 = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %MutualRecursion.x.1, %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*))
-  %fun_call3 = tail call tailcc %umber_block* @MutualRecursion.odd(%umber_block* %fun_call2)
-  br label %cond_otherwise_merge
-
-cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
-  %cond_otherwise_merge4 = phi %umber_block* [ inttoptr (i64 3 to %umber_block*), %cond_binding_merge ], [ %fun_call3, %cond_otherwise ]
-  ret %umber_block* %cond_otherwise_merge4
-}
-
-define tailcc %umber_block* @MutualRecursion.odd(%umber_block* %MutualRecursion.x.2) {
+define tailcc %umber_block* @MutualRecursion.even(%umber_block* %MutualRecursion.x.2) {
 entry:
   %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* %MutualRecursion.x.2, %umber_block* bitcast (%umber_block1* @int.0 to %umber_block*))
   br label %cond
@@ -212,6 +186,32 @@ cond_binding:                                     ; preds = %cond
 
 cond_otherwise:                                   ; preds = %cond
   %fun_call2 = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %MutualRecursion.x.2, %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*))
+  %fun_call3 = tail call tailcc %umber_block* @MutualRecursion.odd(%umber_block* %fun_call2)
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge4 = phi %umber_block* [ inttoptr (i64 3 to %umber_block*), %cond_binding_merge ], [ %fun_call3, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge4
+}
+
+define tailcc %umber_block* @MutualRecursion.odd(%umber_block* %MutualRecursion.x.3) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* %MutualRecursion.x.3, %umber_block* bitcast (%umber_block1* @int.0 to %umber_block*))
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %fun_call1 = ptrtoint %umber_block* %fun_call to i64
+  %equals = icmp eq i64 %fun_call1, 3
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  %fun_call2 = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %MutualRecursion.x.3, %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*))
   %fun_call3 = tail call tailcc %umber_block* @MutualRecursion.even(%umber_block* %fun_call2)
   br label %cond_otherwise_merge
 

@@ -91,15 +91,6 @@ end)
 
 let mem xs = List.mem (to_list xs)
 
-let zip (x :: xs) (y :: ys) =
-  let rec loop xs ys acc =
-    match xs, ys with
-    | [], _ | _, [] -> acc
-    | x :: xs, y :: ys -> loop xs ys (cons (x, y) acc)
-  in
-  loop xs ys [ x, y ] |> rev
-;;
-
 let zip_strict xs ys : _ List.Or_unequal_lengths.t =
   match List.zip (to_list xs) (to_list ys) with
   | Ok list -> Ok (of_list_exn list)
@@ -136,6 +127,7 @@ let reduce xs ~f =
   | x :: x' :: xs -> List.fold ~init:(f x x') xs ~f
 ;;
 
+let fold' (x :: xs) ~init ~f = List.fold xs ~init:(init x) ~f
 let fold_right xs ~init ~f = List.fold_right (to_list xs) ~init ~f
 
 let fold_map xs ~init ~f =
@@ -164,15 +156,18 @@ module Fold2_result = struct
     | Same_length
 end
 
-let fold2 xs ys ~init ~f =
-  let rec loop xs ys ~init:acc ~f =
-    match xs, ys with
-    | [], [] -> acc, Fold2_result.Same_length
-    | [], y :: ys -> acc, Right_trailing (y :: ys)
-    | x :: xs, [] -> acc, Left_trailing (x :: xs)
-    | x :: xs, y :: ys -> loop xs ys ~init:(f acc x y) ~f
-  in
-  loop (to_list xs) (to_list ys) ~init ~f
+let rec fold2_list xs ys ~init:acc ~f =
+  match xs, ys with
+  | [], [] -> acc, Fold2_result.Same_length
+  | [], y :: ys -> acc, Right_trailing (y :: ys)
+  | x :: xs, [] -> acc, Left_trailing (x :: xs)
+  | x :: xs, y :: ys -> fold2_list xs ys ~init:(f acc x y) ~f
+;;
+
+let fold2 xs ys ~init ~f = fold2_list (to_list xs) (to_list ys) ~init ~f
+
+let zip (x :: xs) (y :: ys) =
+  fold2_list ~init:[ x, y ] xs ys ~f:(fun xs_and_ys x y -> cons (x, y) xs_and_ys)
 ;;
 
 let fold2_exn xs ys ~init ~f = List.fold2_exn (to_list xs) (to_list ys) ~init ~f

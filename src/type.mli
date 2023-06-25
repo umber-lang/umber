@@ -88,9 +88,6 @@ module Concrete : sig
 
   val cast : (Nothing.t, Nothing.t, 'n) Expr.t -> ('v, 'pf, 'n) Expr.t
 
-  (* TODO: Consider deleting this. Do we need it? *)
-  val of_polymorphic_exn : ('v, 'pf, Module_path.absolute) Expr.t -> t
-
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 end
@@ -106,11 +103,13 @@ module Decl : sig
     | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type 'n t = Type_param_name.t list * 'n decl [@@deriving compare, equal, hash, sexp]
+  type 'n t = Type_param_name.t Unique_list.t * 'n decl
+  [@@deriving compare, equal, hash, sexp]
 
   val arity : 'n t -> int
   val map_exprs : 'n1 t -> f:('n1 Scheme.t -> 'n2 Scheme.t) -> 'n2 t
   val fold_exprs : 'n t -> init:'acc -> f:('acc -> 'n Scheme.t -> 'acc) -> 'acc
   val iter_exprs : 'n t -> f:('n Scheme.t -> unit) -> unit
   val no_free_params : 'n t -> bool
+  val params_of_list : Type_param_name.t list -> Type_param_name.t Unique_list.t
 end

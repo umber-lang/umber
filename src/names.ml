@@ -96,19 +96,18 @@ module Module_name : Name = Upper_name
 module Module_path : sig
   type +'a t = private Module_name.t list [@@deriving compare, equal, hash, sexp]
   type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
-
-  type relative =
-    [ absolute
-    | `Relative
-    ]
-  [@@deriving compare, equal, hash, sexp]
+  type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
   val is_empty : _ t -> bool
   val is_prefix : prefix:'a t -> 'a t -> bool
   val append : 'a t -> Module_name.t list -> 'a t
-  val append' : 'a t -> _ t -> 'a t
+  val append' : 'a t -> relative t -> 'a t
+  val last : _ t -> Module_name.t option
   val drop_last : 'a t -> 'a t option
+  val drop_last_n_exn : 'a t -> int -> 'a t
+  val split_last : 'a t -> ('a t * Module_name.t) option
   val to_ustring : _ t -> Ustring.t
+  val to_string : _ t -> string
   val to_module_names : _ t -> Module_name.t list
   val of_module_names_unchecked : Module_name.t list -> _ t
 
@@ -130,19 +129,13 @@ module Module_path : sig
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
-    val to_relative : t -> Relative.t
     val of_relative_unchecked : Relative.t -> t
     val empty : t
   end
 end = struct
   type 'a t = Module_name.t list [@@deriving compare, equal, hash, sexp]
   type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
-
-  type relative =
-    [ absolute
-    | `Relative
-    ]
-  [@@deriving compare, equal, hash, sexp]
+  type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
   let is_empty = List.is_empty
 
@@ -158,7 +151,21 @@ end = struct
 
   let append = ( @ )
   let append' = ( @ )
+  let last = List.last
   let drop_last = List.drop_last
+  let split_last = List.split_last
+
+  let drop_last_n_exn t n =
+    let remaining = List.length t - n in
+    if remaining < 0
+    then
+      Compilation_error.raise
+        Name_error
+        ~msg:
+          [%message
+            "Relative path went up too many nesting levels" (n : int) ~path:(t : _ t)];
+    List.take t remaining
+  ;;
 
   let to_ustring path =
     let q = Queue.create ~capacity:(List.length path * 10) () in
@@ -169,6 +176,7 @@ end = struct
     Queue.to_array q |> Ustring.of_array_unchecked
   ;;
 
+  let to_string t = to_ustring t |> Ustring.to_string
   let to_module_names = Fn.id
   let of_module_names_unchecked = Fn.id
 
@@ -192,7 +200,6 @@ end = struct
   module Absolute = struct
     include Relative
 
-    let to_relative = Fn.id
     let of_relative_unchecked = Fn.id
   end
 end
@@ -227,7 +234,6 @@ module type Name_qualified = sig
     include Hashable.S with type t := t
 
     val of_relative_unchecked : Relative.t -> t
-    val to_relative : t -> Relative.t
     val with_path : Module_path.Absolute.t -> name -> t
     val to_ustring : t -> Ustring.t
   end
@@ -342,8 +348,6 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
       type t = Module_path.absolute
     end)
 
-    let to_relative (path, name) = Module_path.Absolute.to_relative path, name
-
     let of_relative_unchecked (path, name) =
       Module_path.Absolute.of_relative_unchecked path, name
     ;;
@@ -449,6 +453,7 @@ module Mir_name : sig
   end
 
   val create_value_name : Name_table.t -> Value_name.Absolute.t -> t
+  val create_exportable_name : Value_name.Absolute.t -> t
   val copy_name : Name_table.t -> t -> t
   val to_ustring : t -> Ustring.t
   val to_string : t -> string
@@ -496,8 +501,10 @@ end = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
+  let create_exportable_name value_name = value_name, 0
+
   let create_value_name name_table value_name =
-    let id = Option.value (Hashtbl.find name_table value_name) ~default:0 in
+    let id = Option.value (Hashtbl.find name_table value_name) ~default:1 in
     Hashtbl.set name_table ~key:value_name ~data:(id + 1);
     value_name, id
   ;;

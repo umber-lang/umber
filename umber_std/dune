@@ -5,7 +5,8 @@
  (files prelude.ml)
  (libraries umberboot)
  (runtime_deps
-  (file Std/Prelude.um))
+  (file Std/Prelude.um)
+  (file prelude.ml))
  (preprocess
   (pps ppx_jane)))
 

@@ -5,7 +5,7 @@ let (Thing1 one | Thing2 one) = Thing1 1
 let make_thing = match
   | 1 -> Thing1 1
   | 2 -> Thing2 2
-  | n -> Thing1 n # TODO: recursion, or something like if n % 2 == 0 then ... else ...
+  | n -> Thing1 n
 let (Thing1 n | Thing2 n) = make_thing 7
 
 type Triple a b c = | Triple a b c 

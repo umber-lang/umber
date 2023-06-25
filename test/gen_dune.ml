@@ -1,4 +1,8 @@
-open Core
+open! Core
+
+(* TODO: Consider having each diff rule depend on the rules for earlier phases. 
+   This would hopefully mean we don't see red diffs for later phases when earlier phases
+   fail. *)
 
 let make_rule dir name : Sexp.t =
   [%sexp

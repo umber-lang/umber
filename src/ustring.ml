@@ -25,7 +25,7 @@ module T = struct
 
   let sexp_of_t t = Sexp.Atom (to_string t)
 
-  let of_gen_exn ?capacity s =
+  let of_gen_exn s =
     let rec loop s q =
       match Uchar.of_gen_exn s with
       | Some c ->
@@ -33,7 +33,7 @@ module T = struct
         loop s q
       | None -> ()
     in
-    let q = Queue.create ?capacity () in
+    let q = Queue.create () in
     loop s q;
     Queue.to_array q
   ;;
@@ -58,6 +58,7 @@ let ( ^ ) = append
 let mem t c = Array.mem t c ~equal:Uchar.( = )
 let index t uchar = Array.findi t ~f:(fun _ c -> Uchar.(c = uchar)) |> Option.map ~f:fst
 let index_exn t uchar = index t uchar |> Option.value_exn
+let make len x = Array.create ~len x
 let of_array_unchecked = Fn.id
 let of_ustring = Fn.id
 let to_ustring = Fn.id

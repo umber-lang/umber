@@ -1,5 +1,7 @@
 module : {
-  val (==) (infix 4) : a, a -> Bool  # TODO: allow shadowing names
+  import Std.Prelude.List  
+
+  val (==) (infix 4) : a, a -> Bool
 
   module Arith : {
     val (+) (infixl 6) : Int, Int -> Int
@@ -10,10 +12,24 @@ module : {
   val (×) : List a, List b -> List (a, b)
 }
 
-let _ = Arith.(2 + 11 :mod: 3 == 4)
+import Std.Prelude.((*), (==), List, (::), Nil)
+
+module Arith = {
+  import Std.Prelude.((+), mod)
+}
+
+let true = Arith.(2 + 11 :mod: 3 == 4)
 let four = Arith.(+) 2 2
 let one = 5 :Arith.mod: 2 
 
-let left_section = (2+)
+let left_section = Arith.((2+))
 let right_section = (*5)
-let unicode_my_dudes = ["damn", "ok"] × ["cartesian", "product", "maybe?"]
+let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?"::Nil)
+
+let (×) xs ys = List.concat_map xs (\x -> List.map ys (\y -> (x, y)))
+
+import Std.Prelude.((;), print, (++), Int, Bool)
+
+let _ = List.map unicode_my_dudes (\(x, y) -> print x; print y)
+let () = print ("true = " ++ Bool.to_string true)
+let () = print ("four = " ++ Int.to_string four)

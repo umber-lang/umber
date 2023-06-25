@@ -5,17 +5,18 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 %umber_block1 = type { %umber_header, [1 x i64] }
+%umber_block8b = type { %umber_header, [8 x i8] }
 
 @AsPattern.pair = global %umber_block* null
 @AsPattern.one = global %umber_block* null
 @AsPattern.two = global %umber_block* null
 @Std.Prelude.List.Nil = external global %umber_block*
-@"AsPattern.*binding" = global %umber_block* null
+@"AsPattern.*binding.1" = global %umber_block* null
 @int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
-@string.763646369 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"foo\00\00\00\00\04" }
-@string.993717661 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"bar\00\00\00\00\04" }
-@string.927989409 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"baz\00\00\00\00\04" }
+@string.763646369 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"foo\00\00\00\00\04" }
+@string.993717661 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"bar\00\00\00\00\04" }
+@string.927989409 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"baz\00\00\00\00\04" }
 
 define i32 @"umber_main:./examples/AsPattern.um"() {
 entry:
@@ -49,7 +50,7 @@ entry:
   store i16 2, i16* %box13, align 2
   %box14 = bitcast i64* %box11 to %umber_block**
   %box15 = getelementptr %umber_block*, %umber_block** %box14, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.927989409 to %umber_block*), %umber_block** %box15, align 8
+  store %umber_block* bitcast (%umber_block8b* @string.927989409 to %umber_block*), %umber_block** %box15, align 8
   %box16 = getelementptr %umber_block*, %umber_block** %box14, i32 2
   store %umber_block* %Std.Prelude.List.Nil, %umber_block** %box16, align 8
   %box17 = bitcast %umber_block** %box14 to %umber_block*
@@ -60,7 +61,7 @@ entry:
   store i16 2, i16* %box20, align 2
   %box21 = bitcast i64* %box18 to %umber_block**
   %box22 = getelementptr %umber_block*, %umber_block** %box21, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.993717661 to %umber_block*), %umber_block** %box22, align 8
+  store %umber_block* bitcast (%umber_block8b* @string.993717661 to %umber_block*), %umber_block** %box22, align 8
   %box23 = getelementptr %umber_block*, %umber_block** %box21, i32 2
   store %umber_block* %box17, %umber_block** %box23, align 8
   %box24 = bitcast %umber_block** %box21 to %umber_block*
@@ -71,12 +72,12 @@ entry:
   store i16 2, i16* %box27, align 2
   %box28 = bitcast i64* %box25 to %umber_block**
   %box29 = getelementptr %umber_block*, %umber_block** %box28, i32 1
-  store %umber_block* bitcast (%umber_block1* @string.763646369 to %umber_block*), %umber_block** %box29, align 8
+  store %umber_block* bitcast (%umber_block8b* @string.763646369 to %umber_block*), %umber_block** %box29, align 8
   %box30 = getelementptr %umber_block*, %umber_block** %box28, i32 2
   store %umber_block* %box24, %umber_block** %box30, align 8
   %box31 = bitcast %umber_block** %box28 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"AsPattern.*fun" to %umber_block*), %umber_block* %box31)
-  store %umber_block* %fun_call, %umber_block** @"AsPattern.*binding", align 8
+  %fun_call = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"AsPattern.*fun.1" to %umber_block*), %umber_block* %box31)
+  store %umber_block* %fun_call, %umber_block** @"AsPattern.*binding.1", align 8
   ret i32 0
 }
 
@@ -84,7 +85,7 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_bl
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* %AsPattern.f, %umber_block* %AsPattern.lst) {
+define tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* %AsPattern.f.1, %umber_block* %AsPattern.lst.1) {
 entry:
   br label %cond
 
@@ -92,20 +93,20 @@ cond_binding_merge:                               ; preds = %cond_binding6, %con
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %AsPattern.lst1 = ptrtoint %umber_block* %AsPattern.lst to i64
-  %equals = icmp eq i64 %AsPattern.lst1, 1
+  %AsPattern.lst.11 = ptrtoint %umber_block* %AsPattern.lst.1 to i64
+  %equals = icmp eq i64 %AsPattern.lst.11, 1
   br i1 %equals, label %cond_binding, label %cond2
 
 cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
 
 cond2:                                            ; preds = %cond
-  %block_field_gep = getelementptr %umber_block, %umber_block* %AsPattern.lst, i32 0, i32 1, i32 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %AsPattern.lst.1, i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
   %block_field3 = ptrtoint %umber_block* %block_field to i64
   %equals4 = icmp eq i64 %block_field3, 1
-  %tag_gep = getelementptr %umber_block, %umber_block* %AsPattern.lst, i32 0, i32 0, i32 0
+  %tag_gep = getelementptr %umber_block, %umber_block* %AsPattern.lst.1, i32 0, i32 0, i32 0
   %tag = load i16, i16* %tag_gep, align 2
   %equals5 = icmp eq i16 %tag, 0
   %cond_and = and i1 %equals5, %equals4
@@ -115,24 +116,24 @@ cond_binding6:                                    ; preds = %cond2
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond2
-  %block_field_gep7 = getelementptr %umber_block, %umber_block* %AsPattern.lst, i32 0, i32 1, i32 1
+  %block_field_gep7 = getelementptr %umber_block, %umber_block* %AsPattern.lst.1, i32 0, i32 1, i32 1
   %block_field_raw8 = load i64, i64* %block_field_gep7, align 8
   %block_field9 = inttoptr i64 %block_field_raw8 to %umber_block*
   %block_field_gep10 = getelementptr %umber_block, %umber_block* %block_field9, i32 0, i32 1, i32 1
   %block_field_raw11 = load i64, i64* %block_field_gep10, align 8
   %block_field12 = inttoptr i64 %block_field_raw11 to %umber_block*
-  %block_field_gep13 = getelementptr %umber_block, %umber_block* %AsPattern.lst, i32 0, i32 1, i32 1
+  %block_field_gep13 = getelementptr %umber_block, %umber_block* %AsPattern.lst.1, i32 0, i32 1, i32 1
   %block_field_raw14 = load i64, i64* %block_field_gep13, align 8
   %block_field15 = inttoptr i64 %block_field_raw14 to %umber_block*
   %block_field_gep16 = getelementptr %umber_block, %umber_block* %block_field15, i32 0, i32 1, i32 0
   %block_field_raw17 = load i64, i64* %block_field_gep16, align 8
   %block_field18 = inttoptr i64 %block_field_raw17 to %umber_block*
-  %block_field_gep19 = getelementptr %umber_block, %umber_block* %AsPattern.lst, i32 0, i32 1, i32 0
+  %block_field_gep19 = getelementptr %umber_block, %umber_block* %AsPattern.lst.1, i32 0, i32 1, i32 0
   %block_field_raw20 = load i64, i64* %block_field_gep19, align 8
   %block_field21 = inttoptr i64 %block_field_raw20 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %AsPattern.f, %umber_block* %block_field21, %umber_block* %block_field18)
+  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %AsPattern.f.1, %umber_block* %block_field21, %umber_block* %block_field18)
   %fun_call22 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %block_field18, %umber_block* %block_field12)
-  %fun_call23 = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* %AsPattern.f, %umber_block* %fun_call22)
+  %fun_call23 = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* %AsPattern.f.1, %umber_block* %fun_call22)
   %fun_call24 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call, %umber_block* %fun_call23)
   br label %cond_otherwise_merge
 
@@ -145,9 +146,9 @@ declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"AsPattern.*fun"(%umber_block* %AsPattern.a.1, %umber_block* %AsPattern.b.1) {
+define tailcc %umber_block* @"AsPattern.*fun.1"(%umber_block* %AsPattern.a.2, %umber_block* %AsPattern.b.2) {
 entry:
-  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* %AsPattern.a.1, %umber_block* %AsPattern.b.1)
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* %AsPattern.a.2, %umber_block* %AsPattern.b.2)
   %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call)
   ret %umber_block* %fun_call1
 }

@@ -25,11 +25,17 @@
    (Type_decl Point3
     (()
      (Variants
-      ((Point3 ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))))))))
+      ((Point3
+        ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ())
+         (Type_app Std.Prelude.Int.Int ()))))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (xyz))
       ((Fun_call (Name Basics.Point3)
+        (Function
+         ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ())
+          (Type_app Std.Prelude.Int.Int ()))
+         (Type_app Basics.Point3 ()))
         (((Literal (Int 1)) (Type_app Int ()))
          ((Literal (Int 2)) (Type_app Int ()))
          ((Literal (Int 3)) (Type_app Int ()))))

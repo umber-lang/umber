@@ -3,9 +3,14 @@ module : {
     type List a =
       | Nil
       | Cons a (List a)
+
+    val reverse : List a -> List a
+    val append : List a, List a -> List a
+    val map : List a, (a -> b) -> List b
+    val concat_map : List a, (a -> List b) -> List b
   }
 
-  import List with Nil, Cons
+  import .List.(Nil, Cons)
 
   module Option : {
     type Option a =
@@ -13,7 +18,32 @@ module : {
       | Some a
   }
 
-  import Option with None, Some
+  import .Option.(None, Some)
+
+  module Bool : {
+    import Bool as PrimitiveBool
+    type Bool = PrimitiveBool
+
+    val to_string : Bool -> String
+  }
+
+  module Int : {
+    import Int as PrimitiveInt
+    type Int = PrimitiveInt
+
+    val to_string : Int -> String
+  }
+
+  module Float : {
+    import Float as PrimitiveFloat
+    type Float = PrimitiveFloat
+
+    val (+) (infixl 6) : Float, Float -> Float
+    val abs : Float, Float -> Float
+    val sin : Float, Float -> Float
+    val cos : Float, Float -> Float
+    val pi : Float
+  }
 
   module Operators : {
     val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
@@ -28,7 +58,12 @@ module : {
     val (*) (infixl 7) : Int, Int -> Int
     #val (/) (infixl 7) : Float, Float -> Float
     #val (//) (infixl 7) : Int, Int -> Int  # Same as quot (not div)
-    #val (%) (infixl 7) : Int, Int -> Int  # Same as rem (not mod)
+
+    # Remainder
+    val (%) (infixl 7) : Int, Int -> Int
+
+    # Euclidean modulus
+    val mod (infixl 7) : Int, Int -> Int
 
     val (+) (infixl 6) : Int, Int -> Int
     val (-) (infixl 6) : Int, Int -> Int
@@ -61,7 +96,7 @@ module : {
     val (++) (infixl 5) : String, String -> String
   }
 
-  import Operators with *
+  import .Operators._
 
   val sqrt : Float -> Float
 
@@ -70,10 +105,6 @@ module : {
   extern print_bool : Bool -> () = "umber_print_bool"
 }
 
-# TODO: implement public/private distinction for modules
-
-#import Bool with *
-#import Fun
 # TODO: need some kind of syntax for re-exporting things easily
 # Idea: just put the imports inside `module :` (could work)
 # Perhaps nicer: just use `include` instead of `import`
@@ -103,6 +134,61 @@ module : {
 
 # TODO: randomness
 
+module Bool = {
+  import Bool as PrimitiveBool
+  type Bool = PrimitiveBool
+
+  let to_string = match
+    | True -> "True"
+    | False -> "False"
+}
+
+module Int = {
+  import Int as PrimitiveInt
+  type Int = PrimitiveInt
+
+  extern to_string : Int -> String = "umber_int_to_string"
+}
+
+module Float = {
+  import Float as PrimitiveFloat
+  type Float = PrimitiveFloat
+
+  extern (+) (infixl 6) : Float, Float -> Float = "umber_float_add"
+  extern abs : Float, Float -> Float = "umber_float_abs"
+  extern sin : Float, Float -> Float = "umber_float_sin"
+  extern cos : Float, Float -> Float = "umber_float_cos"
+  extern pi : Float = "umber_float_pi"
+}
+
+module List = {
+  # `rev_append xs ys` reveres `xs` and concatenates it with `ys`
+  let rev_append xs ys =
+    match xs
+    | Nil -> ys
+    | Cons x xs -> rev_append xs (x :: ys) 
+
+  let reverse xs = rev_append xs Nil
+
+  let append xs ys = rev_append (reverse xs) ys
+
+  let map xs f =
+    let loop acc xs f =
+      match xs
+      | Nil -> reverse acc
+      | Cons x xs -> loop (f x :: acc) xs f
+    in
+    loop Nil xs f
+
+  let concat_map xs f =
+    let loop acc xs f =
+      match xs
+      | Nil -> reverse acc
+      | Cons x xs -> loop (rev_append (f x) acc) xs f
+    in
+    loop Nil xs f
+}
+
 module Operators = {
   # TODO: Consider removing these fixity declarations and copying them from the sig
   # This requires a way to specify fixity in a let binding. (Also consider that there's 
@@ -110,10 +196,12 @@ module Operators = {
   val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
   let (.) f g x = f (g x)
 
-  extern (^) (infixr 8) : Int, Int -> Int = "umber_int_pow"
-  extern (*) (infixl 7) : Int, Int -> Int = "umber_int_mul"
   extern (+) (infixl 6) : Int, Int -> Int = "umber_int_add"
   extern (-) (infixl 6) : Int, Int -> Int = "umber_int_sub"
+  extern (*) (infixl 7) : Int, Int -> Int = "umber_int_mul"
+  extern (%) (infixl 7) : Int, Int -> Int = "umber_int_rem"
+  extern mod (infixl 7) : Int, Int -> Int = "umber_int_mod"
+  extern (^) (infixr 8) : Int, Int -> Int = "umber_int_pow"
 
   extern (*.) (infixl 7) : Float, Float -> Float = "umber_float_mul"
   extern (+.) (infixl 6) : Float, Float -> Float = "umber_float_add"
@@ -146,7 +234,7 @@ module Operators = {
   extern (++) (infixl 5) : String, String -> String = "umber_string_append"
 }
 
-import Operators with *
+import .Operators._
 
 extern sqrt : Float -> Float = "umber_float_sqrt"
 extern print : String -> () = "umber_print_endline"

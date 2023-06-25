@@ -1,6 +1,59 @@
 open Import
 open Names
 
+module Import = struct
+  module Kind = struct
+    type t =
+      | Absolute
+      | Relative of { nth_parent : int (** 0 means relative to current *) }
+    [@@deriving sexp_of]
+
+    let of_n_periods = function
+      | 0 -> Absolute
+      | n -> Relative { nth_parent = n - 1 }
+    ;;
+  end
+
+  module Paths = struct
+    (* TODO: Consider making a ['a Or_underscore.t] type. Then we could rephrase this type
+       in terms of that. *)
+    type t =
+      | All
+      | Module of Module_name.t * t Nonempty.t
+      | Name of Unidentified_name.t
+      | Name_as of Unidentified_name.t * Unidentified_name.t
+      | Name_excluded of Unidentified_name.t
+    [@@deriving compare, sexp_of, variants]
+
+    (* We need `Name_excluded` to come last in sorted order so that when imports are
+       processed in this sorted order, names are always added before being removed.  *)
+    let%expect_test "Name_excluded comes last in sorted order" =
+      let module_name = Module_name.of_string_exn "ModuleName" in
+      let name = Unidentified_name.of_string_exn "name" in
+      let examples =
+        Variants.fold
+          ~init:[]
+          ~all:(fun acc variant -> variant.constructor :: acc)
+          ~module_:(fun acc variant -> variant.constructor module_name [ All ] :: acc)
+          ~name:(fun acc variant -> variant.constructor name :: acc)
+          ~name_as:(fun acc variant -> variant.constructor name name :: acc)
+          ~name_excluded:(fun acc variant -> variant.constructor name :: acc)
+      in
+      print_s [%sexp (List.sort examples ~compare : t list)];
+      [%expect
+        {|
+        (All (Module ModuleName (All)) (Name name) (Name_as name name)
+         (Name_excluded name)) |}]
+    ;;
+  end
+
+  type t =
+    { kind : Kind.t
+    ; paths : Paths.t
+    }
+  [@@deriving sexp_of]
+end
+
 type ('pat, 'expr, 'name) t =
   Module_name.t * 'name sig_ Node.t list * ('pat, 'expr, 'name) def Node.t list
 
@@ -12,14 +65,7 @@ and 'name common =
   (* TODO: [Trait_sig] actually can't appear in defs as it is just parsed as [Trait].
      There should probably be a sig-only type. *)
   | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * 'name sig_ Node.t list
-  (* TODO: Allow importing paths all at once
-     e.g. `import A.B` instead of `import A with B`
-     Related: allow `import A with B.C` or `import A.B.C` instead of multiple imports *)
-  (* TODO: Split imports into their own type and model importing all as a separate
-     variant, not importing with an empty list, which is kinda hacky *)
-  | Import of Module_name.t
-  | Import_with of Module_path.Relative.t * Unidentified_name.t list
-  | Import_without of Module_path.Relative.t * Unidentified_name.t Nonempty.t
+  | Import of Import.t
 
 and 'name sig_ =
   | Common_sig of 'name common
@@ -30,7 +76,7 @@ and ('pat, 'expr, 'name) def =
   | Module of ('pat, 'expr, 'name) t
   | Let of
       { rec_ : bool
-      ; bindings : ('pat * 'expr) Node.t Nonempty.t
+      ; bindings : ('pat Node.t * 'expr Node.t) Nonempty.t
       }
   | Trait of
       Trait_name.t

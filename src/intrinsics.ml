@@ -1,10 +1,6 @@
 open Import
 open Names
 
-(* TODO: should make this more robust - it's not sufficient for compiler internals to
-   refer to types like Int as Std.Prelude.Int since Std could be shadowed - they need a
-   special primitive representation *)
-
 let std_module_name = Module_name.of_string_unchecked "Std"
 let prelude_module_name = Module_name.of_string_unchecked "Prelude"
 
@@ -39,7 +35,9 @@ end) : Variants = struct
       , Extern_name.of_string_exn [%string "%%{String.uncapitalize cnstr_name}"] ))
   ;;
 
-  let decl = [], Type.Decl.Variants (List.map cnstrs ~f:(fun (name, _) -> name, []))
+  let decl =
+    Unique_list.empty, Type.Decl.Variants (List.map cnstrs ~f:(fun (name, _) -> name, []))
+  ;;
 end
 
 module type Abstract = Type
@@ -48,7 +46,7 @@ module Make_abstract (T : sig
   val name : string
 end) : Abstract = struct
   let name = Type_name.of_string_unchecked T.name
-  let decl = [], Type.Decl.Abstract
+  let decl = Unique_list.empty, Type.Decl.Abstract
   let typ = Type.Expr.Type_app ((Module_path.Absolute.empty, name), [])
 end
 

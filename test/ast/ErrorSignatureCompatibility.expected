@@ -15,11 +15,17 @@
           (type_source Let_inferred))))
        (plus_one
         (Incompatible ((typ (Scheme (Function ((Var a)) (Var a)))))
-         ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ()))))
+         ((typ
+           (Scheme
+            (Function ((Type_app Std.Prelude.Int.Int ()))
+             (Type_app Std.Prelude.Int.Int ()))))
           (type_source Let_inferred))))
        (plus_one'
         (Incompatible
-         ((typ (Scheme (Function ((Type_app Int ())) (Type_app Int ())))))
+         ((typ
+           (Scheme
+            (Function ((Type_app Std.Prelude.Int.Int ()))
+             (Type_app Std.Prelude.Int.Int ())))))
          ((typ
            (Scheme
             (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
@@ -28,7 +34,11 @@
      (type_diff
       ((Tuple
         (Incompatible ((a b) (Alias (Tuple ((Var a) (Var b)))))
-         ((a a) (Alias (Tuple ((Var a) (Var a)))))))))
+         ((a b) (Alias (Tuple ((Var a) (Var a)))))))
+       (InconsistentVarUse
+        (Incompatible
+         ((a b) (Variants ((Foo ((Function ((Var a)) (Var b)))))))
+         ((a b) (Variants ((Foo ((Function ((Var b)) (Var a)))))))))))
      (module_diff
       ((A
         (Module_diff
@@ -38,7 +48,8 @@
              (Incompatible
               (()
                (Variants
-                ((Int ((Type_app Int ()))) (Float ((Type_app Float ()))))))
+                ((Int ((Type_app Std.Prelude.Int.Int ())))
+                 (Float ((Type_app Std.Prelude.Float.Float ()))))))
               (()
                (Variants
                 ((Int ((Type_app ErrorSignatureCompatibility.A.Int ())))

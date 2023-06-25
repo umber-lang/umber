@@ -6,7 +6,7 @@ let concat_current dir = Filename.(concat (concat current_dir_name dir))
 (* These tests are currently for parsing only as their related type system features have
    not yet been implemented. *)
 (* TODO: enable these tests for type-checking. *)
-let parse_only_tests = [ "Imports"; "Modules"; "Operators"; "Traits"; "Types" ]
+let parse_only_tests = [ "Modules"; "Traits" (* traits *); "Types" (* records *) ]
 let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests test)
 
 (* These tests are just for type-checking as they are not ready to be converted to MIR. *)
@@ -39,7 +39,7 @@ let print_compilation_error ~out ~filename (error : Compilation_error.t) =
     ~out
     [%sexp
       "Compilation error"
-      , ({ error with filename = Some filename; exn; backtraces = [] }
+      , ({ error with filename = Some filename; exn; backtrace = None }
           : Compilation_error.t)]
 ;;
 

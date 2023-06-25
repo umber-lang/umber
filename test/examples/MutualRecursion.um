@@ -33,7 +33,3 @@ let number =
   let number = 5 in  # This shadows the outer `number`, which is fine
   let' number = number + number in
   number
-
-# TODO: add tests for use between submodules
-# e.g. imports to/from, usage between the parent and child
-# ^ make the above module `Tree` and have mutual usage with the parent

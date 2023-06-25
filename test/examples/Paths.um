@@ -13,11 +13,9 @@ module : {
   }
 }
 
-
 module Std = {
   module Prelude = {
     module List = {
-      # NOTE: this definition isn't right
       let to_list x = x
     }
   }
