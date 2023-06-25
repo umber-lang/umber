@@ -1290,12 +1290,8 @@ module Expr = struct
               ~add_name
           in
           let bindings =
-            (* Bindings must be sorted by their names to match up with [vars] above. This
-               relies on the [Value_name.t]s and [Mir_name.t]s having the same ordering
-               due to the former being a prefix of the latter. *)
-            (* FIXME: Actually I think this might just be wrong since the default string
-               comparison is by length first rather than lexigraphic. Come up with a
-               better approach. *)
+            (* Bindings must be sorted by their names to match up with [vars] above, which
+               are also in sorted order. *)
             List.sort bindings ~compare:[%compare: Mir_name.t * _] |> List.map ~f:snd
           in
           match cond with
