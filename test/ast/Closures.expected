@@ -23,27 +23,6 @@
                   (Type_app Std.Prelude.Int.Int ()))))
                (Type_app Bool ())
                (((Cnstr_appl True ())
-<<<<<<< HEAD
-                 (Fun_call (Name loop)
-                  (((Fun_call (Name +)
-                     (((Name current) (Type_app Int ()))
-                      ((Name count_by) (Type_app Int ()))))
-                    (Type_app Int ())))))
-                ((Cnstr_appl False ()) (Name current))))))))
-          (body (Fun_call (Name loop) (((Name start_at) (Type_app Int ()))))))))
-       (Function ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))
-        (Type_app Int ())))))))
-  (Let (rec_ false)
-   (bindings
-    (((Tuple ())
-      ((Fun_call (Name print_int)
-        (((Fun_call (Name count_up)
-           (((Literal (Int 0)) (Type_app Int ()))
-            ((Literal (Int 2)) (Type_app Int ()))
-            ((Literal (Int 5)) (Type_app Int ()))))
-          (Type_app Int ()))))
-       (Tuple ()))))))))
-=======
                  (Fun_call (Name Closures.loop)
                   (Function ((Type_app Std.Prelude.Int.Int ()))
                    (Type_app Std.Prelude.Int.Int ()))
@@ -67,4 +46,3 @@
         ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ())
          (Type_app Std.Prelude.Int.Int ()))
         (Type_app Std.Prelude.Int.Int ())))))))))
->>>>>>> master

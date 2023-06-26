@@ -33,21 +33,9 @@ module Expr : sig
     | Record_field_access of 'typ t Node.t * Value_name.t Node.t
   [@@deriving sexp]
 
-<<<<<<< HEAD
-  type generalized = Type.Scheme.t t * Type.Scheme.t [@@deriving sexp_of]
-
-  val of_untyped
-    :  names:Name_bindings.t
-    -> types:Type_bindings.t
-    -> Untyped.Expr.t
-    -> (Type.t * Pattern.Names.t) t
-       * Type.t
-       * (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row
-=======
   type generalized =
     Module_path.absolute Type.Scheme.t t * Module_path.absolute Type.Scheme.t
   [@@deriving sexp_of]
->>>>>>> master
 end
 
 module Module : sig

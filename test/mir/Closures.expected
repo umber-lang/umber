@@ -26,16 +26,6 @@
     (Let Closures.loop.1
      (Make_block (tag 12289)
       (fields
-<<<<<<< HEAD
-       ((Name *fun) (Name Closures.count_by) (Name Closures.end_after))))
-     (Fun_call Closures.loop ((Name Closures.start_at)))))))
- (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
- (Value_def *binding
-  (Fun_call Std.Prelude.print_int
-   ((Fun_call Closures.count_up
-     ((Primitive (Int 0)) (Primitive (Int 2)) (Primitive (Int 5))))))))
-=======
        ((Name Closures.*fun.1) (Name Closures.count_by.1)
         (Name Closures.end_after.1))))
      (Fun_call Closures.loop.1 ((Name Closures.start_at.1))))))))
->>>>>>> master

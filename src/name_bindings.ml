@@ -800,18 +800,28 @@ let add_val_or_extern
   =
   let f bindings =
     if not (List.is_empty trait_bounds) then failwith "TODO: trait bounds in val";
-    let scheme = absolutify_type_expr t type_expr in
     { bindings with
       names =
         Map.update bindings.names name ~f:(function
           | None ->
             compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
           | Some (Local existing_entry) ->
+            (match existing_entry.type_source with
+             | Placeholder | Let_inferred -> ()
+             | Val_declared | Val_and_let | Extern_declared ->
+               Compilation_error.raise
+                 Name_error
+                 ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
             unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
             Local
               (Name_entry.merge
                  existing_entry
-                 { type_source; typ = Scheme scheme; fixity; extern_name })
+                 { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
+                 ; type_source
+                 ; typ = Scheme scheme
+                 ; fixity
+                 ; extern_name
+                 })
           | Some (Imported imported_name) ->
             (* TODO: consider allowing this use case
                e.g. importing from another module, and then giving that import a new,
@@ -821,7 +831,7 @@ let add_val_or_extern
               Ustring.(
                 Value_name.to_ustring name
                 ^ of_string_exn " vs "
-                ^ Value_name.Qualified.to_ustring imported_name))
+                ^ Value_name.Absolute.to_ustring imported_name))
     }
   in
   update_current t ~f:{ f }
@@ -857,7 +867,7 @@ let add_type_decl t type_name decl =
         add_to_types
           bindings.types
           type_name
-          (Some (Local decl))
+          (Some (Local (Type_entry.create decl)))
           ~err_msg:"Duplicate type declarations"
     ; names =
         (match decl with
@@ -886,7 +896,7 @@ let add_type_decl t type_name decl =
   update_current t ~f:{ f }
 ;;
 
-let set_inferred_scheme t name scheme =
+let set_inferred_scheme t name scheme ~shadowing_allowed ~check_existing =
   let f bindings =
     let inferred_entry : Name_entry.t =
       { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
@@ -1001,24 +1011,14 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let rec find_type_decl ?at_path ?defs_only t type_name =
-  resolve_decl_or_import
-    ?at_path
-    ?defs_only
-    t
-    (snd (find_type_decl' ?at_path ?defs_only t type_name))
-
-and resolve_decl_or_import ?at_path ?defs_only t = function
-  | Some (Or_imported.Local decl) -> Some decl
-  | Some (Imported path_name) ->
-    (* TODO: pretty sure this import path should be resolved at the place it's written,
-       not the current path - this goes for all imports, unless we absolutify their paths *)
-    find_type_decl ?at_path ?defs_only t path_name
-  | None -> None
+let find_absolute_type_entry ?defs_only t type_name =
+  snd (find_absolute_type_entry_with_path ?defs_only t type_name)
 ;;
 
-let find_type_decl ?at_path ?(defs_only = false) t type_name =
-  option_or_default (find_type_decl ?at_path ~defs_only t type_name) ~f:(fun () ->
+let find_absolute_type_entry ?(defs_only = false) t type_name =
+  Option.value_or_thunk
+    (find_absolute_type_entry ~defs_only t type_name)
+    ~default:(fun () ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
@@ -1026,18 +1026,17 @@ let find_type_decl ?at_path ?(defs_only = false) t type_name =
           (without_std t : t)])
 ;;
 
-let resolve_decl_or_import ?at_path t decl_or_import =
-  option_or_default (resolve_decl_or_import ?at_path t decl_or_import) ~f:(fun () ->
+let resolve_type_or_import t (decl_or_import : _ Or_imported.t option) =
+  match decl_or_import with
+  | Some (Local entry) -> entry
+  | Some (Imported path) -> find_absolute_type_entry t path
+  | None ->
     compiler_bug
       [%message
         "Placeholder decl not replaced"
-          (decl_or_import : (Type.Decl.t, Type_name.Qualified.t) Or_imported.t option)
-          (without_std t : t)])
+          (decl_or_import : (Type_entry.t, Type_name.Absolute.t) Or_imported.t option)
+          (without_std t : t)]
 ;;
-
-let find_absolute_type_decl = find_type_decl ~at_path:[]
-let find_type_decl = find_type_decl ?at_path:None
-let current_path t = t.current_path
 
 let find_sigs_and_defs t path module_name =
   let rec loop t path module_name =
@@ -1099,7 +1098,10 @@ module Sigs_or_defs = struct
   ;;
 
   let find_entry = make_find ~into_bindings:names ~resolve:resolve_name_or_import
-  let find_type_decl = make_find ~into_bindings:types ~resolve:resolve_decl_or_import
+
+  let find_type_decl =
+    (make_find ~into_bindings:types ~resolve:resolve_decl_or_import).decl
+  ;;
 
   let find_module t bindings module_name =
     let open Option.Let_syntax in
