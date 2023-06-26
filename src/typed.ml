@@ -644,7 +644,8 @@ module Module = struct
     let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
         Name_bindings.add_name_placeholder names name
-      | Type_decl (type_name, _) -> Name_bindings.add_type_placeholder names type_name
+      | Type_decl (type_name, decl) ->
+        Name_bindings.add_type_decl_placeholder names type_name decl
       | Import _ | Trait_sig _ -> names
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
@@ -661,6 +662,21 @@ module Module = struct
           gather_name_placeholders ~names module_name sigs defs
         | Common_def common -> f_common names common
         | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)"))
+  ;;
+
+  let import_mentions_prelude : Module.Import.t -> bool = function
+    | { kind = Absolute; paths = Module (module_name, paths) } ->
+      Module_name.equal module_name Intrinsics.std_module_name
+      && Nonempty.exists paths ~f:(function
+           | Module (module_name, _) ->
+             Module_name.equal module_name Intrinsics.prelude_module_name
+           | Name name | Name_as (name, _) | Name_excluded name ->
+             Unidentified_name.equal
+               name
+               (Module_name.unidentify Intrinsics.prelude_module_name)
+           | All -> true)
+    | { kind = Absolute; paths = All | Name _ | Name_as _ | Name_excluded _ }
+    | { kind = Relative _; paths = _ } -> false
   ;;
 
   let gather_imports ~names ~include_std module_name sigs defs =
@@ -737,21 +753,6 @@ module Module = struct
     absolutify_module
   ;;
 
-  let import_mentions_prelude : Module.Import.t -> bool = function
-    | { kind = Absolute; paths = Module (module_name, paths) } ->
-      Module_name.equal module_name Intrinsics.std_module_name
-      && Nonempty.exists paths ~f:(function
-           | Module (module_name, _) ->
-             Module_name.equal module_name Intrinsics.prelude_module_name
-           | Name name | Name_as (name, _) | Name_excluded name ->
-             Unidentified_name.equal
-               name
-               (Module_name.unidentify Intrinsics.prelude_module_name)
-           | All -> true)
-    | { kind = Absolute; paths = All | Name _ | Name_as _ | Name_excluded _ }
-    | { kind = Relative _; paths = _ } -> false
-  ;;
-
   let gather_type_decls ~names sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
@@ -759,31 +760,35 @@ module Module = struct
       | Val _ | Extern _ | Import _ -> names)
   ;;
 
-  (* FIXME: revert to base at master *)
   (** Raise an error upon finding any cycles in a given type alias. *)
   let check_cyclic_type_alias ~names alias =
     (* TODO: can rewrite this with [Type.Expr.map] *)
-    let rec loop ~names aliases_seen = function
-      | Type.Expr.Type_app (name, args) ->
-        let decl = Name_bindings.find_type_decl names name in
-        (match decl with
-         | _, Alias alias ->
-           (match Hashtbl.add aliases_seen ~key:decl ~data:name with
-            | `Ok -> loop ~names aliases_seen alias
-            | `Duplicate ->
-              Compilation_error.raise
-                Type_error
-                ~msg:
-                  [%message
-                    "Cyclic type alias"
-                      (name : Type_name.Qualified.t)
-                      (decl : Type.Decl.t)])
-         | _ -> ());
-        List.iter args ~f:(loop ~names aliases_seen)
+    (* TODO: This could stop checking for cyclic aliases early if it reaches a type in
+       another file. (There should be a separate check for cyclic imports.) *)
+    let rec loop ~names ~aliases_seen (alias : Module_path.absolute Type.Scheme.t) =
+      match alias with
+      | Type_app (name, args) ->
+        let type_entry = Name_bindings.find_absolute_type_entry names name in
+        let decl = Name_bindings.Type_entry.decl type_entry in
+        (match snd decl with
+         | Alias alias ->
+           let id = Name_bindings.Type_entry.id type_entry in
+           if Set.mem aliases_seen id
+           then
+             Compilation_error.raise
+               Type_error
+               ~msg:
+                 [%message
+                   "Cyclic type alias"
+                     (name : Type_name.Absolute.t)
+                     (decl : Module_path.absolute Type.Decl.t)]
+           else loop ~names ~aliases_seen:(Set.add aliases_seen id) alias
+         | Abstract | Variants _ | Record _ -> ());
+        List.iter args ~f:(loop ~names ~aliases_seen)
       | Function (args, body) ->
-        Nonempty.iter args ~f:(loop ~names aliases_seen);
-        loop ~names aliases_seen body
-      | Tuple items -> List.iter items ~f:(loop ~names aliases_seen)
+        Nonempty.iter args ~f:(loop ~names ~aliases_seen);
+        loop ~names ~aliases_seen body
+      | Tuple items -> List.iter items ~f:(loop ~names ~aliases_seen)
       | Var _ -> ()
       | Partial_function _ -> .
     in

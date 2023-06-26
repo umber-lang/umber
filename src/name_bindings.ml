@@ -1026,6 +1026,10 @@ let find_absolute_type_entry ?(defs_only = false) t type_name =
           (without_std t : t)])
 ;;
 
+let find_absolute_type_decl ?defs_only t type_name =
+  (find_absolute_type_entry ?defs_only t type_name).decl
+;;
+
 let resolve_type_or_import t (decl_or_import : _ Or_imported.t option) =
   match decl_or_import with
   | Some (Local entry) -> entry
@@ -1099,8 +1103,9 @@ module Sigs_or_defs = struct
 
   let find_entry = make_find ~into_bindings:names ~resolve:resolve_name_or_import
 
-  let find_type_decl =
-    (make_find ~into_bindings:types ~resolve:resolve_decl_or_import).decl
+  let find_type_decl names t type_name =
+    (make_find names t type_name ~into_bindings:types ~resolve:resolve_type_or_import)
+      .decl
   ;;
 
   let find_module t bindings module_name =
