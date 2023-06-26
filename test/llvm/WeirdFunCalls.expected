@@ -4,25 +4,25 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
-%umber_block1 = type { %umber_header, [1 x i64] }
-%umber_block2 = type { %umber_header, [2 x i64] }
+%umber_block8b = type { %umber_header, [8 x i8] }
+%umber_block16b = type { %umber_header, [16 x i8] }
 
-@"*binding" = global %umber_block* null
-@"*binding.1" = global %umber_block* null
+@"WeirdFunCalls.*binding.1" = global %umber_block* null
+@"WeirdFunCalls.*binding.2" = global %umber_block* null
 @WeirdFunCalls.if_ = global %umber_block* null
-@"*binding.2" = global %umber_block* null
-@string.465106951 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"plain\00\00\02" }
-@string.812905539 = constant %umber_block2 { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"fun call\00\00\00\00\00\00\00\07" }
-@string.1035704714 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"if\00\00\00\00\00\05" }
-@string.1050473980 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"let\00\00\00\00\04" }
+@"WeirdFunCalls.*binding.3" = global %umber_block* null
+@string.465106951 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"plain\00\00\02" }
+@string.812905539 = constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"fun call\00\00\00\00\00\00\00\07" }
+@string.1035704714 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"if\00\00\00\00\00\05" }
+@string.1050473980 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"let\00\00\00\00\04" }
 
 define i32 @"umber_main:./examples/WeirdFunCalls.um"() {
 entry:
-  %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block1* @string.465106951 to %umber_block*))
-  store %umber_block* %fun_call, %umber_block** @"*binding", align 8
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.465106951 to %umber_block*))
+  store %umber_block* %fun_call, %umber_block** @"WeirdFunCalls.*binding.1", align 8
   %fun_call1 = tail call tailcc %umber_block* @WeirdFunCalls.fun_call(%umber_block* inttoptr (i64 1 to %umber_block*))
   %fun_call2 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %fun_call1, %umber_block* inttoptr (i64 1 to %umber_block*))
-  store %umber_block* %fun_call2, %umber_block** @"*binding.1", align 8
+  store %umber_block* %fun_call2, %umber_block** @"WeirdFunCalls.*binding.2", align 8
   br label %cond
 
 cond_binding_merge:                               ; preds = %cond_binding
@@ -39,32 +39,32 @@ cond_otherwise:                                   ; preds = %cond
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
   %cond_otherwise_merge3 = phi %umber_block* [ bitcast (%umber_block* (%umber_block*)* @WeirdFunCalls.print_twice to %umber_block*), %cond_binding_merge ], [ bitcast (%umber_block* (%umber_block*)* @Std.Prelude.print to %umber_block*), %cond_otherwise ]
-  %fun_call4 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %cond_otherwise_merge3, %umber_block* bitcast (%umber_block1* @string.1035704714 to %umber_block*))
+  %fun_call4 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %cond_otherwise_merge3, %umber_block* bitcast (%umber_block8b* @string.1035704714 to %umber_block*))
   store %umber_block* %fun_call4, %umber_block** @WeirdFunCalls.if_, align 8
-  %fun_call5 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block1* @string.1050473980 to %umber_block*))
-  store %umber_block* %fun_call5, %umber_block** @"*binding.2", align 8
+  %fun_call5 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.1050473980 to %umber_block*))
+  store %umber_block* %fun_call5, %umber_block** @"WeirdFunCalls.*binding.3", align 8
   ret i32 0
 }
 
 declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
-define tailcc %umber_block* @"*fun"(%umber_block* %"*lambda_arg.1") {
+define tailcc %umber_block* @"WeirdFunCalls.*fun.1"(%umber_block* %"WeirdFunCalls.*lambda_arg.2") {
 entry:
-  %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block2* @string.812905539 to %umber_block*))
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block16b* @string.812905539 to %umber_block*))
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @WeirdFunCalls.fun_call(%umber_block* %"*lambda_arg") {
+define tailcc %umber_block* @WeirdFunCalls.fun_call(%umber_block* %"WeirdFunCalls.*lambda_arg.1") {
 entry:
-  ret %umber_block* bitcast (%umber_block* (%umber_block*)* @"*fun" to %umber_block*)
+  ret %umber_block* bitcast (%umber_block* (%umber_block*)* @"WeirdFunCalls.*fun.1" to %umber_block*)
 }
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @WeirdFunCalls.print_twice(%umber_block* %WeirdFunCalls.msg) {
+define tailcc %umber_block* @WeirdFunCalls.print_twice(%umber_block* %WeirdFunCalls.msg.1) {
 entry:
-  %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %WeirdFunCalls.msg)
-  %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %WeirdFunCalls.msg)
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %WeirdFunCalls.msg.1)
+  %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %WeirdFunCalls.msg.1)
   %fun_call2 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call, %umber_block* %fun_call1)
   ret %umber_block* %fun_call2
 }

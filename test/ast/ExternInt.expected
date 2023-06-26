@@ -1,6 +1,8 @@
 (ExternInt ()
- ((Common_def (Type_decl MyInt (() (Alias (Type_app Int ())))))
+ ((Common_def
+   (Type_decl MyInt (() (Alias (Type_app Std.Prelude.Int.Int ())))))
   (Common_def
    (Extern plus ((Left 6))
-    (Function ((Type_app MyInt ()) (Type_app MyInt ())) (Type_app MyInt ()))
+    (Function ((Type_app ExternInt.MyInt ()) (Type_app ExternInt.MyInt ()))
+     (Type_app ExternInt.MyInt ()))
     umber_int_add))))

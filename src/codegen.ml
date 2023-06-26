@@ -71,15 +71,26 @@ let block_header_type t =
     typ)
 ;;
 
-let block_fields_type context ~len = Llvm.array_type (Llvm.i64_type context) len
-
-let block_type ?(len = 0) t =
-  let name = if len = 0 then "umber_block" else "umber_block" ^ Int.to_string len in
+let block_type ?(len = 0) ?(field_kind = `Word) t =
+  let name =
+    let prefix = if len = 0 then "umber_block" else "umber_block" ^ Int.to_string len in
+    let suffix =
+      match field_kind with
+      | `Word -> ""
+      | `Byte -> "b"
+    in
+    prefix ^ suffix
+  in
   with_type_memo t ~name ~f:(fun () ->
     let block_type = Llvm.named_struct_type t.context name in
+    let field_type =
+      match field_kind with
+      | `Word -> Llvm.i64_type t.context
+      | `Byte -> Llvm.i8_type t.context
+    in
     Llvm.struct_set_body
       block_type
-      [| block_header_type t; block_fields_type t.context ~len |]
+      [| block_header_type t; Llvm.array_type field_type len |]
       false;
     block_type)
 ;;
@@ -121,12 +132,10 @@ let const_block_header t ~tag ~len =
     |]
 ;;
 
-let constant_block t ~tag ~len ~type_ ~name constant_value =
+let constant_block t ~tag ~len ~type_ ~type_name ~name constant_value =
   let block_header = const_block_header t ~tag ~len in
-  let value =
-    Llvm.const_named_struct (block_type t ~len) [| block_header; constant_value |]
-  in
-  let global_name = [%string "%{type_}.%{name}"] in
+  let value = Llvm.const_named_struct type_ [| block_header; constant_value |] in
+  let global_name = [%string "%{type_name}.%{name}"] in
   let global = Llvm.define_global global_name value t.module_ in
   Llvm.set_global_constant true global;
   global
@@ -142,7 +151,8 @@ let codegen_literal t literal =
         t
         ~tag:Cnstr_tag.int
         ~len:1
-        ~type_:"int"
+        ~type_:(block_type t ~len:1)
+        ~type_name:"int"
         ~name
         (Llvm.const_int type_ i)
     | Float x ->
@@ -152,7 +162,8 @@ let codegen_literal t literal =
         t
         ~tag:Cnstr_tag.float
         ~len:1
-        ~type_:"float"
+        ~type_:(block_type t ~len:1)
+        ~type_name:"float"
         ~name
         (Llvm.const_float type_ x)
     | Char c ->
@@ -163,7 +174,8 @@ let codegen_literal t literal =
         t
         ~tag:Cnstr_tag.char
         ~len:1
-        ~type_:"char"
+        ~type_:(block_type t ~len:1)
+        ~type_name:"char"
         ~name
         (Llvm.const_int type_ c)
     | String s ->
@@ -183,7 +195,14 @@ let codegen_literal t literal =
           Llvm.const_int (Llvm.i8_type t.context) byte)
       in
       let value = Llvm.const_array (Llvm.i8_type t.context) packed_char_array in
-      constant_block t ~tag:Cnstr_tag.string ~len:n_words ~type_:"string" ~name value)
+      constant_block
+        t
+        ~tag:Cnstr_tag.string
+        ~len:n_words
+        ~type_:(block_type t ~len:(n_words * 8) ~field_kind:`Byte)
+        ~type_name:"string"
+        ~name
+        value)
 ;;
 
 let get_block_tag t value =
@@ -358,29 +377,16 @@ let rec codegen_expr t expr =
   | Cond_assign { vars; conds; body; if_none_matched } ->
     let start_block = Llvm.insertion_block t.builder in
     let current_fun = Llvm.block_parent start_block in
-    let num_vars = List.length vars in
-    (* Set up a phi block to receive the variable bindings as a vector. *)
+    (* Set up a block with phi instructions to receive the variable bindings. *)
     let phi_block = Llvm.append_block t.context "cond_binding_merge" current_fun in
     Llvm.position_at_end phi_block t.builder;
-    let phi_value =
-      if num_vars = 0
-      then None
-      else (
+    let phi_values =
+      List.map vars ~f:(fun name ->
         let phi_value =
-          Llvm.build_empty_phi
-            (Llvm.vector_type (block_pointer_type t) num_vars)
-            "cond_bindings"
-            t.builder
+          Llvm.build_empty_phi (block_pointer_type t) "cond_bindings" t.builder
         in
-        (* Extract all the variables out of the vector in the phi. *)
-        List.iteri vars ~f:(fun i var ->
-          ignore_value
-            (Llvm.build_extractelement
-               phi_value
-               (Llvm.const_int (Llvm.i64_type t.context) i)
-               (Mir_name.to_string var)
-               t.builder));
-        Some phi_value)
+        Value_table.add t.values name phi_value;
+        phi_value)
     in
     let body_value = codegen_expr t body in
     let body_block_end = Llvm.insertion_block t.builder in
@@ -395,9 +401,8 @@ let rec codegen_expr t expr =
       in
       ignore_value (Llvm.build_br phi_block t.builder);
       let binding_block_end = Llvm.insertion_block t.builder in
-      Option.iter phi_value ~f:(fun phi_value ->
-        let binding_vector = Llvm.const_vector (List.to_array binding_values) in
-        Llvm.add_incoming (binding_vector, binding_block_end) phi_value);
+      List.iter2_exn phi_values binding_values ~f:(fun phi_value binding_value ->
+        Llvm.add_incoming (binding_value, binding_block_end) phi_value);
       binding_block
     in
     let conds =
@@ -416,9 +421,9 @@ let rec codegen_expr t expr =
       (let _, first_cond_block, _, _ = Nonempty.hd conds in
        Llvm.build_br first_cond_block t.builder);
     (* Have each condition block branch and break to either its binding block or the
-         next condition block. The last condition block goes to the [if_none_matched]
-         case, which either goes to another arbitrary expression, or runs the body with a
-         final set of bindings. *)
+       next condition block. The last condition block goes to the `if_none_matched`
+       case, which either goes to another arbitrary expression, or runs the body with a
+       final set of bindings. *)
     let rec associate_conds : _ Nonempty.t -> _ = function
       | [ (last_cond_value, _, last_cond_block_end, last_binding_block) ] ->
         let if_none_matched_block, final_value, final_block =

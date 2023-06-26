@@ -3,10 +3,6 @@ open Names
 module Var_id = Unique_id.Int ()
 
 module Param = struct
-  (* TODO: need variance for type parameters (e.g. covariant, contravariant)
-     Can probably wait a bit though -- it's needed for subtyping
-     Variance can maybe be added as constraints on the type scheme *)
-
   module T = Type_param_name
   include T
   include Comparable.Make_plain (T)
@@ -55,74 +51,78 @@ module Param = struct
   end
 end
 
+(* TODO: Type declarations/expressions should have spans like other parts of the AST do. *)
+
 module Expr = struct
-  type ('v, 'pf) t =
+  type ('v, 'pf, 'n) t =
     | Var of 'v
-    | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
-    | Tuple of ('v, 'pf) t list
-    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * ('v, 'pf) t
-    | Partial_function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * 'pf
+    | Type_app of 'n Type_name.Qualified.t * ('v, 'pf, 'n) t list
+    | Tuple of ('v, 'pf, 'n) t list
+    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) t
+    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * 'pf
 
   (* FIXME: cleanup *)
   (* | Partial_effect of ('v, 'pf) t * ('pf, 'pf) effect_row *)
-  and ('v, 'pf) effect_row = ('v, 'pf) effect list
+  and ('v, 'pf, 'n) effect_row = ('v, 'pf, 'n) effect list
 
-  and ('v, 'pf) effect =
-    | Effect of Effect_name.t * ('v, 'pf) t list
+  and ('v, 'pf, 'n) effect =
+    | Effect of Effect_name.t * ('v, 'pf, 'n) t list
     | Effect_var of 'v
   [@@deriving hash, compare, equal, sexp]
 
   let var v = Var v
   let tuple list = Tuple list
 
-  let rec map ?(f = Map_action.defer) typ ~var ~pf =
+  let rec map ?(f = Map_action.defer) typ ~var ~pf ~name =
     match f typ with
     | Halt typ -> typ
-    | Retry typ -> map typ ~f ~var ~pf
+    | Retry typ -> map typ ~f ~var ~pf ~name
     | Defer typ ->
       (match typ with
        | Var v -> Var (var v)
-       | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f ~var ~pf))
-       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf))
+       | Type_app (name', fields) ->
+         Type_app (name name', List.map fields ~f:(map ~f ~var ~pf ~name))
+       | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf ~name))
        | Function (args, effect_row, body) ->
-         let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
-         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf) in
-         Function (args, effect_row, map ~f ~var ~pf body)
+         let args = Nonempty.map args ~f:(map ~f ~var ~pf ~name) in
+         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf ~name) in
+         Function (args, effect_row, map ~f ~var ~pf ~name body)
        | Partial_function (args, effect_row, v) ->
-         let args = Nonempty.map args ~f:(map ~f ~var ~pf) in
-         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf) in
+         let args = Nonempty.map args ~f:(map ~f ~var ~pf ~name) in
+         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf ~name) in
          Partial_function (args, effect_row, pf v))
 
-  and map_effect effect ~f ~var ~pf =
+  and map_effect effect ~f ~var ~pf ~name =
     match effect with
     | Effect_var v -> Effect_var (var v)
     | Effect (effect_name, args) ->
-      Effect (effect_name, List.map args ~f:(map ~f ~var ~pf))
+      Effect (effect_name, List.map args ~f:(map ~f ~var ~pf ~name))
   ;;
 
-  let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~pf ~eff =
+  let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~pf ~name ~eff =
     match f (type1, type2) with
     | Halt typ -> typ
-    | Retry (type1, type2) -> map2 type1 type2 ~f ~f_contra ~var ~pf ~eff
+    | Retry (type1, type2) -> map2 type1 type2 ~f ~f_contra ~var ~pf ~name ~eff
     | Defer (type1, type2) ->
       (match type1, type2 with
        | Var v1, Var v2 -> Var (var v1 v2)
        | Type_app (name1, args1), Type_app (name2, args2) ->
          assert_or_compiler_bug ~here:[%here] (Type_name.Qualified.equal name1 name2);
-         Type_app (name1, List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~var ~pf ~eff))
+         Type_app
+           (name1, List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~var ~pf ~name ~eff))
        | Tuple fields1, Tuple fields2 ->
-         Tuple (List.map2_exn fields1 fields2 ~f:(map2 ~f ~f_contra ~var ~pf ~eff))
+         Tuple (List.map2_exn fields1 fields2 ~f:(map2 ~f ~f_contra ~var ~pf ~name ~eff))
        | Function (args1, effect_row1, res1), Function (args2, effect_row2, res2) ->
          let args =
-           Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~pf ~eff)
+           Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~pf ~name ~eff)
          in
          let effect_row = eff effect_row1 effect_row2 in
-         let res = map2 res1 res2 ~f ~f_contra ~var ~pf ~eff in
+         let res = map2 res1 res2 ~f ~f_contra ~var ~pf ~name ~eff in
          Function (args, effect_row, res)
        | ( Partial_function (args1, effect_row1, v1)
          , Partial_function (args2, effect_row2, v2) ) ->
          let args =
-           Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~pf ~eff)
+           Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~pf ~name ~eff)
          in
          let effect_row = eff effect_row1 effect_row2 in
          let v = pf v1 v2 in
@@ -237,79 +237,73 @@ module Expr = struct
   let effect_is_total = List.is_empty
 end
 
-type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
+type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
+[@@deriving compare, hash, equal, sexp]
 
 let fresh_var () = Expr.Var (Var_id.create ())
 
 module Scheme = struct
-  module T = struct
-    (* TODO: add trait constraints to this type here *)
-    type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
+  type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
+  [@@deriving compare, hash, equal, sexp]
 
-    type nonrec effect = (Param.t, Nothing.t) Expr.effect
-    [@@deriving compare, hash, equal, sexp]
+  type nonrec 'n effect = (Param.t, Nothing.t, 'n) Expr.effect
+  [@@deriving compare, hash, equal, sexp]
 
-    type nonrec effect_row = (Param.t, Nothing.t) Expr.effect_row
-    [@@deriving compare, hash, equal, sexp]
-  end
-
-  include T
-  include Comparable.Make (T)
-  include Hashable.Make (T)
+  type nonrec 'n effect_row = (Param.t, Nothing.t, 'n) Expr.effect_row
+  [@@deriving compare, hash, equal, sexp]
 
   module Bounded = struct
-    type nonrec t = Trait_bound.t * t [@@deriving compare, equal, hash, sexp]
+    type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
   end
 
-  let instantiate ?(map_name = Fn.id) ?params typ =
-    let params = option_or_default params ~f:Param.Env_to_vars.create in
+  let instantiate ?params typ =
+    let params = Option.value_or_thunk params ~default:Param.Env_to_vars.create in
     Expr.map
       typ
       ~var:(Param.Env_to_vars.find_or_add params)
-      ~f:
-        (function
-         | Type_app (name, args) -> Defer (Expr.Type_app (map_name name, args))
-         | typ -> Defer typ)
       ~pf:Nothing.unreachable_code
+      ~name:Fn.id
   ;;
 
   (* TODO: handle trait bounds *)
-  let instantiate_bounded ?map_name ?params typ =
+  let instantiate_bounded ?params typ =
     match typ with
-    | [], typ -> instantiate ?map_name ?params typ
+    | [], typ -> instantiate ?params typ
     | _ -> raise_s [%message "Trait bounds not yet implemented"]
   ;;
 end
 
 module Concrete = struct
   module T = struct
-    type t = (Nothing.t, Nothing.t) Expr.t [@@deriving compare, equal, hash, sexp]
+    type t = (Nothing.t, Nothing.t, Module_path.absolute) Expr.t
+    [@@deriving compare, equal, hash, sexp]
   end
 
   include T
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let cast t = Expr.map t ~var:Nothing.unreachable_code ~pf:Nothing.unreachable_code
-
-  let of_polymorphic_exn t =
-    let fail _ = compiler_bug [%message "Type.Concrete.of_polymorphic_exn: found var"] in
-    Expr.map t ~var:fail ~pf:fail
+  let cast t =
+    Expr.map t ~var:Nothing.unreachable_code ~pf:Nothing.unreachable_code ~name:Fn.id
   ;;
 end
 
 module Decl = struct
-  type decl =
+  type 'n decl =
     | Abstract
-    | Alias of Scheme.t
+    | Alias of 'n Scheme.t
     (* TODO: variant constructors should probably support fixity declarations *)
-    | Variants of (Cnstr_name.t * Scheme.t list) list
-    | Record of (Value_name.t * Scheme.t) Nonempty.t
+    | Variants of (Cnstr_name.t * 'n Scheme.t list) list
+    (* TODO: probably just make records a type expression - you can trivially get nominal
+       records with a single variant and an inline record. One problem with this is you
+       can no longer define recursive record types, which is a bit annoying. *)
+    | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]
+  type 'n t = Type_param_name.t Unique_list.t * 'n decl
+  [@@deriving compare, equal, hash, sexp]
 
-  let arity (params, _) = List.length params
+  let arity ((params, _) : _ t) = List.length (params :> Type_param_name.t list)
 
   let map_exprs (params, decl) ~f =
     ( params
@@ -332,8 +326,10 @@ module Decl = struct
   let iter_exprs decl ~f = fold_exprs decl ~init:() ~f:(fun () -> f)
 
   let no_free_params =
-    let check_params params typ =
-      Expr.for_all_vars typ ~f:(List.mem params ~equal:Type_param_name.equal)
+    let check_params (params : Type_param_name.t Unique_list.t) typ =
+      Expr.for_all_vars
+        typ
+        ~f:(List.mem (params :> Type_param_name.t list) ~equal:Type_param_name.equal)
     in
     fun (params, decl) ->
       match decl with
@@ -344,5 +340,14 @@ module Decl = struct
           List.for_all args ~f:(check_params params))
       | Record fields ->
         Nonempty.for_all fields ~f:(fun (_, field) -> check_params params field)
+  ;;
+
+  let params_of_list params =
+    match Unique_list.of_list params ~compare:[%compare: Type_param_name.t] with
+    | Ok params -> params
+    | Error duplicate ->
+      Compilation_error.raise
+        Name_error
+        ~msg:[%message "Duplicate type parameter name" (duplicate : Type_param_name.t)]
   ;;
 end

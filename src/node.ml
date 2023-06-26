@@ -12,14 +12,14 @@ let span t = t.span
 let with_value { value; span } ~f =
   try f value with
   | Compilation_error.Compilation_error error ->
-    raise
+    raise_notrace
       (Compilation_error.Compilation_error
          { error with
            span =
              (match error.span with
               | Some _ -> error.span
               | None -> Some span)
-         ; backtraces = Backtrace.Exn.most_recent () :: error.backtraces
+         ; backtrace = Some (Backtrace.Exn.most_recent ())
          })
 ;;
 

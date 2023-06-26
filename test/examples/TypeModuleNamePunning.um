@@ -1,0 +1,19 @@
+module Foo = {
+  type Foo = Int
+
+  module Foo = {
+    type Foo = Float
+
+    module Foo = {
+      type Foo = String
+    }
+  }
+}
+
+let int : Foo = 5
+let int' : Foo.Foo = 5
+let float : Foo.Foo.Foo = 5.0
+let string : Foo.Foo.Foo.Foo = "5"
+
+# TODO: Should probably add a lint against having a type and module with the same name
+# next to each other. (The type should almost certainly be inside the module.)

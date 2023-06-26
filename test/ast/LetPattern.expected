@@ -4,30 +4,46 @@
   (Common_def
    (Type_decl Thing
     (()
-     (Variants ((Thing1 ((Type_app Int ()))) (Thing2 ((Type_app Int ()))))))))
+     (Variants
+      ((Thing1 ((Type_app Std.Prelude.Int.Int ())))
+       (Thing2 ((Type_app Std.Prelude.Int.Int ()))))))))
   (Let (rec_ false)
    (bindings
-    (((Union (Cnstr_appl Thing1 ((Catch_all (one))))
-       (Cnstr_appl Thing2 ((Catch_all (one)))))
-      ((Fun_call (Name Thing1) (((Literal (Int 1)) (Type_app Int ()))))
+    (((Union (Cnstr_appl LetPattern.Thing1 ((Catch_all (one))))
+       (Cnstr_appl LetPattern.Thing2 ((Catch_all (one)))))
+      ((Fun_call (Name LetPattern.Thing1)
+        (Function ((Type_app Std.Prelude.Int.Int ()))
+         (Type_app LetPattern.Thing ()))
+        (((Literal (Int 1)) (Type_app Int ()))))
        (Type_app LetPattern.Thing ()))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (make_thing))
       ((Lambda ((Catch_all ("")))
-        (Match (Name "") (Type_app Int ())
+        (Match (Name LetPattern.) (Type_app Int ())
          (((Constant (Int 1))
-           (Fun_call (Name Thing1) (((Literal (Int 1)) (Type_app Int ())))))
+           (Fun_call (Name LetPattern.Thing1)
+            (Function ((Type_app Std.Prelude.Int.Int ()))
+             (Type_app LetPattern.Thing ()))
+            (((Literal (Int 1)) (Type_app Int ())))))
           ((Constant (Int 2))
-           (Fun_call (Name Thing2) (((Literal (Int 2)) (Type_app Int ())))))
+           (Fun_call (Name LetPattern.Thing2)
+            (Function ((Type_app Std.Prelude.Int.Int ()))
+             (Type_app LetPattern.Thing ()))
+            (((Literal (Int 2)) (Type_app Int ())))))
           ((Catch_all (n))
-           (Fun_call (Name Thing1) (((Name n) (Type_app Int ()))))))))
+           (Fun_call (Name LetPattern.Thing1)
+            (Function ((Type_app Std.Prelude.Int.Int ()))
+             (Type_app LetPattern.Thing ()))
+            (((Name LetPattern.n) (Type_app Int ()))))))))
        (Function ((Type_app Int ())) (Type_app LetPattern.Thing ())))))))
   (Let (rec_ false)
    (bindings
-    (((Union (Cnstr_appl Thing1 ((Catch_all (n))))
-       (Cnstr_appl Thing2 ((Catch_all (n)))))
-      ((Fun_call (Name make_thing) (((Literal (Int 7)) (Type_app Int ()))))
+    (((Union (Cnstr_appl LetPattern.Thing1 ((Catch_all (n))))
+       (Cnstr_appl LetPattern.Thing2 ((Catch_all (n)))))
+      ((Fun_call (Name LetPattern.make_thing)
+        (Function ((Type_app Int ())) (Type_app LetPattern.Thing ()))
+        (((Literal (Int 7)) (Type_app Int ()))))
        (Type_app LetPattern.Thing ()))))))
   (Common_def
    (Type_decl Triple
@@ -35,7 +51,10 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all ())
-      ((Fun_call (Name Triple)
+      ((Fun_call (Name LetPattern.Triple)
+        (Function ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))
+         (Type_app LetPattern.Triple
+          ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))))
         (((Literal (String s)) (Type_app String ()))
          ((Literal (Int 1)) (Type_app Int ()))
          ((Literal (Int 2)) (Type_app Int ()))))
@@ -49,11 +68,14 @@
   (Let (rec_ false)
    (bindings
     (((Union
-       (Cnstr_appl Triple
+       (Cnstr_appl LetPattern.Triple
         ((Catch_all (x)) (Constant (Int 5)) (Catch_all (y))))
-       (Cnstr_appl Triple
+       (Cnstr_appl LetPattern.Triple
         ((Catch_all (x)) (Catch_all (y)) (Constant (Int 5)))))
-      ((Fun_call (Name Triple)
+      ((Fun_call (Name LetPattern.Triple)
+        (Function ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))
+         (Type_app LetPattern.Triple
+          ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))))
         (((Literal (String "Weird stuff")) (Type_app String ()))
          ((Literal (Int 5)) (Type_app Int ()))
          ((Literal (Int 7)) (Type_app Int ()))))
@@ -69,6 +91,7 @@
        (Tuple ((Type_app String ()) (Type_app Int ()) (Type_app Int ()))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (a)) ((Name ANewThing) (Type_app LetPattern.NewThing ()))))))
-  (Common_def (Val a () (() (Type_app NewThing ()))))
+    (((Catch_all (a))
+      ((Name LetPattern.ANewThing) (Type_app LetPattern.NewThing ()))))))
+  (Common_def (Val a () (() (Type_app LetPattern.NewThing ()))))
   (Common_def (Type_decl NewThing (() (Variants ((ANewThing ()))))))))

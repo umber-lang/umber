@@ -1,0 +1,10 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("Cyclic type alias" (name Paths.Std.Prelude.List.List)
+    (decl
+     ((a)
+      (Alias
+       (Type_app Std.Prelude.Option.Option
+        ((Tuple ((Var a) (Type_app Paths.Std.Prelude.List.List ((Var a))))))))))))
+  (filename Paths.um) (span 8:9-8:49)))

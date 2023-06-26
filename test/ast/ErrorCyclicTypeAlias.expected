@@ -1,6 +1,6 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ("Cyclic type alias" (name ErrorCyclicTypeAlias.A)
-    (decl (() (Alias (Type_app ErrorCyclicTypeAlias.B ()))))))
+   ("Cyclic type alias" (name ErrorCyclicTypeAlias.B)
+    (decl (() (Alias (Type_app ErrorCyclicTypeAlias.A ()))))))
   (filename ErrorCyclicTypeAlias.um) (span 1:1-1:11)))

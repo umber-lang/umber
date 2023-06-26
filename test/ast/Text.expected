@@ -17,7 +17,9 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all ())
-      ((Fun_call (Name ++)
+      ((Fun_call (Name Std.Prelude.Operators.++)
+        (Function ((Type_app String ()) (Type_app String ()))
+         (Type_app String ()))
         (((Literal (String "hello\n")) (Type_app String ()))
          ((Literal (String "\bworld!")) (Type_app String ()))))
        (Type_app String ()))))))

@@ -1,5 +1,8 @@
 (Operators
  ((Common_sig
+   (Import
+    ((kind Absolute) (paths (Module Std ((Module Prelude ((Name List)))))))))
+  (Common_sig
    (Val == ((Non_assoc 4))
     (() (Function ((Var a) (Var a)) (Type_app Bool ())))))
   (Module_sig Arith
@@ -12,44 +15,252 @@
   (Common_sig
    (Val :: ((Right 5))
     (()
-     (Function ((Var a) (Type_app List ((Var a)))) (Type_app List ((Var a)))))))
+     (Function ((Var a) (Type_app Std.Prelude.List.List ((Var a))))
+      (Type_app Std.Prelude.List.List ((Var a)))))))
   (Common_sig
    (Val "\195\151" ()
     (()
-     (Function ((Type_app List ((Var a))) (Type_app List ((Var b))))
-      (Type_app List ((Tuple ((Var a) (Var b))))))))))
- ((Let (rec_ true)
+     (Function
+      ((Type_app Std.Prelude.List.List ((Var a)))
+       (Type_app Std.Prelude.List.List ((Var b))))
+      (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))))))
+ ((Common_def
+   (Import
+    ((kind Absolute)
+     (paths
+      (Module Std
+       ((Module Prelude
+         ((Name *) (Name ==) (Name List) (Name ::) (Name Nil)))))))))
+  (Module
+   (Arith ()
+    ((Common_def
+      (Import
+       ((kind Absolute)
+        (paths (Module Std ((Module Prelude ((Name +) (Name mod))))))))))))
+  (Let (rec_ false)
    (bindings
-    (((Catch_all ())
-      (Qualified (Arith)
-       (Op_tree
-        (==
-         ((mod
-           ((+ (((Literal (Int 2))) ((Literal (Int 11)))))
-            ((Literal (Int 3)))))
-          ((Literal (Int 4)))))))))))
-  (Let (rec_ true)
+    (((Catch_all (true))
+      ((Fun_call (Name Std.Prelude.Operators.==)
+        (Function
+         ((Type_app Std.Prelude.Int.Int ())
+          (Type_app Std.Prelude.Int.Int ()))
+         (Type_app Std.Prelude.Bool.Bool ()))
+        (((Fun_call (Name Std.Prelude.Operators.+)
+           (Function
+            ((Type_app Std.Prelude.Int.Int ())
+             (Type_app Std.Prelude.Int.Int ()))
+            (Type_app Std.Prelude.Int.Int ()))
+           (((Literal (Int 2)) (Type_app Int ()))
+            ((Fun_call (Name Std.Prelude.Operators.mod)
+              (Function
+               ((Type_app Std.Prelude.Int.Int ())
+                (Type_app Std.Prelude.Int.Int ()))
+               (Type_app Std.Prelude.Int.Int ()))
+              (((Literal (Int 11)) (Type_app Int ()))
+               ((Literal (Int 3)) (Type_app Int ()))))
+             (Type_app Std.Prelude.Int.Int ()))))
+          (Type_app Std.Prelude.Int.Int ()))
+         ((Literal (Int 4)) (Type_app Int ()))))
+       (Type_app Std.Prelude.Bool.Bool ()))))))
+  (Let (rec_ false)
    (bindings
     (((Catch_all (four))
-      (Fun_call (Name Arith.+) ((Literal (Int 2)) (Literal (Int 2))))))))
-  (Let (rec_ true)
+      ((Fun_call (Name Std.Prelude.Operators.+)
+        (Function
+         ((Type_app Std.Prelude.Int.Int ())
+          (Type_app Std.Prelude.Int.Int ()))
+         (Type_app Std.Prelude.Int.Int ()))
+        (((Literal (Int 2)) (Type_app Int ()))
+         ((Literal (Int 2)) (Type_app Int ()))))
+       (Type_app Std.Prelude.Int.Int ()))))))
+  (Let (rec_ false)
    (bindings
     (((Catch_all (one))
-      (Op_tree (Arith.mod (((Literal (Int 5))) ((Literal (Int 2))))))))))
-  (Let (rec_ true)
+      ((Fun_call (Name Std.Prelude.Operators.mod)
+        (Function
+         ((Type_app Std.Prelude.Int.Int ())
+          (Type_app Std.Prelude.Int.Int ()))
+         (Type_app Std.Prelude.Int.Int ()))
+        (((Literal (Int 5)) (Type_app Int ()))
+         ((Literal (Int 2)) (Type_app Int ()))))
+       (Type_app Std.Prelude.Int.Int ()))))))
+  (Let (rec_ false)
    (bindings
-    (((Catch_all (left_section)) (Fun_call (Name +) ((Literal (Int 2))))))))
-  (Let (rec_ true)
+    (((Catch_all (left_section))
+      ((Let
+        ((rec_ false)
+         (bindings
+          ((((Catch_all (*arg0)) (Type_app Int ())) (Literal (Int 2)))))
+         (body
+          (Lambda ((Catch_all (*arg1)))
+           (Fun_call (Name Std.Prelude.Operators.+)
+            (Function
+             ((Type_app Std.Prelude.Int.Int ())
+              (Type_app Std.Prelude.Int.Int ()))
+             (Type_app Std.Prelude.Int.Int ()))
+            (((Name Operators.*arg0) (Type_app Int ()))
+             ((Name Operators.*arg1) (Type_app Std.Prelude.Int.Int ()))))))))
+       (Function ((Type_app Std.Prelude.Int.Int ()))
+        (Type_app Std.Prelude.Int.Int ())))))))
+  (Let (rec_ false)
    (bindings
     (((Catch_all (right_section))
-      (Lambda ((Catch_all ("")))
-       (Fun_call (Name *) ((Name "") (Literal (Int 5)))))))))
-  (Let (rec_ true)
+      ((Let
+        ((rec_ false)
+         (bindings
+          ((((Catch_all (*arg1)) (Type_app Int ())) (Literal (Int 5)))))
+         (body
+          (Lambda ((Catch_all (*arg0)))
+           (Fun_call (Name Std.Prelude.Operators.*)
+            (Function
+             ((Type_app Std.Prelude.Int.Int ())
+              (Type_app Std.Prelude.Int.Int ()))
+             (Type_app Std.Prelude.Int.Int ()))
+            (((Name Operators.*arg0) (Type_app Std.Prelude.Int.Int ()))
+             ((Name Operators.*arg1) (Type_app Int ()))))))))
+       (Function ((Type_app Std.Prelude.Int.Int ()))
+        (Type_app Std.Prelude.Int.Int ())))))))
+  (Let (rec_ false)
    (bindings
     (((Catch_all (unicode_my_dudes))
-      (Op_tree
-       ("\195\151"
-        (((Seq_literal ((Literal (String damn)) (Literal (String ok)))))
-         ((Seq_literal
-           ((Literal (String cartesian)) (Literal (String product))
-            (Literal (String maybe?))))))))))))))
+      ((Fun_call (Name "Operators.\195\151")
+        (Function
+         ((Type_app Std.Prelude.List.List ((Type_app String ())))
+          (Type_app Std.Prelude.List.List ((Type_app String ()))))
+         (Type_app Std.Prelude.List.List
+          ((Tuple ((Type_app String ()) (Type_app String ()))))))
+        (((Fun_call (Name Std.Prelude.Operators.::)
+           (Function
+            ((Type_app String ())
+             (Type_app Std.Prelude.List.List ((Type_app String ()))))
+            (Type_app Std.Prelude.List.List ((Type_app String ()))))
+           (((Literal (String damn)) (Type_app String ()))
+            ((Fun_call (Name Std.Prelude.Operators.::)
+              (Function
+               ((Type_app String ())
+                (Type_app Std.Prelude.List.List ((Type_app String ()))))
+               (Type_app Std.Prelude.List.List ((Type_app String ()))))
+              (((Literal (String ok)) (Type_app String ()))
+               ((Name Std.Prelude.List.Nil)
+                (Type_app Std.Prelude.List.List ((Type_app String ()))))))
+             (Type_app Std.Prelude.List.List ((Type_app String ()))))))
+          (Type_app Std.Prelude.List.List ((Type_app String ()))))
+         ((Fun_call (Name Std.Prelude.Operators.::)
+           (Function
+            ((Type_app String ())
+             (Type_app Std.Prelude.List.List ((Type_app String ()))))
+            (Type_app Std.Prelude.List.List ((Type_app String ()))))
+           (((Literal (String cartesian)) (Type_app String ()))
+            ((Fun_call (Name Std.Prelude.Operators.::)
+              (Function
+               ((Type_app String ())
+                (Type_app Std.Prelude.List.List ((Type_app String ()))))
+               (Type_app Std.Prelude.List.List ((Type_app String ()))))
+              (((Literal (String product)) (Type_app String ()))
+               ((Fun_call (Name Std.Prelude.Operators.::)
+                 (Function
+                  ((Type_app String ())
+                   (Type_app Std.Prelude.List.List ((Type_app String ()))))
+                  (Type_app Std.Prelude.List.List ((Type_app String ()))))
+                 (((Literal (String maybe?)) (Type_app String ()))
+                  ((Name Std.Prelude.List.Nil)
+                   (Type_app Std.Prelude.List.List ((Type_app String ()))))))
+                (Type_app Std.Prelude.List.List ((Type_app String ()))))))
+             (Type_app Std.Prelude.List.List ((Type_app String ()))))))
+          (Type_app Std.Prelude.List.List ((Type_app String ()))))))
+       (Type_app Std.Prelude.List.List
+        ((Tuple ((Type_app String ()) (Type_app String ()))))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ("\195\151"))
+      ((Lambda ((Catch_all (xs)) (Catch_all (ys)))
+        (Fun_call (Name Std.Prelude.List.concat_map)
+         (Function
+          ((Type_app Std.Prelude.List.List ((Var a)))
+           (Function ((Var a))
+            (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b)))))))
+          (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))
+         (((Name Operators.xs) (Type_app Std.Prelude.List.List ((Var a))))
+          ((Lambda ((Catch_all (x)))
+            (Fun_call (Name Std.Prelude.List.map)
+             (Function
+              ((Type_app Std.Prelude.List.List ((Var a)))
+               (Function ((Var a)) (Tuple ((Var b) (Var a)))))
+              (Type_app Std.Prelude.List.List ((Tuple ((Var b) (Var a))))))
+             (((Name Operators.ys)
+               (Type_app Std.Prelude.List.List ((Var a))))
+              ((Lambda ((Catch_all (y)))
+                (Tuple ((Name Operators.x) (Name Operators.y))))
+               (Function ((Var a)) (Tuple ((Var b) (Var a))))))))
+           (Function ((Var a))
+            (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))))))
+       (Function
+        ((Type_app Std.Prelude.List.List ((Var a)))
+         (Type_app Std.Prelude.List.List ((Var b))))
+        (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b)))))))))))
+  (Common_def
+   (Import
+    ((kind Absolute)
+     (paths
+      (Module Std
+       ((Module Prelude
+         ((Name ";") (Name print) (Name ++) (Name Int) (Name Bool)))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ())
+      ((Fun_call (Name Std.Prelude.List.map)
+        (Function
+         ((Type_app Std.Prelude.List.List
+           ((Tuple ((Type_app String ()) (Type_app String ())))))
+          (Function ((Tuple ((Type_app String ()) (Type_app String ()))))
+           (Tuple ())))
+         (Type_app Std.Prelude.List.List ((Tuple ()))))
+        (((Name Operators.unicode_my_dudes)
+          (Type_app Std.Prelude.List.List
+           ((Tuple ((Type_app String ()) (Type_app String ()))))))
+         ((Lambda ((Tuple ((Catch_all (x)) (Catch_all (y)))))
+           (Fun_call (Name "Std.Prelude.Operators.;")
+            (Function ((Tuple ()) (Tuple ())) (Tuple ()))
+            (((Fun_call (Name Std.Prelude.print)
+               (Function ((Type_app String ())) (Tuple ()))
+               (((Name Operators.x) (Type_app String ()))))
+              (Tuple ()))
+             ((Fun_call (Name Std.Prelude.print)
+               (Function ((Type_app String ())) (Tuple ()))
+               (((Name Operators.y) (Type_app String ()))))
+              (Tuple ())))))
+          (Function ((Tuple ((Type_app String ()) (Type_app String ()))))
+           (Tuple ())))))
+       (Type_app Std.Prelude.List.List ((Tuple ()))))))))
+  (Let (rec_ false)
+   (bindings
+    (((Tuple ())
+      ((Fun_call (Name Std.Prelude.print)
+        (Function ((Type_app String ())) (Tuple ()))
+        (((Fun_call (Name Std.Prelude.Operators.++)
+           (Function ((Type_app String ()) (Type_app String ()))
+            (Type_app String ()))
+           (((Literal (String "true = ")) (Type_app String ()))
+            ((Fun_call (Name Std.Prelude.Bool.to_string)
+              (Function ((Type_app Std.Prelude.Bool.Bool ()))
+               (Type_app String ()))
+              (((Name Operators.true) (Type_app Std.Prelude.Bool.Bool ()))))
+             (Type_app String ()))))
+          (Type_app String ()))))
+       (Tuple ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Tuple ())
+      ((Fun_call (Name Std.Prelude.print)
+        (Function ((Type_app String ())) (Tuple ()))
+        (((Fun_call (Name Std.Prelude.Operators.++)
+           (Function ((Type_app String ()) (Type_app String ()))
+            (Type_app String ()))
+           (((Literal (String "four = ")) (Type_app String ()))
+            ((Fun_call (Name Std.Prelude.Int.to_string)
+              (Function ((Type_app Std.Prelude.Int.Int ()))
+               (Type_app String ()))
+              (((Name Operators.four) (Type_app Std.Prelude.Int.Int ()))))
+             (Type_app String ()))))
+          (Type_app String ()))))
+       (Tuple ()))))))))

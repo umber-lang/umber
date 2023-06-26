@@ -4,20 +4,20 @@
  (Fun_decl ((name Std.Prelude.Operators.^) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_def
-  ((fun_name LetBindingGroups.fun) (args (LetBindingGroups.n))
+  ((fun_name LetBindingGroups.fun) (args (LetBindingGroups.n.1))
    (body
     (Fun_call Std.Prelude.Operators.+
      ((Fun_call Std.Prelude.Operators.+
        ((Fun_call Std.Prelude.Operators.-
          ((Fun_call Std.Prelude.Operators.^
-           ((Name LetBindingGroups.n) (Primitive (Int 2))))
+           ((Name LetBindingGroups.n.1) (Primitive (Int 2))))
           (Primitive (Int 2))))
-        (Name LetBindingGroups.n)))
+        (Name LetBindingGroups.n.1)))
       (Fun_call Std.Prelude.Operators.*
        ((Fun_call Std.Prelude.Operators.*
-         ((Name LetBindingGroups.n)
+         ((Name LetBindingGroups.n.1)
           (Fun_call Std.Prelude.Operators.-
-           ((Name LetBindingGroups.n) (Primitive (Int 8))))))
+           ((Name LetBindingGroups.n.1) (Primitive (Int 8))))))
         (Primitive (Int 5)))))))))
  (Value_def LetBindingGroups.b
   (Fun_call Std.Prelude.Operators.+
@@ -26,8 +26,8 @@
  (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
  (Fun_decl ((name Std.Prelude.Operators.||) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
- (Value_def _
-  (Let LetBindingGroups.list
+ (Value_def LetBindingGroups._.1
+  (Let LetBindingGroups.list.1
    (Fun_call Std.Prelude.Operators.::
     ((Primitive (String a))
      (Fun_call Std.Prelude.Operators.::
@@ -42,15 +42,18 @@
      (Fun_call Std.Prelude.Operators.==
       ((Primitive (Int 3)) (Primitive (Int 4))))))))
  (Fun_def
-  ((fun_name LetBindingGroups.go_left) (args (LetBindingGroups.x))
-   (body (Fun_call LetBindingGroups.go_right ((Name LetBindingGroups.x))))))
+  ((fun_name LetBindingGroups.go_left.1) (args (LetBindingGroups.x.1))
+   (body
+    (Fun_call LetBindingGroups.go_right.1 ((Name LetBindingGroups.x.1))))))
  (Fun_def
-  ((fun_name LetBindingGroups.go_right) (args (LetBindingGroups.x.1))
-   (body (Fun_call LetBindingGroups.go_left ((Name LetBindingGroups.x.1))))))
+  ((fun_name LetBindingGroups.go_right.1) (args (LetBindingGroups.x.2))
+   (body (Fun_call LetBindingGroups.go_left.1 ((Name LetBindingGroups.x.2))))))
  (Fun_def
-  ((fun_name LetBindingGroups.bottom_again) (args (*lambda_arg))
-   (body (Fun_call LetBindingGroups.go_left ((Primitive (Int 17)))))))
- (Value_def LetBindingGroups.bottom.1 (Name LetBindingGroups.bottom_again))
+  ((fun_name LetBindingGroups.bottom_again.1)
+   (args (LetBindingGroups.*lambda_arg.1))
+   (body (Fun_call LetBindingGroups.go_left.1 ((Primitive (Int 17)))))))
+ (Value_def LetBindingGroups.bottom.1 (Name LetBindingGroups.bottom_again.1))
  (Fun_def
-  ((fun_name LetBindingGroups.bottom) (args (arg0))
-   (body (Fun_call LetBindingGroups.bottom.1 ((Name arg0)))))))
+  ((fun_name LetBindingGroups.bottom) (args (LetBindingGroups.*arg0.1))
+   (body
+    (Fun_call LetBindingGroups.bottom.1 ((Name LetBindingGroups.*arg0.1)))))))

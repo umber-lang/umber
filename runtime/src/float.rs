@@ -1,6 +1,5 @@
 use crate::block::{Block, BlockPtr, KnownTag};
 use core::mem;
-use libm::sqrt;
 
 impl Block {
     pub fn as_float(self) -> f64 {
@@ -36,7 +35,22 @@ pub extern "C" fn umber_float_mul(x: BlockPtr, y: BlockPtr) -> BlockPtr {
 
 #[no_mangle]
 pub extern "C" fn umber_float_sqrt(x: BlockPtr) -> BlockPtr {
-    BlockPtr::new_float(sqrt(x.as_float()))
+    BlockPtr::new_float(libm::sqrt(x.as_float()))
+}
+
+#[no_mangle]
+pub extern "C" fn umber_float_abs(x: BlockPtr) -> BlockPtr {
+    BlockPtr::new_float(libm::fabs(x.as_float()))
+}
+
+#[no_mangle]
+pub extern "C" fn umber_float_sin(x: BlockPtr) -> BlockPtr {
+    BlockPtr::new_float(libm::sin(x.as_float()))
+}
+
+#[no_mangle]
+pub extern "C" fn umber_float_cos(x: BlockPtr) -> BlockPtr {
+    BlockPtr::new_float(libm::cos(x.as_float()))
 }
 
 #[cfg(test)]

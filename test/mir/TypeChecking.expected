@@ -1,48 +1,56 @@
 ((Fun_def
-  ((fun_name TypeChecking.id) (args (TypeChecking.x))
-   (body (Name TypeChecking.x))))
- (Fun_def
-  ((fun_name TypeChecking.id_for_ints) (args (TypeChecking.x.1))
+  ((fun_name TypeChecking.id) (args (TypeChecking.x.1))
    (body (Name TypeChecking.x.1))))
  (Fun_def
-  ((fun_name TypeChecking.id_for_floats) (args (TypeChecking.x.2))
+  ((fun_name TypeChecking.id_for_ints) (args (TypeChecking.x.2))
    (body (Name TypeChecking.x.2))))
+ (Fun_def
+  ((fun_name TypeChecking.id_for_floats) (args (TypeChecking.x.3))
+   (body (Name TypeChecking.x.3))))
  (Value_def TypeChecking.id_for_chars.1 (Name TypeChecking.id))
  (Fun_def
-  ((fun_name TypeChecking.id_for_chars) (args (arg0))
-   (body (Fun_call TypeChecking.id_for_chars.1 ((Name arg0))))))
- (Fun_def
-  ((fun_name TypeChecking.id_for_bools) (args (TypeChecking.x.3))
-   (body (Fun_call TypeChecking.id ((Name TypeChecking.x.3))))))
- (Value_def *binding
-  (Make_block (tag 0) (fields ((Name TypeChecking.id) (Primitive (Int 5))))))
- (Value_def TypeChecking.id_alias (Get_block_field 0 (Name *binding)))
- (Value_def TypeChecking.five (Get_block_field 1 (Name *binding)))
- (Fun_def
-  ((fun_name TypeChecking.|>) (args (TypeChecking.x.4 TypeChecking.f))
-   (body (Fun_call TypeChecking.f ((Name TypeChecking.x.4))))))
- (Fun_def
-  ((fun_name *fun) (args (*closure_env TypeChecking.))
+  ((fun_name TypeChecking.id_for_chars) (args (TypeChecking.*arg0.1))
    (body
-    (Let TypeChecking.then_.1 (Get_block_field 2 (Name *closure_env))
-     (Let TypeChecking.else_.1 (Get_block_field 1 (Name *closure_env))
-      (Cond_assign
-       (conds (((Constant_tag_equals (Name TypeChecking.) 1) ())))
-       (body (Fun_call TypeChecking.then_.1 ((Make_block (tag 0)))))
-       (if_none_matched
-        (Otherwise (Fun_call TypeChecking.else_.1 ((Make_block (tag 0))))))))))))
+    (Fun_call TypeChecking.id_for_chars.1 ((Name TypeChecking.*arg0.1))))))
  (Fun_def
-  ((fun_name TypeChecking.if_) (args (TypeChecking.then_ TypeChecking.else_))
+  ((fun_name TypeChecking.id_for_bools) (args (TypeChecking.x.4))
+   (body (Fun_call TypeChecking.id ((Name TypeChecking.x.4))))))
+ (Value_def TypeChecking.*binding.1
+  (Make_block (tag 0) (fields ((Name TypeChecking.id) (Primitive (Int 5))))))
+ (Value_def TypeChecking.id_alias
+  (Get_block_field 0 (Name TypeChecking.*binding.1)))
+ (Value_def TypeChecking.five
+  (Get_block_field 1 (Name TypeChecking.*binding.1)))
+ (Fun_def
+  ((fun_name TypeChecking.|>) (args (TypeChecking.x.5 TypeChecking.f.1))
+   (body (Fun_call TypeChecking.f.1 ((Name TypeChecking.x.5))))))
+ (Fun_def
+  ((fun_name TypeChecking.*fun.1)
+   (args (TypeChecking.*closure_env.1 TypeChecking..1))
+   (body
+    (Let TypeChecking.then_.2
+     (Get_block_field 2 (Name TypeChecking.*closure_env.1))
+     (Let TypeChecking.else_.2
+      (Get_block_field 1 (Name TypeChecking.*closure_env.1))
+      (Cond_assign
+       (conds (((Constant_tag_equals (Name TypeChecking..1) 1) ())))
+       (body (Fun_call TypeChecking.then_.2 ((Make_block (tag 0)))))
+       (if_none_matched
+        (Otherwise (Fun_call TypeChecking.else_.2 ((Make_block (tag 0))))))))))))
+ (Fun_def
+  ((fun_name TypeChecking.if_)
+   (args (TypeChecking.then_.1 TypeChecking.else_.1))
    (body
     (Make_block (tag 12289)
      (fields
-      ((Name *fun) (Name TypeChecking.else_) (Name TypeChecking.then_)))))))
+      ((Name TypeChecking.*fun.1) (Name TypeChecking.else_.1)
+       (Name TypeChecking.then_.1)))))))
  (Fun_def
   ((fun_name TypeChecking.if')
-   (args (TypeChecking.then_.2 TypeChecking.else_.2 TypeChecking.cond))
+   (args (TypeChecking.then_.3 TypeChecking.else_.3 TypeChecking.cond.1))
    (body
     (Cond_assign
-     (conds (((Constant_tag_equals (Name TypeChecking.cond) 1) ())))
-     (body (Fun_call TypeChecking.then_.2 ((Make_block (tag 0)))))
+     (conds (((Constant_tag_equals (Name TypeChecking.cond.1) 1) ())))
+     (body (Fun_call TypeChecking.then_.3 ((Make_block (tag 0)))))
      (if_none_matched
-      (Otherwise (Fun_call TypeChecking.else_.2 ((Make_block (tag 0)))))))))))
+      (Otherwise (Fun_call TypeChecking.else_.3 ((Make_block (tag 0)))))))))))

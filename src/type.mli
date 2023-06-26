@@ -34,110 +34,107 @@ module Param : sig
 end
 
 module Expr : sig
-  (* FIXME: Rename pf to partial (p?) or something *)
-  type ('v, 'pf) t =
+  type ('v, 'pf, 'n) t =
     | Var of 'v
-    | Type_app of Type_name.Qualified.t * ('v, 'pf) t list
-    | Tuple of ('v, 'pf) t list
-    | Function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * ('v, 'pf) t
-    | Partial_function of ('v, 'pf) t Nonempty.t * ('v, 'pf) effect_row * 'pf
+    | Type_app of 'n Type_name.Qualified.t * ('v, 'pf, 'n) t list
+    | Tuple of ('v, 'pf, 'n) t list
+    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) t
+    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * 'pf
 
-  (* FIXME: We want partial_effect to only be present while doing type inference, I
-       think. Maybe we don't need to enforce that/maybe it still makes sense? *)
-  (* | Partial_effect of ('v, 'pf) effect_row *)
-  and ('v, 'pf) effect_row = ('v, 'pf) effect list
+  and ('v, 'pf, 'n) effect_row = ('v, 'pf, 'n) effect list
 
-  and ('v, 'pf) effect =
-    | Effect of Effect_name.t * ('v, 'pf) t list
+  and ('v, 'pf, 'n) effect =
+    | Effect of Effect_name.t * ('v, 'pf, 'n) t list
     | Effect_var of 'v
   [@@deriving hash, compare, equal, sexp]
 
-  val var : 'v -> ('v, _) t
-  val tuple : ('v, 'pf) t list -> ('v, 'pf) t
-
   val map
-    :  ?f:(('v1, 'pf1) t -> (('v1, 'pf1) t, ('v2, 'pf2) t) Map_action.t)
-    -> ('v1, 'pf1) t
+    :  ?f:(('v1, 'pf1, 'n1) t -> (('v1, 'pf1, 'n1) t, ('v2, 'pf2, 'n2) t) Map_action.t)
+    -> ('v1, 'pf1, 'n1) t
     -> var:('v1 -> 'v2)
     -> pf:('pf1 -> 'pf2)
-    -> ('v2, 'pf2) t
+    -> name:('n1 Type_name.Qualified.t -> 'n2 Type_name.Qualified.t)
+    -> ('v2, 'pf2, 'n2) t
 
   val fold_until
-    :  ('v, 'pf) t
+    :  ('v, 'pf, 'n) t
     -> init:'acc
-    -> f:('acc -> ('v, 'pf) t -> ('acc, 'final) Fold_action.t)
+    -> f:('acc -> ('v, 'pf, 'n) t -> ('acc, 'final) Fold_action.t)
     -> ('acc, 'final) Fold_action.t
 
-  val fold_vars : ('v, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
-  val for_all_vars : ('v, _) t -> f:('v -> bool) -> bool
-  val exists_var : ('v, _) t -> f:('v -> bool) -> bool
-  val union : (Var_id.t, Var_id.t) t -> (Var_id.t, Var_id.t) t -> (Var_id.t, Var_id.t) t
-  val union_effects : ('v, 'pf) effect_row -> ('v, 'pf) effect_row -> ('v, 'pf) effect_row
+  val fold_vars : ('v, _, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
+  val for_all_vars : ('v, _, _) t -> f:('v -> bool) -> bool
+  val exists_var : ('v, _, _) t -> f:('v -> bool) -> bool
+
+  val union
+    :  (Var_id.t, Var_id.t, 'n) t
+    -> (Var_id.t, Var_id.t, 'n) t
+    -> (Var_id.t, Var_id.t, 'n) t
+
+  val union_effects
+    :  ('v, 'pf, 'n) effect_row
+    -> ('v, 'pf, 'n) effect_row
+    -> ('v, 'pf, 'n) effect_row
+
   val total_effect : _ effect_row
   val effect_is_total : _ effect_row -> bool
 end
 
-type t = (Var_id.t, Var_id.t) Expr.t [@@deriving compare, hash, equal, sexp]
+type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
+[@@deriving compare, hash, equal, sexp]
 
 val fresh_var : unit -> t
 
 module Scheme : sig
-  type nonrec t = (Param.t, Nothing.t) Expr.t [@@deriving compare, hash, equal, sexp]
-
-  type nonrec effect = (Param.t, Nothing.t) Expr.effect
+  type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
   [@@deriving compare, hash, equal, sexp]
 
-  type nonrec effect_row = (Param.t, Nothing.t) Expr.effect_row
+  type nonrec 'n effect = (Param.t, Nothing.t, 'n) Expr.effect
   [@@deriving compare, hash, equal, sexp]
 
-  include Comparable.S with type t := t
-  include Hashable.S with type t := t
+  type nonrec 'n effect_row = (Param.t, Nothing.t, 'n) Expr.effect_row
+  [@@deriving compare, hash, equal, sexp]
 
   module Bounded : sig
-    type nonrec t = Trait_bound.t * t [@@deriving compare, equal, hash, sexp]
+    type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
   end
 
-  val instantiate
-    :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
-    -> ?params:Param.Env_to_vars.t
-    -> t
-    -> (Var_id.t, _) Expr.t
+  val instantiate : ?params:Param.Env_to_vars.t -> 'n t -> (Var_id.t, _, 'n) Expr.t
 
   val instantiate_bounded
-    :  ?map_name:(Type_name.Qualified.t -> Type_name.Qualified.t)
-    -> ?params:Param.Env_to_vars.t
-    -> Bounded.t
-    -> (Var_id.t, _) Expr.t
+    :  ?params:Param.Env_to_vars.t
+    -> 'n Bounded.t
+    -> (Var_id.t, _, 'n) Expr.t
 end
 
 module Concrete : sig
-  type t = (Nothing.t, Nothing.t) Expr.t [@@deriving compare, equal, hash, sexp]
+  type t = (Nothing.t, Nothing.t, Module_path.absolute) Expr.t
+  [@@deriving compare, equal, hash, sexp]
 
-  val cast : t -> ('v, 'pf) Expr.t
-
-  (* TODO: Consider deleting this. Do we need it? *)
-  val of_polymorphic_exn : ('v, 'pf) Expr.t -> t
+  val cast : (Nothing.t, Nothing.t, 'n) Expr.t -> ('v, 'pf, 'n) Expr.t
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
 end
 
 module Decl : sig
-  type decl =
+  type 'n decl =
     | Abstract
-    | Alias of Scheme.t
-    | Variants of (Cnstr_name.t * Scheme.t list) list
+    | Alias of 'n Scheme.t
+    | Variants of (Cnstr_name.t * 'n Scheme.t list) list
     (* TODO: probably just make records a type expression - you can trivially get nominal
        records with a single variant and an inline record. One problem with this is you
        can no longer define recursive record types, which is a bit annoying. *)
-    | Record of (Value_name.t * Scheme.t) Nonempty.t
+    | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
   [@@deriving compare, equal, hash, sexp]
 
-  type t = Type_param_name.t list * decl [@@deriving compare, equal, hash, sexp]
+  type 'n t = Type_param_name.t Unique_list.t * 'n decl
+  [@@deriving compare, equal, hash, sexp]
 
-  val arity : t -> int
-  val map_exprs : t -> f:(Scheme.t -> Scheme.t) -> t
-  val fold_exprs : t -> init:'acc -> f:('acc -> Scheme.t -> 'acc) -> 'acc
-  val iter_exprs : t -> f:(Scheme.t -> unit) -> unit
-  val no_free_params : t -> bool
+  val arity : 'n t -> int
+  val map_exprs : 'n1 t -> f:('n1 Scheme.t -> 'n2 Scheme.t) -> 'n2 t
+  val fold_exprs : 'n t -> init:'acc -> f:('acc -> 'n Scheme.t -> 'acc) -> 'acc
+  val iter_exprs : 'n t -> f:('n Scheme.t -> unit) -> unit
+  val no_free_params : 'n t -> bool
+  val params_of_list : Type_param_name.t list -> Type_param_name.t Unique_list.t
 end

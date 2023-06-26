@@ -2,22 +2,31 @@
  ((Let (rec_ false)
    (bindings
     (((Catch_all (id))
-      ((Lambda ((Catch_all (x))) (Name x)) (Function ((Var a)) (Var a)))))))
+      ((Lambda ((Catch_all (x))) (Name Functions.x))
+       (Function ((Var a)) (Var a)))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (zero)) ((Literal (Float 0)) (Type_app Float ()))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (still_zero_wow))
-      ((Fun_call (Name id) (((Name zero) (Type_app Float ()))))
+      ((Fun_call (Name Functions.id)
+        (Function ((Type_app Float ())) (Type_app Float ()))
+        (((Name Functions.zero) (Type_app Float ()))))
        (Type_app Float ()))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (sqr))
       ((Lambda ((Catch_all (x)))
-        (Fun_call (Name *)
-         (((Name x) (Type_app Int ())) ((Name x) (Type_app Int ())))))
-       (Function ((Type_app Int ())) (Type_app Int ())))))))
+        (Fun_call (Name Std.Prelude.Operators.*)
+         (Function
+          ((Type_app Std.Prelude.Int.Int ())
+           (Type_app Std.Prelude.Int.Int ()))
+          (Type_app Std.Prelude.Int.Int ()))
+         (((Name Functions.x) (Type_app Std.Prelude.Int.Int ()))
+          ((Name Functions.x) (Type_app Std.Prelude.Int.Int ())))))
+       (Function ((Type_app Std.Prelude.Int.Int ()))
+        (Type_app Std.Prelude.Int.Int ())))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (lots_of_args))
@@ -29,7 +38,11 @@
   (Let (rec_ false)
    (bindings
     (((Tuple ())
-      ((Fun_call (Name lots_of_args)
+      ((Fun_call (Name Functions.lots_of_args)
+        (Function
+         ((Type_app Int ()) (Type_app Float ()) (Type_app Int ())
+          (Type_app String ()) (Type_app Char ()))
+         (Tuple ()))
         (((Literal (Int 5)) (Type_app Int ()))
          ((Literal (Float 10000000000000)) (Type_app Float ()))
          ((Literal (Int -89)) (Type_app Int ()))

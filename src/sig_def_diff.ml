@@ -9,7 +9,7 @@ type 'a diff =
 
 type t =
   { name_diff : (Value_name.t * Name_bindings.Name_entry.t diff) Sequence.t
-  ; type_diff : (Type_name.t * Type.Decl.t diff) Sequence.t
+  ; type_diff : (Type_name.t * Module_path.absolute Type.Decl.t diff) Sequence.t
   ; module_diff : (Module_name.t * module_diff) Sequence.t
   }
 [@@deriving sexp_of]
@@ -34,12 +34,6 @@ module By_kind = struct
     ; def : 'a
     }
   [@@deriving sexp_of]
-
-  let set t kind new_ =
-    match kind with
-    | `Sig -> { t with sig_ = new_ }
-    | `Def -> { t with def = new_ }
-  ;;
 end
 
 exception Compatibility_error
@@ -47,16 +41,19 @@ exception Compatibility_error
 let no_errors f =
   match f () with
   | () -> true
-  | exception Compatibility_error -> false
+  | (exception Compatibility_error)
+  | (exception Compilation_error.Compilation_error { kind = Type_error; _ }) -> false
 ;;
 
-let iter2 xs ys ~f =
-  match List.iter2 xs ys ~f with
-  | Ok x -> x
+let fold2 xs ys ~init ~f =
+  match List.fold2 xs ys ~init ~f with
+  | Ok result -> result
   | Unequal_lengths -> raise Compatibility_error
 ;;
 
-let check_effects
+(* FIXME: This should be able to use unification. I think I'll need a check for effect
+   declarations though.  *)
+(* let check_effects
   ({ sig_ = sig_effects; def = def_effects } : _ By_kind.t)
   ~param_matching
   =
@@ -76,98 +73,81 @@ let check_effects
       [%equal: Type.Scheme.effect_row]
       sig_effects
       def_effects
+;; *)
+
+let iter2 xs ys ~f = fold2 xs ys ~init:() ~f:(fun () x -> f x)
+
+let create_skolemized_type ~names =
+  Name_bindings.with_path_into_defs names Module_path.Absolute.empty ~f:(fun names ->
+    let type_name = Type_name.create_skolemized () in
+    ( Name_bindings.add_type_decl names type_name (Unique_list.empty, Abstract)
+    , Type.Expr.Type_app ((Module_path.Absolute.empty, type_name), []) ))
 ;;
 
-let check_type_schemes =
-  let rec check_type_schemes ~names ~param_matching ~param_table ~schemes =
-    (* FIXME: Do we need to absolutify type app names in aliases? Likely yes? *)
-    (* let map_alias param_matching ~param_table expr =
-    Type.Expr.map expr ~var:Fn.id ~pf:Nothing.unreachable_code ~f:(function
-      | Var v -> Map.find_exn params v
-      | typ -> Defer typ)
-  in *)
-    let substitute_alias ~params ~args alias =
-      let args_by_parm = List.zip_exn params args in
-      Type.Expr.map alias ~var:Fn.id ~pf:Fn.id ~f:(function
-        | Var var -> Halt (List.Assoc.find_exn args_by_parm var ~equal:Type.Param.equal)
-        | expr -> Defer expr)
-    in
-    let check_type_app ~name ~args ~kind ~on_non_alias =
-      match Name_bindings.find_absolute_type_decl names name with
-      | params, Alias alias ->
-        let alias = substitute_alias ~params ~args alias in
-        check_type_schemes
-          ~names
-          ~param_matching
-          ~param_table
-          ~schemes:(By_kind.set schemes kind alias)
-      | decl -> on_non_alias decl
-    in
-    match (schemes : Type.Scheme.t By_kind.t), param_matching with
-    | { sig_ = Var sig_param; def = Var def_param }, `None ->
-      if not (Type.Param.equal sig_param def_param) then raise Compatibility_error
-    | { sig_ = sig_scheme; def = Var def_param }, `Lenient
-    | { sig_ = Var _ as sig_scheme; def = Var def_param }, `Strict ->
-      (match Hashtbl.find param_table def_param with
-       | None -> Hashtbl.set param_table ~key:def_param ~data:sig_scheme
-       | Some def_scheme ->
-         check_type_schemes
-           ~names
-           ~param_matching:`None
-           ~param_table
-           ~schemes:{ sig_ = sig_scheme; def = def_scheme })
-    | { sig_ = Type_app (name1, args1); def = Type_app (name2, args2) }, _ ->
-      check_type_app ~name:name1 ~args:args1 ~kind:`Sig ~on_non_alias:(fun decl1 ->
-        check_type_app ~name:name2 ~args:args2 ~kind:`Def ~on_non_alias:(fun decl2 ->
-          if not (phys_equal decl1 decl2) then raise Compatibility_error;
-          iter2 args1 args2 ~f:(fun sig_ def ->
-            check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def })))
-    | { sig_ = Type_app (name, args); def = Tuple _ | Function _ | Partial_function _ }, _
-    | { sig_ = Type_app (name, args); def = Var _ }, `None ->
-      check_type_app ~name ~args ~kind:`Sig ~on_non_alias:(fun _ ->
-        raise Compatibility_error)
-    | ( { sig_ = Var _ | Tuple _ | Function _ | Partial_function _
-        ; def = Type_app (name, args)
-        }
-      , _ ) ->
-      check_type_app ~name ~args ~kind:`Def ~on_non_alias:(fun _ ->
-        raise Compatibility_error)
-    | ( { sig_ = Function (args1, effect_row1, res1)
-        ; def = Function (args2, effect_row2, res2)
-        }
-      , _ ) ->
-      iter2 (Nonempty.to_list args1) (Nonempty.to_list args2) ~f:(fun sig_ def ->
-        check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def });
-      check_type_schemes
-        ~names
-        ~param_matching
-        ~param_table
-        ~schemes:{ sig_ = res1; def = res2 };
-      if not (check_effects { sig_ = effect_row1; def = effect_row2 } ~param_matching)
-      then raise Compatibility_error
-    | { sig_ = Tuple args1; def = Tuple args2 }, _ ->
-      iter2 args1 args2 ~f:(fun sig_ def ->
-        check_type_schemes ~names ~param_matching ~param_table ~schemes:{ sig_; def })
-    | ( ( { sig_ = Var _; def = Tuple _ | Function _ }
-        | { sig_ = Tuple _; def = Function _ }
-        | { sig_ = Function _; def = Tuple _ } )
-      , _ )
-    | { sig_ = Type_app _ | Tuple _ | Function _; def = Var _ }, `Strict
-    | { sig_ = Tuple _ | Function _; def = Var _ }, `None -> raise Compatibility_error
-    | ({ sig_ = Partial_function _; def = _ } | { sig_ = _; def = Partial_function _ }), _
-      -> .
+(** Skolemization means replacing all type variables in a type expression with fresh
+    abstract types. e.g. `a -> b -> c` becomes something like `A -> B -> C` where `A`,
+    `B`, and `C` are fresh abstract types. *)
+let skolemize ~names ~types_by_param scheme =
+  let types_by_param, create_skolemized_type =
+    match types_by_param with
+    | None -> Type.Param.Table.create (), create_skolemized_type
+    | Some types_by_param ->
+      ( types_by_param
+      , fun ~names:_ ->
+          compiler_bug
+            [%message
+              "Missing declaration for skolemized param"
+                (scheme : _ Type.Scheme.t)
+                (types_by_param
+                  : (Type.Var_id.t, Type.Var_id.t, _) Type.Expr.t Type.Param.Table.t)] )
   in
-  fun ~names ~param_matching ~schemes ->
-    check_type_schemes
-      ~names
-      ~param_matching
-      ~param_table:(Type.Param.Table.create ())
-      ~schemes
+  let names = ref names in
+  let type_ =
+    Type.Expr.map
+      scheme
+      ~var:(fun var -> compiler_bug [%message "Unskolemized var" (var : Type.Param.t)])
+      ~pf:Nothing.unreachable_code
+      ~name:Fn.id
+      ~f:(function
+        | Var param ->
+          Halt
+            (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
+               let names', type_ = create_skolemized_type ~names:!names in
+               names := names';
+               type_))
+        | type_ -> Defer type_)
+  in
+  !names, type_
+;;
+
+(** A `val` item in a signature is compatible with a `let` in a defintion if the
+    signature is a "more specific" version of the defintion. We can check this by
+    skolemizing the signature, instatiating the defintion, and then unifying the two. *)
+let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
+  let names, sig_type = skolemize ~names sig_scheme ~types_by_param:None in
+  let def_type = Type.Scheme.instantiate def_scheme in
+  let types = Type_bindings.create () in
+  Type_bindings.unify ~names ~types sig_type def_type
+;;
+
+(** Type definitions in a signature an defintion are compatible if they are the same
+    modulo type aliases and type variable renamings. Unlike for `val`s, the compatibility
+    is symmetrical. *)
+let check_type_decl_schemes
+  ~names
+  ~sig_params
+  ~def_params
+  ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t)
+  =
+  let types = Type_bindings.create () in
+  let names, sig_type = skolemize ~names ~types_by_param:(Some sig_params) sig_scheme in
+  let names, def_type = skolemize ~names ~types_by_param:(Some def_params) def_scheme in
+  Type_bindings.unify ~names ~types sig_type def_type
 ;;
 
 let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
   let get_scheme entry =
-    option_or_default (Name_bindings.Name_entry.scheme entry) ~f:(fun () ->
+    Option.value_or_thunk (Name_bindings.Name_entry.scheme entry) ~default:(fun () ->
       compiler_bug
         [%message
           "Type binding not generalized when diffing sigs/defs"
@@ -187,37 +167,52 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
       Extern_name.equal sig_extern_name def_extern_name
   in
   no_errors (fun () ->
-    check_type_schemes
+    check_val_type_schemes
       ~names
-      ~param_matching:`Lenient
-      ~schemes:{ sig_ = get_scheme sig_entry; def = get_scheme def_entry };
+      { sig_ = get_scheme sig_entry; def = get_scheme def_entry };
     if not
          (compatible_fixities sig_entry def_entry
-         && compatible_extern_names sig_entry def_entry)
+          && compatible_extern_names sig_entry def_entry)
     then raise Compatibility_error)
 ;;
 
-(* TODO: test/look at this for correctness, there are probably bugs here *)
-let compatible_type_decls ~names ~sig_:(sig_params, sig_type) ~def:(def_params, def_type) =
+(* TODO: test/look at this for correctness, there are probably bugs here. Could we maybe
+   run quickcheck on the AST types? It might be hard to express all the constraints
+   guaranteed by previous modules. Maybe we could just check that compilation never
+   crashes. *)
+
+let compatible_type_decls
+  ~names
+  ~sig_:((sig_param_list, sig_type) : _ Type.Decl.t)
+  ~def:((def_param_list, def_type) : _ Type.Decl.t)
+  =
   no_errors (fun () ->
-    let types = Type_bindings.create () in
-    let params = Type.Param.Env_to_vars.create () in
-    iter2 sig_params def_params ~f:(fun sig_param def_param ->
-      let sig_var = Type.Param.Env_to_vars.find_or_add params sig_param in
-      let def_var = Type.Param.Env_to_vars.find_or_add params def_param in
-      Type_bindings.unify ~names ~types (Var sig_var) (Var def_var));
-    match (sig_type : Type.Decl.decl), (def_type : Type.Decl.decl) with
+    let sig_params = Type.Param.Table.create () in
+    let def_params = Type.Param.Table.create () in
+    let names =
+      fold2
+        (sig_param_list :> Type_param_name.t list)
+        (def_param_list :> Type_param_name.t list)
+        ~init:names
+        ~f:(fun names sig_param def_param ->
+          let names, type_ = create_skolemized_type ~names in
+          Hashtbl.add_exn sig_params ~key:sig_param ~data:type_;
+          Hashtbl.add_exn def_params ~key:def_param ~data:type_;
+          names)
+    in
+    match (sig_type : _ Type.Decl.decl), (def_type : _ Type.Decl.decl) with
     | Abstract, _ -> ()
     | Alias sig_scheme, Alias def_scheme ->
-      check_type_schemes
+      check_type_decl_schemes
         ~names
-        ~param_matching:`Strict
-        ~schemes:{ sig_ = sig_scheme; def = def_scheme }
+        ~sig_params
+        ~def_params
+        { sig_ = sig_scheme; def = def_scheme }
     | Variants cnstrs1, Variants cnstrs2 ->
       iter2 cnstrs1 cnstrs2 ~f:(fun (cnstr1, args1) (cnstr2, args2) ->
         if not (Cnstr_name.equal cnstr1 cnstr2) then raise Compatibility_error;
         iter2 args1 args2 ~f:(fun sig_ def ->
-          check_type_schemes ~names ~param_matching:`Strict ~schemes:{ sig_; def }))
+          check_type_decl_schemes ~names ~sig_params ~def_params { sig_; def }))
     | Record _, Record _ -> failwith "TODO: record types in compatibility checks"
     (* Records, variants and (in definitions) abstract type declarations always introduce
        new types, so they are never compatible with aliases. *)
@@ -290,7 +285,9 @@ let create ~names module_name =
            else Some (module_name, Module_diff module_diff)
          | None, None -> compiler_bug [%message "Both sig and def module missing"])
   in
-  let sigs, defs = Name_bindings.find_sigs_and_defs names [] module_name in
+  let sigs, defs =
+    Name_bindings.find_sigs_and_defs names Module_path.Relative.empty module_name
+  in
   match sigs with
   | Some sigs -> loop ~names ~parent_module_name:module_name sigs defs
   | None -> empty
@@ -309,3 +306,17 @@ let raise_if_nonempty t ~module_name =
 ;;
 
 let check ~names module_name = create ~names module_name |> raise_if_nonempty ~module_name
+
+let check_val_scheme_vs_inferred_scheme ~names ~val_scheme ~inferred_scheme =
+  if not
+       (no_errors (fun () ->
+          check_val_type_schemes ~names { sig_ = val_scheme; def = inferred_scheme }))
+  then
+    Compilation_error.raise
+      Type_error
+      ~msg:
+        [%message
+          "Type mismatch"
+            ~expected:(val_scheme : Module_path.absolute Type.Scheme.t)
+            ~inferred:(inferred_scheme : Module_path.absolute Type.Scheme.t)]
+;;

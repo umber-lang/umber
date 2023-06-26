@@ -3,4 +3,4 @@
   (msg
    ("The pattern in this let binding is not exhaustive"
     (pattern (Constant (Int 1))) (missing_cases ((Constant (Int 2))))))
-  (filename ErrorInexhaustivePattern.um) (span 1:5-1:10)))
+  (filename ErrorInexhaustivePattern.um) (span 1:5-1:6)))

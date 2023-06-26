@@ -5,15 +5,16 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 %umber_block1 = type { %umber_header, [1 x i64] }
+%umber_block8b = type { %umber_header, [8 x i8] }
 
 @Functions.zero = constant %umber_block* bitcast (%umber_block1* @float.0. to %umber_block*)
 @Functions.still_zero_wow = global %umber_block* null
-@"*binding" = global %umber_block* null
+@"Functions.*binding.1" = global %umber_block* null
 @float.0. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 0.000000e+00 }
 @int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
 @float.10000000000000. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 1.000000e+13 }
 @int.-89 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 -89 }
-@string.1948248 = constant %umber_block1 { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"huh\00\00\00\00\04" }
+@string.1948248 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"huh\00\00\00\00\04" }
 @char.c = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 99 }
 
 define i32 @"umber_main:./examples/Functions.um"() {
@@ -21,25 +22,25 @@ entry:
   %Functions.zero = load %umber_block*, %umber_block** @Functions.zero, align 8
   %fun_call = tail call tailcc %umber_block* @Functions.id(%umber_block* %Functions.zero)
   store %umber_block* %fun_call, %umber_block** @Functions.still_zero_wow, align 8
-  %fun_call1 = tail call tailcc %umber_block* @Functions.lots_of_args(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @float.10000000000000. to %umber_block*), %umber_block* bitcast (%umber_block1* @int.-89 to %umber_block*), %umber_block* bitcast (%umber_block1* @string.1948248 to %umber_block*), %umber_block* bitcast (%umber_block1* @char.c to %umber_block*))
-  store %umber_block* %fun_call1, %umber_block** @"*binding", align 8
+  %fun_call1 = tail call tailcc %umber_block* @Functions.lots_of_args(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @float.10000000000000. to %umber_block*), %umber_block* bitcast (%umber_block1* @int.-89 to %umber_block*), %umber_block* bitcast (%umber_block8b* @string.1948248 to %umber_block*), %umber_block* bitcast (%umber_block1* @char.c to %umber_block*))
+  store %umber_block* %fun_call1, %umber_block** @"Functions.*binding.1", align 8
   ret i32 0
 }
 
-define tailcc %umber_block* @Functions.id(%umber_block* %Functions.x) {
+define tailcc %umber_block* @Functions.id(%umber_block* %Functions.x.1) {
 entry:
-  ret %umber_block* %Functions.x
+  ret %umber_block* %Functions.x.1
 }
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @Functions.sqr(%umber_block* %Functions.x.1) {
+define tailcc %umber_block* @Functions.sqr(%umber_block* %Functions.x.2) {
 entry:
-  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %Functions.x.1, %umber_block* %Functions.x.1)
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %Functions.x.2, %umber_block* %Functions.x.2)
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @Functions.lots_of_args(%umber_block* %Functions.a, %umber_block* %Functions.b, %umber_block* %Functions.c, %umber_block* %Functions.d, %umber_block* %Functions.e) {
+define tailcc %umber_block* @Functions.lots_of_args(%umber_block* %Functions.a.1, %umber_block* %Functions.b.1, %umber_block* %Functions.c.1, %umber_block* %Functions.d.1, %umber_block* %Functions.e.1) {
 entry:
   ret %umber_block* inttoptr (i64 1 to %umber_block*)
 }

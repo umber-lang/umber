@@ -1,14 +1,8 @@
+# Import from the prelude, hiding just these items to prevent a clash
+import Std.Prelude.(_, Option as _, None as _, Some as _)
+
 module : {
   type Option a =
     | None
     | Some a
-    #impl Functor, Applicative, Monad
-    # TODO: what about stuff like (Eq a) => Eq (Option a) ?
-    # Maybe the impls should just be exposed automatically
-    # (private impls cause problems anyway)
-    # Could also have them listed in a block here
-    # If they aren't listed here, maybe a doc tool just generates them?
-    # TODO: replace `impl` with `@deriving`
-    # Also add syntax for `@[annotation_expressions]`
-    # and `@@toplevel_annotations` (actually, scrapped this)
 }

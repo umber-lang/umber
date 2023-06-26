@@ -1,0 +1,11 @@
+module A = {
+  type Foo = | Foo
+}
+
+module B = {
+  type Foo = | Foo
+
+  # TODO: Implement type-directed constructor disambiguation
+  let of_a = match
+    | A.Foo -> Foo
+}

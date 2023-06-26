@@ -1,0 +1,9 @@
+val map : List a, (a -> a) -> List b
+
+# This is inferred to have type `List a, (a -> a) -> List a`, which is not compatible with
+# the type given in the `val`. It doesn't get the most general type of
+# `List a, (a -> b) -> List b` inferred because the type is unified with the val type.
+let map xs f =
+  match xs
+  | Nil -> Nil
+  | Cons x xs -> Cons (f x) (map xs f)

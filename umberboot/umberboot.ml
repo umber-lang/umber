@@ -182,7 +182,11 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
              | None -> names
            in
            let%map.Result names, ast =
-             Ast.Typed.Module.of_untyped ~names ~types:(Type_bindings.create ()) ast
+             Ast.Typed.Module.of_untyped
+               ~names
+               ~types:(Type_bindings.create ())
+               ~include_std:(not no_std)
+               ast
            in
            maybe_output Typed_ast ~f:(fun out ->
              Parsing.fprint_s [%sexp (ast : Ast.Typed.Module.t)] ~out);
@@ -230,11 +234,21 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
   | Error (`Compilation_error (stage, error)) -> on_error stage error
 ;;
 
-let on_error_raise stage error =
-  raise_s [%message "Compilation failed" (stage : Stage.t) (error : Compilation_error.t)]
+let on_error_raise ~filename stage error =
+  raise_s
+    [%message
+      "Compilation failed"
+        (filename : Filename.t)
+        (stage : Stage.t)
+        ~error:
+          ({ error with backtrace = Some (Backtrace.Exn.most_recent ()) }
+            : Compilation_error.t)]
 ;;
 
-let compile ?(no_std = false) ?parent ?(on_error = on_error_raise) ~filename targets =
+let compile ?(no_std = false) ?parent ?on_error ~filename targets =
+  let on_error =
+    Option.value_or_thunk on_error ~default:(fun () -> on_error_raise ~filename)
+  in
   compile_internal ~no_std ~parent ~on_error ~filename ~output:(Output.create targets)
 ;;
 
@@ -251,5 +265,11 @@ let command =
          (optional Ast.Module_name.arg_type_lenient)
          ~doc:"MODULE_NAME The name of the parent module"
      in
-     fun () -> compile_internal ~filename ~output ~no_std ~parent ~on_error:on_error_raise)
+     fun () ->
+       compile_internal
+         ~filename
+         ~output
+         ~no_std
+         ~parent
+         ~on_error:(on_error_raise ~filename))
 ;;

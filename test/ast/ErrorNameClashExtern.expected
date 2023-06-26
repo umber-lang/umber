@@ -1,0 +1,3 @@
+("Compilation error"
+ ((kind Name_error) (msg ("Multiple definitions for name" (name foo)))
+  (filename ErrorNameClashExtern.um) (span 5:5-5:8)))

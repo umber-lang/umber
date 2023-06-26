@@ -60,6 +60,23 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action
+  (no-infer (diff tokens/Constructors.expected tokens/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Constructors.expected ast/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/Constructors.expected mir/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff llvm/Constructors.expected llvm/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/Constructors.expected output/Constructors.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
   (no-infer
    (diff tokens/CrossModuleUsage.expected tokens/CrossModuleUsage.out))))
 
@@ -223,6 +240,36 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorDuplicateTypeParameter.expected
+    tokens/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorDuplicateTypeParameter.expected
+    ast/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorDuplicateTypeParameter.expected
+    mir/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorDuplicateTypeParameter.expected
+    llvm/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorDuplicateTypeParameter.expected
+    output/ErrorDuplicateTypeParameter.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorDuplicateVal.expected tokens/ErrorDuplicateVal.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -242,6 +289,53 @@
  (action
   (no-infer
    (diff output/ErrorDuplicateVal.expected output/ErrorDuplicateVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorHangingVal.expected tokens/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/ErrorHangingVal.expected ast/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff mir/ErrorHangingVal.expected mir/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff llvm/ErrorHangingVal.expected llvm/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorHangingVal.expected output/ErrorHangingVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorImportOfImport.expected tokens/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorImportOfImport.expected ast/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorImportOfImport.expected mir/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorImportOfImport.expected llvm/ErrorImportOfImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorImportOfImport.expected output/ErrorImportOfImport.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -269,6 +363,36 @@
   (no-infer
    (diff output/ErrorIncompatibleSig.expected
     output/ErrorIncompatibleSig.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorInconsistentValType.expected
+    tokens/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorInconsistentValType.expected
+    ast/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorInconsistentValType.expected
+    mir/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorInconsistentValType.expected
+    llvm/ErrorInconsistentValType.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorInconsistentValType.expected
+    output/ErrorInconsistentValType.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -326,6 +450,93 @@
   (no-infer
    (diff output/ErrorLetRecExpression.expected
     output/ErrorLetRecExpression.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorNameClashExtern.expected
+    tokens/ErrorNameClashExtern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorNameClashExtern.expected ast/ErrorNameClashExtern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorNameClashExtern.expected mir/ErrorNameClashExtern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorNameClashExtern.expected llvm/ErrorNameClashExtern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorNameClashExtern.expected
+    output/ErrorNameClashExtern.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorNameClashExternVal.expected
+    tokens/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorNameClashExternVal.expected
+    ast/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorNameClashExternVal.expected
+    mir/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorNameClashExternVal.expected
+    llvm/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorNameClashExternVal.expected
+    output/ErrorNameClashExternVal.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorNameClashWithImport.expected
+    tokens/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorNameClashWithImport.expected
+    ast/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorNameClashWithImport.expected
+    mir/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorNameClashWithImport.expected
+    llvm/ErrorNameClashWithImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorNameClashWithImport.expected
+    output/ErrorNameClashWithImport.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action
@@ -420,6 +631,29 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorShadowedBool.expected tokens/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/ErrorShadowedBool.expected ast/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff mir/ErrorShadowedBool.expected mir/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorShadowedBool.expected llvm/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorShadowedBool.expected output/ErrorShadowedBool.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorSignatureCompatibility.expected
     tokens/ErrorSignatureCompatibility.out))))
 
@@ -476,6 +710,61 @@
   (no-infer
    (diff output/ErrorSubmoduleSignatures.expected
     output/ErrorSubmoduleSignatures.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorToplevelImport.expected tokens/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorToplevelImport.expected ast/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorToplevelImport.expected mir/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorToplevelImport.expected llvm/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorToplevelImport.expected output/ErrorToplevelImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/ErrorUnqualifiedUniversalImport.expected
+    tokens/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorUnqualifiedUniversalImport.expected
+    ast/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorUnqualifiedUniversalImport.expected
+    mir/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorUnqualifiedUniversalImport.expected
+    llvm/ErrorUnqualifiedUniversalImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorUnqualifiedUniversalImport.expected
+    output/ErrorUnqualifiedUniversalImport.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/ExternInt.expected tokens/ExternInt.out))))
@@ -647,6 +936,44 @@
    (diff output/MutualRecursion.expected output/MutualRecursion.out))))
 
 (rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff tokens/OpSectionLeft.expected tokens/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/OpSectionLeft.expected ast/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/OpSectionLeft.expected mir/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff llvm/OpSectionLeft.expected llvm/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/OpSectionLeft.expected output/OpSectionLeft.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff tokens/OpSectionRight.expected tokens/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff ast/OpSectionRight.expected ast/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff mir/OpSectionRight.expected mir/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff llvm/OpSectionRight.expected llvm/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer (diff output/OpSectionRight.expected output/OpSectionRight.out))))
+
+(rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Operators.expected tokens/Operators.out))))
 
 (rule (alias runtest) (deps test.dummy)
@@ -675,6 +1002,73 @@
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff output/Option.expected output/Option.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/OverlappingImports.expected tokens/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/OverlappingImports.expected ast/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/OverlappingImports.expected mir/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/OverlappingImports.expected llvm/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/OverlappingImports.expected output/OverlappingImports.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff tokens/Paths.expected tokens/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff ast/Paths.expected ast/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff mir/Paths.expected mir/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff llvm/Paths.expected llvm/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action (no-infer (diff output/Paths.expected output/Paths.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/SelfReferentialImport.expected
+    tokens/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/SelfReferentialImport.expected ast/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/SelfReferentialImport.expected mir/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/SelfReferentialImport.expected llvm/SelfReferentialImport.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/SelfReferentialImport.expected
+    output/SelfReferentialImport.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Text.expected tokens/Text.out))))
@@ -722,6 +1116,33 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer (diff output/TypeChecking.expected output/TypeChecking.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff tokens/TypeModuleNamePunning.expected
+    tokens/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/TypeModuleNamePunning.expected ast/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/TypeModuleNamePunning.expected mir/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/TypeModuleNamePunning.expected llvm/TypeModuleNamePunning.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/TypeModuleNamePunning.expected
+    output/TypeModuleNamePunning.out))))
 
 (rule (alias runtest) (deps test.dummy)
  (action (no-infer (diff tokens/Types.expected tokens/Types.out))))

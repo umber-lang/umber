@@ -1,0 +1,21 @@
+; ModuleID = './examples/Constructors.um'
+source_filename = "./examples/Constructors.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@Constructors.A.Foo = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@Constructors.B.Foo = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+
+define i32 @"umber_main:./examples/Constructors.um"() {
+entry:
+  ret i32 0
+}
+
+define tailcc %umber_block* @Constructors.B.of_a(%umber_block* %Constructors.B..1) {
+entry:
+  %Constructors.B.Foo = load %umber_block*, %umber_block** @Constructors.B.Foo, align 8
+  ret %umber_block* %Constructors.B.Foo
+}
+
