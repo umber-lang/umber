@@ -7,7 +7,11 @@ val create : unit -> t
 val unify : names:Name_bindings.t -> types:t -> Type.t -> Type.t -> unit
 val substitute : t -> Type.t -> Type.t
 val generalize : t -> Type.t -> Module_path.absolute Type.Scheme.t
-val make_total : t -> (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row -> unit
+
+val make_total
+  :  t
+  -> (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effect_row
+  -> unit
 
 (* Want a message like "this expression has type ... but an expression was
    expected with type ..."

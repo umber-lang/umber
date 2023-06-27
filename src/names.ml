@@ -373,6 +373,28 @@ end = struct
   ;;
 end
 
+module Effect_name : sig
+  include Name_qualified
+
+  val to_type_name : t -> Type_name.t
+
+  module Qualified : sig
+    include module type of Qualified
+
+    val to_type_name : 'a t -> 'a Type_name.Qualified.t
+  end
+end = struct
+  include Upper_name_qualified
+
+  let to_type_name = Type_name.of_ustring_unchecked << to_ustring
+
+  module Qualified = struct
+    include Qualified
+
+    let to_type_name (path, name) = path, to_type_name name
+  end
+end
+
 module Cnstr_name : Name_qualified = Upper_name_qualified
 module Trait_name : Name_qualified = Upper_name_qualified
 

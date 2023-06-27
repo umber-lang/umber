@@ -42,6 +42,11 @@ module Expr : sig
   val op_section_left : t Node.t -> (Ustring.t list * Ustring.t) Node.t -> t
 end
 
+val create_effect
+  :  Type_param_name.t list
+  -> 'name Module.sig_ Node.t list option
+  -> 'name Effect.t
+
 module Module : sig
   include module type of Module
 

@@ -886,11 +886,52 @@ let add_type_decl t type_name decl =
                   | Some args -> Function (args, [], result_type)
                   | None -> result_type)
              in
-             Map.add names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry)
-             |> or_name_clash
-                  "Variant constructor name clashes with another value"
-                  (Cnstr_name.to_ustring cnstr_name))
+             Map.set names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry))
          | _ -> bindings.names)
+    }
+  in
+  update_current t ~f:{ f }
+;;
+
+(* FIXME: use new logic similar to val/extern/let. Also we could probably share code. *)
+let add_name_entry names name scheme new_entry ~unify =
+  Map.update names name ~f:(function
+    | None ->
+      compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
+    | Some (Or_imported.Local existing_entry) ->
+      (* FIXME: We should be asserting that the existing entry is a placeholder. *)
+      unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
+      Local (Name_entry.merge existing_entry new_entry)
+    | Some (Imported imported_name) ->
+      name_error
+        ~msg:"Name clashes with imported item"
+        Ustring.(
+          Value_name.to_ustring name
+          ^ of_string_exn " vs "
+          ^ Value_name.Absolute.to_ustring imported_name))
+;;
+
+let add_effect t effect_name (effect : _ Effect.t) ~unify =
+  let f bindings =
+    let effect_row : _ Type.Scheme.effect_row =
+      [ Effect (effect_name, List.map effect.params ~f:Type.Expr.var) ]
+    in
+    { bindings with
+      (* FIXME: add to effects *)
+      (* types =
+        add_to_types
+          bindings.types
+          (Effect_name.to_type_name effect_name)
+          (Some (Local (Effect effect)))
+          ~err_msg:"Duplicate effect declarations" *)
+      names =
+        Effect.fold_operations
+          effect
+          ~init:bindings.names
+          ~f:(fun names { name; args; result } ->
+          let scheme : _ Type.Scheme.t = Function (args, effect_row, result) in
+          let new_entry = Name_entry.val_declared scheme in
+          add_name_entry names name scheme new_entry ~unify)
     }
   in
   update_current t ~f:{ f }
@@ -968,9 +1009,10 @@ let add_type_decl_placeholder t type_name (decl : _ Type.Decl.t) =
   update_current t ~f:{ f }
 ;;
 
-let add_effect_placeholder t effect_name effect =
+let add_effect_placeholder t _effect_name effect =
   (* TODO: This could be more efficient if it just did all the updates in one go. *)
-  let t = add_type_placeholder t (Effect_name.to_type_name effect_name) in
+  (* FIXME: Put effects in their own category *)
+  (* let t = add_type_decl_placeholder t (Effect_name.to_type_name effect_name) in *)
   Effect.fold_operations effect ~init:t ~f:(fun t operation ->
     add_name_placeholder t operation.name)
 ;;

@@ -868,7 +868,8 @@ module Expr = struct
     | Type_app _ | Tuple _ | Var _ ->
       compiler_bug [%message "Non-function type in function call"]
     | Partial_function _ -> .
-    | Function (fun_arg_types, (_return_type : _ Type.Scheme.t)) ->
+    | Function
+        (fun_arg_types, (_ : _ Type.Expr.effect_row), (_return_type : _ Type.Scheme.t)) ->
       (match snd (Nonempty.zip fun_arg_types args_and_types) with
        | Same_length -> `Already_fully_applied
        | Right_trailing _ ->

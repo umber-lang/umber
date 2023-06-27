@@ -38,8 +38,8 @@ module Expr : sig
     | Var of 'v
     | Type_app of 'n Type_name.Qualified.t * ('v, 'pf, 'n) t list
     | Tuple of ('v, 'pf, 'n) t list
-    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) t
-    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * 'pf
+    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * ('v, 'pf, 'n) t
+    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * 'pf
 
   and ('v, 'pf, 'n) effect_row = ('v, 'pf, 'n) effect list
 
@@ -47,6 +47,9 @@ module Expr : sig
     | Effect of Effect_name.t * ('v, 'pf, 'n) t list
     | Effect_var of 'v
   [@@deriving hash, compare, equal, sexp]
+
+  val var : 'v -> ('v, 'pf, 'n) t
+  val tuple : ('v, 'pf, 'n) t list -> ('v, 'pf, 'n) t
 
   val map
     :  ?f:(('v1, 'pf1, 'n1) t -> (('v1, 'pf1, 'n1) t, ('v2, 'pf2, 'n2) t) Map_action.t)

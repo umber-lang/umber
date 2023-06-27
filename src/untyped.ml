@@ -155,8 +155,8 @@ module Expr = struct
   let op_section_left expr op = op_section_internal ~op ~expr ~side:`Left
 end
 
-let create_effect_operation sig_ : Effect.Operation.t =
-  match (sig_ : Module.sig_) with
+let create_effect_operation sig_ : _ Effect.Operation.t =
+  match (sig_ : _ Module.sig_) with
   | Common_sig (Val (_, Some _, _)) ->
     Compilation_error.raise
       Other
@@ -170,7 +170,7 @@ let create_effect_operation sig_ : Effect.Operation.t =
            Other
            ~msg:
              [%message
-               "Effect operations can't perform effects" (type_ : Type.Scheme.Bounded.t)];
+               "Effect operations can't perform effects" (type_ : _ Type.Scheme.Bounded.t)];
        (* FIXME: Check for free params. Should be done elsewhere. *)
        { name; args; result }
      | _ :: _, _ -> failwith "TODO: trait bounds on effect operations"
@@ -179,26 +179,19 @@ let create_effect_operation sig_ : Effect.Operation.t =
          Other
          ~msg:
            [%message
-             "Effect operations must be functions" (type_ : Type.Scheme.Bounded.t)]
+             "Effect operations must be functions" (type_ : _ Type.Scheme.Bounded.t)]
      | [], Partial_function _ -> .)
-  | Module_sig _
-  | Common_sig
-      ( Extern _
-      | Type_decl _
-      | Effect _
-      | Trait_sig _
-      | Import _
-      | Import_with _
-      | Import_without _ ) ->
+  | Module_sig _ | Common_sig (Extern _ | Type_decl _ | Effect _ | Trait_sig _ | Import _)
+    ->
     Compilation_error.raise
       Other
       ~msg:
         [%message
           [%string "This kind of statement is not allowed inside an effect declaration"]
-            (sig_ : Module.sig_)]
+            (sig_ : _ Module.sig_)]
 ;;
 
-let create_effect params sigs : Effect.t =
+let create_effect params sigs : _ Effect.t =
   let operations =
     Option.map sigs ~f:(List.map ~f:(Node.with_value ~f:create_effect_operation))
   in

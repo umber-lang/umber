@@ -58,8 +58,8 @@ module Expr = struct
     | Var of 'v
     | Type_app of 'n Type_name.Qualified.t * ('v, 'pf, 'n) t list
     | Tuple of ('v, 'pf, 'n) t list
-    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) t
-    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * 'pf
+    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * ('v, 'pf, 'n) t
+    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * 'pf
 
   (* FIXME: cleanup *)
   (* | Partial_effect of ('v, 'pf) t * ('pf, 'pf) effect_row *)
@@ -107,7 +107,9 @@ module Expr = struct
       (match type1, type2 with
        | Var v1, Var v2 -> Var (var v1 v2)
        | Type_app (name1, args1), Type_app (name2, args2) ->
-         assert_or_compiler_bug ~here:[%here] (Type_name.Qualified.equal name1 name2);
+         assert_or_compiler_bug
+           ~here:[%here]
+           ([%equal: _ Type_name.Qualified.t] name1 name2);
          Type_app
            (name1, List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~var ~pf ~name ~eff))
        | Tuple fields1, Tuple fields2 ->
@@ -135,7 +137,8 @@ module Expr = struct
        | Function _, (Var _ | Type_app _ | Tuple _)
        | Partial_function _, (Var _ | Type_app _ | Tuple _) ->
          compiler_bug
-           [%message "Incompatible types for map2" (type1 : (_, _) t) (type2 : (_, _) t)])
+           [%message
+             "Incompatible types for map2" (type1 : (_, _, _) t) (type2 : (_, _, _) t)])
   ;;
 
   let rec fold_until typ ~init ~f =
@@ -193,7 +196,7 @@ module Expr = struct
   let intersect_effects effects1 effects2 =
     List.filter
       effects1
-      ~f:(List.mem effects2 ~equal:[%equal: (Var_id.t, Var_id.t) effect])
+      ~f:(List.mem effects2 ~equal:[%equal: (Var_id.t, Var_id.t, _) effect])
   ;;
 
   (* FIXME: function variance goes from contra -> co.
@@ -220,8 +223,14 @@ module Expr = struct
      intersection instead of union.
   *)
   let rec union t1 t2 =
-    map2 t1 t2 ~var:Fn.const ~pf:Fn.const ~eff:union_effects ~f_contra:(fun (t1, t2) ->
-      Halt (intersect t1 t2))
+    map2
+      t1
+      t2
+      ~var:Fn.const
+      ~pf:Fn.const
+      ~name:Fn.const
+      ~eff:union_effects
+      ~f_contra:(fun (t1, t2) -> Halt (intersect t1 t2))
 
   and intersect t1 t2 =
     map2
@@ -229,6 +238,7 @@ module Expr = struct
       t2
       ~var:Fn.const
       ~pf:Fn.const
+      ~name:Fn.const
       ~eff:intersect_effects
       ~f_contra:(fun (t1, t2) -> Halt (union t1 t2))
   ;;

@@ -62,7 +62,7 @@ and 'name common =
   | Val of Value_name.t * Fixity.t option * 'name Type.Scheme.Bounded.t
   | Extern of Value_name.t * Fixity.t option * 'name Type.Scheme.t * Extern_name.t
   | Type_decl of Type_name.t * 'name Type.Decl.t
-  | Effect of Effect_name.t * Effect.t
+  | Effect of Effect_name.t * 'name Effect.t
   (* TODO: [Trait_sig] actually can't appear in defs as it is just parsed as [Trait].
      There should probably be a sig-only type. *)
   | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * 'name sig_ Node.t list

@@ -189,14 +189,14 @@ module Expr = struct
   let type_recursive_let_bindings =
     let collect_effects f =
       let effects = ref [] in
-      let (expr : _ t), (typ : _ Type.Expr.t) =
+      let (expr : _ t Node.t), (typ : Type.t) =
         f ~add_effects:(fun effects' ->
           effects := Type.Expr.union_effects !effects effects')
       in
       expr, typ, !effects
     in
     let rec of_untyped ~names ~types ~f_name expr
-      : (Type.t * Pattern.Names.t) t Node.t * Type.t * _ Type.effect_row
+      : (Type.t * Pattern.Names.t) t Node.t * Type.t * _ Type.Expr.effect_row
       =
       let node e = Node.create e (Node.span expr) in
       Node.with_value expr ~f:(fun expr ->
@@ -205,7 +205,7 @@ module Expr = struct
         | Name name ->
           let name, name_entry = Name_bindings.find_entry_with_path names name in
           f_name name name_entry;
-          node (Name name), Name_bindings.Name_entry.typ name_entry
+          node (Name name), Name_bindings.Name_entry.typ name_entry, []
         | Qualified (path, expr) ->
           let names = Name_bindings.import_all names path in
           of_untyped ~names ~types ~f_name expr
@@ -257,7 +257,7 @@ module Expr = struct
           in
           let args, arg_types = Nonempty.unzip args_and_types in
           let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
-          node (Lambda (args, body)), Function (arg_types, body_effects, body_type)
+          node (Lambda (args, body)), Function (arg_types, body_effects, body_type), []
         | If (cond, then_, else_) ->
           (* FIXME: Places with multiple branches e.g. if, match, now can't rely on the
            types of the two branches being unified to be equivalent, and arbitrarily
@@ -598,6 +598,9 @@ module Module = struct
                | Type_decl (type_name, _) ->
                  ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_type_decl type_name)
                  , def )
+               | Effect _ ->
+                 (* TODO: Copy effect declarations to defs *)
+                 sig_map, def
                | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
                | Val _ | Extern _ | Import _ -> sig_map, def)
             | Module (module_name, sigs, defs) ->
@@ -646,6 +649,8 @@ module Module = struct
         Name_bindings.add_name_placeholder names name
       | Type_decl (type_name, decl) ->
         Name_bindings.add_type_decl_placeholder names type_name decl
+      | Effect (effect_name, effect) ->
+        Name_bindings.add_effect_placeholder names effect_name effect
       | Import _ | Trait_sig _ -> names
     in
     gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
@@ -687,8 +692,7 @@ module Module = struct
           if include_std && not !import_mentioned_prelude
           then import_mentioned_prelude := import_mentions_prelude import;
           Name_bindings.import names import
-        | Trait_sig _ -> failwith "TODO: trait sigs"
-        | Val _ | Extern _ | Type_decl _ -> names)
+        | Val _ | Extern _ | Type_decl _ | Effect _ | Trait_sig _ -> names)
     in
     if !import_mentioned_prelude || not include_std
     then names
@@ -713,6 +717,8 @@ module Module = struct
         Extern (name, fixity, Name_bindings.absolutify_type_expr names type_, extern_name)
       | Type_decl (type_name, decl) ->
         Type_decl (type_name, Name_bindings.absolutify_type_decl names decl)
+      | Effect (effect_name, effect) ->
+        Effect (effect_name, Name_bindings.absolutify_effect names effect)
       | Import _ as common -> common
       | Trait_sig _ -> failwith "absolutify_everything: traits"
     in
@@ -753,9 +759,12 @@ module Module = struct
     absolutify_module
   ;;
 
-  let gather_type_decls ~names sigs defs =
+  let gather_type_decls ~names ~types sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
+      | Effect (effect_name, effect) ->
+        let unify = Type_bindings.unify ~names ~types in
+        Name_bindings.add_effect names effect_name effect ~unify
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ | Import _ -> names)
   ;;
@@ -785,7 +794,8 @@ module Module = struct
            else loop ~names ~aliases_seen:(Set.add aliases_seen id) alias
          | Abstract | Variants _ | Record _ -> ());
         List.iter args ~f:(loop ~names ~aliases_seen)
-      | Function (args, body) ->
+      | Function (args, _effects, body) ->
+        (* FIXME: Check for function types that are cyclic via their effects. *)
         Nonempty.iter args ~f:(loop ~names ~aliases_seen);
         loop ~names ~aliases_seen body
       | Tuple items -> List.iter items ~f:(loop ~names ~aliases_seen)
@@ -818,6 +828,9 @@ module Module = struct
         Name_bindings.add_extern names name fixity ([], typ) extern_name ~unify
       | Type_decl (_, (_, Alias alias)) ->
         check_cyclic_type_alias ~names alias;
+        names
+      | Effect _ ->
+        (* FIXME: Check for cyclic effect types. *)
         names
       | Type_decl _ | Trait_sig _ | Import _ -> names
     in
@@ -1026,7 +1039,7 @@ module Module = struct
                    (entry : Name_bindings.Name_entry.t)])
         | Module (module_name, _sigs, defs) ->
           check_every_val_is_defined ~names module_name defs
-        | Common_def (Extern _ | Type_decl _ | Trait_sig _ | Import _)
+        | Common_def (Extern _ | Type_decl _ | Effect _ | Trait_sig _ | Import _)
         | Let _ | Trait _ | Impl _ -> ()))
   ;;
 
@@ -1036,7 +1049,7 @@ module Module = struct
       let names = gather_name_placeholders ~names module_name sigs defs in
       let names = gather_imports ~names ~include_std module_name sigs defs in
       let sigs, defs = absolutify_everything ~names module_name sigs defs in
-      let names = gather_type_decls ~names module_name sigs defs in
+      let names = gather_type_decls ~names ~types module_name sigs defs in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
       check_every_val_is_defined ~names module_name defs;

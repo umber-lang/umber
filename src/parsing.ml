@@ -186,7 +186,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_option_preceded_EQUALS_expr__ : Untyped.Expr.t Node.t option nonterminal
   | N_option_preceded_EQUALS_braces_list_stmt_sig____
-      : Module.sig_ Node.t list option nonterminal
+      : Parser_scope.Module_path.relative Module.sig_ Node.t list option nonterminal
   | N_option_parens_fixity__ : Fixity.t option nonterminal
   | N_operator : (Ustring.t list * Ustring.t) nonterminal
   | N_op_section : Untyped.Expr.t nonterminal

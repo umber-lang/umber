@@ -2,10 +2,10 @@ open! Import
 open Names
 
 module Operation = struct
-  type t =
+  type 'n t =
     { name : Value_name.t
-    ; args : Type.Scheme.t Nonempty.t
-    ; result : Type.Scheme.t
+    ; args : 'n Type.Scheme.t Nonempty.t
+    ; result : 'n Type.Scheme.t
     }
   [@@deriving sexp]
 
@@ -14,9 +14,9 @@ module Operation = struct
   ;;
 end
 
-type t =
+type 'n t =
   { params : Type_param_name.t list
-  ; operations : Operation.t list option
+  ; operations : 'n Operation.t list option
   }
 [@@deriving sexp]
 

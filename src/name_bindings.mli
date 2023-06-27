@@ -68,7 +68,7 @@ val set_inferred_scheme
 
 val add_name_placeholder : t -> Value_name.t -> t
 val add_type_decl_placeholder : t -> Type_name.t -> Module_path.relative Type.Decl.t -> t
-val add_effect_placeholder : t -> Effect_name.t -> Effect.t -> t
+val add_effect_placeholder : t -> Effect_name.t -> Module_path.relative Effect.t -> t
 
 (** Fold over all the local (non-imported) names bound. *)
 val fold_local_names
@@ -111,6 +111,11 @@ val absolutify_type_decl
   -> Module_path.relative Type.Decl.t
   -> Module_path.absolute Type.Decl.t
 
+val absolutify_effect
+  :  t
+  -> Module_path.relative Effect.t
+  -> Module_path.absolute Effect.t
+
 (* Scope handling *)
 val current_path : t -> Module_path.Absolute.t
 val into_module : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
@@ -149,7 +154,13 @@ val add_extern
   -> t
 
 val add_type_decl : t -> Type_name.t -> Module_path.absolute Type.Decl.t -> t
-val add_effect : t -> Effect_name.t -> Effect.t -> unify:(Type.t -> Type.t -> unit) -> t
+
+val add_effect
+  :  t
+  -> Effect_name.t
+  -> Module_path.absolute Effect.t
+  -> unify:(Type.t -> Type.t -> unit)
+  -> t
 
 module Sigs_or_defs : sig
   type name_bindings = t

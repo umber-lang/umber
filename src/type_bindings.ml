@@ -26,7 +26,9 @@ let type_error msg t1 t2 =
 
 type t =
   { type_vars : Type.t Type.Var_id.Table.t
-  ; effect_vars : (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row Type.Var_id.Table.t
+  ; effect_vars :
+      (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effect_row
+      Type.Var_id.Table.t
   }
 [@@deriving sexp]
 
@@ -67,7 +69,8 @@ let unhandled_effects effects =
     ~msg:
       [%message
         "Unhandled effects"
-          (effects : (Type.Var_id.t, Type.Var_id.t) Type.Expr.effect_row)]
+          (effects
+            : (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effect_row)]
 ;;
 
 let make_total t (effects : _ Type.Expr.effect_row) =
@@ -80,18 +83,17 @@ let make_total t (effects : _ Type.Expr.effect_row) =
     | Effect _ as effect -> unhandled_effects [ effect ])
 ;;
 
-let iter2 xs ys ~f =
-  match List.iter2 ~f xs ys with
-  | Ok () -> ()
-  | Unequal_lengths -> type_error_msg "Type item length mismatch"
-;;
-
 let rec unify ~names ~types t1 t2 =
   let is_bound = Hashtbl.mem types.type_vars in
   let get_type = Hashtbl.find_exn types.type_vars in
   let set_type id typ =
     if occurs_in id typ then type_error "Occurs check failed" t1 t2;
     Hashtbl.set types.type_vars ~key:id ~data:typ
+  in
+  let iter2 xs ys ~f =
+    match List.iter2 ~f xs ys with
+    | Ok () -> ()
+    | Unequal_lengths -> type_error "Type item length mismatch" t1 t2
   in
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     let params = Type.Param.Env_to_vars.create () in
@@ -243,12 +245,11 @@ let generalize types typ =
     ~var:(Type.Param.Env_of_vars.find_or_add env)
     ~pf:(never_happens [%here])
     ~name:Fn.id
-    ~f:
-      (function
-       | Partial_function (args, effect_row, id) ->
-         (* FIXME: fix effects *)
-         Defer (Function (args, effect_row, Var id))
-       | typ -> Defer typ)
+    ~f:(function
+      | Partial_function (args, effect_row, id) ->
+        (* FIXME: fix effects *)
+        Defer (Function (args, effect_row, Var id))
+      | typ -> Defer typ)
 ;;
 
 let%expect_test "unification cycles" =
