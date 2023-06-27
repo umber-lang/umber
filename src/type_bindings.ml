@@ -256,21 +256,21 @@ let%expect_test "unification cycles" =
   let types = create () in
   let names = Name_bindings.core in
   print_s [%sexp (types : t)];
-  [%expect {| ((vars ())) |}];
+  [%expect {| ((type_vars ()) (effect_vars ())) |}];
   let a = Type.fresh_var () in
   let b = Type.fresh_var () in
   let c = Type.fresh_var () in
   let d = Type.fresh_var () in
   unify ~names ~types a b;
   print_s [%sexp (types : t)];
-  [%expect {| ((vars ((0 (Var 1))))) |}];
+  [%expect {| ((type_vars ((0 (Var 1)))) (effect_vars ())) |}];
   unify ~names ~types b c;
   print_s [%sexp (types : t)];
-  [%expect {| ((vars ((0 (Var 1)) (1 (Var 2))))) |}];
+  [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)))) (effect_vars ())) |}];
   unify ~names ~types c d;
   print_s [%sexp (types : t)];
-  [%expect {| ((vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3))))) |}];
+  [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}];
   unify ~names ~types d a;
   print_s [%sexp (types : t)];
-  [%expect {| ((vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3))))) |}]
+  [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}]
 ;;
