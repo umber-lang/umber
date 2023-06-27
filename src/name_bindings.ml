@@ -109,24 +109,34 @@ end
 
 (* TODO: Represent placeholder entries in `Type_entry.t` rather than as an extra `option`
    in `bindings`. This will be easier to understand and more consistent with [Name_entry]. *)
-module Type_entry = struct
+module Make_entry_with_id (T : Sexpable.S) () = struct
   module Id = Unique_id.Int ()
 
   type t =
     { id : Id.t
-    ; decl : Module_path.absolute Type.Decl.t
+    ; decl : T.t
     }
   [@@deriving fields]
 
-  let sexp_of_t { id = _; decl } = [%sexp (decl : Module_path.absolute Type.Decl.t)]
-
-  let t_of_sexp sexp =
-    { id = Id.create (); decl = [%of_sexp: Module_path.absolute Type.Decl.t] sexp }
-  ;;
-
+  let sexp_of_t { id = _; decl } = [%sexp (decl : T.t)]
+  let t_of_sexp sexp = { id = Id.create (); decl = [%of_sexp: T.t] sexp }
   let identical t t' = Id.equal t.id t'.id
   let create decl = { id = Id.create (); decl }
 end
+
+module Type_entry =
+  Make_entry_with_id
+    (struct
+      type t = Module_path.absolute Type.Decl.t [@@deriving sexp]
+    end)
+    ()
+
+module Effect_entry =
+  Make_entry_with_id
+    (struct
+      type t = Module_path.absolute Effect.t [@@deriving sexp]
+    end)
+    ()
 
 module Or_imported = struct
   type ('entry, 'path) t =
@@ -200,6 +210,8 @@ and defs = sigs bindings
 and 'a bindings =
   { names : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t
   ; types : (Type_entry.t, Type_name.Absolute.t) Or_imported.t option Type_name.Map.t
+  ; effects :
+      (Effect_entry.t, Effect_name.Absolute.t) Or_imported.t option Effect_name.Map.t
   ; modules :
       ('a option * 'a bindings, Module_path.Absolute.t) Or_imported.t Module_name.Map.t
   }
@@ -225,6 +237,7 @@ let or_name_error_path x path =
 let empty_bindings =
   { names = Value_name.Map.empty
   ; types = Type_name.Map.empty
+  ; effects = Effect_name.Map.empty
   ; modules = Module_name.Map.empty
   }
 ;;
@@ -374,6 +387,14 @@ let merge_no_shadow t1 t2 =
           (err
              Type_name.to_ustring
              [%sexp_of: (Type_entry.t, Type_name.Absolute.t) Or_imported.t option])
+  ; effects =
+      Map.merge_skewed
+        t1.effects
+        t2.effects
+        ~combine:
+          (err
+             Effect_name.to_ustring
+             [%sexp_of: (Effect_entry.t, Effect_name.Absolute.t) Or_imported.t option])
   ; modules =
       Map.merge_skewed
         t1.modules
@@ -619,8 +640,8 @@ let absolutify_path t (path : Module_path.Relative.t) =
 let absolutify_type_name t path = fst (find_type_entry_with_path t path)
 let absolutify_value_name t path = fst (find_entry_with_path t path)
 
-let bindings_are_empty { names; types; modules } =
-  Map.is_empty names && Map.is_empty types && Map.is_empty modules
+let bindings_are_empty { names; types; effects; modules } =
+  Map.is_empty names && Map.is_empty types && Map.is_empty effects && Map.is_empty modules
 ;;
 
 let import =
@@ -677,6 +698,12 @@ let import =
               (module Type_name)
               Type_name.of_ustring_unchecked
               (fun name -> Some (Or_imported.Imported (path, name)))
+        ; effects =
+            find_singleton_map
+              bindings.effects
+              (module Effect_name)
+              Effect_name.of_ustring_unchecked
+              (fun name -> Some (Or_imported.Imported (path, name)))
         ; modules =
             find_singleton_map
               bindings.modules
@@ -701,6 +728,9 @@ let import =
         ; types =
             Map.mapi bindings.types ~f:(fun ~key:name ~data:_ ->
               Some (Or_imported.Imported (path, name)))
+        ; effects =
+            Map.mapi bindings.effects ~f:(fun ~key:name ~data:_ ->
+              Some (Or_imported.Imported (path, name)))
         ; modules =
             Map.mapi bindings.modules ~f:(fun ~key:name ~data:_ ->
               Or_imported.Imported (Module_path.append path [ name ]))
@@ -716,6 +746,7 @@ let import =
     let name = Unidentified_name.to_ustring name in
     let value_name = Value_name.of_ustring_unchecked name in
     let type_name = Type_name.of_ustring_unchecked name in
+    let effect_name = Effect_name.of_ustring_unchecked name in
     let module_name = Module_name.of_ustring_unchecked name in
     let ensure_imported_name_exists bindings =
       if not
@@ -729,6 +760,7 @@ let import =
      | Defs defs -> ensure_imported_name_exists defs);
     { names = Map.remove acc.names value_name
     ; types = Map.remove acc.types type_name
+    ; effects = Map.remove acc.effects effect_name
     ; modules = Map.remove acc.modules module_name
     }
   in

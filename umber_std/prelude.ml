@@ -27,11 +27,12 @@ let names = {|
      (Bool ((Local (() (Variants ((False ()) (True ())))))))
      (Char ((Local (() Abstract)))) (Float ((Local (() Abstract))))
      (String ((Local (() Abstract))))))
+   (effects ())
    (modules
     ((Std
       (Local
        (()
-        ((names ()) (types ())
+        ((names ()) (types ()) (effects ())
          (modules
           ((Prelude
             (Local
@@ -92,7 +93,7 @@ let names = {|
                         (Tuple ()))))
                      (type_source Extern_declared)
                      (extern_name umber_print_bool))))))
-                (types ())
+                (types ()) (effects ())
                 (modules
                  ((Int
                    (Local
@@ -107,7 +108,7 @@ let names = {|
                       (types
                        ((Int ((Local (() (Alias (Type_app Int ()))))))
                         (PrimitiveInt ((Imported Int)))))
-                      (modules ())))))
+                      (effects ()) (modules ())))))
                   (Bool
                    (Local
                     (()
@@ -121,7 +122,7 @@ let names = {|
                       (types
                        ((Bool ((Local (() (Alias (Type_app Bool ()))))))
                         (PrimitiveBool ((Imported Bool)))))
-                      (modules ())))))
+                      (effects ()) (modules ())))))
                   (List
                    (Local
                     (()
@@ -180,7 +181,7 @@ let names = {|
                               (Cons
                                ((Var a)
                                 (Type_app Std.Prelude.List.List ((Var a)))))))))))))
-                      (modules ())))))
+                      (effects ()) (modules ())))))
                   (Float
                    (Local
                     (()
@@ -225,7 +226,7 @@ let names = {|
                       (types
                        ((Float ((Local (() (Alias (Type_app Float ()))))))
                         (PrimitiveFloat ((Imported Float)))))
-                      (modules ())))))
+                      (effects ()) (modules ())))))
                   (Option
                    (Local
                     (()
@@ -245,7 +246,7 @@ let names = {|
                        ((Option
                          ((Local
                            ((a) (Variants ((None ()) (Some ((Var a)))))))))))
-                      (modules ())))))
+                      (effects ()) (modules ())))))
                   (Operators
                    (Local
                     (()
@@ -437,7 +438,7 @@ let names = {|
                             (Scheme
                              (Function ((Type_app Std.Prelude.Bool.Bool ()))
                               () (Type_app Std.Prelude.Bool.Bool ())))))))))
-                      (types ()) (modules ())))))))))
+                      (types ()) (effects ()) (modules ())))))))))
               ((names
                 ((% (Imported Std.Prelude.Operators.%))
                  (* (Imported Std.Prelude.Operators.*))
@@ -492,7 +493,7 @@ let names = {|
                        (Tuple ()))))
                     (type_source Extern_declared)
                     (extern_name umber_print_bool))))))
-               (types ())
+               (types ()) (effects ())
                (modules
                 ((Int
                   (Local
@@ -509,7 +510,7 @@ let names = {|
                      (types
                       ((Int ((Local (() (Alias (Type_app Int ()))))))
                        (PrimitiveInt ((Imported Int)))))
-                     (modules ())))))
+                     (effects ()) (modules ())))))
                  (Bool
                   (Local
                    (()
@@ -524,7 +525,7 @@ let names = {|
                      (types
                       ((Bool ((Local (() (Alias (Type_app Bool ()))))))
                        (PrimitiveBool ((Imported Bool)))))
-                     (modules ())))))
+                     (effects ()) (modules ())))))
                  (List
                   (Local
                    (()
@@ -601,7 +602,7 @@ let names = {|
                              (Cons
                               ((Var a)
                                (Type_app Std.Prelude.List.List ((Var a)))))))))))))
-                     (modules ())))))
+                     (effects ()) (modules ())))))
                  (Float
                   (Local
                    (()
@@ -655,7 +656,7 @@ let names = {|
                      (types
                       ((Float ((Local (() (Alias (Type_app Float ()))))))
                        (PrimitiveFloat ((Imported Float)))))
-                     (modules ())))))
+                     (effects ()) (modules ())))))
                  (Option
                   (Local
                    (()
@@ -675,7 +676,7 @@ let names = {|
                       ((Option
                         ((Local
                           ((a) (Variants ((None ()) (Some ((Var a)))))))))))
-                     (modules ())))))
+                     (effects ()) (modules ())))))
                  (Operators
                   (Local
                    (()
@@ -884,7 +885,7 @@ let names = {|
                             (Function ((Type_app Bool ())) ()
                              (Type_app Bool ()))))
                           (type_source Let_inferred))))))
-                     (types ()) (modules ()))))))))))))))))))))))
+                     (types ()) (effects ()) (modules ()))))))))))))))))))))))
 |}
 |> Sexp.of_string
 (*$*)
