@@ -75,9 +75,19 @@ module Expr : sig
     -> (Var_id.t, Var_id.t, 'n) t
 
   val union_effects
-    :  ('v, 'pf, 'n) effect_row
-    -> ('v, 'pf, 'n) effect_row
-    -> ('v, 'pf, 'n) effect_row
+    :  (Var_id.t, Var_id.t, 'n) effect_row
+    -> (Var_id.t, Var_id.t, 'n) effect_row
+    -> (Var_id.t, Var_id.t, 'n) effect_row
+
+  val intersect
+    :  (Var_id.t, Var_id.t, 'n) t
+    -> (Var_id.t, Var_id.t, 'n) t
+    -> (Var_id.t, Var_id.t, 'n) t
+
+  val intersect_effects
+    :  (Var_id.t, Var_id.t, 'n) effect_row
+    -> (Var_id.t, Var_id.t, 'n) effect_row
+    -> (Var_id.t, Var_id.t, 'n) effect_row
 
   val total_effect : _ effect_row
   val effect_is_total : _ effect_row -> bool

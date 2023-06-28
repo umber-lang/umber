@@ -190,9 +190,12 @@ module Expr = struct
   let union_effects effects1 effects2 = effects1 @ effects2
 
   (* FIXME: Maybe just make effects a set? *)
-  (* TODO: Since we don't consider unified type variables to be equal, this may give 
+  (* FIXME: Since we don't consider unified type variables to be equal, this may give 
      stricter types than necessary. Integrate this and union with `Type_bindings` so it
-     can deal with this. *)
+     can deal with this.
+     
+     Is this even going to be correct? Maybe effect_row needs to explicitly model
+     intersection? *)
   let intersect_effects effects1 effects2 =
     List.filter
       effects1

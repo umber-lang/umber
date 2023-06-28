@@ -141,7 +141,7 @@ val add_val
   -> Value_name.t
   -> Fixity.t option
   -> Module_path.absolute Type.Scheme.Bounded.t
-  -> unify:(Type.t -> Type.t -> unit)
+  -> constrain:(subtype:Type.t -> supertype:Type.t -> unit)
   -> t
 
 val add_extern
@@ -150,7 +150,7 @@ val add_extern
   -> Fixity.t option
   -> Module_path.absolute Type.Scheme.Bounded.t
   -> Extern_name.t
-  -> unify:(Type.t -> Type.t -> unit)
+  -> constrain:(subtype:Type.t -> supertype:Type.t -> unit)
   -> t
 
 val add_type_decl : t -> Type_name.t -> Module_path.absolute Type.Decl.t -> t
@@ -159,7 +159,7 @@ val add_effect
   :  t
   -> Effect_name.t
   -> Module_path.absolute Effect.t
-  -> unify:(Type.t -> Type.t -> unit)
+  -> constrain:(subtype:Type.t -> supertype:Type.t -> unit)
   -> t
 
 module Sigs_or_defs : sig

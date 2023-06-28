@@ -127,7 +127,7 @@ let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ B
   let names, sig_type = skolemize ~names sig_scheme ~types_by_param:None in
   let def_type = Type.Scheme.instantiate def_scheme in
   let types = Type_bindings.create () in
-  Type_bindings.unify ~names ~types sig_type def_type
+  Type_bindings.constrain ~names ~types ~subtype:sig_type ~supertype:def_type
 ;;
 
 (** Type definitions in a signature an defintion are compatible if they are the same
@@ -142,7 +142,7 @@ let check_type_decl_schemes
   let types = Type_bindings.create () in
   let names, sig_type = skolemize ~names ~types_by_param:(Some sig_params) sig_scheme in
   let names, def_type = skolemize ~names ~types_by_param:(Some def_params) def_scheme in
-  Type_bindings.unify ~names ~types sig_type def_type
+  Type_bindings.constrain ~names ~types ~subtype:sig_type ~supertype:def_type
 ;;
 
 let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =

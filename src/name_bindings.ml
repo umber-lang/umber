@@ -827,7 +827,7 @@ let add_val_or_extern
   name
   fixity
   (trait_bounds, scheme)
-  ~unify
+  ~constrain
   ~type_source
   =
   let f bindings =
@@ -844,7 +844,9 @@ let add_val_or_extern
                Compilation_error.raise
                  Name_error
                  ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
-            unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
+            constrain
+              ~subtype:(Name_entry.typ existing_entry)
+              ~supertype:(Type.Scheme.instantiate scheme);
             Local
               (Name_entry.merge
                  existing_entry
@@ -871,8 +873,8 @@ let add_val_or_extern
 
 let add_val = add_val_or_extern ?extern_name:None ~type_source:Val_declared
 
-let add_extern t name fixity typ extern_name ~unify =
-  add_val_or_extern t name fixity typ ~extern_name ~unify ~type_source:Extern_declared
+let add_extern t name fixity typ extern_name ~constrain =
+  add_val_or_extern t name fixity typ ~extern_name ~constrain ~type_source:Extern_declared
 ;;
 
 let absolutify_type_decl t = Type.Decl.map_exprs ~f:(absolutify_type_expr t)
@@ -926,13 +928,15 @@ let add_type_decl t type_name decl =
 ;;
 
 (* FIXME: use new logic similar to val/extern/let. Also we could probably share code. *)
-let add_name_entry names name scheme new_entry ~unify =
+let add_name_entry names name scheme new_entry ~constrain =
   Map.update names name ~f:(function
     | None ->
       compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
     | Some (Or_imported.Local existing_entry) ->
       (* FIXME: We should be asserting that the existing entry is a placeholder. *)
-      unify (Type.Scheme.instantiate scheme) (Name_entry.typ existing_entry);
+      constrain
+        ~subtype:(Type.Scheme.instantiate scheme)
+        ~supertype:(Name_entry.typ existing_entry);
       Local (Name_entry.merge existing_entry new_entry)
     | Some (Imported imported_name) ->
       name_error
@@ -943,7 +947,7 @@ let add_name_entry names name scheme new_entry ~unify =
           ^ Value_name.Absolute.to_ustring imported_name))
 ;;
 
-let add_effect t effect_name (effect : _ Effect.t) ~unify =
+let add_effect t effect_name (effect : _ Effect.t) ~constrain =
   let f bindings =
     let effect_row : _ Type.Scheme.effect_row =
       [ Effect (effect_name, List.map effect.params ~f:Type.Expr.var) ]
@@ -963,7 +967,7 @@ let add_effect t effect_name (effect : _ Effect.t) ~unify =
           ~f:(fun names { name; args; result } ->
           let scheme : _ Type.Scheme.t = Function (args, effect_row, result) in
           let new_entry = Name_entry.val_declared scheme in
-          add_name_entry names name scheme new_entry ~unify)
+          add_name_entry names name scheme new_entry ~constrain)
     }
   in
   update_current t ~f:{ f }

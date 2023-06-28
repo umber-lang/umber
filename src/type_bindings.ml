@@ -24,13 +24,19 @@ let type_error msg t1 t2 =
     ~msg:[%message msg ~type1:(map_type t1 : Sexp.t) ~type2:(map_type t2 : Sexp.t)]
 ;;
 
+type var_bounds =
+  { lower_bounds : Type.t Queue.t
+  ; upper_bounds : Type.t Queue.t
+  }
+[@@deriving sexp_of]
+
 type t =
-  { type_vars : Type.t Type.Var_id.Table.t
+  { type_vars : var_bounds Type.Var_id.Table.t
   ; effect_vars :
       (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effect_row
       Type.Var_id.Table.t
   }
-[@@deriving sexp]
+[@@deriving sexp_of]
 
 let create () =
   { type_vars = Type.Var_id.Table.create (); effect_vars = Type.Var_id.Table.create () }
@@ -83,17 +89,16 @@ let make_total t (effects : _ Type.Expr.effect_row) =
     | Effect _ as effect -> unhandled_effects [ effect ])
 ;;
 
-let rec unify ~names ~types t1 t2 =
-  let is_bound = Hashtbl.mem types.type_vars in
-  let get_type = Hashtbl.find_exn types.type_vars in
-  let set_type id typ =
-    if occurs_in id typ then type_error "Occurs check failed" t1 t2;
-    Hashtbl.set types.type_vars ~key:id ~data:typ
+let rec constrain ~names ~types ~subtype ~supertype =
+  (* FIXME: Need a constraint cache to avoid infinite recursion *)
+  let get_var_bounds =
+    Hashtbl.find_or_add ~default:(fun () ->
+      { lower_bounds = Queue.create (); upper_bounds = Queue.create () })
   in
   let iter2 xs ys ~f =
     match List.iter2 ~f xs ys with
     | Ok () -> ()
-    | Unequal_lengths -> type_error "Type item length mismatch" t1 t2
+    | Unequal_lengths -> type_error "Type item length mismatch" subtype supertype
   in
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     let params = Type.Param.Env_to_vars.create () in
@@ -106,73 +111,126 @@ let rec unify ~names ~types t1 t2 =
     let type_entry = Name_bindings.find_absolute_type_entry names name in
     if List.length args = Type.Decl.arity (Name_bindings.Type_entry.decl type_entry)
     then type_entry
-    else type_error "Partially applied type constructor" t1 t2
+    else type_error "Partially applied type constructor" subtype supertype
   in
-  match t1, t2 with
+  match subtype, supertype with
   | Var id1, Var id2 when Type.Var_id.(id1 = id2) -> ()
-  | Var id1, _ when is_bound id1 -> unify ~names ~types (get_type id1) t2
-  | _, Var id2 when is_bound id2 -> unify ~names ~types t1 (get_type id2)
-  | Var id1, _ -> set_type id1 t2
-  | _, Var id2 -> set_type id2 t1
+  | Var id1, type2 ->
+    if occurs_in id1 type2 then type_error "Occurs check failed" subtype supertype;
+    let id1_bounds = get_var_bounds types.type_vars id1 in
+    Queue.enqueue id1_bounds.upper_bounds type2;
+    Queue.iter id1_bounds.lower_bounds ~f:(fun subtype ->
+      constrain ~names ~types ~subtype ~supertype:type2)
+  | type1, Var id2 ->
+    if occurs_in id2 type1 then type_error "Occurs check failed" subtype supertype;
+    let id2_bounds = get_var_bounds types.type_vars id2 in
+    Queue.enqueue id2_bounds.lower_bounds type1;
+    Queue.iter id2_bounds.upper_bounds ~f:(fun supertype ->
+      constrain ~names ~types ~subtype:type1 ~supertype)
   | Type_app (name1, args1), Type_app (name2, args2) ->
     let type_entry1 = lookup_type names name1 args1 in
     (match Name_bindings.Type_entry.decl type_entry1 with
-     | params, Alias expr -> unify ~names ~types (instantiate_alias params expr) t2
+     | params, Alias expr ->
+       constrain ~names ~types ~subtype:(instantiate_alias params expr) ~supertype
      | (_ : _ Type.Decl.t) ->
        let type_entry2 = lookup_type names name2 args2 in
        (match Name_bindings.Type_entry.decl type_entry2 with
-        | params, Alias expr -> unify ~names ~types t1 (instantiate_alias params expr)
+        | params, Alias expr ->
+          constrain ~names ~types ~subtype ~supertype:(instantiate_alias params expr)
         | (_ : _ Type.Decl.t) ->
           if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
-          then type_error "Type application mismatch" t1 t2;
-          iter2 args1 args2 ~f:(unify ~names ~types)))
-  | Type_app (name, args), ((Tuple _ | Function _ | Partial_function _) as other_type)
-  | ((Tuple _ | Function _ | Partial_function _) as other_type), Type_app (name, args) ->
+          then type_error "Type application mismatch" subtype supertype;
+          iter2 args1 args2 ~f:(fun subtype supertype ->
+            constrain ~names ~types ~subtype ~supertype)))
+  | Type_app (name, args), (Tuple _ | Function _ | Partial_function _) ->
     (match Name_bindings.Type_entry.decl (lookup_type names name args) with
      | params, Alias expr ->
-       unify ~names ~types (instantiate_alias params expr) other_type
-     | _ -> type_error "Type application mismatch" t1 t2)
+       constrain ~names ~types ~subtype:(instantiate_alias params expr) ~supertype
+     | _ -> type_error "Type application mismatch" subtype supertype)
+  | (Tuple _ | Function _ | Partial_function _), Type_app (name, args) ->
+    (match Name_bindings.Type_entry.decl (lookup_type names name args) with
+     | params, Alias expr ->
+       constrain ~names ~types ~subtype ~supertype:(instantiate_alias params expr)
+     | _ -> type_error "Type application mismatch" subtype supertype)
   | Function (args1, _, res1), Function (args2, _, res2) ->
     (* FIXME: Do we need to unify or do anything with effects here, or will subtyping
        handle it later? We might end up needing to represent the subtyping contraints
        explicitly here. Also ignored in partial same length cases below. *)
-    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    (* FIXME: function type variance:
+       A -> B is a subtype of C -> D iff B is a subtype of D and B is a subtype of A
+       contra -> co
+    *)
+    (match
+       Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
+         constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
+     with
      | Same_length -> ()
-     | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch t1 t2);
-    unify ~names ~types res1 res2
+     | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch subtype supertype);
+    constrain ~names ~types ~subtype:res1 ~supertype:res2
   | Partial_function (args1, effect_row1, id1), Partial_function (args2, effect_row2, id2)
     ->
-    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    (match
+       Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
+         constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
+     with
      | Left_trailing args1_trailing ->
        (* FIXME: Left fun has more args, right fun is under-applied and must be total. *)
        check_effect_is_total effect_row2;
-       unify ~names ~types (Partial_function (args1_trailing, effect_row1, id1)) (Var id2)
+       (* FIXME: what's the subtyping direction for the remainder of function args? 
+          Maybe it should work like returning a value, so covariant? *)
+       constrain
+         ~names
+         ~types
+         ~subtype:(Partial_function (args1_trailing, effect_row1, id1))
+         ~supertype:(Var id2)
      | Right_trailing args2_trailing ->
        check_effect_is_total effect_row1;
-       unify ~names ~types (Var id1) (Partial_function (args2_trailing, effect_row2, id2))
-     | Same_length -> unify ~names ~types (Var id1) (Var id2))
+       constrain
+         ~names
+         ~types
+         ~subtype:(Var id1)
+         ~supertype:(Partial_function (args2_trailing, effect_row2, id2))
+     | Same_length -> constrain ~names ~types ~subtype:(Var id1) ~supertype:(Var id2))
   | Partial_function (args1, effect_row1, id), Function (args2, effect_row2, res) ->
-    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
-     | Left_trailing _ -> fun_arg_number_mismatch t1 t2
+    (match
+       Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
+         constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
+     with
+     | Left_trailing _ -> fun_arg_number_mismatch subtype supertype
      | Right_trailing args2_trailing ->
        check_effect_is_total effect_row1;
        let id' = Type.Var_id.create () in
-       unify ~names ~types (Var id') res;
-       unify ~names ~types (Var id) (Partial_function (args2_trailing, effect_row2, id'))
-     | Same_length -> unify ~names ~types (Var id) res)
+       constrain ~names ~types ~subtype:(Var id') ~supertype:res;
+       constrain
+         ~names
+         ~types
+         ~subtype:(Var id)
+         ~supertype:(Partial_function (args2_trailing, effect_row2, id'))
+     | Same_length -> constrain ~names ~types ~subtype:(Var id) ~supertype:res)
   | Function (args1, effect_row1, res), Partial_function (args2, effect_row2, id) ->
-    (match Nonempty.iter2 args1 args2 ~f:(unify ~names ~types) with
+    (match
+       Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
+         constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
+     with
      | Left_trailing args1_trailing ->
        check_effect_is_total effect_row2;
        let id' = Type.Var_id.create () in
-       unify ~names ~types res (Var id');
-       unify ~names ~types (Partial_function (args1_trailing, effect_row1, id')) (Var id)
-     | Right_trailing _ -> fun_arg_number_mismatch t1 t2
-     | Same_length -> unify ~names ~types res (Var id))
-  | Tuple xs, Tuple ys -> iter2 ~f:(unify ~names ~types) xs ys
+       constrain ~names ~types ~subtype:res ~supertype:(Var id');
+       constrain
+         ~names
+         ~types
+         ~subtype:(Partial_function (args1_trailing, effect_row1, id'))
+         ~supertype:(Var id)
+     | Right_trailing _ -> fun_arg_number_mismatch subtype supertype
+     | Same_length -> constrain ~names ~types ~subtype:res ~supertype:(Var id))
+  | Tuple xs, Tuple ys ->
+    iter2
+      ~f:(fun arg1 arg2 -> constrain ~names ~types ~subtype:arg1 ~supertype:arg2)
+      xs
+      ys
   | Tuple _, (Function _ | Partial_function _)
   | Function _, Tuple _
-  | Partial_function _, Tuple _ -> type_error "Types do not match" t1 t2
+  | Partial_function _, Tuple _ -> type_error "Types do not match" subtype supertype
 ;;
 
 (* | Partial_effect _, _ | _, Partial_effect _ ->
@@ -207,33 +265,100 @@ let rec unify ~names ~types t1 t2 =
   unify ~names ~types
 ;; *)
 
-(* FIXME: Need to simplify effect types *)
-let rec substitute types typ =
+(* FIXME: write effect type inference:
+   Example:
+
+   ```
+   val run_both : (a -> <e1> b), (a -> <e2> c), a -> <e1, e2> (b, c)
+   let run_both f g x = (f x, g x)
+   ```
+   This becomes Lambda ([f; g; x], Tuple [Fun_call (f, [x]); Fun_call (g, [x])])
+   Constraints we check for:
+   Var f :> Partial_function ([Var a], [Var e1], b)
+   | => f gets an upper bound of this type
+   Var g :> Partial_function ([Var a], [Var e2], c)
+   | => g gets an upper bound of this type
+
+   Another example:
+
+   ```
+   val run_twice : (a -> <e1> b), a, a -> <e1> (b, b)
+   let run_twice f x y = (f x, f y)
+   ```
+   This becomes Lambda ([f; x; y], Tuple [Fun_call (f, [x]); Fun_call (f, [y])])
+   Constraints we check for:
+   Var f :> Partial_function ([Var a], [Var e1], b)
+   | => f gets an upper bound of this type
+   Var f :> Partial_function ([Var a], [Var e2], c)
+   | => f gets an upper bound of this type
+   Substituting means we should 
+*)
+
+module Polarity = struct
+  type t =
+    | Positive
+    | Negative
+
+  let flip = function
+    | Positive -> Negative
+    | Negative -> Positive
+  ;;
+end
+
+(* FIXME: Need to simplify effect types using intersection and union. Also, maybe we
+   shouldn't use Type.Expr.map given how many of the variants we special-case. *)
+let rec substitute_internal types typ ~(polarity : Polarity.t) =
   Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~name:Fn.id ~f:(fun typ ->
     match typ with
     | Var id ->
       (match Hashtbl.find types.type_vars id with
-       | Some type_sub -> Retry type_sub
+       (* FIXME: How do we do substitution for type variables now that we have effect
+          types? I think we need to encode the constraints in the type expression, maybe?
+          Hmm, I think all the lower/upper bounds are going to look basically the same,
+          modulo effect types. So, roughly, the lowermost bound produces the fewest
+          effects, and the uppermost bound produces the most.  *)
+       | Some { lower_bounds; upper_bounds } ->
+         let bounds, combine_types =
+           match polarity with
+           | Positive -> lower_bounds, Type.Expr.union
+           | Negative -> upper_bounds, Type.Expr.intersect
+         in
+         Halt
+           (Queue.fold bounds ~init:typ ~f:(fun acc bound ->
+              combine_types acc (substitute_internal types bound ~polarity)))
        | None -> Halt typ)
+    | Function (args, effects, res) ->
+      (* FIXME: substitute effects (on full/partial functions) *)
+      Halt
+        (Function
+           ( Nonempty.map
+               args
+               ~f:(substitute_internal types ~polarity:(Polarity.flip polarity))
+           , effects
+           , substitute_internal types res ~polarity ))
     | Partial_function (args, effect_row, id) ->
-      combine_partial_functions types typ args effect_row id
-    | _ -> Defer typ)
+      combine_partial_functions types args effect_row id ~polarity
+    | Tuple _ | Type_app _ -> Defer typ)
 
-and combine_partial_functions types typ args effect_row id =
-  match Hashtbl.find types.type_vars id with
-  | None -> Defer typ
-  | Some type_sub ->
-    let args = Nonempty.map args ~f:(substitute types) in
-    (match substitute types type_sub with
-     | Partial_function (args', effect_row', id') ->
-       check_effect_is_total effect_row;
-       let args' = Nonempty.map args' ~f:(substitute types) in
-       let args_combined = Nonempty.(args @ args') in
-       let typ : Type.t = Partial_function (args_combined, effect_row', id') in
-       combine_partial_functions types typ args_combined effect_row' id'
-     | (Var _ | Type_app _ | Tuple _ | Function _) as type_sub ->
-       Halt (Function (args, effect_row, type_sub)))
+and combine_partial_functions types args effect_row id ~polarity =
+  let args =
+    Nonempty.map args ~f:(fun arg ->
+      substitute_internal types arg ~polarity:(Polarity.flip polarity))
+  in
+  match substitute_internal types (Var id) ~polarity with
+  | Var _ as typ -> Halt typ
+  | Partial_function (args', effect_row', id') ->
+    check_effect_is_total effect_row;
+    let args' =
+      Nonempty.map args' ~f:(substitute_internal types ~polarity:(Polarity.flip polarity))
+    in
+    let args_combined = Nonempty.(args @ args') in
+    combine_partial_functions types args_combined effect_row' id' ~polarity
+  | (Type_app _ | Tuple _ | Function _) as type_sub ->
+    Halt (Function (args, effect_row, type_sub))
 ;;
+
+let substitute = substitute_internal ~polarity:Positive
 
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
@@ -261,16 +386,16 @@ let%expect_test "unification cycles" =
   let b = Type.fresh_var () in
   let c = Type.fresh_var () in
   let d = Type.fresh_var () in
-  unify ~names ~types a b;
+  constrain ~names ~types ~subtype:a ~supertype:b;
   print_s [%sexp (types : t)];
   [%expect {| ((type_vars ((0 (Var 1)))) (effect_vars ())) |}];
-  unify ~names ~types b c;
+  constrain ~names ~types ~subtype:b ~supertype:c;
   print_s [%sexp (types : t)];
   [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)))) (effect_vars ())) |}];
-  unify ~names ~types c d;
+  constrain ~names ~types ~subtype:c ~supertype:d;
   print_s [%sexp (types : t)];
   [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}];
-  unify ~names ~types d a;
+  constrain ~names ~types ~subtype:d ~supertype:a;
   print_s [%sexp (types : t)];
   [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}]
 ;;

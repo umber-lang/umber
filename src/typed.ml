@@ -25,7 +25,7 @@ module Pattern = struct
         pat_names, (Catch_all name, typ)
       | Cnstr_appl (cnstr, args) ->
         (* TODO: inferring unqualified name given type information *)
-        let arg_types, body_type =
+        let expected_arg_types, body_type =
           match Name_bindings.find_cnstr_type names cnstr with
           | Function (arg_types, _effect, body_type) ->
             Nonempty.to_list arg_types, body_type
@@ -33,14 +33,18 @@ module Pattern = struct
         in
         (match
            List.fold2
-             arg_types
+             expected_arg_types
              args
              ~init:(pat_names, [])
-             ~f:(fun (pat_names, args) arg_type arg ->
-             let pat_names, (arg, arg_type') =
+             ~f:(fun (pat_names, args) expected_arg_type arg ->
+             let pat_names, (arg, actual_arg_type) =
                of_untyped_with_names ~names ~types pat_names arg
              in
-             Type_bindings.unify ~names ~types arg_type arg_type';
+             Type_bindings.constrain
+               ~names
+               ~types
+               ~subtype:actual_arg_type
+               ~supertype:expected_arg_type;
              pat_names, arg :: args)
          with
          | Ok (pat_names, args) ->
@@ -95,30 +99,38 @@ module Pattern = struct
         let pat_names2, (pat2, typ2) =
           of_untyped_with_names ~names ~types pat_names pat2
         in
-        Type_bindings.unify ~names ~types typ1 typ2;
-        (* Unions must define the same names with the same types *)
+        let result_type = Type.fresh_var () in
+        Type_bindings.constrain ~names ~types ~subtype:typ1 ~supertype:result_type;
+        Type_bindings.constrain ~names ~types ~subtype:typ2 ~supertype:result_type;
+        (* Unions must define the same names with compatible types. *)
         if not
              (Map.equal
                 (fun entry1 entry2 ->
-                  Type_bindings.unify
+                  let entry_type = Type.fresh_var () in
+                  Type_bindings.constrain
                     ~names
                     ~types
-                    (Name_bindings.Name_entry.typ entry1)
-                    (Name_bindings.Name_entry.typ entry2);
+                    ~subtype:(Name_bindings.Name_entry.typ entry1)
+                    ~supertype:entry_type;
+                  Type_bindings.constrain
+                    ~names
+                    ~types
+                    ~subtype:(Name_bindings.Name_entry.typ entry2)
+                    ~supertype:entry_type;
                   true)
                 pat_names1
                 pat_names2)
         then type_error_msg "Pattern unions must define the same names";
-        pat_names1, (Union (pat1, pat2), typ1)
+        pat_names1, (Union (pat1, pat2), result_type)
       | As (pat, name) ->
         let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
         let pat_names =
           Pattern.Names.add_name pat_names name typ ~type_source:Placeholder
         in
         pat_names, (As (pat, name), typ)
-      | Type_annotation (pat, typ) ->
-        let typ1 =
-          Tuple2.map_snd typ ~f:(fun typ ->
+      | Type_annotation (pat, annotated_type) ->
+        let annotated_type =
+          Tuple2.map_snd annotated_type ~f:(fun typ ->
             Type.Expr.map
               typ
               ~name:(Name_bindings.absolutify_type_name names)
@@ -126,13 +138,20 @@ module Pattern = struct
               ~pf:Nothing.unreachable_code)
           |> Type.Scheme.instantiate_bounded
         in
-        let pat_names, (pat, typ2) = of_untyped_with_names ~names ~types pat_names pat in
-        Type_bindings.unify ~names ~types typ1 typ2;
-        pat_names, (pat, typ2)
+        let pat_names, (pat, inferred_type) =
+          of_untyped_with_names ~names ~types pat_names pat
+        in
+        Type_bindings.constrain
+          ~names
+          ~types
+          ~subtype:inferred_type
+          ~supertype:annotated_type;
+        pat_names, (pat, annotated_type)
     in
     let pat_names, (pat, typ) =
       of_untyped_with_names ~names ~types Value_name.Map.empty pat
     in
+    (* FIXME: Do we need to substitute here? What effect does it have? *)
     pat_names, (pat, Type_bindings.substitute types typ)
   ;;
 
@@ -238,11 +257,11 @@ module Expr = struct
               [ Effect_var (Type.Var_id.create ()) ]
             in
             add_effects call_effects;
-            Type_bindings.unify
+            Type_bindings.constrain
               ~names
               ~types
-              fun_type
-              (Partial_function (arg_types, call_effects, result_var));
+              ~subtype:fun_type
+              ~supertype:(Partial_function (arg_types, call_effects, result_var));
             node (Fun_call (fun_, (fun_type, Pattern.Names.empty), args)), Var result_var)
         | Op_tree tree ->
           of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
@@ -266,14 +285,24 @@ module Expr = struct
             let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
             add_effects cond_effects;
             let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
-            Type_bindings.unify ~names ~types cond_type bool_type;
+            Type_bindings.constrain ~names ~types ~subtype:cond_type ~supertype:bool_type;
             let (then_, then_type, then_effects), (else_, else_type, else_effects) =
               ( of_untyped ~names ~types ~f_name then_
               , of_untyped ~names ~types ~f_name else_ )
             in
             add_effects then_effects;
             add_effects else_effects;
-            Type_bindings.unify ~names ~types then_type else_type;
+            let result_type = Type.fresh_var () in
+            Type_bindings.constrain
+              ~names
+              ~types
+              ~subtype:then_type
+              ~supertype:result_type;
+            Type_bindings.constrain
+              ~names
+              ~types
+              ~subtype:else_type
+              ~supertype:result_type;
             let branch name expr =
               Node.create (Cnstr_appl (name, []) : Pattern.t) (Node.span expr), expr
             in
@@ -284,27 +313,35 @@ module Expr = struct
                    , [ branch Intrinsics.Bool.true_ then_
                      ; branch Intrinsics.Bool.false_ else_
                      ] ))
-            , then_type ))
+            , result_type ))
         | Match (expr, branches) ->
           collect_effects (fun ~add_effects ->
             let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
             add_effects expr_effects;
-            let branches, branch_type :: rest =
+            let result_type = Type.fresh_var () in
+            let branches =
               Nonempty.map branches ~f:(fun (pat, branch) ->
                 let pat_span = Node.span pat in
-                let names, ((_ : Pattern.Names.t), (pat, pat_typ)) =
+                let names, ((_ : Pattern.Names.t), (pat, pat_type)) =
                   Node.with_value pat ~f:(Pattern.of_untyped_into ~names ~types)
                 in
-                Type_bindings.unify ~names ~types expr_type pat_typ;
+                Type_bindings.constrain
+                  ~names
+                  ~types
+                  ~subtype:expr_type
+                  ~supertype:pat_type;
                 let branch, branch_type, branch_effects =
                   of_untyped ~names ~types ~f_name branch
                 in
                 add_effects branch_effects;
-                (Node.create pat pat_span, branch), branch_type)
-              |> Nonempty.unzip
+                Type_bindings.constrain
+                  ~names
+                  ~types
+                  ~subtype:branch_type
+                  ~supertype:result_type;
+                Node.create pat pat_span, branch)
             in
-            List.iter_pairs (branch_type :: rest) ~f:(Type_bindings.unify ~names ~types);
-            node (Match (expr, (expr_type, Pattern.Names.empty), branches)), branch_type)
+            node (Match (expr, (expr_type, Pattern.Names.empty), branches)), result_type)
         | Let { rec_; bindings; body } ->
           collect_effects (fun ~add_effects ->
             let names, rec_, bindings =
@@ -331,7 +368,11 @@ module Expr = struct
                       of_untyped ~names ~types ~f_name expr
                     in
                     add_effects expr_effects;
-                    Type_bindings.unify ~names ~types pat_type expr_type;
+                    Type_bindings.constrain
+                      ~names
+                      ~types
+                      ~subtype:expr_type
+                      ~supertype:pat_type;
                     names, (Node.create (pat, (pat_type, pat_names)) pat_span, expr))
                 in
                 names, false, bindings)
@@ -365,7 +406,11 @@ module Expr = struct
               |> Type.Scheme.instantiate_bounded)
           in
           let expr, inferred_type, expr_effects = of_untyped ~names ~types ~f_name expr in
-          Type_bindings.unify ~names ~types annotated_type inferred_type;
+          Type_bindings.constrain
+            ~names
+            ~types
+            ~subtype:inferred_type
+            ~supertype:annotated_type;
           expr, annotated_type, expr_effects)
     and type_recursive_let_bindings ~names ~types ~f_name ~add_effects bindings =
       let all_bound_names =
@@ -395,7 +440,7 @@ module Expr = struct
           let expr, expr_type, expr_effects = of_untyped expr ~f_name ~names ~types in
           add_effects expr_effects;
           Node.with_value pat ~f:(fun (_, (pat_type, _)) ->
-            Type_bindings.unify ~names ~types pat_type expr_type);
+            Type_bindings.constrain ~names ~types ~subtype:expr_type ~supertype:pat_type);
           pat, expr)
       in
       let rec_ = !used_a_bound_name in
@@ -763,8 +808,8 @@ module Module = struct
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
       | Effect (effect_name, effect) ->
-        let unify = Type_bindings.unify ~names ~types in
-        Name_bindings.add_effect names effect_name effect ~unify
+        let constrain = Type_bindings.constrain ~names ~types in
+        Name_bindings.add_effect names effect_name effect ~constrain
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ | Import _ -> names)
   ;;
@@ -821,11 +866,11 @@ module Module = struct
     =
     let handle_common ~names = function
       | Val (name, fixity, typ) ->
-        let unify = Type_bindings.unify ~names ~types in
-        Name_bindings.add_val names name fixity typ ~unify
+        let constrain = Type_bindings.constrain ~names ~types in
+        Name_bindings.add_val names name fixity typ ~constrain
       | Extern (name, fixity, typ, extern_name) ->
-        let unify = Type_bindings.unify ~names ~types in
-        Name_bindings.add_extern names name fixity ([], typ) extern_name ~unify
+        let constrain = Type_bindings.constrain ~names ~types in
+        Name_bindings.add_extern names name fixity ([], typ) extern_name ~constrain
       | Type_decl (_, (_, Alias alias)) ->
         check_cyclic_type_alias ~names alias;
         names
@@ -854,10 +899,18 @@ module Module = struct
         in
         let names =
           (* Unify pattern bindings with local type information (e.g. val declarations) *)
-          Name_bindings.merge_names names pat_names ~combine:(fun _ entry entry' ->
-            let typ, typ' = Name_bindings.Name_entry.(typ entry, typ entry') in
-            Type_bindings.unify ~names ~types typ typ';
-            Name_bindings.Name_entry.merge entry entry')
+          Name_bindings.merge_names
+            names
+            pat_names
+            ~combine:(fun _ existing_entry new_entry ->
+            let existing_type = Name_bindings.Name_entry.typ existing_entry in
+            let new_type = Name_bindings.Name_entry.typ new_entry in
+            Type_bindings.constrain
+              ~names
+              ~types
+              ~subtype:new_type
+              ~supertype:existing_type;
+            Name_bindings.Name_entry.merge existing_entry new_entry)
         in
         let pat, pat_type = pat in
         names, (Node.create (pat, (pat_type, pat_names)) pat_span, expr))
