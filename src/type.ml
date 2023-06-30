@@ -58,16 +58,14 @@ module Expr = struct
     | Var of 'v
     | Type_app of 'n Type_name.Qualified.t * ('v, 'pf, 'n) t list
     | Tuple of ('v, 'pf, 'n) t list
-    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * ('v, 'pf, 'n) t
-    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * 'pf
+    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effects * ('v, 'pf, 'n) t
+    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effects * 'pf
 
-  (* FIXME: cleanup *)
-  (* | Partial_effect of ('v, 'pf) t * ('pf, 'pf) effect_row *)
-  and ('v, 'pf, 'n) effect_row = ('v, 'pf, 'n) effect list
-
-  and ('v, 'pf, 'n) effect =
-    | Effect of Effect_name.t * ('v, 'pf, 'n) t list
-    | Effect_var of 'v
+  (* FIXME: It should be an effect path, not a name *)
+  and ('v, 'pf, 'n) effects =
+    { effects : ('v, 'pf, 'n) t list Map.M(Effect_name).t
+    ; effect_var : 'v option
+    }
   [@@deriving hash, compare, equal, sexp]
 
   let var v = Var v
@@ -83,20 +81,21 @@ module Expr = struct
        | Type_app (name', fields) ->
          Type_app (name name', List.map fields ~f:(map ~f ~var ~pf ~name))
        | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~var ~pf ~name))
-       | Function (args, effect_row, body) ->
+       | Function (args, effects, body) ->
          let args = Nonempty.map args ~f:(map ~f ~var ~pf ~name) in
-         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf ~name) in
-         Function (args, effect_row, map ~f ~var ~pf ~name body)
-       | Partial_function (args, effect_row, v) ->
+         let effects = map_effects effects ~f ~var ~pf ~name in
+         Function (args, effects, map ~f ~var ~pf ~name body)
+       | Partial_function (args, effects, v) ->
          let args = Nonempty.map args ~f:(map ~f ~var ~pf ~name) in
-         let effect_row = List.map effect_row ~f:(map_effect ~f ~var ~pf ~name) in
-         Partial_function (args, effect_row, pf v))
+         let effects = map_effects effects ~f ~var ~pf ~name in
+         Partial_function (args, effects, pf v))
 
-  and map_effect effect ~f ~var ~pf ~name =
-    match effect with
-    | Effect_var v -> Effect_var (var v)
-    | Effect (effect_name, args) ->
-      Effect (effect_name, List.map args ~f:(map ~f ~var ~pf ~name))
+  and map_effects { effects; effect_var } ~f ~var ~pf ~name =
+    let effects =
+      Map.map effects ~f:(fun args -> List.map args ~f:(map ~f ~var ~pf ~name))
+    in
+    let effect_var = Option.map effect_var ~f:var in
+    { effects; effect_var }
   ;;
 
   let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~pf ~name ~eff =
@@ -111,7 +110,8 @@ module Expr = struct
            ~here:[%here]
            ([%equal: _ Type_name.Qualified.t] name1 name2);
          Type_app
-           (name1, List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~var ~pf ~name ~eff))
+           ( name name1
+           , List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~var ~pf ~name ~eff) )
        | Tuple fields1, Tuple fields2 ->
          Tuple (List.map2_exn fields1 fields2 ~f:(map2 ~f ~f_contra ~var ~pf ~name ~eff))
        | Function (args1, effect_row1, res1), Function (args2, effect_row2, res2) ->
@@ -187,7 +187,7 @@ module Expr = struct
      
      Let's remove effect variables which are unified later. Also want to remove
      duplicates later. *)
-  let union_effects effects1 effects2 = effects1 @ effects2
+  (* let union_effects effects1 effects2 = effects1 @ effects2 *)
 
   (* FIXME: Maybe just make effects a set? *)
   (* FIXME: Since we don't consider unified type variables to be equal, this may give 
@@ -196,58 +196,13 @@ module Expr = struct
      
      Is this even going to be correct? Maybe effect_row needs to explicitly model
      intersection? *)
-  let intersect_effects effects1 effects2 =
+  (* let intersect_effects effects1 effects2 =
     List.filter
       effects1
       ~f:(List.mem effects2 ~equal:[%equal: (Var_id.t, Var_id.t, _) effect])
-  ;;
+  ;; *)
 
-  (* FIXME: function variance goes from contra -> co.
-     You can reduce the set of possible inputs or increase the set of possible outputs
-     and get a supertype.
-     A -> B is a subtype of C -> D iff C is a subtype of A and B is a subtype of D.
-
-     When we take the "union" of two function types, we're trying to find a function
-     type which is a supertype of both of them. Maybe we can just consider the
-     effect types? Hmm, but now we've introduced subtyping in, it might be anywhere.
-
-     e.g. For
-     `Int -> <> (Int -> <Foo> Int)`
-     and
-     `Int -> <> (Int -> <Bar> Int)`
-     we can say the union is `Int -> <> (Int -> <Foo,Bar> Int)`
-
-     And for
-     `(Int -> <Foo> Int) -> <> Int`
-     and
-     `(Int -> <Bar> Int) -> <> Int`
-     we can say the union is `(Int -> <> Int) -> <> Int` by finding a type which is
-     a subtype of both of the effects in the argument functions. So this is
-     intersection instead of union.
-  *)
-  let rec union t1 t2 =
-    map2
-      t1
-      t2
-      ~var:Fn.const
-      ~pf:Fn.const
-      ~name:Fn.const
-      ~eff:union_effects
-      ~f_contra:(fun (t1, t2) -> Halt (intersect t1 t2))
-
-  and intersect t1 t2 =
-    map2
-      t1
-      t2
-      ~var:Fn.const
-      ~pf:Fn.const
-      ~name:Fn.const
-      ~eff:intersect_effects
-      ~f_contra:(fun (t1, t2) -> Halt (union t1 t2))
-  ;;
-
-  let total_effect = []
-  let effect_is_total = List.is_empty
+  let no_effects = { effects = Effect_name.Map.empty; effect_var = None }
 end
 
 type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
@@ -259,10 +214,7 @@ module Scheme = struct
   type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
   [@@deriving compare, hash, equal, sexp]
 
-  type nonrec 'n effect = (Param.t, Nothing.t, 'n) Expr.effect
-  [@@deriving compare, hash, equal, sexp]
-
-  type nonrec 'n effect_row = (Param.t, Nothing.t, 'n) Expr.effect_row
+  type nonrec 'n effects = (Param.t, Nothing.t, 'n) Expr.effects
   [@@deriving compare, hash, equal, sexp]
 
   module Bounded = struct

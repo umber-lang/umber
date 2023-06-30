@@ -38,14 +38,17 @@ module Expr : sig
     | Var of 'v
     | Type_app of 'n Type_name.Qualified.t * ('v, 'pf, 'n) t list
     | Tuple of ('v, 'pf, 'n) t list
-    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * ('v, 'pf, 'n) t
-    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effect_row * 'pf
+    | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effects * ('v, 'pf, 'n) t
+    | Partial_function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) effects * 'pf
 
-  and ('v, 'pf, 'n) effect_row = ('v, 'pf, 'n) effect list
-
-  and ('v, 'pf, 'n) effect =
-    | Effect of Effect_name.t * ('v, 'pf, 'n) t list
-    | Effect_var of 'v
+  (* FIXME: When unifying, we should just allow one effect variable, which may have some
+     subtyping constraints. When generalizing, we should sub in unions. Lets not use the
+     term effect_row, since we aren't using row types. We probably end up needing a type
+     to represent user-facing types and an internal type for types during unification. *)
+  and ('v, 'pf, 'n) effects =
+    { effects : ('v, 'pf, 'n) t list Effect_name.Map.t
+    ; effect_var : 'v option
+    }
   [@@deriving hash, compare, equal, sexp]
 
   val var : 'v -> ('v, 'pf, 'n) t
@@ -59,6 +62,24 @@ module Expr : sig
     -> name:('n1 Type_name.Qualified.t -> 'n2 Type_name.Qualified.t)
     -> ('v2, 'pf2, 'n2) t
 
+  val map2
+    :  ?f:
+         (('v1, 'pf1, 'n1) t * ('v1, 'pf1, 'n1) t
+          -> (('v1, 'pf1, 'n1) t * ('v1, 'pf1, 'n1) t, ('v2, 'pf2, 'n2) t) Map_action.t)
+    -> ?f_contra:
+         (('v1, 'pf1, 'n1) t * ('v1, 'pf1, 'n1) t
+          -> (('v1, 'pf1, 'n1) t * ('v1, 'pf1, 'n1) t, ('v2, 'pf2, 'n2) t) Map_action.t)
+    -> ('v1, 'pf1, 'n1) t
+    -> ('v1, 'pf1, 'n1) t
+    -> var:('v1 -> 'v1 -> 'v2)
+    -> pf:('pf1 -> 'pf1 -> 'pf2)
+    -> name:('n1 Type_name.Qualified.t -> 'n2 Type_name.Qualified.t)
+    -> eff:
+         (('v1, 'pf1, 'n1) effects
+          -> ('v1, 'pf1, 'n1) effects
+          -> ('v2, 'pf2, 'n2) effects)
+    -> ('v2, 'pf2, 'n2) t
+
   val fold_until
     :  ('v, 'pf, 'n) t
     -> init:'acc
@@ -69,7 +90,8 @@ module Expr : sig
   val for_all_vars : ('v, _, _) t -> f:('v -> bool) -> bool
   val exists_var : ('v, _, _) t -> f:('v -> bool) -> bool
 
-  val union
+  (* FIXME: cleanup*)
+  (* val union
     :  (Var_id.t, Var_id.t, 'n) t
     -> (Var_id.t, Var_id.t, 'n) t
     -> (Var_id.t, Var_id.t, 'n) t
@@ -89,8 +111,9 @@ module Expr : sig
     -> (Var_id.t, Var_id.t, 'n) effect_row
     -> (Var_id.t, Var_id.t, 'n) effect_row
 
-  val total_effect : _ effect_row
-  val effect_is_total : _ effect_row -> bool
+  val effect_is_total : _ effect_row -> bool *)
+
+  val no_effects : _ effects
 end
 
 type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
@@ -102,10 +125,7 @@ module Scheme : sig
   type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
   [@@deriving compare, hash, equal, sexp]
 
-  type nonrec 'n effect = (Param.t, Nothing.t, 'n) Expr.effect
-  [@@deriving compare, hash, equal, sexp]
-
-  type nonrec 'n effect_row = (Param.t, Nothing.t, 'n) Expr.effect_row
+  type nonrec 'n effects = (Param.t, Nothing.t, 'n) Expr.effects
   [@@deriving compare, hash, equal, sexp]
 
   module Bounded : sig

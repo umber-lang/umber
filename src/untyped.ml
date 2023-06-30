@@ -163,8 +163,8 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
       ~msg:[%message "Fixity declarations are not supported on effect operations"]
   | Common_sig (Val (name, None, type_)) ->
     (match type_ with
-     | [], Function (args, effect_row, result) ->
-       if not (Type.Expr.effect_is_total effect_row)
+     | [], Function (args, effects, result) ->
+       if not ([%equal: _ Type.Scheme.effects] effects Type.Expr.no_effects)
        then
          Compilation_error.raise
            Other

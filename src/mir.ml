@@ -868,8 +868,8 @@ module Expr = struct
     | Type_app _ | Tuple _ | Var _ ->
       compiler_bug [%message "Non-function type in function call"]
     | Partial_function _ -> .
-    | Function
-        (fun_arg_types, (_ : _ Type.Expr.effect_row), (_return_type : _ Type.Scheme.t)) ->
+    | Function (fun_arg_types, (_ : _ Type.Expr.effects), (_return_type : _ Type.Scheme.t))
+      ->
       (match snd (Nonempty.zip fun_arg_types args_and_types) with
        | Same_length -> `Already_fully_applied
        | Right_trailing _ ->
@@ -965,7 +965,7 @@ module Expr = struct
              (* FIXME: We lost the effect information. We don't actually use it, though.
              For now, just making the effect total. *)
              let fun_type =
-               Type.Expr.Function (arg_types, Type.Expr.total_effect, body_type)
+               Type.Expr.Function (arg_types, Type.Expr.no_effects, body_type)
              in
              let fun_ = of_typed_expr ~ctx fun_ fun_type in
              let args =

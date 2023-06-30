@@ -12,13 +12,21 @@ val constrain
   -> supertype:Type.t
   -> unit
 
+val constrain_effects
+  :  names:Name_bindings.t
+  -> types:t
+  -> subtype:(Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effects
+  -> supertype:(Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effects
+  -> unit
+
+val constrain_effects_to_be_total
+  :  names:Name_bindings.t
+  -> types:t
+  -> (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effects
+  -> unit
+
 val substitute : t -> Type.t -> Type.t
 val generalize : t -> Type.t -> Module_path.absolute Type.Scheme.t
-
-val make_total
-  :  t
-  -> (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effect_row
-  -> unit
 
 (* Want a message like "this expression has type ... but an expression was
    expected with type ..."

@@ -228,7 +228,8 @@ type_fun_args:
 
 %inline type_fun:
   | args = type_fun_args; ARROW; body = type_non_fun
-    { Type.Expr.Function (args, [], body) }
+    (* TODO: Implement effect syntax in function types. *)
+    { Type.Expr.Function (args, Type.Expr.no_effects, body) }
 
 type_expr:
   | t = type_non_fun { t }

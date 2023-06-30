@@ -164,6 +164,13 @@ module Pattern = struct
   ;;
 
   let generalize ~names ~types pat_names typ ~shadowing_allowed =
+    (* FIXME: cleanup *)
+    (* print_s
+      [%message
+        "Pattern.generalize"
+          (pat_names : Pattern.Names.t)
+          (typ : Type.t)
+          (types : Type_bindings.t)]; *)
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let inferred_scheme =
@@ -206,25 +213,28 @@ module Expr = struct
   [@@deriving sexp_of]
 
   let type_recursive_let_bindings =
-    let collect_effects f =
-      let effects = ref [] in
-      let (expr : _ t Node.t), (typ : Type.t) =
-        f ~add_effects:(fun effects' ->
-          effects := Type.Expr.union_effects !effects effects')
+    let collect_effects ~names ~types f =
+      let effects : _ Type.Expr.effects =
+        { effects = Effect_name.Map.empty; effect_var = Some (Type.Var_id.create ()) }
       in
-      expr, typ, !effects
+      let (expr : _ t Node.t), (typ : Type.t) =
+        f ~add_effects:(fun subtype ->
+          Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects)
+      in
+      expr, typ, effects
     in
     let rec of_untyped ~names ~types ~f_name expr
-      : (Type.t * Pattern.Names.t) t Node.t * Type.t * _ Type.Expr.effect_row
+      : (Type.t * Pattern.Names.t) t Node.t * Type.t * _ Type.Expr.effects
       =
       let node e = Node.create e (Node.span expr) in
       Node.with_value expr ~f:(fun expr ->
         match (expr : Untyped.Expr.t) with
-        | Literal lit -> node (Literal lit), Type.Concrete.cast (Literal.typ lit), []
+        | Literal lit ->
+          node (Literal lit), Type.Concrete.cast (Literal.typ lit), Type.Expr.no_effects
         | Name name ->
           let name, name_entry = Name_bindings.find_entry_with_path names name in
           f_name name name_entry;
-          node (Name name), Name_bindings.Name_entry.typ name_entry, []
+          node (Name name), Name_bindings.Name_entry.typ name_entry, Type.Expr.no_effects
         | Qualified (path, expr) ->
           let names = Name_bindings.import_all names path in
           of_untyped ~names ~types ~f_name expr
@@ -242,7 +252,7 @@ module Expr = struct
            If you have e.g. `if cond then foo else bar` we don't want to force `foo` and
            `bar` to produce exactly the same effects. Effects have true automatic
            subtyping like that. *)
-          collect_effects (fun ~add_effects ->
+          collect_effects ~names ~types (fun ~add_effects ->
             let fun_, fun_type, fun_effects = of_untyped ~names ~types ~f_name fun_ in
             add_effects fun_effects;
             let args =
@@ -253,8 +263,10 @@ module Expr = struct
             in
             let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
             let result_var = Type.Var_id.create () in
-            let call_effects : _ Type.Expr.effect_row =
-              [ Effect_var (Type.Var_id.create ()) ]
+            let call_effects : _ Type.Expr.effects =
+              { effects = Effect_name.Map.empty
+              ; effect_var = Some (Type.Var_id.create ())
+              }
             in
             add_effects call_effects;
             Type_bindings.constrain
@@ -276,12 +288,14 @@ module Expr = struct
           in
           let args, arg_types = Nonempty.unzip args_and_types in
           let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
-          node (Lambda (args, body)), Function (arg_types, body_effects, body_type), []
+          ( node (Lambda (args, body))
+          , Function (arg_types, body_effects, body_type)
+          , Type.Expr.no_effects )
         | If (cond, then_, else_) ->
           (* FIXME: Places with multiple branches e.g. if, match, now can't rely on the
            types of the two branches being unified to be equivalent, and arbitrarily
            picking one. They need to get the supertype (for e.g functions). *)
-          collect_effects (fun ~add_effects ->
+          collect_effects ~names ~types (fun ~add_effects ->
             let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
             add_effects cond_effects;
             let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
@@ -315,7 +329,7 @@ module Expr = struct
                      ] ))
             , result_type ))
         | Match (expr, branches) ->
-          collect_effects (fun ~add_effects ->
+          collect_effects ~names ~types (fun ~add_effects ->
             let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
             add_effects expr_effects;
             let result_type = Type.fresh_var () in
@@ -343,7 +357,7 @@ module Expr = struct
             in
             node (Match (expr, (expr_type, Pattern.Names.empty), branches)), result_type)
         | Let { rec_; bindings; body } ->
-          collect_effects (fun ~add_effects ->
+          collect_effects ~names ~types (fun ~add_effects ->
             let names, rec_, bindings =
               if rec_
               then (
@@ -381,7 +395,7 @@ module Expr = struct
             add_effects body_effects;
             node (Let { rec_; bindings; body }), body_type)
         | Tuple items ->
-          collect_effects (fun ~add_effects ->
+          collect_effects ~names ~types (fun ~add_effects ->
             let items, types =
               List.map items ~f:(fun item ->
                 let item, type_, effects = of_untyped item ~names ~types ~f_name in
@@ -985,7 +999,7 @@ module Module = struct
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings ~names ~types bindings ~add_effects:(fun effects ->
         (* No effects are handled at toplevel, so get rid of any produced effects. *)
-        Type_bindings.make_total types effects)
+        Type_bindings.constrain_effects_to_be_total ~names ~types effects)
     in
     Nonempty.fold_map bindings ~init:names ~f:(fun names (pattern_etc, expr) ->
       let pat_span = Node.span pattern_etc in

@@ -917,7 +917,7 @@ let add_type_decl t type_name decl =
                (* TODO: This should have an effect for allocation. *)
                Name_entry.val_declared
                  (match Nonempty.of_list args with
-                  | Some args -> Function (args, [], result_type)
+                  | Some args -> Function (args, Type.Expr.no_effects, result_type)
                   | None -> result_type)
              in
              Map.set names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry))
@@ -949,8 +949,11 @@ let add_name_entry names name scheme new_entry ~constrain =
 
 let add_effect t effect_name (effect : _ Effect.t) ~constrain =
   let f bindings =
-    let effect_row : _ Type.Scheme.effect_row =
-      [ Effect (effect_name, List.map effect.params ~f:Type.Expr.var) ]
+    let effects : _ Type.Scheme.effects =
+      { effects =
+          Effect_name.Map.singleton effect_name (List.map effect.params ~f:Type.Expr.var)
+      ; effect_var = None
+      }
     in
     { bindings with
       (* FIXME: add to effects *)
@@ -965,7 +968,7 @@ let add_effect t effect_name (effect : _ Effect.t) ~constrain =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let scheme : _ Type.Scheme.t = Function (args, effect_row, result) in
+          let scheme : _ Type.Scheme.t = Function (args, effects, result) in
           let new_entry = Name_entry.val_declared scheme in
           add_name_entry names name scheme new_entry ~constrain)
     }
