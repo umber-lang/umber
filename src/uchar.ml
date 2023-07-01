@@ -2,6 +2,17 @@ open Core
 include Uchar
 include Comparable.Make (Uchar)
 
+(* TODO: Generate characters outside of ascii. *)
+include
+  Quickcheckable.Of_quickcheckable
+    (Char)
+    (struct
+      type nonrec t = t
+
+      let to_quickcheckable = to_char_exn
+      let of_quickcheckable = of_char
+    end)
+
 exception Malformed
 
 (* Code "liberated" from:
@@ -61,9 +72,9 @@ let of_gen_exn s =
     if n2 lsr 6 <> 0b10 || n3 lsr 6 <> 0b10 || n4 lsr 6 <> 0b10 then raise Malformed;
     Uchar.of_scalar_exn
       (((n1 land 0x07) lsl 18)
-      lor ((n2 land 0x3f) lsl 12)
-      lor ((n3 land 0x3f) lsl 6)
-      lor (n4 land 0x3f))
+       lor ((n2 land 0x3f) lsl 12)
+       lor ((n3 land 0x3f) lsl 6)
+       lor (n4 land 0x3f))
   | _ -> raise Malformed
 ;;
 

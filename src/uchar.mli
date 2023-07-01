@@ -1,6 +1,7 @@
 open Core
 include module type of Uchar
 include Comparable.S with type t := t
+include Quickcheckable.S with type t := t
 
 exception Malformed
 

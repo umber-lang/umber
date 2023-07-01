@@ -2,7 +2,7 @@ open Import
 include Array
 
 module T = struct
-  type t = Uchar.t array [@@deriving compare, equal]
+  type t = Uchar.t array [@@deriving compare, equal, quickcheck]
   type elt = Uchar.t
 
   let add_substring_to_buffer buf t ~pos ~len =

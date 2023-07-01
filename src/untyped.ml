@@ -158,6 +158,8 @@ end
 module Module = struct
   include Module
 
-  type nonrec t = (Pattern.t, Expr.t, Module_path.relative) t [@@deriving sexp_of]
+  type nonrec t = (Pattern.t, Expr.t, Module_path.relative) t
+  [@@deriving sexp_of, quickcheck]
+
   type nonrec def = (Pattern.t, Expr.t, Module_path.relative) def [@@deriving sexp_of]
 end

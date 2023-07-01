@@ -386,3 +386,6 @@ let lex_file ~print_tokens_to =
 ;;
 
 let parse_file ?print_tokens_to = with_file ~f:(try_parse ?print_tokens_to)
+
+(* FIXME: Idea: Use quickcheck to generate random ASTs, then serialize them to code, then
+   parse them and assert the parsed AST is identical to the original. *)

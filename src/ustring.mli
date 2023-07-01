@@ -1,6 +1,6 @@
 open Import
 
-type t [@@deriving compare, equal, hash, sexp]
+type t [@@deriving compare, equal, hash, sexp, quickcheck]
 type elt = Uchar.t
 
 include Container.S0 with type t := t with type elt := elt

@@ -3,7 +3,7 @@ open Import
 (* TODO: This should almost certainly use the [Non_empty_list] library. Any extensions can
    still be implemented on top of that, like what we've done with [List] in util.ml *)
 
-type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash, sexp]
+type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash, sexp, quickcheck]
 
 include Container.S1 with type 'a t := 'a t
 include Monad.S with type 'a t := 'a t

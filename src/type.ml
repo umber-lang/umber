@@ -60,7 +60,7 @@ module Expr = struct
     | Tuple of ('v, 'pf, 'n) t list
     | Function of ('v, 'pf, 'n) t Nonempty.t * ('v, 'pf, 'n) t
     | Partial_function of ('v, 'pf, 'n) t Nonempty.t * 'pf
-  [@@deriving compare, equal, hash, sexp, variants]
+  [@@deriving compare, equal, hash, sexp, variants, quickcheck]
 
   let rec map ?(f = Map_action.defer) typ ~var ~pf ~name =
     match f typ with
@@ -126,10 +126,11 @@ let fresh_var () = Expr.Var (Var_id.create ())
 
 module Scheme = struct
   type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
-  [@@deriving compare, hash, equal, sexp]
+  [@@deriving compare, hash, equal, sexp, quickcheck]
 
   module Bounded = struct
-    type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
+    type nonrec 'n t = Trait_bound.t * 'n t
+    [@@deriving compare, equal, hash, sexp, quickcheck]
   end
 
   let instantiate ?params typ =
@@ -174,10 +175,15 @@ module Decl = struct
        records with a single variant and an inline record. One problem with this is you
        can no longer define recursive record types, which is a bit annoying. *)
     | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
-  [@@deriving compare, equal, hash, sexp]
+  [@@deriving compare, equal, hash, sexp, quickcheck]
 
-  type 'n t = Type_param_name.t Unique_list.t * 'n decl
-  [@@deriving compare, equal, hash, sexp]
+  type 'n t =
+    Type_param_name.t Unique_list.t
+    [@quickcheck.generator
+      Type_param_name.Set.quickcheck_generator Type_param_name.quickcheck_generator
+      |> Quickcheck.Generator.map ~f:(List.permute << Set.to_list)]
+    * 'n decl
+  [@@deriving compare, equal, hash, sexp, quickcheck]
 
   let arity ((params, _) : _ t) = List.length (params :> Type_param_name.t list)
 

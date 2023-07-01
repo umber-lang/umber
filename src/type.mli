@@ -68,10 +68,11 @@ val fresh_var : unit -> t
 
 module Scheme : sig
   type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
-  [@@deriving compare, hash, equal, sexp]
+  [@@deriving compare, hash, equal, sexp, quickcheck]
 
   module Bounded : sig
-    type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
+    type nonrec 'n t = Trait_bound.t * 'n t
+    [@@deriving compare, equal, hash, sexp, quickcheck]
   end
 
   val instantiate : ?params:Param.Env_to_vars.t -> 'n t -> (Var_id.t, _, 'n) Expr.t
@@ -101,10 +102,10 @@ module Decl : sig
        records with a single variant and an inline record. One problem with this is you
        can no longer define recursive record types, which is a bit annoying. *)
     | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
-  [@@deriving compare, equal, hash, sexp]
+  [@@deriving compare, equal, hash, sexp, quickcheck]
 
   type 'n t = Type_param_name.t Unique_list.t * 'n decl
-  [@@deriving compare, equal, hash, sexp]
+  [@@deriving compare, equal, hash, sexp, quickcheck]
 
   val arity : 'n t -> int
   val map_exprs : 'n1 t -> f:('n1 Scheme.t -> 'n2 Scheme.t) -> 'n2 t

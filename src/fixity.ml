@@ -12,6 +12,9 @@ module Level = struct
   let min = 0
   let max = 9
   let all = List.range ~start:`inclusive ~stop:`inclusive min max
+  let quickcheck_generator = Quickcheck.Generator.of_list all
+  let quickcheck_shrinker = Quickcheck.Shrinker.empty ()
+  let quickcheck_observer = Quickcheck.Observer.of_hash (module T)
 
   let of_int_exn n =
     if min <= n && n <= max
@@ -28,7 +31,7 @@ module Assoc = struct
     | Non_assoc
     | Left
     | Right
-  [@@deriving compare, equal, hash, sexp, enumerate]
+  [@@deriving compare, equal, hash, sexp, enumerate, quickcheck]
 
   let compatible t1 t2 =
     match t1, t2 with
@@ -37,7 +40,7 @@ module Assoc = struct
   ;;
 end
 
-type t = Assoc.t * Level.t [@@deriving compare, equal, hash, sexp, enumerate]
+type t = Assoc.t * Level.t [@@deriving compare, equal, hash, sexp, enumerate, quickcheck]
 
 (* TODO: maybe the default should be no associativity and unknown precedence *)
 let default = Assoc.Non_assoc, 9

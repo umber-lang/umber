@@ -88,7 +88,7 @@ and ('pat, 'expr, 'name) def =
       * Trait_name.t
       * 'name Type.Scheme.t Nonempty.t
       * ('pat, 'expr, 'name) def Node.t list
-[@@deriving sexp_of]
+[@@deriving sexp_of, quickcheck]
 
 (* TODO: probably move this somewhere else, like Parsing *)
 let with_filename (_, sigs, defs) filename =

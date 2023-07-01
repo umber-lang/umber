@@ -1,6 +1,6 @@
 open! Import
 
-type 'a t [@@deriving compare, sexp, equal, hash]
+type 'a t [@@deriving compare, sexp, equal, hash, quickcheck]
 
 val create : 'a -> Span.t -> 'a t
 val span : _ t -> Span.t

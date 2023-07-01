@@ -26,3 +26,4 @@ let t_of_sexp a_of_sexp (sexp : Sexp.t) =
 
 let empty = []
 let singleton x = [ x ]
+let quickcheck_observer = List.quickcheck_observer

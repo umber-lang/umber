@@ -1,7 +1,7 @@
 open Import
 
 module type General_name = sig
-  type t = private Ustring.t [@@deriving compare, equal, hash, sexp]
+  type t = private Ustring.t [@@deriving compare, equal, hash, sexp, quickcheck]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
@@ -94,7 +94,9 @@ end)
 module Module_name : Name = Upper_name
 
 module Module_path : sig
-  type +'a t = private Module_name.t list [@@deriving compare, equal, hash, sexp]
+  type +'a t = private Module_name.t list
+  [@@deriving compare, equal, hash, sexp, quickcheck]
+
   type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
   type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
@@ -133,7 +135,7 @@ module Module_path : sig
     val empty : t
   end
 end = struct
-  type 'a t = Module_name.t list [@@deriving compare, equal, hash, sexp]
+  type 'a t = Module_name.t list [@@deriving compare, equal, hash, sexp, quickcheck]
   type absolute = [ `Absolute ] [@@deriving compare, equal, hash, sexp]
   type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
@@ -210,7 +212,8 @@ module type Name_qualified = sig
   type name := t
 
   module Qualified : sig
-    type 'a t = 'a Module_path.t * name [@@deriving compare, equal, hash, sexp]
+    type 'a t = 'a Module_path.t * name
+    [@@deriving compare, equal, hash, sexp, quickcheck]
   end
 
   module Relative : sig
@@ -243,7 +246,7 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
   include N
 
   module Qualified = struct
-    type nonrec 'a t = 'a Module_path.t * t [@@deriving compare, equal, hash]
+    type nonrec 'a t = 'a Module_path.t * t [@@deriving compare, equal, hash, quickcheck]
 
     let iter_chars ((path, name) : _ t) ~f =
       List.iter (Module_path.to_module_names path) ~f:(fun module_name ->

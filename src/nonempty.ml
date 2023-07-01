@@ -1,6 +1,6 @@
 open Import
 
-type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash]
+type 'a t = ( :: ) of 'a * 'a list [@@deriving compare, equal, hash, quickcheck]
 
 let singleton x = [ x ]
 let hd (x :: _) = x
