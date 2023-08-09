@@ -1,6 +1,6 @@
 open Import
 open Names
-module Var_id : module type of Unique_id.Int ()
+module Var_id : Unique_id.Id
 
 module Param : sig
   (* TODO: consider adding support for weak type variables here *)
@@ -44,7 +44,12 @@ module Expr : sig
   (* FIXME: When unifying, we should just allow one effect variable, which may have some
      subtyping constraints. When generalizing, we should sub in unions. Lets not use the
      term effect_row, since we aren't using row types. We probably end up needing a type
-     to represent user-facing types and an internal type for types during unification. *)
+     to represent user-facing types and an internal type for types during unification.
+     
+     This is a good opportunity to put the external (input and output) types and internal
+     (for type-checking) types. Currently we roll everything into [Type.Expr.t]. This
+     would let us simplify each of the types (e.g. external types don't have to mention
+     partial application, and internal types can use [Type.Var_id.t]). *)
   and ('v, 'pf, 'n) effects =
     { effects : ('v, 'pf, 'n) t list Effect_name.Map.t
     ; effect_var : 'v option
@@ -119,13 +124,14 @@ end
 type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
 [@@deriving compare, hash, equal, sexp]
 
+include Hashable.S with type t := t
+
 val fresh_var : unit -> t
 
 module Scheme : sig
-  type nonrec 'n t = (Param.t, Nothing.t, 'n) Expr.t
-  [@@deriving compare, hash, equal, sexp]
+  type 'n t = (Param.t, Nothing.t, 'n) Expr.t [@@deriving compare, hash, equal, sexp]
 
-  type nonrec 'n effects = (Param.t, Nothing.t, 'n) Expr.effects
+  type 'n effects = (Param.t, Nothing.t, 'n) Expr.effects
   [@@deriving compare, hash, equal, sexp]
 
   module Bounded : sig

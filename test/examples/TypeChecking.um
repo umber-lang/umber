@@ -25,6 +25,7 @@ let if_ then_ else_ = match
   | False -> else_ ()
 
 # `(() -> a), (() -> a), Bool -> a`
+# TODO: Show get this type instead: `(() -> <e1> a), (() -> <e2> a), Bool -> <e1, e2> a`
 let if' then_ else_ cond = match cond
   | True -> then_ ()
   | False -> else_ ()

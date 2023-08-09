@@ -205,8 +205,13 @@ module Expr = struct
   let no_effects = { effects = Effect_name.Map.empty; effect_var = None }
 end
 
-type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
-[@@deriving compare, hash, equal, sexp]
+module T = struct
+  type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
+  [@@deriving compare, hash, equal, sexp]
+end
+
+include T
+include Hashable.Make (T)
 
 let fresh_var () = Expr.Var (Var_id.create ())
 

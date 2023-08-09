@@ -25,7 +25,6 @@ val constrain_effects_to_be_total
   -> (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effects
   -> unit
 
-val substitute : t -> Type.t -> Type.t
 val generalize : t -> Type.t -> Module_path.absolute Type.Scheme.t
 
 (* Want a message like "this expression has type ... but an expression was

@@ -151,8 +151,10 @@ module Pattern = struct
     let pat_names, (pat, typ) =
       of_untyped_with_names ~names ~types Value_name.Map.empty pat
     in
-    (* FIXME: Do we need to substitute here? What effect does it have? *)
-    pat_names, (pat, Type_bindings.substitute types typ)
+    (* FIXME: Do we need to substitute here? What effect does it have? I'm going to get
+       rid of it for now. Previous code was:
+       `pat_names, (pat, Type_bindings.substitute types typ)` *)
+    pat_names, (pat, typ)
   ;;
 
   let of_untyped_into ~names ~types pattern =
@@ -1110,6 +1112,9 @@ module Module = struct
         | Let _ | Trait _ | Impl _ -> ()))
   ;;
 
+  (* TODO: Type inference is local to groups of toplevel let bindings, so we could be
+     creating a new [Type_bindings.t] to use for each of those, instead of re-using one
+     for a whole file. This would save some memory and hopefully have the GC scan less. *)
   let of_untyped ~names ~types ~include_std (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
