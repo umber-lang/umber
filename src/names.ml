@@ -129,6 +129,11 @@ module Module_path : sig
     include Comparable.S with type t := t
     include Hashable.S with type t := t
 
+    module Map : sig
+      include module type of Map
+      include Ppx_hash_lib.Hashable.S1 with type 'a t := 'a t
+    end
+
     val of_relative_unchecked : Relative.t -> t
     val empty : t
   end
@@ -191,6 +196,11 @@ end = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
+    module Map = struct
+      include Map
+      include Map.Provide_hash (T)
+    end
+
     let of_module_names = Fn.id
     let of_ustrings_unchecked = List.map ~f:Module_name.of_ustring_unchecked
     let of_ustrings_exn = List.map ~f:Module_name.of_ustring_exn
@@ -232,6 +242,11 @@ module type Name_qualified = sig
     include Stringable.S with type t := t
     include Comparable.S with type t := t
     include Hashable.S with type t := t
+
+    module Map : sig
+      include module type of Map
+      include Ppx_hash_lib.Hashable.S1 with type 'a t := 'a t
+    end
 
     val of_relative_unchecked : Relative.t -> t
     val with_path : Module_path.Absolute.t -> name -> t
@@ -324,6 +339,11 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
     include T
     include Comparable.Make (T)
     include Hashable.Make (T)
+
+    module Map = struct
+      include Map
+      include Map.Provide_hash (T)
+    end
 
     let with_path path name = path, name
 

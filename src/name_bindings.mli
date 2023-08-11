@@ -14,12 +14,12 @@ module Name_entry : sig
     [@@deriving compare, enumerate, equal, sexp, variants]
   end
 
-  val typ : t -> Type.t
-  val scheme : t -> Module_path.absolute Type.Scheme.t option
+  val typ : t -> Internal_type.t
+  val scheme : t -> Module_path.absolute Type_scheme.t option
   val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
-  val create : ?fixity:Fixity.t -> type_source:Type_source.t -> Type.t -> t
+  val create : ?fixity:Fixity.t -> type_source:Type_source.t -> Internal_type.t -> t
   val merge : t -> t -> t
   val identical : t -> t -> bool
 end
@@ -33,7 +33,7 @@ module Type_entry : sig
     include Comparable.S_plain with type t := t
   end
 
-  val decl : t -> Module_path.absolute Type.Decl.t
+  val decl : t -> Module_path.absolute Type_decl.t
   val identical : t -> t -> bool
   val id : t -> Id.t
 end
@@ -54,20 +54,20 @@ val find_entry_with_path
   -> Value_name.Relative.t
   -> Value_name.Absolute.t * Name_entry.t
 
-val find_type : t -> Value_name.Relative.t -> Type.t
-val find_cnstr_type : t -> Cnstr_name.Relative.t -> Type.t
+val find_type : t -> Value_name.Relative.t -> Internal_type.t
+val find_cnstr_type : t -> Cnstr_name.Relative.t -> Internal_type.t
 val find_fixity : t -> Value_name.Relative.t -> Fixity.t
 
 val set_inferred_scheme
   :  t
   -> Value_name.t
-  -> Module_path.absolute Type.Scheme.t
+  -> Module_path.absolute Type_scheme.t
   -> shadowing_allowed:bool
   -> check_existing:(Name_entry.t -> unit)
   -> t
 
 val add_name_placeholder : t -> Value_name.t -> t
-val add_type_decl_placeholder : t -> Type_name.t -> Module_path.relative Type.Decl.t -> t
+val add_type_decl_placeholder : t -> Type_name.t -> Module_path.relative Type_decl.t -> t
 val add_effect_placeholder : t -> Effect_name.t -> Module_path.relative Effect.t -> t
 
 (** Fold over all the local (non-imported) names bound. *)
@@ -90,7 +90,7 @@ val find_absolute_type_decl
   :  ?defs_only:bool
   -> t
   -> Type_name.Absolute.t
-  -> Module_path.absolute Type.Decl.t
+  -> Module_path.absolute Type_decl.t
 
 val find_absolute_type_entry
   :  ?defs_only:bool
@@ -103,13 +103,13 @@ val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Absolute.t
 
 val absolutify_type_expr
   :  t
-  -> ('v, 'pf, Module_path.relative) Type.Expr.t
-  -> ('v, 'pf, Module_path.absolute) Type.Expr.t
+  -> Module_path.relative Type_scheme.t
+  -> Module_path.absolute Type_scheme.t
 
 val absolutify_type_decl
   :  t
-  -> Module_path.relative Type.Decl.t
-  -> Module_path.absolute Type.Decl.t
+  -> Module_path.relative Type_decl.t
+  -> Module_path.absolute Type_decl.t
 
 val absolutify_effect
   :  t
@@ -140,26 +140,26 @@ val add_val
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Module_path.absolute Type.Scheme.Bounded.t
-  -> constrain:(subtype:Type.t -> supertype:Type.t -> unit)
+  -> Module_path.absolute Type_scheme.Bounded.t
+  -> constrain:(subtype:Internal_type.t -> supertype:Internal_type.t -> unit)
   -> t
 
 val add_extern
   :  t
   -> Value_name.t
   -> Fixity.t option
-  -> Module_path.absolute Type.Scheme.Bounded.t
+  -> Module_path.absolute Type_scheme.Bounded.t
   -> Extern_name.t
-  -> constrain:(subtype:Type.t -> supertype:Type.t -> unit)
+  -> constrain:(subtype:Internal_type.t -> supertype:Internal_type.t -> unit)
   -> t
 
-val add_type_decl : t -> Type_name.t -> Module_path.absolute Type.Decl.t -> t
+val add_type_decl : t -> Type_name.t -> Module_path.absolute Type_decl.t -> t
 
 val add_effect
   :  t
   -> Effect_name.t
   -> Module_path.absolute Effect.t
-  -> constrain:(subtype:Type.t -> supertype:Type.t -> unit)
+  -> constrain:(subtype:Internal_type.t -> supertype:Internal_type.t -> unit)
   -> t
 
 module Sigs_or_defs : sig
@@ -176,7 +176,7 @@ module Sigs_or_defs : sig
     :  name_bindings
     -> t
     -> Type_name.t
-    -> Module_path.absolute Type.Decl.t
+    -> Module_path.absolute Type_decl.t
 
   val find_module : name_bindings -> t -> Module_name.t -> t option
 end

@@ -32,9 +32,9 @@ type ('pat, 'expr, 'name) t =
   Module_name.t * 'name sig_ Node.t list * ('pat, 'expr, 'name) def Node.t list
 
 and 'name common =
-  | Val of Value_name.t * Fixity.t option * 'name Type.Scheme.Bounded.t
-  | Extern of Value_name.t * Fixity.t option * 'name Type.Scheme.t * Extern_name.t
-  | Type_decl of Type_name.t * 'name Type.Decl.t
+  | Val of Value_name.t * Fixity.t option * 'name Type_scheme.Bounded.t
+  | Extern of Value_name.t * Fixity.t option * 'name Type_scheme.t * Extern_name.t
+  | Type_decl of Type_name.t * 'name Type_decl.t
   | Effect of Effect_name.t * 'name Effect.t
   | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * 'name sig_ Node.t list
   | Import of Import.t
@@ -58,7 +58,7 @@ and ('pat, 'expr, 'name) def =
   | Impl of
       Trait_bound.t
       * Trait_name.t
-      * 'name Type.Scheme.t Nonempty.t
+      * 'name Type_scheme.t Nonempty.t
       * ('pat, 'expr, 'name) def Node.t list
 [@@deriving sexp_of]
 

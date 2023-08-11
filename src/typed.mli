@@ -10,13 +10,13 @@ module Pattern : sig
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Pattern.t
-    -> Names.t * (t * Type.t)
+    -> Names.t * (t * Internal_type.t)
 
   val of_untyped_into
     :  names:Name_bindings.t
     -> types:Type_bindings.t
     -> Untyped.Pattern.t
-    -> Name_bindings.t * (Names.t * (t * Type.t))
+    -> Name_bindings.t * (Names.t * (t * Internal_type.t))
 end
 
 module Expr : sig
@@ -34,7 +34,7 @@ module Expr : sig
   [@@deriving sexp]
 
   type generalized =
-    Module_path.absolute Type.Scheme.t t * Module_path.absolute Type.Scheme.t
+    Module_path.absolute Type_scheme.t t * Module_path.absolute Type_scheme.t
   [@@deriving sexp_of]
 end
 

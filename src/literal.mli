@@ -1,4 +1,5 @@
 open Import
+open Names
 
 type t =
   | Int of int
@@ -10,4 +11,4 @@ type t =
 include Comparable.S with type t := t
 include Hashable.S with type t := t
 
-val typ : t -> Type.Concrete.t
+val typ : t -> Module_path.absolute Type_scheme.t

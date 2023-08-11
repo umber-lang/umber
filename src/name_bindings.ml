@@ -26,8 +26,8 @@ module Name_entry = struct
 
   module Type_or_scheme = struct
     type t =
-      | Type of Type.t
-      | Scheme of Module_path.absolute Type.Scheme.t
+      | Type of Internal_type.t
+      | Scheme of Module_path.absolute Type_scheme.t
     [@@deriving equal, sexp]
   end
 
@@ -48,7 +48,7 @@ module Name_entry = struct
   let typ entry =
     match entry.typ with
     | Type typ -> typ
-    | Scheme scheme -> Type.Scheme.instantiate scheme
+    | Scheme scheme -> Internal_type.of_type_scheme scheme
   ;;
 
   let scheme entry =
@@ -75,7 +75,7 @@ module Name_entry = struct
     }
   ;;
 
-  let placeholder () = create ~type_source:Placeholder (Type.fresh_var ())
+  let placeholder () = create ~type_source:Placeholder (Internal_type.fresh_var ())
 
   let merge entry entry' =
     let preferred, typ, other =
@@ -127,7 +127,7 @@ end
 module Type_entry =
   Make_entry_with_id
     (struct
-      type t = Module_path.absolute Type.Decl.t [@@deriving sexp]
+      type t = Module_path.absolute Type_decl.t [@@deriving sexp]
     end)
     ()
 
@@ -351,11 +351,7 @@ let core =
             Map.set
               names
               ~key:(Value_name.of_cnstr_name cnstr_name)
-              ~data:
-                (Local
-                   (Name_entry.val_declared
-                      ~extern_name
-                      (Type.Concrete.cast Intrinsics.Bool.typ))))
+              ~data:(Local (Name_entry.val_declared ~extern_name Intrinsics.Bool.typ)))
       }
   }
 ;;
@@ -846,7 +842,7 @@ let add_val_or_extern
                  ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
             constrain
               ~subtype:(Name_entry.typ existing_entry)
-              ~supertype:(Type.Scheme.instantiate scheme);
+              ~supertype:(Internal_type.of_type_scheme scheme);
             Local
               (Name_entry.merge
                  existing_entry
@@ -877,7 +873,7 @@ let add_extern t name fixity typ extern_name ~constrain =
   add_val_or_extern t name fixity typ ~extern_name ~constrain ~type_source:Extern_declared
 ;;
 
-let absolutify_type_decl t = Type.Decl.map_exprs ~f:(absolutify_type_expr t)
+let absolutify_type_decl t = Type_decl.map_exprs ~f:(absolutify_type_expr t)
 let absolutify_effect t = Effect.map_exprs ~f:(absolutify_type_expr t)
 
 let add_to_types types name decl ~err_msg =
@@ -886,16 +882,16 @@ let add_to_types types name decl ~err_msg =
     | Some _ -> name_error ~msg:err_msg (Type_name.to_ustring name))
 ;;
 
-let add_type_decl t type_name decl =
+let add_type_decl type_name decl =
   let f bindings =
-    if not (Type.Decl.no_free_params decl)
+    if not (Type_decl.no_free_params decl)
     then
       Compilation_error.raise
         Type_error
         ~msg:
           [%message
             "Free parameters in type declaration"
-              (decl : Module_path.absolute Type.Decl.t)];
+              (decl : Module_path.absolute Type_decl.t)];
     { bindings with
       types =
         add_to_types
@@ -907,7 +903,7 @@ let add_type_decl t type_name decl =
         (match decl with
          | params, Variants cnstrs ->
            (* Add constructors as functions to the namespace *)
-           let result_type : _ Type.Scheme.t =
+           let result_type : _ Type_scheme.t =
              let path = current_path t in
              let params = List.map (params :> Type_param_name.t list) ~f:Type.Expr.var in
              Type_app ((path, type_name), params)
@@ -935,7 +931,7 @@ let add_name_entry names name scheme new_entry ~constrain =
     | Some (Or_imported.Local existing_entry) ->
       (* FIXME: We should be asserting that the existing entry is a placeholder. *)
       constrain
-        ~subtype:(Type.Scheme.instantiate scheme)
+        ~subtype:(Internal_type.of_type_scheme scheme)
         ~supertype:(Name_entry.typ existing_entry);
       Local (Name_entry.merge existing_entry new_entry)
     | Some (Imported imported_name) ->
@@ -949,7 +945,7 @@ let add_name_entry names name scheme new_entry ~constrain =
 
 let add_effect t effect_name (effect : _ Effect.t) ~constrain =
   let f bindings =
-    let effects : _ Type.Scheme.effects =
+    let effects : _ Type_scheme.effects =
       { effects =
           Effect_name.Map.singleton effect_name (List.map effect.params ~f:Type.Expr.var)
       ; effect_var = None
@@ -968,7 +964,7 @@ let add_effect t effect_name (effect : _ Effect.t) ~constrain =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let scheme : _ Type.Scheme.t = Function (args, effects, result) in
+          let scheme : _ Type_scheme.t = Function (args, effects, result) in
           let new_entry = Name_entry.val_declared scheme in
           add_name_entry names name scheme new_entry ~constrain)
     }
@@ -1032,7 +1028,7 @@ let add_name_placeholder t name =
   update_current t ~f:{ f }
 ;;
 
-let add_type_decl_placeholder t type_name (decl : _ Type.Decl.t) =
+let add_type_decl_placeholder t type_name (decl : _ Type_decl.t) =
   let f bindings =
     { bindings with
       types = add_to_types bindings.types type_name None ~err_msg:"Duplicate type name"

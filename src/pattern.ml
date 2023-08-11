@@ -54,7 +54,7 @@ module Names = struct
   ;;
 
   let add_fresh_name pat_names name ~type_source =
-    let var = Type.fresh_var () in
+    let var = Internal_type.fresh_var () in
     add_name pat_names name var ~type_source, var
   ;;
 

@@ -1,37 +1,5 @@
 open Import
 open Names
-module Var_id : Unique_id.Id
-
-module Param : sig
-  (* TODO: consider adding support for weak type variables here *)
-  type t = Type_param_name.t [@@deriving compare, equal, sexp_of]
-
-  val dummy : t
-
-  include Comparable.S_plain with type t := t
-
-  module Map : sig
-    include module type of Map
-
-    val hash_fold_t : (Hash.state -> 'a -> Hash.state) -> Hash.state -> 'a t -> Hash.state
-  end
-
-  include Hashable.S_plain with type t := t
-
-  module Env_to_vars : sig
-    type t
-
-    val create : unit -> t
-    val find_or_add : t -> Type_param_name.t -> Var_id.t
-  end
-
-  module Env_of_vars : sig
-    type t
-
-    val create : unit -> t
-    val find_or_add : t -> Var_id.t -> Type_param_name.t
-  end
-end
 
 module Expr : sig
   type ('v, 'pf, 'n) t =
@@ -49,7 +17,7 @@ module Expr : sig
      This is a good opportunity to put the external (input and output) types and internal
      (for type-checking) types. Currently we roll everything into [Type.Expr.t]. This
      would let us simplify each of the types (e.g. external types don't have to mention
-     partial application, and internal types can use [Type.Var_id.t]). *)
+     partial application, and internal types can use [Var_id.t]). *)
   and ('v, 'pf, 'n) effects =
     { effects : ('v, 'pf, 'n) t list Effect_name.Map.t
     ; effect_var : 'v option
@@ -94,56 +62,7 @@ module Expr : sig
   val fold_vars : ('v, _, _) t -> init:'acc -> f:('acc -> 'v -> 'acc) -> 'acc
   val for_all_vars : ('v, _, _) t -> f:('v -> bool) -> bool
   val exists_var : ('v, _, _) t -> f:('v -> bool) -> bool
-
-  (* FIXME: cleanup*)
-  (* val union
-    :  (Var_id.t, Var_id.t, 'n) t
-    -> (Var_id.t, Var_id.t, 'n) t
-    -> (Var_id.t, Var_id.t, 'n) t
-
-  val union_effects
-    :  (Var_id.t, Var_id.t, 'n) effect_row
-    -> (Var_id.t, Var_id.t, 'n) effect_row
-    -> (Var_id.t, Var_id.t, 'n) effect_row
-
-  val intersect
-    :  (Var_id.t, Var_id.t, 'n) t
-    -> (Var_id.t, Var_id.t, 'n) t
-    -> (Var_id.t, Var_id.t, 'n) t
-
-  val intersect_effects
-    :  (Var_id.t, Var_id.t, 'n) effect_row
-    -> (Var_id.t, Var_id.t, 'n) effect_row
-    -> (Var_id.t, Var_id.t, 'n) effect_row
-
-  val effect_is_total : _ effect_row -> bool *)
-
   val no_effects : _ effects
-end
-
-type t = (Var_id.t, Var_id.t, Module_path.absolute) Expr.t
-[@@deriving compare, hash, equal, sexp]
-
-include Hashable.S with type t := t
-
-val fresh_var : unit -> t
-
-module Scheme : sig
-  type 'n t = (Param.t, Nothing.t, 'n) Expr.t [@@deriving compare, hash, equal, sexp]
-
-  type 'n effects = (Param.t, Nothing.t, 'n) Expr.effects
-  [@@deriving compare, hash, equal, sexp]
-
-  module Bounded : sig
-    type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
-  end
-
-  val instantiate : ?params:Param.Env_to_vars.t -> 'n t -> (Var_id.t, _, 'n) Expr.t
-
-  val instantiate_bounded
-    :  ?params:Param.Env_to_vars.t
-    -> 'n Bounded.t
-    -> (Var_id.t, _, 'n) Expr.t
 end
 
 module Concrete : sig
@@ -154,26 +73,4 @@ module Concrete : sig
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t
-end
-
-module Decl : sig
-  type 'n decl =
-    | Abstract
-    | Alias of 'n Scheme.t
-    | Variants of (Cnstr_name.t * 'n Scheme.t list) list
-    (* TODO: probably just make records a type expression - you can trivially get nominal
-       records with a single variant and an inline record. One problem with this is you
-       can no longer define recursive record types, which is a bit annoying. *)
-    | Record of (Value_name.t * 'n Scheme.t) Nonempty.t
-  [@@deriving compare, equal, hash, sexp]
-
-  type 'n t = Type_param_name.t Unique_list.t * 'n decl
-  [@@deriving compare, equal, hash, sexp]
-
-  val arity : 'n t -> int
-  val map_exprs : 'n1 t -> f:('n1 Scheme.t -> 'n2 Scheme.t) -> 'n2 t
-  val fold_exprs : 'n t -> init:'acc -> f:('acc -> 'n Scheme.t -> 'acc) -> 'acc
-  val iter_exprs : 'n t -> f:('n Scheme.t -> unit) -> unit
-  val no_free_params : 'n t -> bool
-  val params_of_list : Type_param_name.t list -> Type_param_name.t Unique_list.t
 end

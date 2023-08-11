@@ -209,7 +209,7 @@ let to_untyped_expr ~names t = to_untyped_expr (fix_precedence_and_associativity
 let%test_module _ =
   (module struct
     let operators =
-      let dummy_type = Type.fresh_var () in
+      let dummy_type = Internal_type.fresh_var () in
       List.map Fixity.all ~f:(fun fixity ->
         let op_name =
           Value_name.of_string_unchecked (Sexp.to_string [%sexp (fixity : Fixity.t)])

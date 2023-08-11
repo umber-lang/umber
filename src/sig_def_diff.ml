@@ -9,7 +9,7 @@ type 'a diff =
 
 type t =
   { name_diff : (Value_name.t * Name_bindings.Name_entry.t diff) Sequence.t
-  ; type_diff : (Type_name.t * Module_path.absolute Type.Decl.t diff) Sequence.t
+  ; type_diff : (Type_name.t * Module_path.absolute Type_decl.diff) Sequence.t
   ; module_diff : (Module_name.t * module_diff) Sequence.t
   }
 [@@deriving sexp_of]
@@ -65,12 +65,12 @@ let fold2 xs ys ~init ~f =
     (* FIXME: Need to handle subtyping properly. Should properly consider that first-class
        here, since that's what we're basically doing. Need variance handling. It's
        sufficient to keep tracking of how many function arrows we are to the left of. *)
-    List.for_all def_effects ~f:(List.mem sig_effects ~equal:[%equal: Type.Scheme.effect])
+    List.for_all def_effects ~f:(List.mem sig_effects ~equal:[%equal: Type_scheme.effect])
   | `Strict | `None ->
     (* Effects in the signature are exactly the same as effects in the definition. *)
     Comparable.lift
-      ~f:(List.sort ~compare:[%compare: Type.Scheme.effect])
-      [%equal: Type.Scheme.effect_row]
+      ~f:(List.sort ~compare:[%compare: Type_scheme.effect])
+      [%equal: Type_scheme.effect_row]
       sig_effects
       def_effects
 ;; *)
@@ -90,22 +90,22 @@ let create_skolemized_type ~names =
 let skolemize ~names ~types_by_param scheme =
   let types_by_param, create_skolemized_type =
     match types_by_param with
-    | None -> Type.Param.Table.create (), create_skolemized_type
+    | None -> Type_param.Table.create (), create_skolemized_type
     | Some types_by_param ->
       ( types_by_param
       , fun ~names:_ ->
           compiler_bug
             [%message
               "Missing declaration for skolemized param"
-                (scheme : _ Type.Scheme.t)
+                (scheme : _ Type_scheme.t)
                 (types_by_param
-                  : (Type.Var_id.t, Type.Var_id.t, _) Type.Expr.t Type.Param.Table.t)] )
+                  : (Type.Var_id.t, Type.Var_id.t, _) Type.Expr.t Type_param.Table.t)] )
   in
   let names = ref names in
   let type_ =
     Type.Expr.map
       scheme
-      ~var:(fun var -> compiler_bug [%message "Unskolemized var" (var : Type.Param.t)])
+      ~var:(fun var -> compiler_bug [%message "Unskolemized var" (var : Type_param.t)])
       ~pf:Nothing.unreachable_code
       ~name:Fn.id
       ~f:(function
@@ -125,7 +125,7 @@ let skolemize ~names ~types_by_param scheme =
     skolemizing the signature, instatiating the defintion, and then unifying the two. *)
 let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
   let names, sig_type = skolemize ~names sig_scheme ~types_by_param:None in
-  let def_type = Type.Scheme.instantiate def_scheme in
+  let def_type = Internal_type.of_type_scheme def_scheme in
   let types = Type_bindings.create () in
   Type_bindings.constrain ~names ~types ~subtype:sig_type ~supertype:def_type
 ;;
@@ -183,12 +183,12 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
 
 let compatible_type_decls
   ~names
-  ~sig_:((sig_param_list, sig_type) : _ Type.Decl.t)
-  ~def:((def_param_list, def_type) : _ Type.Decl.t)
+  ~sig_:((sig_param_list, sig_type) : _ Type_decl.t)
+  ~def:((def_param_list, def_type) : _ Type_decl.t)
   =
   no_errors (fun () ->
-    let sig_params = Type.Param.Table.create () in
-    let def_params = Type.Param.Table.create () in
+    let sig_params = Type_param.Table.create () in
+    let def_params = Type_param.Table.create () in
     let names =
       fold2
         (sig_param_list :> Type_param_name.t list)
@@ -200,7 +200,7 @@ let compatible_type_decls
           Hashtbl.add_exn def_params ~key:def_param ~data:type_;
           names)
     in
-    match (sig_type : _ Type.Decl.decl), (def_type : _ Type.Decl.decl) with
+    match (sig_type : _ Type_decl.decl), (def_type : _ Type_decl.decl) with
     | Abstract, _ -> ()
     | Alias sig_scheme, Alias def_scheme ->
       check_type_decl_schemes
@@ -317,6 +317,6 @@ let check_val_scheme_vs_inferred_scheme ~names ~val_scheme ~inferred_scheme =
       ~msg:
         [%message
           "Type mismatch"
-            ~expected:(val_scheme : Module_path.absolute Type.Scheme.t)
-            ~inferred:(inferred_scheme : Module_path.absolute Type.Scheme.t)]
+            ~expected:(val_scheme : Module_path.absolute Type_scheme.t)
+            ~inferred:(inferred_scheme : Module_path.absolute Type_scheme.t)]
 ;;

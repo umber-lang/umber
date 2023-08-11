@@ -201,7 +201,7 @@ expr_:
 type_record:
   (* TODO Support function types directly as record fields *)
   | fields = braces(flexible_nonempty(COMMA, type_annot_non_fun(LOWER_NAME)))
-    { Type.Decl.Record (Nonempty.map fields ~f:(fun (name, typ) ->
+    { Type_decl.Record (Nonempty.map fields ~f:(fun (name, typ) ->
         Value_name.of_ustring_unchecked name, typ)) }
 
 type_tuple_or_fun:
@@ -250,8 +250,8 @@ type_cnstr_decl:
     { Cnstr_name.of_ustring_unchecked cnstr, args }
 
 type_decl:
-  | expr = type_expr { Type.Decl.Alias expr }
-  | PIPE; variants = separated_list(PIPE, type_cnstr_decl) { Type.Decl.Variants variants }
+  | expr = type_expr { Type_decl.Alias expr }
+  | PIPE; variants = separated_list(PIPE, type_cnstr_decl) { Type_decl.Variants variants }
   | record = type_record { record }
 
 %inline type_params:
@@ -304,7 +304,7 @@ stmt_common:
   | TYPE; name = UPPER_NAME; params = type_params; decl = preceded(EQUALS, type_decl)?
     { Module.Type_decl (
         Type_name.of_ustring_unchecked name,
-        (Type.Decl.params_of_list params, Option.value decl ~default:Abstract)) }
+        (Type_decl.params_of_list params, Option.value decl ~default:Abstract)) }
   | EFFECT; name = UPPER_NAME; params = type_params;
     sigs = option(preceded(EQUALS, braces(list(stmt_sig))))
     { Module.Effect (

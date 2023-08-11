@@ -11,15 +11,15 @@ let prelude_module_path =
 
 module type Type = sig
   val name : Type_name.t
-  val decl : Module_path.absolute Type.Decl.t
-  val typ : Type.Concrete.t
+  val decl : Module_path.absolute Type_decl.t
+  val typ : Module_path.absolute Type_scheme.t
 end
 
 module type Variants = sig
   include Type
 
   val cnstrs : (Cnstr_name.t * Extern_name.t) list
-  val decl : Module_path.absolute Type.Decl.t
+  val decl : Module_path.absolute Type_decl.t
 end
 
 module Make_variants (T : sig
@@ -27,7 +27,7 @@ module Make_variants (T : sig
   val cnstrs : string list
 end) : Variants = struct
   let name = Type_name.of_string_unchecked T.name
-  let typ = Type.Expr.Type_app ((Module_path.Absolute.empty, name), [])
+  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), [])
 
   let cnstrs =
     List.map T.cnstrs ~f:(fun cnstr_name ->
@@ -36,7 +36,7 @@ end) : Variants = struct
   ;;
 
   let decl =
-    Unique_list.empty, Type.Decl.Variants (List.map cnstrs ~f:(fun (name, _) -> name, []))
+    Unique_list.empty, Type_decl.Variants (List.map cnstrs ~f:(fun (name, _) -> name, []))
   ;;
 end
 
@@ -46,8 +46,8 @@ module Make_abstract (T : sig
   val name : string
 end) : Abstract = struct
   let name = Type_name.of_string_unchecked T.name
-  let decl = Unique_list.empty, Type.Decl.Abstract
-  let typ = Type.Expr.Type_app ((Module_path.Absolute.empty, name), [])
+  let decl = Unique_list.empty, Type_decl.Abstract
+  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), [])
 end
 
 module Bool = struct

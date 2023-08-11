@@ -1,54 +1,55 @@
 open Import
 open Names
-module Var_id = Unique_id.Int ()
 
-type 'n t =
-  | Var of Var_id.t
-  | Type_app of 'n Type_name.Qualified.t * 'n t list
-  | Tuple of 'n t list
-  | Function of 'n t Nonempty.t * 'n effects * 'n t
-  | Partial_function of 'n t Nonempty.t * 'n effects * Var_id.t
+module T = struct
+  type t =
+    | Var of Type_var.t
+    | Type_app of Type_name.Absolute.t * t list
+    | Tuple of t list
+    | Function of t Nonempty.t * effects * t
+    | Partial_function of t Nonempty.t * effects * Type_var.t
 
-and 'n effects =
-  { effects : ('n Effect_name.Qualified.t * 'n t list) list
-  ; effect_var : Var_id.t option
-  }
-[@@deriving hash, compare, equal, sexp]
+  and effects =
+    { effects : t list Effect_name.Absolute.Map.t
+    ; effect_var : Type_var.t option
+    }
+  [@@deriving hash, compare, equal, sexp]
+end
 
+include T
+include Hashable.Make (T)
+
+let fresh_var () = Var (Type_var.create ())
 let var v = Var v
 let tuple list = Tuple list
 
-let rec map ?(f = Map_action.defer) typ ~type_name ~effect_name =
-  match f typ with
+let rec map typ ~f =
+  match (f typ : _ Map_action.t) with
   | Halt typ -> typ
-  | Retry typ -> map typ ~f ~type_name ~effect_name
+  | Retry typ -> map typ ~f
   | Defer typ ->
     (match typ with
      | Var v -> Var v
-     | Type_app (name', fields) ->
-       Type_app (type_name name', List.map fields ~f:(map ~f ~type_name ~effect_name))
-     | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~type_name ~effect_name))
+     | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f))
+     | Tuple fields -> Tuple (List.map fields ~f:(map ~f))
      | Function (args, effects, body) ->
-       let args = Nonempty.map args ~f:(map ~f ~type_name ~effect_name) in
-       let effects = map_effects effects ~f ~type_name ~effect_name in
-       Function (args, effects, map ~f ~type_name ~effect_name body)
+       let args = Nonempty.map args ~f:(map ~f) in
+       let effects = map_effects effects ~f in
+       Function (args, effects, map ~f body)
      | Partial_function (args, effects, v) ->
-       let args = Nonempty.map args ~f:(map ~f ~type_name ~effect_name) in
-       let effects = map_effects effects ~f ~type_name ~effect_name in
+       let args = Nonempty.map args ~f:(map ~f) in
+       let effects = map_effects effects ~f in
        Partial_function (args, effects, v))
 
-and map_effects { effects; effect_var } ~f ~type_name ~effect_name =
-  let effects =
-    List.map effects ~f:(fun (name, args) ->
-      effect_name name, List.map args ~f:(map ~f ~type_name ~effect_name))
-  in
+and map_effects { effects; effect_var } ~f =
+  let effects = Map.map effects ~f:(List.map ~f:(map ~f)) in
   { effects; effect_var }
 ;;
 
-let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~name ~eff =
+let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~eff =
   match f (type1, type2) with
   | Halt typ -> typ
-  | Retry (type1, type2) -> map2 type1 type2 ~f ~f_contra ~name ~var ~eff
+  | Retry (type1, type2) -> map2 type1 type2 ~f ~f_contra ~var ~eff
   | Defer (type1, type2) ->
     (match type1, type2 with
      | Var v1, Var v2 -> Var (var v1 v2)
@@ -56,22 +57,17 @@ let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~name ~eff
        assert_or_compiler_bug
          ~here:[%here]
          ([%equal: _ Type_name.Qualified.t] name1 name2);
-       Type_app
-         (name name1, List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~name ~var ~eff))
+       Type_app (name1, List.map2_exn args1 args2 ~f:(map2 ~f ~f_contra ~var ~eff))
      | Tuple fields1, Tuple fields2 ->
-       Tuple (List.map2_exn fields1 fields2 ~f:(map2 ~f ~f_contra ~name ~var ~eff))
+       Tuple (List.map2_exn fields1 fields2 ~f:(map2 ~f ~f_contra ~var ~eff))
      | Function (args1, effect_row1, res1), Function (args2, effect_row2, res2) ->
-       let args =
-         Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~name ~var ~eff)
-       in
+       let args = Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~eff) in
        let effect_row = eff effect_row1 effect_row2 in
-       let res = map2 res1 res2 ~f ~f_contra ~name ~var ~eff in
+       let res = map2 res1 res2 ~f ~f_contra ~var ~eff in
        Function (args, effect_row, res)
      | Partial_function (args1, effect_row1, v1), Partial_function (args2, effect_row2, v2)
        ->
-       let args =
-         Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~name ~var ~eff)
-       in
+       let args = Nonempty.map2 args1 args2 ~f:(map2 ~f:f_contra ~f_contra:f ~var ~eff) in
        let effect_row = eff effect_row1 effect_row2 in
        let v = var v1 v2 in
        Partial_function (args, effect_row, v)
@@ -82,7 +78,7 @@ let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~name ~eff
      | Tuple _, (Var _ | Type_app _ | Function _ | Partial_function _)
      | Function _, (Var _ | Type_app _ | Tuple _)
      | Partial_function _, (Var _ | Type_app _ | Tuple _) ->
-       compiler_bug [%message "Incompatible types for map2" (type1 : _ t) (type2 : _ t)])
+       compiler_bug [%message "Incompatible types for map2" (type1 : t) (type2 : t)])
 ;;
 
 let rec fold_until typ ~init ~f =
@@ -94,6 +90,7 @@ let rec fold_until typ ~init ~f =
      | Type_app (_, fields) | Tuple fields ->
        List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
      | Function (args, _, body) ->
+       (* FIXME: Ignoring effects *)
        let%bind.Fold_action init =
          Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
        in
@@ -123,4 +120,38 @@ let exists_var typ ~f =
   |> Fold_action.id
 ;;
 
-let no_effects = { effects = []; effect_var = None }
+let no_effects = { effects = Effect_name.Absolute.Map.empty; effect_var = None }
+
+let of_type_scheme =
+  let rec of_type_scheme ~params (scheme : Module_path.absolute Type_scheme.t) =
+    match scheme with
+    | Var param -> Var (Type_param.Env_to_vars.find_or_add params param)
+    | Type_app (type_name, args) ->
+      Type_app (type_name, List.map args ~f:(of_type_scheme ~params))
+    | Tuple fields -> Tuple (List.map fields ~f:(of_type_scheme ~params))
+    | Function (args, effects, result) ->
+      let args = Nonempty.map args ~f:(of_type_scheme ~params) in
+      let effects : effects =
+        match effects with
+        | None -> { effects = Effect_name.Absolute.Map.empty; effect_var = None }
+        | Some (Effect (effect_name, args)) ->
+          { effects =
+              Effect_name.Absolute.Map.singleton
+                effect_name
+                (List.map args ~f:(of_type_scheme ~params))
+          ; effect_var = None
+          }
+        | Some (Effect_var param) ->
+          let var = Type_param.Env_to_vars.find_or_add params param in
+          { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
+        | Some (Effect_union _ | Effect_intersection _) ->
+          failwith
+            "TODO: Handle effect unions and intersections (maybe need to add constraints \
+             to the type bindings?)"
+      in
+      Function (args, effects, of_type_scheme ~params result)
+    | Union _ | Intersection _ ->
+      failwith "TODO: conversion from union and intersection types"
+  in
+  fun ?(params = Type_param.Env_to_vars.create ()) scheme -> of_type_scheme ~params scheme
+;;

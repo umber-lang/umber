@@ -4,8 +4,8 @@ open Names
 module Operation = struct
   type 'n t =
     { name : Value_name.t
-    ; args : 'n Type.Scheme.t Nonempty.t
-    ; result : 'n Type.Scheme.t
+    ; args : 'n Type_scheme.t Nonempty.t
+    ; result : 'n Type_scheme.t
     }
   [@@deriving sexp]
 

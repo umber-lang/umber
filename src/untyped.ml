@@ -7,7 +7,7 @@ open Names
 module Pattern = struct
   include Pattern
 
-  type nonrec t = (Module_path.relative Type.Scheme.Bounded.t, Module_path.relative) t
+  type nonrec t = (Module_path.relative Type_scheme.Bounded.t, Module_path.relative) t
   [@@deriving equal, sexp]
 end
 
@@ -27,7 +27,7 @@ module Expr = struct
     | Record_literal of (Value_name.t * t Node.t option) Nonempty.t
     | Record_update of t Node.t * (Value_name.t * t Node.t option) Nonempty.t
     | Record_field_access of t Node.t * Value_name.t Node.t
-    | Type_annotation of t Node.t * Module_path.relative Type.Scheme.Bounded.t Node.t
+    | Type_annotation of t Node.t * Module_path.relative Type_scheme.Bounded.t Node.t
   [@@deriving equal, sexp, variants]
 
   let names_used ~names =
@@ -164,13 +164,13 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
   | Common_sig (Val (name, None, type_)) ->
     (match type_ with
      | [], Function (args, effects, result) ->
-       if not ([%equal: _ Type.Scheme.effects] effects Type.Expr.no_effects)
+       if not ([%equal: _ Type_scheme.effects] effects Type.Expr.no_effects)
        then
          Compilation_error.raise
            Other
            ~msg:
              [%message
-               "Effect operations can't perform effects" (type_ : _ Type.Scheme.Bounded.t)];
+               "Effect operations can't perform effects" (type_ : _ Type_scheme.Bounded.t)];
        (* FIXME: Check for free params. Should be done elsewhere. *)
        { name; args; result }
      | _ :: _, _ -> failwith "TODO: trait bounds on effect operations"
@@ -179,7 +179,7 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
          Other
          ~msg:
            [%message
-             "Effect operations must be functions" (type_ : _ Type.Scheme.Bounded.t)]
+             "Effect operations must be functions" (type_ : _ Type_scheme.Bounded.t)]
      | [], Partial_function _ -> .)
   | Module_sig _ | Common_sig (Extern _ | Type_decl _ | Effect _ | Trait_sig _ | Import _)
     ->

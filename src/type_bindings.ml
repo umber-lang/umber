@@ -12,12 +12,24 @@ open! Names
 
 let type_error msg t1 t2 =
   (* Prevent unstable Var_ids from appearing in test output *)
-  let env = Type.Param.Env_of_vars.create () in
-  let handle_var = Type.Param.Env_of_vars.find_or_add env in
+  let env = Type_param.Env_of_vars.create () in
+  (* FIXME: Need a way to show an internnal type with stable names for the variables.
+     Hmm, maybe it would be good enough if each type expression had its own variable scope,
+     instead of it being global. Maybe generalize what Mir_name.Name_table does? Or make a
+     wrapper for Unique_id.Int ()? Or an easier way: map over the sexp. *)
+  (* TODO: This is a hack to remove unstable type variables from the output in tests. 
+     We should probably have type variables be scopied properly to let binding groups for
+     one [Type_bindings.t]. We also need to think of a smarter way to display an
+     [Internal_type.t] in a user-friendly format. (A sexp is definitely not it.) *)
   let map_type t =
-    Type.Expr.map t ~var:handle_var ~pf:handle_var ~name:Fn.id
-    |> [%sexp_of:
-         (Type_param_name.t, Type_param_name.t, Module_path.absolute) Type.Expr.t]
+    let rec loop : Sexp.t -> Sexp.t = function
+      | List sexps -> List (List.map sexps ~f:loop)
+      | Atom str as atom ->
+        (match Type_var.of_string str with
+         | var -> [%sexp (Type_param.Env_of_vars.find_or_add env var : Type_param_name.t)]
+         | exception _ -> atom)
+    in
+    loop [%sexp (t : Internal_type.t)]
   in
   Compilation_error.raise
     Type_error
@@ -32,8 +44,7 @@ type 'a var_bounds =
 
 module Effect_type = struct
   module T = struct
-    type t = (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effects
-    [@@deriving hash, compare, sexp]
+    type t = Internal_type.effects [@@deriving hash, compare, sexp]
   end
 
   include T
@@ -41,8 +52,8 @@ module Effect_type = struct
 end
 
 module Type_pair = struct
-  include Tuple.Make (Type) (Type)
-  include Tuple.Hashable (Type) (Type)
+  include Tuple.Make (Internal_type) (Internal_type)
+  include Tuple.Hashable (Internal_type) (Internal_type)
 end
 
 module Effect_type_pair = struct
@@ -51,23 +62,23 @@ module Effect_type_pair = struct
 end
 
 type t =
-  { type_vars : Type.t var_bounds Type.Var_id.Table.t
-  ; effect_vars : Effect_type.t var_bounds Type.Var_id.Table.t
+  { type_vars : Internal_type.t var_bounds Type_var.Table.t
+  ; effect_vars : Effect_type.t var_bounds Type_var.Table.t
   ; constrained_types : Type_pair.Hash_set.t
   ; constrained_effects : Effect_type_pair.Hash_set.t
   }
 [@@deriving sexp_of]
 
 let create () =
-  { type_vars = Type.Var_id.Table.create ()
-  ; effect_vars = Type.Var_id.Table.create ()
+  { type_vars = Type_var.Table.create ()
+  ; effect_vars = Type_var.Table.create ()
   ; constrained_types = Type_pair.Hash_set.create ()
   ; constrained_effects = Effect_type_pair.Hash_set.create ()
   }
 ;;
 
-let rec occurs_in id : Type.t -> bool = function
-  | Var id' -> Type.Var_id.(id = id')
+let rec occurs_in id : Internal_type.t -> bool = function
+  | Var id' -> Type_var.(id = id')
   | Type_app (_, fields) | Tuple fields -> List.exists fields ~f:(occurs_in id)
   | Function (args, effects, body) ->
     Nonempty.exists args ~f:(occurs_in id)
@@ -76,11 +87,11 @@ let rec occurs_in id : Type.t -> bool = function
   | Partial_function (args, effects, id') ->
     Nonempty.exists args ~f:(occurs_in id)
     || occurs_in_effects id effects
-    || Type.Var_id.(id = id')
+    || Type_var.(id = id')
 
-and occurs_in_effects id ({ effects; effect_var } : _ Type.Expr.effects) =
+and occurs_in_effects id ({ effects; effect_var } : Internal_type.effects) =
   Map.exists effects ~f:(List.exists ~f:(occurs_in id))
-  || Option.exists effect_var ~f:(Type.Var_id.( = ) id)
+  || Option.exists effect_var ~f:(Type_var.( = ) id)
 ;;
 
 let fun_arg_number_mismatch = type_error "Function argument number mismatch"
@@ -93,7 +104,7 @@ let fun_arg_number_mismatch = type_error "Function argument number mismatch"
       [%message
         "Unhandled effects"
           (effects
-            : (Type.Var_id.t, Type.Var_id.t, Module_path.absolute) Type.Expr.effects)]
+            : (Type_var.t, Type_var.t, Module_path.absolute) Internal_type.effects)]
 ;; *)
 
 let iter2_types xs ys ~subtype ~supertype ~f =
@@ -110,15 +121,15 @@ let get_var_bounds =
 let rec constrain ~names ~types ~subtype ~supertype =
   (* FIXME: Need a constraint cache to avoid infinite recursion *)
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
-    let params = Type.Param.Env_to_vars.create () in
+    let params = Type_param.Env_to_vars.create () in
     List.iter
       (param_list :> Type_param_name.t list)
-      ~f:(fun p -> ignore (Type.Param.Env_to_vars.find_or_add params p : Type.Var_id.t));
-    Type.Scheme.instantiate expr ~params
+      ~f:(fun p -> ignore (Type_param.Env_to_vars.find_or_add params p : Type_var.t));
+    Internal_type.of_type_scheme expr ~params
   in
   let lookup_type names name args =
     let type_entry = Name_bindings.find_absolute_type_entry names name in
-    if List.length args = Type.Decl.arity (Name_bindings.Type_entry.decl type_entry)
+    if List.length args = Type_decl.arity (Name_bindings.Type_entry.decl type_entry)
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
@@ -126,7 +137,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
   then (
     Hash_set.add types.constrained_types (subtype, supertype);
     match subtype, supertype with
-    | Var id1, Var id2 when Type.Var_id.(id1 = id2) -> ()
+    | Var id1, Var id2 when Type_var.(id1 = id2) -> ()
     | Var id1, type2 ->
       if occurs_in id1 type2 then type_error "Occurs check failed" subtype supertype;
       let id1_bounds = get_var_bounds types.type_vars id1 in
@@ -144,12 +155,12 @@ let rec constrain ~names ~types ~subtype ~supertype =
       (match Name_bindings.Type_entry.decl type_entry1 with
        | params, Alias expr ->
          constrain ~names ~types ~subtype:(instantiate_alias params expr) ~supertype
-       | (_ : _ Type.Decl.t) ->
+       | (_ : _ Type_decl.t) ->
          let type_entry2 = lookup_type names name2 args2 in
          (match Name_bindings.Type_entry.decl type_entry2 with
           | params, Alias expr ->
             constrain ~names ~types ~subtype ~supertype:(instantiate_alias params expr)
-          | (_ : _ Type.Decl.t) ->
+          | (_ : _ Type_decl.t) ->
             if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
             then type_error "Type application mismatch" subtype supertype;
             (* TODO: We don't know what the variance of the type parameters to the type are,
@@ -211,7 +222,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
        | Left_trailing _ -> fun_arg_number_mismatch subtype supertype
        | Right_trailing args2_trailing ->
          constrain_effects_to_be_total ~names ~types effect_row1;
-         let id' = Type.Var_id.create () in
+         let id' = Type_var.create () in
          constrain ~names ~types ~subtype:(Var id') ~supertype:res;
          constrain
            ~names
@@ -226,7 +237,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
        with
        | Left_trailing args1_trailing ->
          constrain_effects_to_be_total ~names ~types effect_row2;
-         let id' = Type.Var_id.create () in
+         let id' = Type_var.create () in
          constrain ~names ~types ~subtype:res ~supertype:(Var id');
          constrain
            ~names
@@ -246,10 +257,12 @@ and constrain_effects ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_effects (subtype, supertype))
   then (
     Hash_set.add types.constrained_effects (subtype, supertype);
-    let ({ effects = subtype_effects; effect_var = subtype_var } : _ Type.Expr.effects) =
+    let ({ effects = subtype_effects; effect_var = subtype_var }
+          : _ Internal_type.effects)
+      =
       subtype
     and ({ effects = supertype_effects; effect_var = supertype_var }
-          : _ Type.Expr.effects)
+          : _ Internal_type.effects)
       =
       supertype
     in
@@ -303,7 +316,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
         constrain_effects ~names ~types ~subtype ~supertype:bound))
 
 and constrain_effects_to_be_total ~names ~types effects =
-  constrain_effects ~names ~types ~subtype:effects ~supertype:Type.Expr.no_effects
+  constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
 ;;
 
 (* FIXME: write effect type inference:
@@ -365,7 +378,7 @@ and constrain_effects_to_be_total ~names ~types effects =
    and known types as part of bounds. We need to represent unions explicitly in the
    intermediate types. *)
 let rec union_types t1 t2 =
-  Type.Expr.map2
+  Internal_type.map2
     t1
     t2
     ~var:Fn.const
@@ -375,7 +388,7 @@ let rec union_types t1 t2 =
     ~f_contra:(fun (t1, t2) -> Halt (intersect_types t1 t2))
 
 and intersect_types t1 t2 =
-  Type.Expr.map2
+  Internal_type.map2
     t1
     t2
     ~var:Fn.const
@@ -401,11 +414,11 @@ module Polarity = struct
 end
 
 (* FIXME: Need to simplify effect types using intersection and union. Also, maybe we
-   shouldn't use Type.Expr.map given how many of the variants we special-case. *)
+   shouldn't use Internal_type.map given how many of the variants we special-case. *)
 let rec substitute_internal types typ ~(polarity : Polarity.t) =
   (* FIXME: cleanup *)
-  print_s [%message "substitute_internal" (typ : Type.t) (polarity : Polarity.t)];
-  Type.Expr.map typ ~var:Fn.id ~pf:Fn.id ~name:Fn.id ~f:(fun typ ->
+  print_s [%message "substitute_internal" (typ : Internal_type.t) (polarity : Polarity.t)];
+  Internal_type.map typ ~var:Fn.id ~pf:Fn.id ~name:Fn.id ~f:(fun typ ->
     match typ with
     | Var id ->
       (match Hashtbl.find types.type_vars id with
@@ -525,11 +538,11 @@ and combine_partial_functions types args effect_row id ~polarity =
    expresion/statement. *)
 let generalize types typ =
   (* FIXME: cleanup *)
-  print_s [%message "Type_bindings.generalize" (typ : Type.t) (types : t)];
-  let env = Type.Param.Env_of_vars.create () in
-  Type.Expr.map
+  print_s [%message "Type_bindings.generalize" (typ : Internal_type.t) (types : t)];
+  let env = Type_param.Env_of_vars.create () in
+  Internal_type.map
     (substitute_internal types typ ~polarity:Positive)
-    ~var:(Type.Param.Env_of_vars.find_or_add env)
+    ~var:(Type_param.Env_of_vars.find_or_add env)
     ~pf:(never_happens [%here])
     ~name:Fn.id
     ~f:(function
@@ -546,10 +559,10 @@ let%expect_test "unification cycles" =
   let names = Name_bindings.core in
   print_s [%sexp (types : t)];
   [%expect {| ((type_vars ()) (effect_vars ())) |}];
-  let a = Type.fresh_var () in
-  let b = Type.fresh_var () in
-  let c = Type.fresh_var () in
-  let d = Type.fresh_var () in
+  let a = Internal_type.fresh_var () in
+  let b = Internal_type.fresh_var () in
+  let c = Internal_type.fresh_var () in
+  let d = Internal_type.fresh_var () in
   constrain ~names ~types ~subtype:a ~supertype:b;
   print_s [%sexp (types : t)];
   [%expect {| ((type_vars ((0 (Var 1)))) (effect_vars ())) |}];

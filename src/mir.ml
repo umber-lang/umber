@@ -33,7 +33,7 @@ module Cnstr_info : sig
      callsites generally do that, which leads to looking up each constructor separately. *)
 
   val tag : t -> Cnstr.t -> Cnstr_tag.t
-  val arg_type : t -> Cnstr.t -> Block_index.t -> Module_path.absolute Type.Scheme.t
+  val arg_type : t -> Cnstr.t -> Block_index.t -> Module_path.absolute Type_scheme.t
   val cnstrs : t -> Cnstr.t list
 
   val fold
@@ -43,20 +43,20 @@ module Cnstr_info : sig
          ('acc
           -> Cnstr.t
           -> Cnstr_tag.t
-          -> Module_path.absolute Type.Scheme.t list
+          -> Module_path.absolute Type_scheme.t list
           -> 'acc)
     -> 'acc
 
-  val of_variants : (Cnstr_name.t * Module_path.absolute Type.Scheme.t list) list -> t
-  val of_tuple : Module_path.absolute Type.Scheme.t list -> t
+  val of_variants : (Cnstr_name.t * Module_path.absolute Type_scheme.t list) list -> t
+  val of_tuple : Module_path.absolute Type_scheme.t list -> t
 end = struct
   type t =
     | Variants of
         { constant_cnstrs : Cnstr_name.t list
         ; non_constant_cnstrs :
-            (Cnstr_name.t * Module_path.absolute Type.Scheme.t list) list
+            (Cnstr_name.t * Module_path.absolute Type_scheme.t list) list
         }
-    | Tuple of Module_path.absolute Type.Scheme.t list
+    | Tuple of Module_path.absolute Type_scheme.t list
   [@@deriving sexp_of]
 
   let of_variants variants =
@@ -134,7 +134,7 @@ end
 
 (* TODO: This doesn't handle polymorphic types particularly smartly. Should think about
    whether that matters. *)
-let rec arity_of_type ~names : Module_path.absolute Type.Scheme.t -> int = function
+let rec arity_of_type ~names : Module_path.absolute Type_scheme.t -> int = function
   | Var _ | Tuple _ -> 0
   | Type_app (type_name, _) ->
     (match
@@ -171,11 +171,11 @@ module Context : sig
   val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
   val current_path : t -> Module_path.Absolute.t
-  val find_cnstr_info : t -> Module_path.absolute Type.Scheme.t -> Cnstr_info.t
+  val find_cnstr_info : t -> Module_path.absolute Type_scheme.t -> Cnstr_info.t
 
   val find_cnstr_info_from_decl
     :  t
-    -> Module_path.absolute Type.Decl.decl
+    -> Module_path.absolute Type_decl.decl
     -> follow_aliases:bool
     -> Cnstr_info.t option
 end = struct
@@ -325,11 +325,11 @@ end = struct
   let cnstr_info_lookup_failed type_ =
     compiler_bug
       [%message
-        "Constructor info lookup failed" (type_ : Module_path.absolute Type.Scheme.t)]
+        "Constructor info lookup failed" (type_ : Module_path.absolute Type_scheme.t)]
   ;;
 
   let rec find_cnstr_info_internal t type_ =
-    match (type_ : Module_path.absolute Type.Scheme.t) with
+    match (type_ : Module_path.absolute Type_scheme.t) with
     | Type_app (type_name, _args) ->
       let decl =
         snd
@@ -343,7 +343,7 @@ end = struct
     | Function _ | Partial_function _ | Var _ -> cnstr_info_lookup_failed type_
 
   and find_cnstr_info_from_decl t decl ~follow_aliases =
-    match (decl : _ Type.Decl.decl) with
+    match (decl : _ Type_decl.decl) with
     | Alias alias -> if follow_aliases then find_cnstr_info_internal t alias else None
     | Variants variants -> Some (Cnstr_info.of_variants variants)
     | Abstract | Record _ -> None
@@ -353,7 +353,7 @@ end = struct
     Option.value_or_thunk (find_cnstr_info_internal t type_) ~default:(fun () ->
       compiler_bug
         [%message
-          "Constructor info lookup failed" (type_ : Module_path.absolute Type.Scheme.t)])
+          "Constructor info lookup failed" (type_ : Module_path.absolute Type_scheme.t)])
   ;;
 end
 
@@ -380,7 +380,7 @@ module Simple_pattern : sig
     val missing_cases
       :  t
       -> ctx:Context.t
-      -> input_type:Module_path.absolute Type.Scheme.t
+      -> input_type:Module_path.absolute Type_scheme.t
       -> simple_pattern list
   end
 end = struct
@@ -860,7 +860,7 @@ module Expr = struct
 
   let try_rewriting_partial_application
     ~fun_
-    ~(fun_type : _ Type.Scheme.t)
+    ~(fun_type : _ Type_scheme.t)
     ~args_and_types
     ~current_path
     =
@@ -868,7 +868,7 @@ module Expr = struct
     | Type_app _ | Tuple _ | Var _ ->
       compiler_bug [%message "Non-function type in function call"]
     | Partial_function _ -> .
-    | Function (fun_arg_types, (_ : _ Type.Expr.effects), (_return_type : _ Type.Scheme.t))
+    | Function (fun_arg_types, (_ : _ Type.Expr.effects), (_return_type : _ Type_scheme.t))
       ->
       (match snd (Nonempty.zip fun_arg_types args_and_types) with
        | Same_length -> `Already_fully_applied
@@ -937,8 +937,8 @@ module Expr = struct
     in
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match
-        ( (expr : Module_path.absolute Type.Scheme.t Typed.Expr.t)
-        , (expr_type : _ Type.Scheme.t) )
+        ( (expr : Module_path.absolute Type_scheme.t Typed.Expr.t)
+        , (expr_type : _ Type_scheme.t) )
       with
       | Literal lit, _ -> Primitive lit
       | Name name, _ ->
@@ -1036,7 +1036,7 @@ module Expr = struct
             ~ctx_for_body
             ~rec_
             ~init:[]
-            ~add_let:(fun bindings name mir_expr (_ : Module_path.absolute Type.Scheme.t) ->
+            ~add_let:(fun bindings name mir_expr (_ : Module_path.absolute Type_scheme.t) ->
               (name, mir_expr) :: bindings)
             ~extract_binding:(fun (pat_and_type, expr) ->
               Node.map pat_and_type ~f:fst, expr, Node.with_value pat_and_type ~f:snd)
@@ -1464,7 +1464,7 @@ let of_typed_module =
           Context.with_module ctx module_name ~f:(fun ctx ->
             loop ~ctx ~names ~stmts ~fun_decls defs)
         | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
-        | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type.Decl.t))) ->
+        | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type_decl.t))) ->
           ctx, generate_variant_constructor_values ~ctx ~stmts decl
         | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
           let name = Context.find_value_name_assert_external ctx value_name in

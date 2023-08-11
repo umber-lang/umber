@@ -9,18 +9,18 @@ module Pattern = struct
   type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
 
   let of_untyped_with_names ~names ~types (pat : Untyped.Pattern.t)
-    : Names.t * (t * Type.t)
+    : Names.t * (t * Internal_type.t)
     =
     let rec of_untyped_with_names ~names ~types pat_names
-      : Untyped.Pattern.t -> Names.t * (t * Type.t)
+      : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
       = function
-      | Constant lit -> pat_names, (Constant lit, Type.Concrete.cast (Literal.typ lit))
+      | Constant lit -> pat_names, (Constant lit, Literal.typ lit)
       | Catch_all name ->
         let pat_names, typ =
           match name with
           | Some name ->
             Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder
-          | None -> pat_names, Type.fresh_var ()
+          | None -> pat_names, Internal_type.fresh_var ()
         in
         pat_names, (Catch_all name, typ)
       | Cnstr_appl (cnstr, args) ->
@@ -99,14 +99,14 @@ module Pattern = struct
         let pat_names2, (pat2, typ2) =
           of_untyped_with_names ~names ~types pat_names pat2
         in
-        let result_type = Type.fresh_var () in
+        let result_type = Internal_type.fresh_var () in
         Type_bindings.constrain ~names ~types ~subtype:typ1 ~supertype:result_type;
         Type_bindings.constrain ~names ~types ~subtype:typ2 ~supertype:result_type;
         (* Unions must define the same names with compatible types. *)
         if not
              (Map.equal
                 (fun entry1 entry2 ->
-                  let entry_type = Type.fresh_var () in
+                  let entry_type = Internal_type.fresh_var () in
                   Type_bindings.constrain
                     ~names
                     ~types
@@ -136,7 +136,7 @@ module Pattern = struct
               ~name:(Name_bindings.absolutify_type_name names)
               ~var:Fn.id
               ~pf:Nothing.unreachable_code)
-          |> Type.Scheme.instantiate_bounded
+          |> Internal_type.of_type_scheme_bounded
         in
         let pat_names, (pat, inferred_type) =
           of_untyped_with_names ~names ~types pat_names pat
@@ -171,7 +171,7 @@ module Pattern = struct
       [%message
         "Pattern.generalize"
           (pat_names : Pattern.Names.t)
-          (typ : Type.t)
+          (typ : Internal_type.t)
           (types : Type_bindings.t)]; *)
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
@@ -211,7 +211,7 @@ module Expr = struct
   [@@deriving sexp]
 
   type generalized =
-    Module_path.absolute Type.Scheme.t t * Module_path.absolute Type.Scheme.t
+    Module_path.absolute Type_scheme.t t * Module_path.absolute Type_scheme.t
   [@@deriving sexp_of]
 
   let type_recursive_let_bindings =
@@ -219,20 +219,21 @@ module Expr = struct
       let effects : _ Type.Expr.effects =
         { effects = Effect_name.Map.empty; effect_var = Some (Type.Var_id.create ()) }
       in
-      let (expr : _ t Node.t), (typ : Type.t) =
+      let (expr : _ t Node.t), (typ : Internal_type.t) =
         f ~add_effects:(fun subtype ->
           Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects)
       in
       expr, typ, effects
     in
     let rec of_untyped ~names ~types ~f_name expr
-      : (Type.t * Pattern.Names.t) t Node.t * Type.t * _ Type.Expr.effects
+      : (Internal_type.t * Pattern.Names.t) t Node.t
+        * Internal_type.t
+        * _ Type.Expr.effects
       =
       let node e = Node.create e (Node.span expr) in
       Node.with_value expr ~f:(fun expr ->
         match (expr : Untyped.Expr.t) with
-        | Literal lit ->
-          node (Literal lit), Type.Concrete.cast (Literal.typ lit), Type.Expr.no_effects
+        | Literal lit -> node (Literal lit), Literal.typ lit, Type.Expr.no_effects
         | Name name ->
           let name, name_entry = Name_bindings.find_entry_with_path names name in
           f_name name name_entry;
@@ -300,7 +301,7 @@ module Expr = struct
           collect_effects ~names ~types (fun ~add_effects ->
             let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
             add_effects cond_effects;
-            let bool_type = Type.Concrete.cast Intrinsics.Bool.typ in
+            let bool_type = Intrinsics.Bool.typ in
             Type_bindings.constrain ~names ~types ~subtype:cond_type ~supertype:bool_type;
             let (then_, then_type, then_effects), (else_, else_type, else_effects) =
               ( of_untyped ~names ~types ~f_name then_
@@ -308,7 +309,7 @@ module Expr = struct
             in
             add_effects then_effects;
             add_effects else_effects;
-            let result_type = Type.fresh_var () in
+            let result_type = Internal_type.fresh_var () in
             Type_bindings.constrain
               ~names
               ~types
@@ -334,7 +335,7 @@ module Expr = struct
           collect_effects ~names ~types (fun ~add_effects ->
             let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
             add_effects expr_effects;
-            let result_type = Type.fresh_var () in
+            let result_type = Internal_type.fresh_var () in
             let branches =
               Nonempty.map branches ~f:(fun (pat, branch) ->
                 let pat_span = Node.span pat in
@@ -419,7 +420,7 @@ module Expr = struct
                   ~name:(Name_bindings.absolutify_type_name names)
                   ~var:Fn.id
                   ~pf:Nothing.unreachable_code)
-              |> Type.Scheme.instantiate_bounded)
+              |> Internal_type.of_type_scheme_bounded)
           in
           let expr, inferred_type, expr_effects = of_untyped ~names ~types ~f_name expr in
           Type_bindings.constrain
@@ -657,7 +658,7 @@ module Module = struct
             | Common_def common ->
               (match common with
                | Type_decl (type_name, _) ->
-                 ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_type_decl type_name)
+                 ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_Type_decl.pe_name)
                  , def )
                | Effect _ ->
                  (* TODO: Copy effect declarations to defs *)
@@ -835,7 +836,7 @@ module Module = struct
     (* TODO: can rewrite this with [Type.Expr.map] *)
     (* TODO: This could stop checking for cyclic aliases early if it reaches a type in
        another file. (There should be a separate check for cyclic imports.) *)
-    let rec loop ~names ~aliases_seen (alias : Module_path.absolute Type.Scheme.t) =
+    let rec loop ~names ~aliases_seen (alias : Module_path.absolute Type_scheme.t) =
       match alias with
       | Type_app (name, args) ->
         let type_entry = Name_bindings.find_absolute_type_entry names name in
@@ -851,7 +852,7 @@ module Module = struct
                  [%message
                    "Cyclic type alias"
                      (name : Type_name.Absolute.t)
-                     (decl : Module_path.absolute Type.Decl.t)]
+                     (decl : Module_path.absolute Type_decl.t)]
            else loop ~names ~aliases_seen:(Set.add aliases_seen id) alias
          | Abstract | Variants _ | Record _ -> ());
         List.iter args ~f:(loop ~names ~aliases_seen)
@@ -869,7 +870,7 @@ module Module = struct
   (* TODO: We should make this a record type, it would a lot of this code way easier to
      read. *)
   type intermediate_def =
-    ( Pattern.t * (Type.t * Pattern.Names.t)
+    ( Pattern.t * (Internal_type.t * Pattern.Names.t)
     , Untyped.Expr.t
     , Module_path.absolute )
     Module.def
