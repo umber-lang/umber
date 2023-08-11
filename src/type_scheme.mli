@@ -18,6 +18,8 @@ and 'n effects =
 
 val var : Type_param_name.t -> 'n t
 val tuple : 'n t list -> 'n t
+val union : 'n t Nonempty.t -> 'n t
+val intersection : 'n t Nonempty.t -> 'n t
 val effect_union : 'n effects Nonempty.t -> 'n effects
 
 val map

@@ -21,8 +21,10 @@ and 'n effects =
 (* FIXME: cleanup *)
 
 let var v = Var v
-let tuple list = Tuple list
-let effect_union list = Effect_union list
+let tuple ts = Tuple ts
+let union ts = Union ts
+let intersection ts = Intersection ts
+let effect_union ts = Effect_union ts
 
 let rec map ?(f = Map_action.defer) typ ~type_name ~effect_name =
   match f typ with
