@@ -1,7 +1,7 @@
 open Import
 
 module type General_name = sig
-  type t = private Ustring.t [@@deriving compare, equal, hash, sexp]
+  type t [@@deriving compare, equal, hash, sexp]
 
   include Comparable.S with type t := t
   include Hashable.S with type t := t

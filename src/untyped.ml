@@ -163,24 +163,22 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
       ~msg:[%message "Fixity declarations are not supported on effect operations"]
   | Common_sig (Val (name, None, type_)) ->
     (match type_ with
-     | [], Function (args, effects, result) ->
-       if not ([%equal: _ Type_scheme.effects] effects Type.Expr.no_effects)
-       then
-         Compilation_error.raise
-           Other
-           ~msg:
-             [%message
-               "Effect operations can't perform effects" (type_ : _ Type_scheme.Bounded.t)];
-       (* FIXME: Check for free params. Should be done elsewhere. *)
-       { name; args; result }
-     | _ :: _, _ -> failwith "TODO: trait bounds on effect operations"
-     | [], (Var _ | Type_app _ | Tuple _) ->
+     | [], Function (_, Some _, _) ->
        Compilation_error.raise
          Other
          ~msg:
            [%message
-             "Effect operations must be functions" (type_ : _ Type_scheme.Bounded.t)]
-     | [], Partial_function _ -> .)
+             "Effect operations can't perform effects" (type_ : _ Type_scheme.Bounded.t)]
+     | [], Function (args, None, result) ->
+       (* FIXME: Check for free params. Should be done elsewhere. *)
+       { name; args; result }
+     | _ :: _, _ -> failwith "TODO: trait bounds on effect operations"
+     | [], (Var _ | Type_app _ | Tuple _ | Union _ | Intersection _) ->
+       Compilation_error.raise
+         Other
+         ~msg:
+           [%message
+             "Effect operations must be functions" (type_ : _ Type_scheme.Bounded.t)])
   | Module_sig _ | Common_sig (Extern _ | Type_decl _ | Effect _ | Trait_sig _ | Import _)
     ->
     Compilation_error.raise

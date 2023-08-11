@@ -22,6 +22,7 @@ and 'n effects =
 
 let var v = Var v
 let tuple list = Tuple list
+let effect_union list = Effect_union list
 
 let rec map ?(f = Map_action.defer) typ ~type_name ~effect_name =
   match f typ with

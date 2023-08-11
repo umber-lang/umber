@@ -257,12 +257,10 @@ and constrain_effects ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_effects (subtype, supertype))
   then (
     Hash_set.add types.constrained_effects (subtype, supertype);
-    let ({ effects = subtype_effects; effect_var = subtype_var }
-          : _ Internal_type.effects)
-      =
+    let ({ effects = subtype_effects; effect_var = subtype_var } : Internal_type.effects) =
       subtype
     and ({ effects = supertype_effects; effect_var = supertype_var }
-          : _ Internal_type.effects)
+          : Internal_type.effects)
       =
       supertype
     in
@@ -273,7 +271,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       Map.fold_symmetric_diff
         subtype_effects
         supertype_effects
-        ~init:Effect_name.Map.empty
+        ~init:Effect_name.Absolute.Map.empty
         ~data_equal:(fun _ _ -> false)
         ~f:(fun subtype_only (effect_name, diff) ->
           (* FIXME: Somehow need to unify the unmatched parts with the variable *)
@@ -299,7 +297,8 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           Type_error
           ~msg:
             [%message
-              "Found more effects than expected" ~_:(subtype_only : _ Effect_name.Map.t)]
+              "Found more effects than expected"
+                ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
     | Some subtype_var, _ ->
       if occurs_in_effects subtype_var supertype
       then Compilation_error.raise Type_error ~msg:[%message "Occurs check failed"];
@@ -378,24 +377,12 @@ and constrain_effects_to_be_total ~names ~types effects =
    and known types as part of bounds. We need to represent unions explicitly in the
    intermediate types. *)
 let rec union_types t1 t2 =
-  Internal_type.map2
-    t1
-    t2
-    ~var:Fn.const
-    ~pf:Fn.const
-    ~name:Fn.id
-    ~eff:union_effects
-    ~f_contra:(fun (t1, t2) -> Halt (intersect_types t1 t2))
+  Internal_type.map2 t1 t2 ~var:Fn.const ~eff:union_effects ~f_contra:(fun (t1, t2) ->
+    Halt (intersect_types t1 t2))
 
 and intersect_types t1 t2 =
-  Internal_type.map2
-    t1
-    t2
-    ~var:Fn.const
-    ~pf:Fn.const
-    ~name:Fn.id
-    ~eff:intersect_effects
-    ~f_contra:(fun (t1, t2) -> Halt (union_types t1 t2))
+  Internal_type.map2 t1 t2 ~var:Fn.const ~eff:intersect_effects ~f_contra:(fun (t1, t2) ->
+    Halt (union_types t1 t2))
 
 (* FIXME: implement *)
 and union_effects _ _ = failwith "FIXME: union_effects"
@@ -418,7 +405,7 @@ end
 let rec substitute_internal types typ ~(polarity : Polarity.t) =
   (* FIXME: cleanup *)
   print_s [%message "substitute_internal" (typ : Internal_type.t) (polarity : Polarity.t)];
-  Internal_type.map typ ~var:Fn.id ~pf:Fn.id ~name:Fn.id ~f:(fun typ ->
+  Internal_type.map typ ~f:(fun typ ->
     match typ with
     | Var id ->
       (match Hashtbl.find types.type_vars id with
@@ -540,18 +527,38 @@ let generalize types typ =
   (* FIXME: cleanup *)
   print_s [%message "Type_bindings.generalize" (typ : Internal_type.t) (types : t)];
   let env = Type_param.Env_of_vars.create () in
-  Internal_type.map
-    (substitute_internal types typ ~polarity:Positive)
-    ~var:(Type_param.Env_of_vars.find_or_add env)
-    ~pf:(never_happens [%here])
-    ~name:Fn.id
-    ~f:(function
-      | Partial_function (args, effect_row, id) ->
-        (* FIXME: fix effects. In particular, just one effect variable should be total,
-           if there are no other uses. Maybe add a lower bound of [total] to every effect
-           var? *)
-        Defer (Function (args, effect_row, Var id))
-      | typ -> Defer typ)
+  let rec loop : Internal_type.t -> Module_path.absolute Type_scheme.t = function
+    | Var var -> Var (Type_param.Env_of_vars.find_or_add env var)
+    | Partial_function (args, effects, var) ->
+      (* FIXME: fix effects. In particular, just one effect variable should be total,
+       if there are no other uses. Maybe add a lower bound of [total] to every effect
+       var? *)
+      let args = Nonempty.map args ~f:loop in
+      let effects = loop_effects effects in
+      Function (args, effects, Var (Type_param.Env_of_vars.find_or_add env var))
+    | Function (args, effects, body) ->
+      let args = Nonempty.map args ~f:loop in
+      let effects = loop_effects effects in
+      Function (args, effects, loop body)
+    | Type_app (name, fields) -> Type_app (name, List.map fields ~f:loop)
+    | Tuple fields -> Tuple (List.map fields ~f:loop)
+  and loop_effects = function
+    | { effects; effect_var = None } ->
+      Option.map (convert_effect_map effects) ~f:Type_scheme.effect_union
+    | { effects; effect_var = Some effect_var } ->
+      let effect_var = Type_param.Env_of_vars.find_or_add env effect_var in
+      (match convert_effect_map effects with
+       | None -> Some (Effect_var effect_var)
+       | Some effects ->
+         Some (Effect_union (Effect_var effect_var :: Nonempty.to_list effects)))
+  and convert_effect_map effects =
+    Option.map
+      (Nonempty.of_list (Map.to_alist effects))
+      ~f:(fun effects ->
+        Nonempty.map effects ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
+          Effect (effect_name, List.map args ~f:loop)))
+  in
+  loop (substitute_internal types typ ~polarity:Positive)
 ;;
 
 let%expect_test "unification cycles" =

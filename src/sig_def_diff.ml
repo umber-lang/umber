@@ -9,7 +9,7 @@ type 'a diff =
 
 type t =
   { name_diff : (Value_name.t * Name_bindings.Name_entry.t diff) Sequence.t
-  ; type_diff : (Type_name.t * Module_path.absolute Type_decl.diff) Sequence.t
+  ; type_diff : (Type_name.t * Module_path.absolute Type_decl.t diff) Sequence.t
   ; module_diff : (Module_name.t * module_diff) Sequence.t
   }
 [@@deriving sexp_of]
@@ -81,7 +81,7 @@ let create_skolemized_type ~names =
   Name_bindings.with_path_into_defs names Module_path.Absolute.empty ~f:(fun names ->
     let type_name = Type_name.create_skolemized () in
     ( Name_bindings.add_type_decl names type_name (Unique_list.empty, Abstract)
-    , Type.Expr.Type_app ((Module_path.Absolute.empty, type_name), []) ))
+    , Type_scheme.Type_app ((Module_path.Absolute.empty, type_name), []) ))
 ;;
 
 (** Skolemization means replacing all type variables in a type expression with fresh
@@ -98,24 +98,19 @@ let skolemize ~names ~types_by_param scheme =
             [%message
               "Missing declaration for skolemized param"
                 (scheme : _ Type_scheme.t)
-                (types_by_param
-                  : (Type.Var_id.t, Type.Var_id.t, _) Type.Expr.t Type_param.Table.t)] )
+                (types_by_param : _ Type_scheme.t Type_param.Table.t)] )
   in
   let names = ref names in
   let type_ =
-    Type.Expr.map
-      scheme
-      ~var:(fun var -> compiler_bug [%message "Unskolemized var" (var : Type_param.t)])
-      ~pf:Nothing.unreachable_code
-      ~name:Fn.id
-      ~f:(function
-        | Var param ->
-          Halt
-            (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
-               let names', type_ = create_skolemized_type ~names:!names in
-               names := names';
-               type_))
-        | type_ -> Defer type_)
+    Type_scheme.map scheme ~type_name:Fn.id ~effect_name:Fn.id ~f:(function
+      | Var param ->
+        Halt
+          (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
+             let names', type_ = create_skolemized_type ~names:!names in
+             names := names';
+             type_))
+      | type_ -> Defer type_)
+    |> Internal_type.of_type_scheme
   in
   !names, type_
 ;;

@@ -205,19 +205,19 @@ type_record:
         Value_name.of_ustring_unchecked name, typ)) }
 
 type_tuple_or_fun:
-  | t = tuple(type_non_fun) { single_or_list Type.Expr.tuple t }
+  | t = tuple(type_non_fun) { single_or_list Type_scheme.tuple t }
   | t = parens(type_fun) { t }
 
 type_term:
   | t = type_tuple_or_fun { t }
   | cnstr = qualified(UPPER_NAME)
-    { Type.Expr.Type_app (Type_name.Relative.of_ustrings_unchecked cnstr, []) }
-  | param = LOWER_NAME { Type.Expr.Var (Type_param_name.of_ustring_unchecked param) }
+    { Type_scheme.Type_app (Type_name.Relative.of_ustrings_unchecked cnstr, []) }
+  | param = LOWER_NAME { Type_scheme.Var (Type_param_name.of_ustring_unchecked param) }
 
 type_non_fun:
   | t = type_term { t }
   | cnstr = qualified(UPPER_NAME); args = nonempty(type_term)
-    { Type.Expr.Type_app (
+    { Type_scheme.Type_app (
         Type_name.Relative.of_ustrings_unchecked cnstr, Nonempty.to_list args) }
 
 (* Writing this out like this instead of just using 
@@ -229,7 +229,7 @@ type_fun_args:
 %inline type_fun:
   | args = type_fun_args; ARROW; body = type_non_fun
     (* TODO: Implement effect syntax in function types. *)
-    { Type.Expr.Function (args, Type.Expr.no_effects, body) }
+    { Type_scheme.Function (args, None, body) }
 
 type_expr:
   | t = type_non_fun { t }

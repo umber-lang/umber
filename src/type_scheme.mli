@@ -18,6 +18,7 @@ and 'n effects =
 
 val var : Type_param_name.t -> 'n t
 val tuple : 'n t list -> 'n t
+val effect_union : 'n effects Nonempty.t -> 'n effects
 
 val map
   :  ?f:('n1 t -> ('n1 t, 'n2 t) Map_action.t)

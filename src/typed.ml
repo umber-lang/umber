@@ -14,7 +14,8 @@ module Pattern = struct
     let rec of_untyped_with_names ~names ~types pat_names
       : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
       = function
-      | Constant lit -> pat_names, (Constant lit, Literal.typ lit)
+      | Constant lit ->
+        pat_names, (Constant lit, Internal_type.of_type_scheme (Literal.typ lit))
       | Catch_all name ->
         let pat_names, typ =
           match name with
@@ -128,15 +129,14 @@ module Pattern = struct
           Pattern.Names.add_name pat_names name typ ~type_source:Placeholder
         in
         pat_names, (As (pat, name), typ)
-      | Type_annotation (pat, annotated_type) ->
+      | Type_annotation (pat, ((_ : Trait_bound.t), annotated_type)) ->
+        (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
         let annotated_type =
-          Tuple2.map_snd annotated_type ~f:(fun typ ->
-            Type.Expr.map
-              typ
-              ~name:(Name_bindings.absolutify_type_name names)
-              ~var:Fn.id
-              ~pf:Nothing.unreachable_code)
-          |> Internal_type.of_type_scheme_bounded
+          Type_scheme.map
+            annotated_type
+            ~type_name:(Name_bindings.absolutify_type_name names)
+            ~effect_name:(Name_bindings.absolutify_effect_name names)
+          |> Internal_type.of_type_scheme
         in
         let pat_names, (pat, inferred_type) =
           of_untyped_with_names ~names ~types pat_names pat
@@ -216,8 +216,10 @@ module Expr = struct
 
   let type_recursive_let_bindings =
     let collect_effects ~names ~types f =
-      let effects : _ Type.Expr.effects =
-        { effects = Effect_name.Map.empty; effect_var = Some (Type.Var_id.create ()) }
+      let effects : Internal_type.effects =
+        { effects = Effect_name.Absolute.Map.empty
+        ; effect_var = Some (Type_var.create ())
+        }
       in
       let (expr : _ t Node.t), (typ : Internal_type.t) =
         f ~add_effects:(fun subtype ->
@@ -228,16 +230,21 @@ module Expr = struct
     let rec of_untyped ~names ~types ~f_name expr
       : (Internal_type.t * Pattern.Names.t) t Node.t
         * Internal_type.t
-        * _ Type.Expr.effects
+        * Internal_type.effects
       =
       let node e = Node.create e (Node.span expr) in
       Node.with_value expr ~f:(fun expr ->
         match (expr : Untyped.Expr.t) with
-        | Literal lit -> node (Literal lit), Literal.typ lit, Type.Expr.no_effects
+        | Literal lit ->
+          ( node (Literal lit)
+          , Internal_type.of_type_scheme (Literal.typ lit)
+          , Internal_type.no_effects )
         | Name name ->
           let name, name_entry = Name_bindings.find_entry_with_path names name in
           f_name name name_entry;
-          node (Name name), Name_bindings.Name_entry.typ name_entry, Type.Expr.no_effects
+          ( node (Name name)
+          , Name_bindings.Name_entry.typ name_entry
+          , Internal_type.no_effects )
         | Qualified (path, expr) ->
           let names = Name_bindings.import_all names path in
           of_untyped ~names ~types ~f_name expr
@@ -265,10 +272,10 @@ module Expr = struct
                 arg, (arg_type, Pattern.Names.empty))
             in
             let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
-            let result_var = Type.Var_id.create () in
-            let call_effects : _ Type.Expr.effects =
-              { effects = Effect_name.Map.empty
-              ; effect_var = Some (Type.Var_id.create ())
+            let result_var = Type_var.create () in
+            let call_effects : Internal_type.effects =
+              { effects = Effect_name.Absolute.Map.empty
+              ; effect_var = Some (Type_var.create ())
               }
             in
             add_effects call_effects;
@@ -293,7 +300,7 @@ module Expr = struct
           let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
           ( node (Lambda (args, body))
           , Function (arg_types, body_effects, body_type)
-          , Type.Expr.no_effects )
+          , Internal_type.no_effects )
         | If (cond, then_, else_) ->
           (* FIXME: Places with multiple branches e.g. if, match, now can't rely on the
            types of the two branches being unified to be equivalent, and arbitrarily
@@ -301,7 +308,7 @@ module Expr = struct
           collect_effects ~names ~types (fun ~add_effects ->
             let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
             add_effects cond_effects;
-            let bool_type = Intrinsics.Bool.typ in
+            let bool_type = Internal_type.of_type_scheme Intrinsics.Bool.typ in
             Type_bindings.constrain ~names ~types ~subtype:cond_type ~supertype:bool_type;
             let (then_, then_type, then_effects), (else_, else_type, else_effects) =
               ( of_untyped ~names ~types ~f_name then_
@@ -411,16 +418,17 @@ module Expr = struct
         | Record_literal _fields -> failwith "TODO: record1"
         | Record_update (_expr, _fields) -> failwith "TODO: record2"
         | Record_field_access (_record, _name) -> failwith "TODO: record3"
-        | Type_annotation (expr, typ) ->
+        | Type_annotation (expr, annotated_type) ->
+          (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
           let annotated_type =
-            Node.with_value typ ~f:(fun typ ->
-              Tuple2.map_snd typ ~f:(fun typ ->
-                Type.Expr.map
-                  typ
-                  ~name:(Name_bindings.absolutify_type_name names)
-                  ~var:Fn.id
-                  ~pf:Nothing.unreachable_code)
-              |> Internal_type.of_type_scheme_bounded)
+            Node.with_value
+              annotated_type
+              ~f:(fun ((_ : Trait_bound.t), annotated_type) ->
+              Type_scheme.map
+                annotated_type
+                ~type_name:(Name_bindings.absolutify_type_name names)
+                ~effect_name:(Name_bindings.absolutify_effect_name names)
+              |> Internal_type.of_type_scheme)
           in
           let expr, inferred_type, expr_effects = of_untyped ~names ~types ~f_name expr in
           Type_bindings.constrain
@@ -658,7 +666,7 @@ module Module = struct
             | Common_def common ->
               (match common with
                | Type_decl (type_name, _) ->
-                 ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_Type_decl.pe_name)
+                 ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_type_decl type_name)
                  , def )
                | Effect _ ->
                  (* TODO: Copy effect declarations to defs *)
@@ -774,9 +782,10 @@ module Module = struct
         Val
           ( name
           , fixity
-          , Tuple2.map_snd type_ ~f:(Name_bindings.absolutify_type_expr names) )
+          , Tuple2.map_snd type_ ~f:(Name_bindings.absolutify_type_scheme names) )
       | Extern (name, fixity, type_, extern_name) ->
-        Extern (name, fixity, Name_bindings.absolutify_type_expr names type_, extern_name)
+        Extern
+          (name, fixity, Name_bindings.absolutify_type_scheme names type_, extern_name)
       | Type_decl (type_name, decl) ->
         Type_decl (type_name, Name_bindings.absolutify_type_decl names decl)
       | Effect (effect_name, effect) ->
@@ -861,8 +870,9 @@ module Module = struct
         Nonempty.iter args ~f:(loop ~names ~aliases_seen);
         loop ~names ~aliases_seen body
       | Tuple items -> List.iter items ~f:(loop ~names ~aliases_seen)
+      | Union items | Intersection items ->
+        Nonempty.iter items ~f:(loop ~names ~aliases_seen)
       | Var _ -> ()
-      | Partial_function _ -> .
     in
     loop ~names ~aliases_seen:Name_bindings.Type_entry.Id.Set.empty alias
   ;;

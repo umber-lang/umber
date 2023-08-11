@@ -260,6 +260,7 @@ let without_std t =
 ;;
 
 type f_bindings = { f : 'a. 'a bindings -> 'a bindings }
+type 'b get_bindings = { get : 'a. 'a bindings -> 'b }
 
 let update_current t ~f =
   let updating_import_err imported_module =
@@ -549,68 +550,79 @@ let find_type t name = find_entry t name |> Name_entry.typ
 let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
-let find_type_entry_with_path, find_absolute_type_entry_with_path =
-  let rec f t ~defs_only path name bindings =
-    let f bindings ~check_submodule =
-      match Map.find bindings.types name with
-      | Some entry ->
-        Some (resolve_type_or_import_with_path t (path, name) entry ~defs_only)
-      | None ->
-        (* Allow type names like `List.List` to be found as just `List` *)
-        let module_name = Type_name.to_ustring name |> Module_name.of_ustring_unchecked in
-        let%bind.Option bindings = Map.find bindings.modules module_name in
-        check_submodule bindings (Module_path.append path [ module_name ])
-    in
-    let find_type bindings path name =
-      let%map.Option entry = Map.find bindings.types name in
-      resolve_type_or_import_with_path t (path, name) entry ~defs_only
-    in
-    let find_in_imported_submodule ~import_path =
-      let bindings = snd (resolve_absolute_path_exn t import_path ~defs_only) in
-      let name =
-        (* Use the name of the imported module as the type name to look up. *)
-        match Module_path.last import_path with
-        | Some module_name ->
-          Module_name.to_ustring module_name |> Type_name.of_ustring_unchecked
+let ( (find_type_entry_with_path, find_absolute_type_entry_with_path)
+    , (find_effect_entry_with_path, _find_absolute_effect_entry) )
+  =
+  let make (type name) ~field ~name:(module Name : Name_qualified with type t = name) =
+    let rec f t ~defs_only path name bindings =
+      let f bindings ~check_submodule =
+        match Map.find (field.get bindings) name with
+        | Some entry ->
+          Some (resolve_type_or_import_with_path t (path, name) entry ~defs_only)
         | None ->
-          compiler_bug
-            [%message "Empty import path" (import_path : Module_path.Absolute.t)]
+          (* Allow type names like `List.List` to be found as just `List` *)
+          let module_name = Name.to_ustring name |> Module_name.of_ustring_unchecked in
+          let%bind.Option bindings = Map.find bindings.modules module_name in
+          check_submodule bindings (Module_path.append path [ module_name ])
+      in
+      let find_type bindings path name =
+        let%map.Option entry = Map.find (field.get bindings) name in
+        resolve_type_or_import_with_path t (path, name) entry ~defs_only
+      in
+      let find_in_imported_submodule ~import_path =
+        let bindings = snd (resolve_absolute_path_exn t import_path ~defs_only) in
+        let name =
+          (* Use the name of the imported module as the type name to look up. *)
+          match Module_path.last import_path with
+          | Some module_name ->
+            Module_name.to_ustring module_name |> Name.of_ustring_unchecked
+          | None ->
+            compiler_bug
+              [%message "Empty import path" (import_path : Module_path.Absolute.t)]
+        in
+        match bindings with
+        | Sigs sigs -> find_type sigs import_path name
+        | Defs defs -> find_type defs import_path name
       in
       match bindings with
-      | Sigs sigs -> find_type sigs import_path name
-      | Defs defs -> find_type defs import_path name
-    in
-    match bindings with
-    | Sigs sigs ->
-      f sigs ~check_submodule:(fun bindings path ->
-        match bindings with
-        | Local (None, sigs) -> find_type sigs path name
-        | Local (Some _, _) -> .
-        | Imported import_path -> find_in_imported_submodule ~import_path)
-    | Defs defs ->
-      f defs ~check_submodule:(fun bindings path ->
-        match bindings with
-        | Local (None, defs) -> find_type defs path name
-        | Local (Some sigs, defs) ->
-          if defs_only then find_type defs path name else find_type sigs path name
-        | Imported import_path -> find_in_imported_submodule ~import_path)
-  and find_type_entry_with_path ?(defs_only = false) t name =
-    find t name ~to_ustring:Type_name.Relative.to_ustring ~defs_only ~f:(f t ~defs_only)
-  and find_absolute_type_entry_with_path ?(defs_only = false) t (path, name) =
-    find_absolute
+      | Sigs sigs ->
+        f sigs ~check_submodule:(fun bindings path ->
+          match bindings with
+          | Local (None, sigs) -> find_type sigs path name
+          | Local (Some _, _) -> .
+          | Imported import_path -> find_in_imported_submodule ~import_path)
+      | Defs defs ->
+        f defs ~check_submodule:(fun bindings path ->
+          match bindings with
+          | Local (None, defs) -> find_type defs path name
+          | Local (Some sigs, defs) ->
+            if defs_only then find_type defs path name else find_type sigs path name
+          | Imported import_path -> find_in_imported_submodule ~import_path)
+    and find_type_entry_with_path ?(defs_only = false) t name =
+      find t name ~to_ustring:Name.Relative.to_ustring ~defs_only ~f:(f t ~defs_only)
+    and find_absolute_type_entry_with_path ?(defs_only = false) t (path, name) =
+      find_absolute
+        t
+        (path, name)
+        ~defs_only
+        ~to_ustring:Name.Absolute.to_ustring
+        ~f:(f t ~defs_only path)
+    and resolve_type_or_import_with_path
+      ?defs_only
       t
-      (path, name)
-      ~to_ustring:Type_name.Absolute.to_ustring
-      ~defs_only
-      ~f:(f t ~defs_only path)
-  and resolve_type_or_import_with_path ?defs_only t path (entry : _ Or_imported.t option) =
-    match entry with
-    | Some (Local decl) -> path, Some decl
-    | Some (Imported path_name) ->
-      find_absolute_type_entry_with_path ?defs_only t path_name
-    | None -> path, None
+      path
+      (entry : _ Or_imported.t option)
+      =
+      match entry with
+      | Some (Local decl) -> path, Some decl
+      | Some (Imported path_name) ->
+        find_absolute_type_entry_with_path ?defs_only t path_name
+      | None -> path, None
+    in
+    find_type_entry_with_path, find_absolute_type_entry_with_path
   in
-  find_type_entry_with_path, find_absolute_type_entry_with_path
+  ( make ~field:{ get = (fun bindings -> bindings.types) } ~name:(module Type_name)
+  , make ~field:{ get = (fun bindings -> bindings.effects) } ~name:(module Effect_name) )
 ;;
 
 let absolutify_path t (path : Module_path.Relative.t) =
@@ -633,8 +645,9 @@ let absolutify_path t (path : Module_path.Relative.t) =
         Module_path.to_ustring (Module_path.append path [ name ]))
 ;;
 
-let absolutify_type_name t path = fst (find_type_entry_with_path t path)
 let absolutify_value_name t path = fst (find_entry_with_path t path)
+let absolutify_type_name t path = fst (find_type_entry_with_path t path)
+let absolutify_effect_name t path = fst (find_effect_entry_with_path t path)
 
 let bindings_are_empty { names; types; effects; modules } =
   Map.is_empty names && Map.is_empty types && Map.is_empty effects && Map.is_empty modules
@@ -811,8 +824,11 @@ let import_all_absolute t (path : Module_path.Absolute.t) =
 
 let import_all t path = import_all_absolute t (absolutify_path t path)
 
-let absolutify_type_expr t type_ =
-  Type.Expr.map type_ ~var:Fn.id ~pf:Fn.id ~name:(fun name -> absolutify_type_name t name)
+let absolutify_type_scheme t type_ =
+  Type_scheme.map
+    type_
+    ~type_name:(absolutify_type_name t)
+    ~effect_name:(absolutify_effect_name t)
 ;;
 
 let prelude = lazy (into_parent (t_of_sexp Umber_std.Prelude.names))
@@ -873,8 +889,8 @@ let add_extern t name fixity typ extern_name ~constrain =
   add_val_or_extern t name fixity typ ~extern_name ~constrain ~type_source:Extern_declared
 ;;
 
-let absolutify_type_decl t = Type_decl.map_exprs ~f:(absolutify_type_expr t)
-let absolutify_effect t = Effect.map_exprs ~f:(absolutify_type_expr t)
+let absolutify_type_decl t = Type_decl.map_exprs ~f:(absolutify_type_scheme t)
+let absolutify_effect t = Effect.map_exprs ~f:(absolutify_type_scheme t)
 
 let add_to_types types name decl ~err_msg =
   Map.update types name ~f:(function
@@ -882,7 +898,7 @@ let add_to_types types name decl ~err_msg =
     | Some _ -> name_error ~msg:err_msg (Type_name.to_ustring name))
 ;;
 
-let add_type_decl type_name decl =
+let add_type_decl t type_name decl =
   let f bindings =
     if not (Type_decl.no_free_params decl)
     then
@@ -905,7 +921,9 @@ let add_type_decl type_name decl =
            (* Add constructors as functions to the namespace *)
            let result_type : _ Type_scheme.t =
              let path = current_path t in
-             let params = List.map (params :> Type_param_name.t list) ~f:Type.Expr.var in
+             let params =
+               List.map (params :> Type_param_name.t list) ~f:Type_scheme.var
+             in
              Type_app ((path, type_name), params)
            in
            List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
@@ -913,7 +931,7 @@ let add_type_decl type_name decl =
                (* TODO: This should have an effect for allocation. *)
                Name_entry.val_declared
                  (match Nonempty.of_list args with
-                  | Some args -> Function (args, Type.Expr.no_effects, result_type)
+                  | Some args -> Function (args, None, result_type)
                   | None -> result_type)
              in
              Map.set names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry))
@@ -946,10 +964,7 @@ let add_name_entry names name scheme new_entry ~constrain =
 let add_effect t effect_name (effect : _ Effect.t) ~constrain =
   let f bindings =
     let effects : _ Type_scheme.effects =
-      { effects =
-          Effect_name.Map.singleton effect_name (List.map effect.params ~f:Type.Expr.var)
-      ; effect_var = None
-      }
+      Effect ((current_path t, effect_name), List.map effect.params ~f:Type_scheme.var)
     in
     { bindings with
       (* FIXME: add to effects *)
@@ -964,7 +979,7 @@ let add_effect t effect_name (effect : _ Effect.t) ~constrain =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let scheme : _ Type_scheme.t = Function (args, effects, result) in
+          let scheme : _ Type_scheme.t = Function (args, Some effects, result) in
           let new_entry = Name_entry.val_declared scheme in
           add_name_entry names name scheme new_entry ~constrain)
     }

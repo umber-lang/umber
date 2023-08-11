@@ -143,7 +143,9 @@ let rec arity_of_type ~names : Module_path.absolute Type_scheme.t -> int = funct
      | Abstract | Variants _ | Record _ -> 0
      | Alias type_ -> arity_of_type ~names type_)
   | Function (args, _, _) -> Nonempty.length args
-  | Partial_function _ -> .
+  | Union _ | Intersection _ ->
+    (* FIXME: fix *)
+    failwith "TODO: handle arity for union and intersection types"
 ;;
 
 module Context : sig
@@ -340,7 +342,10 @@ end = struct
       in
       find_cnstr_info_from_decl t decl ~follow_aliases:true
     | Tuple args -> Some (Cnstr_info.of_tuple args)
-    | Function _ | Partial_function _ | Var _ -> cnstr_info_lookup_failed type_
+    | Function _ | Var _ -> cnstr_info_lookup_failed type_
+    | Union _ | Intersection _ ->
+      (* FIXME: fix *)
+      failwith "TODO: handle cnstr info lookup for union and intersection types"
 
   and find_cnstr_info_from_decl t decl ~follow_aliases =
     match (decl : _ Type_decl.decl) with
@@ -866,10 +871,15 @@ module Expr = struct
     =
     match fun_type with
     | Type_app _ | Tuple _ | Var _ ->
-      compiler_bug [%message "Non-function type in function call"]
-    | Partial_function _ -> .
-    | Function (fun_arg_types, (_ : _ Type.Expr.effects), (_return_type : _ Type_scheme.t))
-      ->
+      compiler_bug [%message "Non-funtion type in function call"]
+    | Union _ | Intersection _ ->
+      (* FIXME: fix *)
+      failwith
+        "TODO: handle rewriting partial application for union and intersection types"
+    | Function
+        ( fun_arg_types
+        , (_effects : _ Type_scheme.effects option)
+        , (_return_type : _ Type_scheme.t) ) ->
       (match snd (Nonempty.zip fun_arg_types args_and_types) with
        | Same_length -> `Already_fully_applied
        | Right_trailing _ ->
@@ -964,9 +974,7 @@ module Expr = struct
              let arg_types = Nonempty.map ~f:snd args_and_types in
              (* FIXME: We lost the effect information. We don't actually use it, though.
              For now, just making the effect total. *)
-             let fun_type =
-               Type.Expr.Function (arg_types, Type.Expr.no_effects, body_type)
-             in
+             let fun_type : _ Type_scheme.t = Function (arg_types, None, body_type) in
              let fun_ = of_typed_expr ~ctx fun_ fun_type in
              let args =
                Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
@@ -1072,7 +1080,9 @@ module Expr = struct
         | Tuple _, (Var _ | Type_app _ | Function _) ) as expr ->
         compiler_bug
           [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
-      | _, Partial_function _ -> .
+      | _, (Union _ | Intersection _) ->
+        (* FIXME: fix *)
+        failwith "TODO: handle mir conversion for union and intersection types"
     and add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound =
       (* Keep track of the parent context before binding any variables. This lets us
          check which variables are captured by closures later on. *)

@@ -98,10 +98,11 @@ val find_absolute_type_entry
   -> Type_name.Absolute.t
   -> Type_entry.t
 
-val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Absolute.t
 val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Absolute.t
+val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Absolute.t
+val absolutify_effect_name : t -> Effect_name.Relative.t -> Effect_name.Absolute.t
 
-val absolutify_type_expr
+val absolutify_type_scheme
   :  t
   -> Module_path.relative Type_scheme.t
   -> Module_path.absolute Type_scheme.t
