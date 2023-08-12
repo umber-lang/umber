@@ -151,6 +151,8 @@ let of_type_scheme =
       in
       Function (args, effects, of_type_scheme ~params result)
     | Union _ | Intersection _ ->
+      (* FIXME: Need to add constraints to the type bindings. Might make using this pretty
+         inconvenient. *)
       failwith "TODO: conversion from union and intersection types"
   in
   fun ?(params = Type_param.Env_to_vars.create ()) scheme -> of_type_scheme ~params scheme

@@ -232,6 +232,7 @@ module Expr = struct
         * Internal_type.t
         * Internal_type.effects
       =
+      print_s [%message "Typed.Expr.of_untyped" (expr : Untyped.Expr.t Node.t)];
       let node e = Node.create e (Node.span expr) in
       Node.with_value expr ~f:(fun expr ->
         match (expr : Untyped.Expr.t) with
@@ -1009,6 +1010,15 @@ module Module = struct
     let representative_span =
       get_spans (Nonempty.hd bindings) |> Tuple2.uncurry Span.combine
     in
+    print_s
+      [%message
+        "typing bindings"
+          (bindings
+            : ((Pattern.t
+               * (Internal_type.t * Name_bindings.Name_entry.t Value_name.Map.t))
+               Node.t
+              * Untyped.Expr.t Node.t)
+              Nonempty.t)];
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings ~names ~types bindings ~add_effects:(fun effects ->
         (* No effects are handled at toplevel, so get rid of any produced effects. *)

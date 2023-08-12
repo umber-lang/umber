@@ -119,7 +119,6 @@ let get_var_bounds =
 ;;
 
 let rec constrain ~names ~types ~subtype ~supertype =
-  (* FIXME: Need a constraint cache to avoid infinite recursion *)
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     let params = Type_param.Env_to_vars.create () in
     List.iter
@@ -135,6 +134,13 @@ let rec constrain ~names ~types ~subtype ~supertype =
   in
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
+    (* FIXME: cleanup *)
+    print_s
+      [%message
+        "Type_bindings.constrain"
+          (subtype : Internal_type.t)
+          (supertype : Internal_type.t)
+          (types : t)];
     Hash_set.add types.constrained_types (subtype, supertype);
     match subtype, supertype with
     | Var id1, Var id2 when Type_var.(id1 = id2) -> ()
@@ -181,8 +187,8 @@ let rec constrain ~names ~types ~subtype ~supertype =
        | _ -> type_error "Type application mismatch" subtype supertype)
     | Function (args1, _effect_row1, res1), Function (args2, _effect_row2, res2) ->
       (* FIXME: We aren't constraining the effect rows here! (Also not in the other cases
-       either.) It's also pretty unclear how subtyping on effect rows should work. This
-       doesn't seemm to make sense as-is. *)
+         either.) It's also pretty unclear how subtyping on effect rows should work. This
+         doesn't seemm to make sense as-is. *)
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
@@ -389,58 +395,87 @@ and union_effects _ _ = failwith "FIXME: union_effects"
 and intersect_effects _ _ = failwith "FIXME: intersect_effects" *)
 
 module Polarity = struct
-  type t =
-    | Positive
-    | Negative
-  [@@deriving sexp_of]
+  module T = struct
+    type t =
+      | Positive
+      | Negative
+    [@@deriving sexp, compare]
 
-  let flip = function
-    | Positive -> Negative
-    | Negative -> Positive
-  ;;
+    let flip = function
+      | Positive -> Negative
+      | Negative -> Positive
+    ;;
+  end
+
+  include T
+  include Comparable.Make (T)
 end
 
-(* FIXME: Need to simplify effect types using intersection and union. Also, maybe we
-   shouldn't use Internal_type.map given how many of the variants we special-case. *)
-let rec generalize_internal types typ ~env ~(polarity : Polarity.t)
-  : Module_path.absolute Type_scheme.t
-  =
-  (* FIXME: cleanup *)
-  print_s [%message "generalize_internal" (typ : Internal_type.t) (polarity : Polarity.t)];
-  match typ with
-  | Var var ->
-    let bounds = find_var_bounds types var ~polarity in
-    collapse_var_bounds types var bounds ~env ~polarity
-  | Function (args, effects, res) ->
-    (* FIXME: substitute effects (on full/partial functions) *)
-    Function
-      ( Nonempty.map
-          args
-          ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
-      , generalize_effects_internal types effects ~env ~polarity
-      , generalize_internal types res ~env ~polarity )
-  | Partial_function (args, effects, id) ->
-    combine_partial_functions types args effects id ~env ~polarity
-  | Type_app (name, fields) ->
-    Type_app (name, List.map fields ~f:(generalize_internal types ~env ~polarity))
-  | Tuple fields -> Tuple (List.map fields ~f:(generalize_internal types ~env ~polarity))
+module Polar_var = struct
+  include Tuple.Make (Polarity) (Type_var)
+  include Tuple.Comparable (Polarity) (Type_var)
+end
 
-and find_var_bounds types var ~polarity =
-  match Hashtbl.find types.type_vars var with
-  (* FIXME: How do we do substitution for type variables now that we have effect
+(* TODO: We should probably have a notion of type variable scope so that the type
+   variables we introduce can be shared between multiple type expressions in the same
+   expresion/statement. *)
+let generalize types outer_type =
+  let rec generalize_internal types typ ~env ~in_progress ~(polarity : Polarity.t)
+    : Module_path.absolute Type_scheme.t
+    =
+    (* FIXME: cleanup *)
+    print_s
+      [%message "generalize_internal" (typ : Internal_type.t) (polarity : Polarity.t)];
+    match typ with
+    | Var var ->
+      if Set.mem in_progress (polarity, var)
+      then
+        Compilation_error.raise
+          Type_error
+          ~msg:
+            [%message
+              "Recursive type"
+                ~recursive_var:(polarity, var : Polar_var.t)
+                (outer_type : Internal_type.t)]
+      else (
+        let bounds = find_var_bounds types var ~polarity in
+        let in_progress = Set.add in_progress (polarity, var) in
+        collapse_var_bounds types var bounds ~env ~in_progress ~polarity)
+    | Function (args, effects, res) ->
+      Function
+        ( Nonempty.map
+            args
+            ~f:
+              (generalize_internal
+                 types
+                 ~env
+                 ~in_progress
+                 ~polarity:(Polarity.flip polarity))
+        , generalize_effects_internal types effects ~env ~in_progress ~polarity
+        , generalize_internal types res ~env ~in_progress ~polarity )
+    | Partial_function (args, effects, id) ->
+      combine_partial_functions types args effects id ~env ~in_progress ~polarity
+    | Type_app (name, fields) ->
+      Type_app
+        (name, List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
+    | Tuple fields ->
+      Tuple (List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
+  and find_var_bounds types var ~polarity =
+    match Hashtbl.find types.type_vars var with
+    (* FIXME: How do we do substitution for type variables now that we have effect
           types? I think we need to encode the constraints in the type expression, maybe?
           Hmm, I think all the lower/upper bounds are going to look basically the same,
           modulo effect types. So, roughly, the lowermost bound produces the fewest
           effects, and the uppermost bound produces the most.  *)
-  (* FIXME: Can we avoid infinite recursion without supporting recursive types?
+    (* FIXME: Can we avoid infinite recursion without supporting recursive types?
           Maybe we could eagerly collapse upper/lower bounds into single types? Slightly
           annoying since we'd need to introduce the concept of polarity to [constrain],
           but it might work? It should be fine to always start at Positive. But this might
           effectively be eager substitution which could be questionable. *)
-  (* FIXME: union/intersection (at least currently) don't work for type variables, so
+    (* FIXME: union/intersection (at least currently) don't work for type variables, so
           the below is always going to fail (if it doesn't infinitely recurse).
           We can't handle vars being in bounds with other types. *)
-  (* FIXME: example
+    (* FIXME: example
           We want `(::) : a, List a -> List a` and have `(::) : 124`
 
           Constraints:
@@ -464,30 +499,28 @@ and find_var_bounds types var ~polarity =
           given fresh type variables for each use. We want the inferred effect types to be
           nice though.
        *)
-  | Some { lower_bounds; upper_bounds } ->
-    Queue.to_list
-      (match polarity with
-       | Positive -> lower_bounds
-       | Negative -> upper_bounds)
-  | None -> []
-
-and collapse_var_bounds types var bounds ~env ~polarity =
-  let combine_types =
-    match polarity with
-    | Positive -> Type_scheme.union
-    | Negative -> Type_scheme.intersection
-  in
-  (* FIXME: The algorithm from the paper includes [typ], the type itself, in the
+    | Some { lower_bounds; upper_bounds } ->
+      Queue.to_list
+        (match polarity with
+         | Positive -> lower_bounds
+         | Negative -> upper_bounds)
+    | None -> []
+  and collapse_var_bounds types var bounds ~env ~in_progress ~polarity =
+    let combine_types =
+      match polarity with
+      | Positive -> Type_scheme.union
+      | Negative -> Type_scheme.intersection
+    in
+    (* FIXME: The algorithm from the paper includes [typ], the type itself, in the
      union/intersection of the bounds. Do we have to do that? (I think yes) *)
-  let bounds : _ Type_scheme.t Nonempty.t =
-    Var (Type_param.Env_of_vars.find_or_add env var)
-    :: List.map bounds ~f:(generalize_internal types ~env ~polarity)
-  in
-  (* FIXME: Also need to simplify away type variables. *)
-  combine_types bounds
-
-(* FIXME: Implement this *)
-(* and substitute_effects types {effects ; effect_vars} ~polarity =
+    let bounds : _ Type_scheme.t Nonempty.t =
+      Var (Type_param.Env_of_vars.find_or_add env var)
+      :: List.map bounds ~f:(generalize_internal types ~env ~in_progress ~polarity)
+    in
+    (* FIXME: Also need to simplify away type variables. *)
+    combine_types bounds
+  (* FIXME: Implement this *)
+  (* and substitute_effects types {effects ; effect_vars} ~polarity =
   let () =
     (* FIXME: deduplicate var handling code with regular types *)
     match Hashtbl.find types.effect_vars id with
@@ -511,58 +544,69 @@ and collapse_var_bounds types var bounds ~env ~polarity =
   in
   () *)
 
-(* FIXME: The way we handle partial functions seems pretty sus. I don't think we can
+  (* FIXME: The way we handle partial functions seems pretty sus. I don't think we can
    properly distinguish between a partial function that then gets later applied in the
    same function, or a function that really returns another function. Which one should we
    assume? *)
-
-and combine_partial_functions types args effects id ~env ~polarity =
-  (* FIXME: Does this make any sense? In the var case we're just returning a var instead
+  and combine_partial_functions types args effects id ~env ~in_progress ~polarity =
+    (* FIXME: Does this make any sense? In the var case we're just returning a var instead
      of the function?? *)
-  (* FIXME: We should put some simplification steps in [find_var_bounds] so this
+    (* FIXME: We should put some simplification steps in [find_var_bounds] so this
      identification of [Partial_function]s actually works. *)
-  match find_var_bounds types id ~polarity with
-  | [ Partial_function (args', effects', id') ] ->
-    (* FIXME: Do we need this? (Surely yes) *)
-    (* constrain_effects_to_be_total ~names ~types effect_row; *)
-    let args_combined = Nonempty.(args @ args') in
-    combine_partial_functions types args_combined effects' id' ~env ~polarity
-  | bounds ->
-    Function
-      ( Nonempty.map
-          args
-          ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
-      , generalize_effects_internal types effects ~env ~polarity
-      , collapse_var_bounds types id bounds ~env ~polarity )
-
-and generalize_effects_internal types effects ~env ~polarity =
-  match effects with
-  | { effects; effect_var = None } ->
+    match find_var_bounds types id ~polarity with
+    | [ Partial_function (args', effects', id') ] ->
+      (* FIXME: Do we need this? (Surely yes) *)
+      (* constrain_effects_to_be_total ~names ~types effect_row; *)
+      let args_combined = Nonempty.(args @ args') in
+      combine_partial_functions
+        types
+        args_combined
+        effects'
+        id'
+        ~env
+        ~in_progress:(Set.add in_progress (polarity, id))
+        ~polarity
+    | bounds ->
+      Function
+        ( Nonempty.map
+            args
+            ~f:
+              (generalize_internal
+                 types
+                 ~env
+                 ~in_progress
+                 ~polarity:(Polarity.flip polarity))
+        , generalize_effects_internal types effects ~env ~in_progress ~polarity
+        , collapse_var_bounds types id bounds ~env ~in_progress ~polarity )
+  and generalize_effects_internal types effects ~env ~in_progress ~polarity =
+    match effects with
+    | { effects; effect_var = None } ->
+      Option.map
+        (convert_effect_map types effects ~env ~in_progress ~polarity)
+        ~f:Type_scheme.effect_union
+    | { effects; effect_var = Some effect_var } ->
+      let effect_var = Type_param.Env_of_vars.find_or_add env effect_var in
+      (match convert_effect_map types effects ~env ~in_progress ~polarity with
+       | None -> Some (Effect_var effect_var)
+       | Some effects ->
+         Some (Effect_union (Effect_var effect_var :: Nonempty.to_list effects)))
+  and convert_effect_map types effects ~env ~in_progress ~polarity =
     Option.map
-      (convert_effect_map types effects ~env ~polarity)
-      ~f:Type_scheme.effect_union
-  | { effects; effect_var = Some effect_var } ->
-    let effect_var = Type_param.Env_of_vars.find_or_add env effect_var in
-    (match convert_effect_map types effects ~env ~polarity with
-     | None -> Some (Effect_var effect_var)
-     | Some effects ->
-       Some (Effect_union (Effect_var effect_var :: Nonempty.to_list effects)))
-
-and convert_effect_map types effects ~env ~polarity =
-  Option.map
-    (Nonempty.of_list (Map.to_alist effects))
-    ~f:(fun effects ->
-      Nonempty.map effects ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
-        Effect (effect_name, List.map args ~f:(generalize_internal types ~env ~polarity))))
-;;
-
-(* TODO: We should probably have a notion of type variable scope so that the type
-   variables we introduce can be shared between multiple type expressions in the same
-   expresion/statement. *)
-let generalize types typ =
+      (Nonempty.of_list (Map.to_alist effects))
+      ~f:(fun effects ->
+        Nonempty.map effects ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
+          Effect
+            ( effect_name
+            , List.map args ~f:(generalize_internal types ~env ~in_progress ~polarity) )))
+  in
   (* FIXME: cleanup *)
-  print_s [%message "Type_bindings.generalize" (typ : Internal_type.t) (types : t)];
-  generalize_internal types typ ~env:(Type_param.Env_of_vars.create ()) ~polarity:Positive
+  print_s [%message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
+  generalize_internal
+    types
+    outer_type
+    ~env:(Type_param.Env_of_vars.create ())
+    ~in_progress:Polar_var.Set.empty
+    ~polarity:Positive
 ;;
 
 let%expect_test "unification cycles" =
