@@ -61,17 +61,66 @@ module Effect_type_pair = struct
   include Tuple.Hashable (Effect_type) (Effect_type)
 end
 
+module Constraints : sig
+  type t [@@deriving sexp_of]
+
+  val create : unit -> t
+  val add : t -> subtype:Type_var.t -> supertype:Type_var.t -> unit
+  val find_vars_with_same_shape : t -> Type_var.t -> Type_var.t list
+end = struct
+  type t =
+    { lower_bounds : Type_var.t Queue.t Type_var.Table.t
+    ; upper_bounds : Type_var.t Queue.t Type_var.Table.t
+    }
+  [@@deriving sexp_of]
+
+  let create () =
+    { lower_bounds = Type_var.Table.create (); upper_bounds = Type_var.Table.create () }
+  ;;
+
+  let get_bounds = Hashtbl.find_or_add ~default:Queue.create
+
+  let add_bounds { lower_bounds; upper_bounds } ~subtype ~supertype =
+    Queue.enqueue (get_bounds upper_bounds subtype) supertype;
+    Queue.enqueue (get_bounds lower_bounds supertype) subtype
+  ;;
+
+  (* If we get a constraint [a <= b], we also need to add all constraints transitively
+     implied by that, so that the constraints remain closed under logical implication.
+     So we need to add all constraints of the form 'a <= 'b for all 'a <= a and 'b >= b. *)
+  let add t ~subtype ~supertype =
+    Queue.iter (get_bounds t.lower_bounds subtype) ~f:(fun subtype' ->
+      Queue.iter (get_bounds t.upper_bounds supertype) ~f:(fun supertype' ->
+        add_bounds t ~subtype:subtype' ~supertype:supertype'));
+    add_bounds t ~subtype ~supertype
+  ;;
+
+  let find_vars_with_same_shape { lower_bounds; upper_bounds } var =
+    (* TODO: This could definitely be made more efficient. *)
+    List.dedup_and_sort
+      ~compare:Type_var.compare
+      (Queue.to_list (get_bounds lower_bounds var)
+       @ Queue.to_list (get_bounds upper_bounds var))
+  ;;
+end
+
+module Substitution = struct
+  type t = Internal_type.t Type_var.Table.t [@@deriving sexp_of]
+end
+
 type t =
-  { type_vars : Internal_type.t var_bounds Type_var.Table.t
-  ; effect_vars : Effect_type.t var_bounds Type_var.Table.t
+  { type_var_constraints : Constraints.t
+  ; effect_var_constraints : Constraints.t
+  ; substitution : Substitution.t
   ; constrained_types : Type_pair.Hash_set.t
   ; constrained_effects : Effect_type_pair.Hash_set.t
   }
 [@@deriving sexp_of]
 
 let create () =
-  { type_vars = Type_var.Table.create ()
-  ; effect_vars = Type_var.Table.create ()
+  { type_var_constraints = Constraints.create ()
+  ; effect_var_constraints = Constraints.create ()
+  ; substitution = Type_var.Table.create ()
   ; constrained_types = Type_pair.Hash_set.create ()
   ; constrained_effects = Effect_type_pair.Hash_set.create ()
   }
@@ -118,6 +167,23 @@ let get_var_bounds =
     { lower_bounds = Queue.create (); upper_bounds = Queue.create () })
 ;;
 
+let refresh_type type_ =
+  let vars = Type_var.Table.create () in
+  let refresh_var = Hashtbl.find_or_add vars ~default:Type_var.create in
+  let refresh_effects ({ effects; effect_var } : Internal_type.effects)
+    : Internal_type.effects
+    =
+    { effects; effect_var = Option.map effect_var ~f:refresh_var }
+  in
+  Internal_type.map type_ ~f:(function
+    | Var v -> Halt (Var (refresh_var v))
+    | Function (args, effects, result) ->
+      Defer (Function (args, refresh_effects effects, result))
+    | Partial_function (args, effects, result) ->
+      Defer (Partial_function (args, refresh_effects effects, result))
+    | (Type_app _ | Tuple _) as type_ -> Defer type_)
+;;
+
 let rec constrain ~names ~types ~subtype ~supertype =
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     let params = Type_param.Env_to_vars.create () in
@@ -143,8 +209,11 @@ let rec constrain ~names ~types ~subtype ~supertype =
           (types : t)];
     Hash_set.add types.constrained_types (subtype, supertype);
     match subtype, supertype with
-    | Var id1, Var id2 when Type_var.(id1 = id2) -> ()
+    | Var id1, Var id2 ->
+      if not (Type_var.equal id1 id2)
+      then Constraints.add types.type_var_constraints ~subtype:id1 ~supertype:id2
     | Var id1, type2 ->
+      (* FIXME: Need a more robust occurs check *)
       if occurs_in id1 type2 then type_error "Occurs check failed" subtype supertype;
       let id1_bounds = get_var_bounds types.type_vars id1 in
       Queue.enqueue id1_bounds.upper_bounds type2;
@@ -415,6 +484,18 @@ module Polar_var = struct
   include Tuple.Make (Polarity) (Type_var)
   include Tuple.Comparable (Polarity) (Type_var)
 end
+
+(* FIXME: Simplify constrains. See https://arxiv.org/pdf/1312.2334.pdf.
+   
+   IDEA:
+   - unify constraints by decomposition. For each bound on a type parameter which is a
+     non-parameter type, get a copy of that type with fresh type variables and unify it
+     with the parameter. This reflects the fact that this is the only way to satisfy the
+     bound.
+   - decomposition requires a nontrivial occurs check
+   - When decomposing, we need to replace the variable with its new bound. Maybe we could
+     do this iteratively as we unify normally?
+   *)
 
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same

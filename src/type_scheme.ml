@@ -3,6 +3,9 @@ open Names
 
 (* TODO: Type declarations/expressions should have spans like other parts of the AST do. *)
 
+(* FIXME: Remove type unions. We should be able to simplify the types by unifying and
+   simplifying constraints. *)
+
 type 'n t =
   | Var of Type_param_name.t
   | Type_app of 'n Type_name.Qualified.t * 'n t list
