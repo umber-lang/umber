@@ -46,6 +46,19 @@ and map_effects { effects; effect_var } ~f =
   { effects; effect_var }
 ;;
 
+let map_vars typ ~f =
+  let map_effects { effects; effect_var } =
+    { effects; effect_var = Option.map effect_var ~f }
+  in
+  map typ ~f:(function
+    | Var v -> Halt (Var (f v))
+    | Function (args, effects, result) ->
+      Defer (Function (args, map_effects effects, result))
+    | Partial_function (args, effects, result) ->
+      Defer (Partial_function (args, map_effects effects, result))
+    | (Type_app _ | Tuple _) as type_ -> Defer type_)
+;;
+
 let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~eff =
   match f (type1, type2) with
   | Halt typ -> typ

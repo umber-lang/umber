@@ -21,6 +21,7 @@ val fresh_var : unit -> t
 val var : Type_var.t -> t
 val tuple : t list -> t
 val map : t -> f:(t -> (t, t) Map_action.t) -> t
+val map_vars : t -> f:(Type_var.t -> Type_var.t) -> t
 
 val map2
   :  ?f:(t * t -> (t * t, t) Map_action.t)
