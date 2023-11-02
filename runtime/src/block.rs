@@ -15,7 +15,7 @@ pub union BlockPtr {
 const BLOCK_PTR_MASK: u64 = 0x1;
 
 impl BlockPtr {
-    fn is_block(self) -> bool {
+    pub fn is_block(self) -> bool {
         let value: u64 = unsafe { mem::transmute(self) };
         value & BLOCK_PTR_MASK == 0
     }
@@ -24,10 +24,10 @@ impl BlockPtr {
         if self.is_block() {
             unsafe {
                 match KnownTag::try_from(self.block.header().tag) {
-                    Ok(KnownTag::Int) => Value::Int(self.block.as_int()),
-                    Ok(KnownTag::Float) => Value::Float(self.block.as_float()),
-                    Ok(KnownTag::String) => Value::String(self.block.as_str()),
-                    Err(()) => Value::OtherBlock(self.block),
+                    Ok(KnownTag::Int) => Value::Int(self.block.expect_int()),
+                    Ok(KnownTag::Float) => Value::Float(self.block.expect_float()),
+                    Ok(KnownTag::String) => Value::String(self.block.expect_str()),
+                    Ok(KnownTag::Forward) | Err(()) => Value::OtherBlock(self.block),
                 }
             }
         } else {
@@ -35,7 +35,15 @@ impl BlockPtr {
         }
     }
 
-    pub fn as_block(self) -> Block {
+    pub fn as_block(self) -> Option<Block> {
+        if self.is_block() {
+            unsafe { Some(self.block) }
+        } else {
+            None
+        }
+    }
+
+    pub fn expect_block(self) -> Block {
         unsafe {
             if self.is_block() {
                 self.block
@@ -48,7 +56,7 @@ impl BlockPtr {
         }
     }
 
-    pub fn as_constant_cnstr(self) -> ConstantCnstr {
+    pub fn expect_constant_cnstr(self) -> ConstantCnstr {
         unsafe {
             if self.is_block() {
                 panic!(
@@ -89,14 +97,16 @@ impl BlockPtr {
     }
 }
 
-// This must be kept in sync with the same definitions in codegen.ml.
+// This must be kept in sync with the same definitions in cnstr_tag.ml.
 #[repr(u16)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(enum_iterator::Sequence))]
 pub enum KnownTag {
     Int = 0x8001,
     // Char = 0x8002,
     Float = 0x8003,
     String = 0x8004,
+    Forward = 0x9000,
 }
 
 impl TryFrom<u16> for KnownTag {
@@ -107,6 +117,7 @@ impl TryFrom<u16> for KnownTag {
             0x8001 => Ok(KnownTag::Int),
             0x8003 => Ok(KnownTag::Float),
             0x8004 => Ok(KnownTag::String),
+            0x9000 => Ok(KnownTag::Forward),
             _ => Err(()),
         }
     }
@@ -137,16 +148,38 @@ impl Block {
         self.0.as_ptr()
     }
 
+    pub fn new(p: NonNull<BlockPtr>) -> Self {
+        Self(p)
+    }
+
     pub fn header(self) -> BlockHeader {
         unsafe { *(self.as_ptr() as *const BlockHeader) }
     }
 
+    // This kind of lifetime is safe because the GC will ensure all lifetimes are as long
+    // as needed.
     pub fn fields<'a>(self) -> &'a [BlockPtr] {
         unsafe { slice::from_raw_parts(self.as_ptr().add(1), self.header().len as usize) }
     }
 
     pub unsafe fn get_field(self, index: u16) -> BlockPtr {
         *self.as_ptr().add(index as usize + 1)
+    }
+
+    unsafe fn set_field(self, index: u16, value: BlockPtr) {
+        *self.as_ptr().add(index as usize + 1) = value;
+    }
+
+    pub fn classify<'a>(self) -> Value<'a> {
+        let ptr = BlockPtr { block: self };
+        ptr.classify()
+    }
+
+    /// Set the tag of this block to [Forward] and have it point to the new block.
+    /// Used by the garbage collector.
+    pub fn forward(self, new_block: Self) {
+        self.header().tag = KnownTag::Forward as u16;
+        unsafe { self.set_field(0, BlockPtr { block: new_block }) }
     }
 
     // These kinds of runtime checks shouldn't be needed if the compiler produced correct
@@ -174,5 +207,17 @@ impl ConstantCnstr {
 
     pub fn tag(&self) -> u64 {
         self.0 >> 1
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::KnownTag;
+
+    #[test]
+    fn all_known_tags_roundtrip() {
+        for tag in enum_iterator::all::<KnownTag>() {
+            assert_eq!(Ok(tag), KnownTag::try_from(tag as u16))
+        }
     }
 }

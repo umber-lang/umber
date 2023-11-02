@@ -9,7 +9,7 @@ impl Block {
         (self.header().len as usize) * 8 - (last_byte as usize) - 1
     }
 
-    pub fn as_str<'a>(self) -> &'a str {
+    pub fn expect_str<'a>(self) -> &'a str {
         self.expect_tag(KnownTag::String);
         unsafe {
             let bytes = slice::from_raw_parts(self.as_ptr().add(1) as *const u8, self.string_len());
@@ -19,8 +19,8 @@ impl Block {
 }
 
 impl BlockPtr {
-    pub fn as_str<'a>(self) -> &'a str {
-        self.as_block().as_str()
+    pub fn expect_str<'a>(self) -> &'a str {
+        self.expect_block().expect_str()
     }
 
     unsafe fn new_string_with_initializer(
@@ -50,7 +50,7 @@ impl BlockPtr {
 
 #[no_mangle]
 pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    let (x, y) = (x.as_str(), y.as_str());
+    let (x, y) = (x.expect_str(), y.expect_str());
     unsafe {
         BlockPtr::new_string_with_initializer(x.len() + y.len(), |fields| {
             copy_nonoverlapping(x.as_ptr(), fields, x.len());
@@ -68,15 +68,19 @@ mod test {
     #[test]
     fn string_creation() {
         unsafe { umber_gc_init() };
-        assert_eq!(BlockPtr::new_string("hello world").as_str(), "hello world");
-        assert_eq!(BlockPtr::new_string("").as_str(), "")
+        assert_eq!(
+            BlockPtr::new_string("hello world").expect_str(),
+            "hello world"
+        );
+        assert_eq!(BlockPtr::new_string("").expect_str(), "")
     }
 
     #[test]
     fn string_appending() {
         unsafe { umber_gc_init() };
         assert_eq!(
-            umber_string_append(BlockPtr::new_string("foo"), BlockPtr::new_string("bar")).as_str(),
+            umber_string_append(BlockPtr::new_string("foo"), BlockPtr::new_string("bar"))
+                .expect_str(),
             "foobar"
         )
     }

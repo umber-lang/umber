@@ -3,12 +3,12 @@ use libc_print::std_name::print;
 
 #[no_mangle]
 pub extern "C" fn umber_print_int(x: BlockPtr) {
-    print!("{}", x.as_int());
+    print!("{}", x.expect_int());
 }
 
 #[no_mangle]
 pub extern "C" fn umber_print_float(x: BlockPtr) {
-    print!("{}", x.as_float());
+    print!("{}", x.expect_float());
 }
 
 #[no_mangle]
@@ -19,10 +19,10 @@ pub extern "C" fn umber_print_bool(x: BlockPtr) {
 
 #[no_mangle]
 pub extern "C" fn umber_print_string(x: BlockPtr) {
-    print!("{}", x.as_str());
+    print!("{}", x.expect_str());
 }
 
 #[no_mangle]
 pub extern "C" fn umber_print_endline(x: BlockPtr) {
-    print!("{}\n", x.as_str());
+    print!("{}\n", x.expect_str());
 }
