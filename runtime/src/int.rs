@@ -16,7 +16,7 @@ impl BlockPtr {
     }
 
     pub fn new_int(x: i64) -> BlockPtr {
-        unsafe { Self::new(KnownTag::Int, [mem::transmute(x)]) }
+        unsafe { Self::new(KnownTag::Int as u16, [mem::transmute(x)]) }
     }
 }
 

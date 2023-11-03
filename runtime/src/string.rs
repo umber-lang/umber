@@ -29,7 +29,7 @@ impl BlockPtr {
     ) -> Self {
         let n_words: u16 = ((str_len / 8) + 1).try_into().unwrap();
         let n_bytes = 8 * (n_words as usize);
-        Self::new_with_initializer(KnownTag::String, n_words, |block| {
+        Self::new_with_initializer(KnownTag::String as u16, n_words, |block| {
             let fields = block.as_ptr().add(1) as *mut u8;
             initialize(fields);
             for i in str_len..(n_bytes - 1) {

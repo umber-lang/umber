@@ -69,7 +69,7 @@ impl BlockPtr {
         }
     }
 
-    pub fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
+    pub fn new<const N: usize>(tag: u16, fields: [BlockPtr; N]) -> BlockPtr {
         let len: u16 = fields.len().try_into().unwrap();
         unsafe {
             Self::new_with_initializer(tag, len, |block| {
@@ -83,13 +83,13 @@ impl BlockPtr {
     }
 
     pub unsafe fn new_with_initializer(
-        tag: KnownTag,
+        tag: u16,
         len: u16,
         initialize: impl FnOnce(Block),
     ) -> BlockPtr {
         let n_bytes = 8 * (len + 1) as usize;
         let header = Gc::get().alloc(n_bytes) as *mut BlockHeader;
-        (*header).tag = tag as u16;
+        (*header).tag = tag;
         (*header).len = len;
         let block = Block(NonNull::new_unchecked(header as *mut BlockPtr));
         initialize(block);
@@ -135,7 +135,7 @@ pub enum Value<'a> {
 #[repr(C, align(8))]
 #[derive(Copy, Clone)]
 pub struct BlockHeader {
-    tag: u16,
+    pub tag: u16,
     pub len: u16,
 }
 
@@ -152,8 +152,12 @@ impl Block {
         Self(p)
     }
 
-    pub fn header(self) -> BlockHeader {
-        unsafe { *(self.as_ptr() as *const BlockHeader) }
+    pub fn header<'a>(self) -> &'a BlockHeader {
+        unsafe { &*(self.as_ptr() as *const BlockHeader) }
+    }
+
+    pub fn header_mut(self) -> *mut BlockHeader {
+        self.as_ptr() as *mut BlockHeader
     }
 
     // This kind of lifetime is safe because the GC will ensure all lifetimes are as long
@@ -166,7 +170,7 @@ impl Block {
         *self.as_ptr().add(index as usize + 1)
     }
 
-    unsafe fn set_field(self, index: u16, value: BlockPtr) {
+    pub unsafe fn set_field(self, index: u16, value: BlockPtr) {
         *self.as_ptr().add(index as usize + 1) = value;
     }
 
@@ -178,8 +182,10 @@ impl Block {
     /// Set the tag of this block to [Forward] and have it point to the new block.
     /// Used by the garbage collector.
     pub fn forward(self, new_block: Self) {
-        self.header().tag = KnownTag::Forward as u16;
-        unsafe { self.set_field(0, BlockPtr { block: new_block }) }
+        unsafe {
+            (*self.header_mut()).tag = KnownTag::Forward as u16;
+            self.set_field(0, BlockPtr { block: new_block })
+        }
     }
 
     // These kinds of runtime checks shouldn't be needed if the compiler produced correct
