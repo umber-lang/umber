@@ -12,8 +12,7 @@
   llvm.analysis
   llvm.irreader
   llvm.target
-  shell
-  umber_std)
+  shell)
  (preprocess
   (pps sedlex.ppx ppx_jane))
  (inline_tests)

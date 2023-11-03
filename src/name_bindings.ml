@@ -785,7 +785,7 @@ let absolutify_type_expr t type_ =
   Type.Expr.map type_ ~var:Fn.id ~pf:Fn.id ~name:(fun name -> absolutify_type_name t name)
 ;;
 
-let prelude = lazy (into_parent (t_of_sexp Umber_std.Prelude.names))
+let prelude = lazy (into_parent (t_of_sexp (force Sites.prelude_names)))
 
 let add_val_or_extern
   ?extern_name

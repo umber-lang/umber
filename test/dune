@@ -10,14 +10,13 @@
  (alias runtest)
  (target test.dummy)
  (deps
-  (universe) ; cop-out: see https://dune.readthedocs.io/en/stable/concepts.html#deps-field
+  (package umber)
   (glob_files examples/*)
   (glob_files tokens/*.expected)
   (glob_files ast/*.expected)
   (glob_files mir/*.expected)
   (glob_files llvm/*.expected)
-  (glob_files output/*.expected)
-  (alias ../runtime/default))
+  (glob_files output/*.expected))
  (action
   (progn
    (ignore-stderr
