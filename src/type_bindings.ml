@@ -122,7 +122,7 @@ end = struct
   type data =
     | Type of Internal_type.t
     | Effects of Internal_type.effects
-  [@@derivin sexp_of]
+  [@@deriving sexp_of]
 
   type t = data Type_var.Table.t [@@deriving sexp_of]
 
@@ -132,7 +132,7 @@ end = struct
 
   let rec apply_to_type t type_ =
     Internal_type.map type_ ~f:(function
-      | Var v ->
+      | Var var ->
         (* FIXME: Should this be Retry? *)
         Halt
           (match Hashtbl.find t var with
@@ -161,12 +161,16 @@ end = struct
       | Type _ -> compiler_bug [%message "Expected effects, got type"]
     in
     (* FIXME: apply substitutions to effect vars. We should be able to do that, right? *)
-    { effects = Map.map ~f:(List.map ~f:(apply_to_type t))
+    { effects = Map.map effects ~f:(List.map ~f:(apply_to_type t))
     ; effect_var = (if Option.is_some new_effects then None else effect_var)
     }
   ;;
 
-  let compose t t' = Hashtbl.map_inplace t ~f:(apply_to_type t')
+  let compose t t' =
+    Hashtbl.map_inplace t ~f:(function
+      | Type type_ -> Type (apply_to_type t' type_)
+      | Effects effects -> Effects (apply_to_effects t' effects))
+  ;;
 end
 
 type t =
@@ -178,8 +182,7 @@ type t =
 [@@deriving sexp_of]
 
 let create () =
-  { type_var_constraints = Constraints.create ()
-  ; effect_var_constraints = Constraints.create ()
+  { constraints = Constraints.create ()
   ; substitution = Substitution.create ()
   ; constrained_types = Type_pair.Hash_set.create ()
   ; constrained_effects = Effect_type_pair.Hash_set.create ()
@@ -243,12 +246,22 @@ let refresh_effects ({ effects; effect_var } : Internal_type.effects)
   }
 ;;
 
-let check_var_vs_type ~names ~types ~constraints ~constrain ~var ~type_ ~var_side =
-  (* FIXME: simplify `orient` *)
+let check_var_vs_type
+  ~names
+  ~types
+  ~var
+  ~type_
+  ~var_side
+  ~constrain
+  ~to_var
+  ~set_substitution
+  ~refresh
+  =
+  (* FIXME: simplify `orient` - How? *)
   let orient f ~var ~type_ =
     match var_side with
-    | `Left -> f (Internal_type.Var var) type_
-    | `Right -> f type_ (Internal_type.Var var)
+    | `Left -> f (to_var var) type_
+    | `Right -> f type_ (to_var var)
   in
   (* FIXME: Clean up pseudocode:
      Let S be the current substitution, C be the current constraints.
@@ -270,13 +283,15 @@ let check_var_vs_type ~names ~types ~constraints ~constrain ~var ~type_ ~var_sid
          - S'(C') (Constraints for all the new versions of vars with the same shape
            as id1)
   *)
-  let vars_with_same_shape = Constraints.find_vars_with_same_shape constraints var in
+  let vars_with_same_shape =
+    Constraints.find_vars_with_same_shape types.constraints var
+  in
   Set.iter vars_with_same_shape ~f:(fun var ->
-    Constraints.remove_vars constraints var vars_with_same_shape);
+    Constraints.remove_vars types.constraints var vars_with_same_shape);
   let new_var_substitution =
     let substitution = Substitution.create () in
     Set.iter vars_with_same_shape ~f:(fun var ->
-      Substitution.set substitution var (refresh_type type_));
+      set_substitution substitution var (refresh type_));
     substitution
   in
   Substitution.compose types.substitution new_var_substitution;
@@ -284,7 +299,7 @@ let check_var_vs_type ~names ~types ~constraints ~constrain ~var ~type_ ~var_sid
     constrain ~names ~types ~subtype ~supertype);
   Set.iter vars_with_same_shape ~f:(fun v ->
     Set.iter vars_with_same_shape ~f:(fun v' ->
-      constrain ~names ~types ~subtype:(Var v) ~supertype:(Var v')))
+      constrain ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
 ;;
 
 let rec constrain ~names ~types ~subtype ~supertype =
@@ -317,17 +332,33 @@ let rec constrain ~names ~types ~subtype ~supertype =
     match subtype, supertype with
     | Var var1, Var var2 ->
       if not (Type_var.equal var1 var2)
-      then Constraints.add types.type_var_constraints ~subtype:var1 ~supertype:var2
+      then Constraints.add types.constraints ~subtype:var1 ~supertype:var2
     | Var var, type_ ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      let constraints = types.type_var_constraints in
-      check_var_vs_type ~names ~types ~constraints ~constrain ~var ~type_ ~var_side:`Left
+      check_var_vs_type
+        ~names
+        ~types
+        ~var
+        ~type_
+        ~var_side:`Left
+        ~constrain
+        ~to_var:Internal_type.var
+        ~set_substitution:Substitution.set_type
+        ~refresh:refresh_type
     | type_, Var var ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      let constraints = types.type_var_constraints in
-      check_var_vs_type ~names ~types ~constraints ~constrain ~var ~type_ ~var_side:`Right
+      check_var_vs_type
+        ~names
+        ~types
+        ~var
+        ~type_
+        ~var_side:`Right
+        ~constrain
+        ~to_var:Internal_type.var
+        ~set_substitution:Substitution.set_type
+        ~refresh:refresh_type
     | Type_app (name1, args1), Type_app (name2, args2) ->
       let type_entry1 = lookup_type names name1 args1 in
       (match Name_bindings.Type_entry.decl type_entry1 with
@@ -483,30 +514,31 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       (* FIXME: Robust effect occurs check *)
       if occurs_in_effects subtype_var supertype
       then Compilation_error.raise Type_error ~msg:[%message "Occurs check failed"];
-      let vars_with_same_shape =
-        Constraints.find_vars_with_same_shape types.effect_var_constraints subtype_var
-      in
-      Set.iter vars_with_same_shape ~f:(fun var ->
-        Constraints.remove_vars types.effect_var_constraints var vars_with_same_shape);
-      let new_var_substitution =
-        let substitution = Substitution.create () in
-        Set.iter vars_with_same_shape ~f:(fun var ->
-          Substitution.set substitution var (refresh_effects supertype));
-        substitution
-      in
-      Substitution.compose types.substitution new_var_substitution;
-      orient ~var ~type_ (fun subtype supertype ->
-        constrain ~names ~types ~subtype ~supertype);
-      Set.iter vars_with_same_shape ~f:(fun v ->
-        Set.iter vars_with_same_shape ~f:(fun v' ->
-          constrain ~names ~types ~subtype:(Var v) ~supertype:(Var v')))
+      check_var_vs_type
+        ~names
+        ~types
+        ~var:subtype_var
+        ~type_:supertype
+        ~var_side:`Left
+        ~constrain:constrain_effects
+        ~to_var:(fun var : Internal_type.effects ->
+          { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
+        ~set_substitution:Substitution.set_effects
+        ~refresh:refresh_effects
     | None, Some supertype_var ->
       if occurs_in_effects supertype_var subtype
       then Compilation_error.raise Type_error ~msg:[%message "Occurs check failed"];
-      let supertype_bounds = get_var_bounds types.effect_vars supertype_var in
-      Queue.enqueue supertype_bounds.lower_bounds subtype;
-      Queue.iter supertype_bounds.upper_bounds ~f:(fun bound ->
-        constrain_effects ~names ~types ~subtype ~supertype:bound))
+      check_var_vs_type
+        ~names
+        ~types
+        ~var:supertype_var
+        ~type_:subtype
+        ~var_side:`Right
+        ~constrain:constrain_effects
+        ~to_var:(fun var : Internal_type.effects ->
+          { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
+        ~set_substitution:Substitution.set_effects
+        ~refresh:refresh_effects)
 
 and constrain_effects_to_be_total ~names ~types effects =
   constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
@@ -661,6 +693,7 @@ let generalize types outer_type =
     | Tuple fields ->
       Tuple (List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
   and find_var_bounds types var ~polarity =
+    (* FIXME: var bounds kinda aren't a thing anymore? What should we do here? *)
     match Hashtbl.find types.type_vars var with
     (* FIXME: How do we do substitution for type variables now that we have effect
           types? I think we need to encode the constraints in the type expression, maybe?
