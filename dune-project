@@ -9,4 +9,5 @@
 (package
  (name umber)
  (sites
-  (share runtime)))
+  (share runtime)
+  (share stdlib)))

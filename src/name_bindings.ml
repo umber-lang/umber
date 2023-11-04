@@ -831,7 +831,7 @@ let absolutify_type_scheme t type_ =
     ~effect_name:(absolutify_effect_name t)
 ;;
 
-let prelude = lazy (into_parent (t_of_sexp Umber_std.Prelude.names))
+let prelude = lazy (into_parent (t_of_sexp (force Sites.prelude_names)))
 
 let add_val_or_extern
   ?extern_name

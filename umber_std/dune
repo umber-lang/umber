@@ -1,17 +1,31 @@
-; TODO: Consider doing this generation with a normal binary and including the files using
-; a dune "site", similarly to how the runtime is linked in.
+(install
+ (section
+  (site
+   (umber stdlib)))
+ (files prelude_names.sexp prelude_llvm.ll))
 
-(cinaps
- (files prelude.ml)
- (libraries umberboot)
- (runtime_deps
-  (file Std/Prelude.um)
-  (file prelude.ml))
- (preprocess
-  (pps ppx_jane)))
+(rule
+ (target prelude_names.sexp)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{dep:../umberboot.exe}
+    %{dep:Std/Prelude.um}
+    -no-std
+    -parent
+    Std
+    -names))))
 
-(library
- (name umber_std)
- (libraries core_kernel)
- (preprocess
-  (pps ppx_jane)))
+(rule
+ (target prelude_llvm.ll)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{dep:../umberboot.exe}
+    %{dep:Std/Prelude.um}
+    -no-std
+    -parent
+    Std
+    -llvm))))
