@@ -70,10 +70,11 @@ module Constraints : sig
   (* FIXME: Make this interface less confusing*)
   val remove_vars : t -> Type_var.t -> Type_var.Set.t -> unit
   val find_vars_with_same_shape : t -> Type_var.t -> Type_var.Set.t
+  val print : t -> unit
 end = struct
   type t =
-    { lower_bounds : Type_var.t Queue.t Type_var.Table.t
-    ; upper_bounds : Type_var.t Queue.t Type_var.Table.t
+    { lower_bounds : Type_var.Hash_set.t Type_var.Table.t
+    ; upper_bounds : Type_var.Hash_set.t Type_var.Table.t
     }
   [@@deriving sexp_of]
 
@@ -81,31 +82,50 @@ end = struct
     { lower_bounds = Type_var.Table.create (); upper_bounds = Type_var.Table.create () }
   ;;
 
-  let get_bounds = Hashtbl.find_or_add ~default:Queue.create
+  let get_bounds = Hashtbl.find_or_add ~default:Type_var.Hash_set.create
 
   let add_bounds { lower_bounds; upper_bounds } ~subtype ~supertype =
-    Queue.enqueue (get_bounds upper_bounds subtype) supertype;
-    Queue.enqueue (get_bounds lower_bounds supertype) subtype
+    Hash_set.add (get_bounds upper_bounds subtype) supertype;
+    Hash_set.add (get_bounds lower_bounds supertype) subtype
   ;;
 
-  (* If we get a constraint [a <= b], we also need to add all constraints transitively
+  (* If we get a constraint [a <: b], we also need to add all constraints transitively
      implied by that, so that the constraints remain closed under logical implication.
-     So we need to add all constraints of the form a' <= b' for all a' <= a and b' >= b. *)
+     So we need to add all constraints of the form a' <: b' for all a' <: a and b' >: b. *)
   let add t ~subtype ~supertype =
-    Queue.iter (get_bounds t.lower_bounds subtype) ~f:(fun subtype' ->
-      Queue.iter (get_bounds t.upper_bounds supertype) ~f:(fun supertype' ->
-        add_bounds t ~subtype:subtype' ~supertype:supertype'));
-    add_bounds t ~subtype ~supertype
+    List.iter
+      (subtype :: Hash_set.to_list (get_bounds t.lower_bounds subtype))
+      ~f:(fun subtype' ->
+        List.iter
+          (supertype :: Hash_set.to_list (get_bounds t.upper_bounds supertype))
+          ~f:(fun supertype' -> add_bounds t ~subtype:subtype' ~supertype:supertype'))
   ;;
 
   let remove_vars { lower_bounds; upper_bounds } var vars =
-    Queue.filter_inplace (get_bounds lower_bounds var) ~f:(not << Set.mem vars);
-    Queue.filter_inplace (get_bounds upper_bounds var) ~f:(not << Set.mem vars)
+    Hash_set.filter_inplace (get_bounds lower_bounds var) ~f:(not << Set.mem vars);
+    Hash_set.filter_inplace (get_bounds upper_bounds var) ~f:(not << Set.mem vars)
   ;;
 
   let find_vars_with_same_shape { lower_bounds; upper_bounds } var =
-    let add_vars bounds vars = Queue.fold ~init:vars (get_bounds bounds var) ~f:Set.add in
+    let add_vars bounds vars =
+      Hash_set.fold ~init:vars (get_bounds bounds var) ~f:Set.add
+    in
     Type_var.Set.empty |> add_vars lower_bounds |> add_vars upper_bounds
+  ;;
+
+  let print t =
+    Hashtbl.to_alist t.upper_bounds
+    |> List.sort ~compare:[%compare: Type_var.t * _]
+    |> List.iter ~f:(fun (subtype, supertypes) ->
+         if not (Hash_set.is_empty supertypes)
+         then (
+           let supertypes =
+             Hash_set.to_list supertypes
+             |> List.sort ~compare:Type_var.compare
+             |> List.map ~f:Type_var.to_string
+             |> String.concat ~sep:", "
+           in
+           print_endline [%string "%{subtype#Type_var} <: %{supertypes}"]))
   ;;
 end
 
@@ -886,29 +906,36 @@ let%expect_test "unification cycles" =
   let names = Name_bindings.core in
   let print_constraints () =
     [%test_pred: Substitution.t] Substitution.is_empty types.substitution;
-    print_s [%sexp (types.constraints : Constraints.t)]
+    Constraints.print (types.constraints : Constraints.t)
   in
   print_constraints ();
-  [%expect {| ((type_vars ()) (effect_vars ())) |}];
-  let a = Internal_type.fresh_var () in
-  let b = Internal_type.fresh_var () in
-  let c = Internal_type.fresh_var () in
-  let d = Internal_type.fresh_var () in
-  constrain ~names ~types ~subtype:a ~supertype:b;
+  [%expect {| |}];
+  let v0 = Internal_type.fresh_var () in
+  let v1 = Internal_type.fresh_var () in
+  let v2 = Internal_type.fresh_var () in
+  let v3 = Internal_type.fresh_var () in
+  constrain ~names ~types ~subtype:v0 ~supertype:v1;
   print_constraints ();
-  [%expect {| ((type_vars ()) (effect_vars ())) |}];
-  [%expect {| ((type_vars ((0 (Var 1)))) (effect_vars ())) |}];
-  constrain ~names ~types ~subtype:b ~supertype:c;
+  [%expect {|
+    $0 <: $1 |}];
+  constrain ~names ~types ~subtype:v1 ~supertype:v2;
   print_constraints ();
-  [%expect {| ((type_vars ()) (effect_vars ())) |}];
+  [%expect {|
+    $0 <: $1, $2
+    $1 <: $2 |}];
+  constrain ~names ~types ~subtype:v2 ~supertype:v3;
   print_constraints ();
-  [%expect {| ((type_vars ()) (effect_vars ())) |}];
+  [%expect {|
+    $0 <: $1, $2, $3
+    $1 <: $2, $3
+    $2 <: $3 |}];
+  constrain ~names ~types ~subtype:v3 ~supertype:v0;
+  (* FIXME: No 1 < 0 etc. ? Shouldn't there be more constraints? *)
   print_constraints ();
-  [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)))) (effect_vars ())) |}];
-  constrain ~names ~types ~subtype:c ~supertype:d;
-  print_constraints ();
-  [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}];
-  constrain ~names ~types ~subtype:d ~supertype:a;
-  print_constraints ();
-  [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}]
+  [%expect
+    {|
+    $0 <: $0, $1, $2, $3
+    $1 <: $0, $1, $2, $3
+    $2 <: $0, $1, $2, $3
+    $3 <: $0, $1, $2, $3 |}]
 ;;
