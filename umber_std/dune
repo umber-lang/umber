@@ -6,6 +6,7 @@
 
 (rule
  (target prelude_names.sexp)
+ (mode promote)
  (action
   (with-stdout-to
    %{target}
