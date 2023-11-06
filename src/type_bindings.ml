@@ -117,7 +117,7 @@ module Substitution : sig
   val set_effects : t -> Type_var.t -> Internal_type.effects -> unit
   val compose : t -> t -> unit
   val apply_to_type : t -> Internal_type.t -> Internal_type.t
-  val apply_to_effects : t -> Internal_type.effects -> Internal_type.effects
+  val is_empty : t -> bool
 end = struct
   type data =
     | Type of Internal_type.t
@@ -130,25 +130,39 @@ end = struct
   let set_type t var type_ = Hashtbl.set t ~key:var ~data:(Type type_)
   let set_effects t var effects = Hashtbl.set t ~key:var ~data:(Effects effects)
 
+  let apply_to_type_var t var =
+    match Hashtbl.find t var with
+    | Some (Type type_) -> type_
+    | None -> Var var
+    | Some (Effects _) -> compiler_bug [%message "Expected type, got effects"]
+  ;;
+
   let rec apply_to_type t type_ =
     Internal_type.map type_ ~f:(function
       | Var var ->
-        (* FIXME: Should this be Retry? *)
-        Halt
-          (match Hashtbl.find t var with
-           | Some (Type type_) -> type_
-           | None -> Var var
-           | Some (Effects _) -> compiler_bug [%message "Expected type, got effects"])
+        (* FIXME: Should this be Retry? No, I don't think we want to recursively apply
+           the substitution, do we? *)
+        Halt (apply_to_type_var t var)
       | Function (args, effects, result) ->
         Halt
           (Function
              ( Nonempty.map args ~f:(apply_to_type t)
              , apply_to_effects t effects
              , apply_to_type t result ))
-      | Partial_function (args, effects, result) ->
-        Halt
-          (Partial_function
-             (Nonempty.map args ~f:(apply_to_type t), apply_to_effects t effects, result))
+      | Partial_function (args, effects, result_var) ->
+        let args = Nonempty.map args ~f:(apply_to_type t) in
+        let effects = apply_to_effects t effects in
+        (match apply_to_type_var t result_var with
+         | Var result_var -> Halt (Partial_function (args, effects, result_var))
+         | Partial_function (args', effects', result_var) as result_type ->
+           (* FIXME: Effects must be pure for us to combine partial functions.
+              PROBLEM: We might not know at this stage whether effects are pure. For now,
+              let's do something naive. *)
+           if Internal_type.equal_effects effects Internal_type.no_effects
+           then Halt (Partial_function (Nonempty.append args args', effects', result_var))
+           else Halt (Function (args, effects, result_type))
+         | (Function _ | Type_app _ | Tuple _) as result_type ->
+           Halt (Function (args, effects, result_type)))
       | (Type_app _ | Tuple _) as type_ -> Defer type_)
 
   and apply_to_effects t ({ effects; effect_var } : Internal_type.effects)
@@ -171,6 +185,8 @@ end = struct
       | Type type_ -> Type (apply_to_type t' type_)
       | Effects effects -> Effects (apply_to_effects t' effects))
   ;;
+
+  let is_empty = Hashtbl.is_empty
 end
 
 type t =
@@ -225,10 +241,11 @@ let iter2_types xs ys ~subtype ~supertype ~f =
   | Unequal_lengths -> type_error "Type item length mismatch" subtype supertype
 ;;
 
-let get_var_bounds =
+(* FIXME: cleanup *)
+(* let get_var_bounds =
   Hashtbl.find_or_add ~default:(fun () ->
     { lower_bounds = Queue.create (); upper_bounds = Queue.create () })
-;;
+;; *)
 
 let refresh_type type_ =
   let vars = Type_var.Table.create () in
@@ -319,12 +336,12 @@ let rec constrain ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     (* FIXME: cleanup *)
-    print_s
+    (* print_s
       [%message
         "Type_bindings.constrain"
           (subtype : Internal_type.t)
           (supertype : Internal_type.t)
-          (types : t)];
+          (types : t)]; *)
     Hash_set.add types.constrained_types (subtype, supertype);
     (* FIXME: Must apply the current substitution to all generated constraints. *)
     let subtype = Substitution.apply_to_type types.substitution subtype in
@@ -391,7 +408,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Function (args1, _effect_row1, res1), Function (args2, _effect_row2, res2) ->
       (* FIXME: We aren't constraining the effect rows here! (Also not in the other cases
          either.) It's also pretty unclear how subtyping on effect rows should work. This
-         doesn't seemm to make sense as-is. *)
+         doesn't seem to make sense as-is. *)
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
@@ -409,7 +426,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
          (* FIXME: Left fun has more args, right fun is under-applied and must be total. *)
          constrain_effects_to_be_total ~names ~types effect_row2;
          (* FIXME: what's the subtyping direction for the remainder of function args? 
-          Maybe it should work like returning a value, so covariant? *)
+            Maybe it should work like returning a value, so covariant? *)
          constrain
            ~names
            ~types
@@ -510,7 +527,8 @@ and constrain_effects ~names ~types ~subtype ~supertype =
                 ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
     | Some subtype_var, _ ->
       (* FIXME: Code duplication with code for types *)
-      (* FIXME: Is it really ok to ignore the supertype var above? *)
+      (* FIXME: Is it really ok to ignore the supertype var above? Is this separate
+         handling of effect vars and effects correct? (probably not) *)
       (* FIXME: Robust effect occurs check *)
       if occurs_in_effects subtype_var supertype
       then Compilation_error.raise Type_error ~msg:[%message "Occurs check failed"];
@@ -526,6 +544,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
         ~set_substitution:Substitution.set_effects
         ~refresh:refresh_effects
     | None, Some supertype_var ->
+      (* FIXME: Robust effect occurs check *)
       if occurs_in_effects supertype_var subtype
       then Compilation_error.raise Type_error ~msg:[%message "Occurs check failed"];
       check_var_vs_type
@@ -648,10 +667,28 @@ end
      do this iteratively as we unify normally?
    *)
 
+(* FIXME: How does generalization work now? We need to reify the information from the
+   gathered constraints and substitution. Yes, we need to (optionally) simplify the 
+   constraints, then apply the substitution, and return the constraints. *)
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
    expresion/statement. *)
 let generalize types outer_type =
+  let generalize_type_var ~env ~in_progress ~polarity ~var =
+    if Set.mem in_progress (polarity, var)
+    then
+      Compilation_error.raise
+        Type_error
+        ~msg:
+          [%message
+            "Recursive type"
+              ~recursive_var:(polarity, var : Polar_var.t)
+              (outer_type : Internal_type.t)]
+    else Type_param.Env_of_vars.find_or_add env var
+    (* let bounds = find_var_bounds types var ~polarity in
+        let in_progress = Set.add in_progress (polarity, var) in
+        collapse_var_bounds types var bounds ~env ~in_progress ~polarity *)
+  in
   let rec generalize_internal types typ ~env ~in_progress ~(polarity : Polarity.t)
     : Module_path.absolute Type_scheme.t
     =
@@ -659,20 +696,7 @@ let generalize types outer_type =
     print_s
       [%message "generalize_internal" (typ : Internal_type.t) (polarity : Polarity.t)];
     match typ with
-    | Var var ->
-      if Set.mem in_progress (polarity, var)
-      then
-        Compilation_error.raise
-          Type_error
-          ~msg:
-            [%message
-              "Recursive type"
-                ~recursive_var:(polarity, var : Polar_var.t)
-                (outer_type : Internal_type.t)]
-      else (
-        let bounds = find_var_bounds types var ~polarity in
-        let in_progress = Set.add in_progress (polarity, var) in
-        collapse_var_bounds types var bounds ~env ~in_progress ~polarity)
+    | Var var -> Var (generalize_type_var ~env ~in_progress ~polarity ~var)
     | Function (args, effects, res) ->
       Function
         ( Nonempty.map
@@ -685,16 +709,28 @@ let generalize types outer_type =
                  ~polarity:(Polarity.flip polarity))
         , generalize_effects_internal types effects ~env ~in_progress ~polarity
         , generalize_internal types res ~env ~in_progress ~polarity )
-    | Partial_function (args, effects, id) ->
-      combine_partial_functions types args effects id ~env ~in_progress ~polarity
+    | Partial_function (args, effects, result_var) ->
+      Function
+        ( Nonempty.map
+            args
+            ~f:
+              (generalize_internal
+                 types
+                 ~env
+                 ~in_progress
+                 ~polarity:(Polarity.flip polarity))
+        , generalize_effects_internal types effects ~env ~in_progress ~polarity
+        , Var (generalize_type_var ~env ~in_progress ~polarity ~var:result_var) )
+      (* combine_partial_functions types args effects id ~env ~in_progress ~polarity *)
     | Type_app (name, fields) ->
       Type_app
         (name, List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
     | Tuple fields ->
       Tuple (List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
-  and find_var_bounds types var ~polarity =
+  (* FIXME: cleanup/remove *)
+  (* and _find_var_bounds _types var ~polarity =
     (* FIXME: var bounds kinda aren't a thing anymore? What should we do here? *)
-    match Hashtbl.find types.type_vars var with
+    match Hashtbl.find (failwith "type vars") var with
     (* FIXME: How do we do substitution for type variables now that we have effect
           types? I think we need to encode the constraints in the type expression, maybe?
           Hmm, I think all the lower/upper bounds are going to look basically the same,
@@ -737,8 +773,8 @@ let generalize types outer_type =
         (match polarity with
          | Positive -> lower_bounds
          | Negative -> upper_bounds)
-    | None -> []
-  and collapse_var_bounds types var bounds ~env ~in_progress ~polarity =
+    | None -> [] *)
+  (* and collapse_var_bounds types var bounds ~env ~in_progress ~polarity =
     let combine_types =
       match polarity with
       | Positive -> Type_scheme.union
@@ -751,7 +787,7 @@ let generalize types outer_type =
       :: List.map bounds ~f:(generalize_internal types ~env ~in_progress ~polarity)
     in
     (* FIXME: Also need to simplify away type variables. *)
-    combine_types bounds
+    combine_types bounds *)
   (* FIXME: Implement this *)
   (* and substitute_effects types {effects ; effect_vars} ~polarity =
   let () =
@@ -781,7 +817,10 @@ let generalize types outer_type =
    properly distinguish between a partial function that then gets later applied in the
    same function, or a function that really returns another function. Which one should we
    assume? *)
-  and combine_partial_functions types args effects id ~env ~in_progress ~polarity =
+  (* and combine_partial_functions types args effects id ~env ~in_progress ~polarity =
+    (* FIXME: We need to determine if [id] is constrained to the same shape as some
+       function type (either subtype or supertype). Actually, I think what should happen
+       is that the var gets substituted with a function type already. *)
     (* FIXME: Does this make any sense? In the var case we're just returning a var instead
      of the function?? *)
     (* FIXME: We should put some simplification steps in [find_var_bounds] so this
@@ -810,7 +849,7 @@ let generalize types outer_type =
                  ~in_progress
                  ~polarity:(Polarity.flip polarity))
         , generalize_effects_internal types effects ~env ~in_progress ~polarity
-        , collapse_var_bounds types id bounds ~env ~in_progress ~polarity )
+        , collapse_var_bounds types id bounds ~env ~in_progress ~polarity ) *)
   and generalize_effects_internal types effects ~env ~in_progress ~polarity =
     match effects with
     | { effects; effect_var = None } ->
@@ -845,22 +884,31 @@ let generalize types outer_type =
 let%expect_test "unification cycles" =
   let types = create () in
   let names = Name_bindings.core in
-  print_s [%sexp (types : t)];
+  let print_constraints () =
+    [%test_pred: Substitution.t] Substitution.is_empty types.substitution;
+    print_s [%sexp (types.constraints : Constraints.t)]
+  in
+  print_constraints ();
   [%expect {| ((type_vars ()) (effect_vars ())) |}];
   let a = Internal_type.fresh_var () in
   let b = Internal_type.fresh_var () in
   let c = Internal_type.fresh_var () in
   let d = Internal_type.fresh_var () in
   constrain ~names ~types ~subtype:a ~supertype:b;
-  print_s [%sexp (types : t)];
+  print_constraints ();
+  [%expect {| ((type_vars ()) (effect_vars ())) |}];
   [%expect {| ((type_vars ((0 (Var 1)))) (effect_vars ())) |}];
   constrain ~names ~types ~subtype:b ~supertype:c;
-  print_s [%sexp (types : t)];
+  print_constraints ();
+  [%expect {| ((type_vars ()) (effect_vars ())) |}];
+  print_constraints ();
+  [%expect {| ((type_vars ()) (effect_vars ())) |}];
+  print_constraints ();
   [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)))) (effect_vars ())) |}];
   constrain ~names ~types ~subtype:c ~supertype:d;
-  print_s [%sexp (types : t)];
+  print_constraints ();
   [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}];
   constrain ~names ~types ~subtype:d ~supertype:a;
-  print_s [%sexp (types : t)];
+  print_constraints ();
   [%expect {| ((type_vars ((0 (Var 1)) (1 (Var 2)) (2 (Var 3)))) (effect_vars ())) |}]
 ;;
