@@ -1,6 +1,9 @@
 open! Import
 open! Names
 
+(* FIXME: cleanup *)
+let eprint_s = ignore
+
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
    Some of these features can make local let-generalization difficult, see:
@@ -10,9 +13,8 @@ open! Names
 (* TODO: Consider integrating source locations into stored types to give better type
    errors. *)
 
-let type_error msg t1 t2 =
-  (* Prevent unstable Var_ids from appearing in test output *)
-  let env = Type_param.Env_of_vars.create () in
+(** Prevent unstable [Type_var.t]s from appearing in test output sexps. *)
+let replace_vars_in_sexp env sexp =
   (* FIXME: Need a way to show an internnal type with stable names for the variables.
      Hmm, maybe it would be good enough if each type expression had its own variable scope,
      instead of it being global. Maybe generalize what Mir_name.Name_table does? Or make a
@@ -21,19 +23,25 @@ let type_error msg t1 t2 =
      We should probably have type variables be scopied properly to let binding groups for
      one [Type_bindings.t]. We also need to think of a smarter way to display an
      [Internal_type.t] in a user-friendly format. (A sexp is definitely not it.) *)
-  let map_type t =
-    let rec loop : Sexp.t -> Sexp.t = function
-      | List sexps -> List (List.map sexps ~f:loop)
-      | Atom str as atom ->
-        (match Type_var.of_string str with
-         | var -> [%sexp (Type_param.Env_of_vars.find_or_add env var : Type_param_name.t)]
-         | exception _ -> atom)
-    in
-    loop [%sexp (t : Internal_type.t)]
+  let rec loop : Sexp.t -> Sexp.t = function
+    | List sexps -> List (List.map sexps ~f:loop)
+    | Atom str as atom ->
+      (match Type_var.of_string str with
+       | var -> [%sexp (Type_param.Env_of_vars.find_or_add env var : Type_param_name.t)]
+       | exception _ -> atom)
   in
+  loop sexp
+;;
+
+let type_error msg t1 t2 =
+  let env = Type_param.Env_of_vars.create () in
   Compilation_error.raise
     Type_error
-    ~msg:[%message msg ~type1:(map_type t1 : Sexp.t) ~type2:(map_type t2 : Sexp.t)]
+    ~msg:
+      [%message
+        msg
+          ~type1:(replace_vars_in_sexp env [%sexp (t1 : Internal_type.t)] : Sexp.t)
+          ~type2:(replace_vars_in_sexp env [%sexp (t2 : Internal_type.t)] : Sexp.t)]
 ;;
 
 type 'a var_bounds =
@@ -110,7 +118,7 @@ end = struct
     let add_vars bounds vars =
       Hash_set.fold ~init:vars (get_bounds bounds var) ~f:Set.add
     in
-    Type_var.Set.empty |> add_vars lower_bounds |> add_vars upper_bounds
+    Type_var.Set.singleton var |> add_vars lower_bounds |> add_vars upper_bounds
   ;;
 
   let print t =
@@ -137,6 +145,7 @@ module Substitution : sig
   val set_effects : t -> Type_var.t -> Internal_type.effects -> unit
   val compose : t -> t -> unit
   val apply_to_type : t -> Internal_type.t -> Internal_type.t
+  val apply_to_effects : t -> Internal_type.effects -> Internal_type.effects
   val is_empty : t -> bool
 end = struct
   type data =
@@ -201,9 +210,12 @@ end = struct
   ;;
 
   let compose t t' =
-    Hashtbl.map_inplace t ~f:(function
-      | Type type_ -> Type (apply_to_type t' type_)
-      | Effects effects -> Effects (apply_to_effects t' effects))
+    Hashtbl.merge_into ~src:t' ~dst:t ~f:(fun ~key:_ new_value old_value ->
+      Set_to
+        (match old_value with
+         | None -> new_value
+         | Some (Type type_) -> Type (apply_to_type t' type_)
+         | Some (Effects effects) -> Effects (apply_to_effects t' effects)))
   ;;
 
   let is_empty = Hashtbl.is_empty
@@ -331,6 +343,13 @@ let check_var_vs_type
       set_substitution substitution var (refresh type_));
     substitution
   in
+  eprint_s
+    [%message
+      "check_var_vs_type"
+        (var : Type_var.t)
+        (var_side : [ `Left | `Right ])
+        (vars_with_same_shape : Type_var.Set.t)
+        (new_var_substitution : Substitution.t)];
   Substitution.compose types.substitution new_var_substitution;
   orient ~var ~type_ (fun subtype supertype ->
     constrain ~names ~types ~subtype ~supertype);
@@ -356,14 +375,16 @@ let rec constrain ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     (* FIXME: cleanup *)
-    (* print_s
+    eprint_s
       [%message
         "Type_bindings.constrain"
           (subtype : Internal_type.t)
           (supertype : Internal_type.t)
-          (types : t)]; *)
+          (types : t)];
     Hash_set.add types.constrained_types (subtype, supertype);
-    (* FIXME: Must apply the current substitution to all generated constraints. *)
+    (* FIXME: Must apply the current substitution to all generated constraints.
+       Should this substitution be applied before checking the constrained_types cache?
+       Probably. *)
     let subtype = Substitution.apply_to_type types.substitution subtype in
     let supertype = Substitution.apply_to_type types.substitution supertype in
     match subtype, supertype with
@@ -503,6 +524,11 @@ and constrain_effects ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_effects (subtype, supertype))
   then (
     Hash_set.add types.constrained_effects (subtype, supertype);
+    (* FIXME: Must apply the current substitution to all generated constraints.
+       Should this substitution be applied before checking the constrained_types cache?
+       Probably. *)
+    let subtype = Substitution.apply_to_effects types.substitution subtype in
+    let supertype = Substitution.apply_to_effects types.substitution supertype in
     let ({ effects = subtype_effects; effect_var = subtype_var } : Internal_type.effects) =
       subtype
     and ({ effects = supertype_effects; effect_var = supertype_var }
@@ -511,8 +537,30 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       supertype
     in
     (* FIXME: I think we need to just use variables only? Otherwise we'd have to represent
-     subtracting some effects from a variable here. Maybe we have to do that anyway, to be
-     able to represent handling effects, though. Yeah, we do. *)
+       subtracting some effects from a variable here. Maybe we have to do that anyway, to be
+       able to represent handling effects, though. Yeah, we do. *)
+    (* FIXME: Ok, what's going on in this function? 
+       We want to unify the known effects and the effect variables. Conceptually, if we have
+       <e1, a> <: <e2, b>, we want to constrain like this: (a - e1) <: (b - e2).
+       Can we do some sketchy algebra to make this (a) <: (b - e2 + e1) ?
+       or maybe (a + e2 - e1) <: (b) ?
+
+       Cases:
+       - If the variables are both missing or equal, just constrain that e1 <: e2 i.e.
+         there are no effects in e1 not in e2. Effect polymorphism makes this a bit weird,
+         but fine.
+       - If a exists but b does not, a + e1 <: e2, so subtype_only (e1 - e2) must be empty,
+         then constrain a <: e2 - e1, or just a <: e2 should also be correct I guess,
+         since (e2 - e1) <: e2. Use check_var_vs_type for this.
+       - If b exists but a does not, e1 <: b + e2, so subtype_only (e1 - e2) may be
+         non-empty (b would contain the rest). Constrain e1 - e2 <: b. Use
+         check_var_vs_type with subtype_only as a new effect type.
+       - If both a and b exist, we have the general case of a + e1 <: b + e2.
+
+       Actually, check_var_vs_type is just gonna do some recursion, yeah? Hmm, maybe
+       through some janky modifications of substitution/constraints, this can make
+       progress? We need to apply substitutions, similarly to for regular types.
+    *)
     let subtype_only =
       Map.fold_symmetric_diff
         subtype_effects
@@ -535,8 +583,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
              | Unequal_lengths ->
                compiler_bug [%message "Unequal number of arguments to effect types"]))
     in
-    match subtype_var, supertype_var with
-    | None, None ->
+    let check_subtype_only_is_empty () =
       if not (Map.is_empty subtype_only)
       then
         Compilation_error.raise
@@ -545,13 +592,28 @@ and constrain_effects ~names ~types ~subtype ~supertype =
             [%message
               "Found more effects than expected"
                 ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
-    | Some subtype_var, _ ->
-      (* FIXME: Code duplication with code for types *)
-      (* FIXME: Is it really ok to ignore the supertype var above? Is this separate
-         handling of effect vars and effects correct? (probably not) *)
+    in
+    match subtype_var, supertype_var with
+    | None, None -> check_subtype_only_is_empty ()
+    | Some subtype_var, Some supertype_var when Type_var.equal subtype_var supertype_var
+      -> check_subtype_only_is_empty ()
+    | Some subtype_var, None ->
+      check_subtype_only_is_empty ();
       (* FIXME: Robust effect occurs check *)
       if occurs_in_effects subtype_var supertype
-      then Compilation_error.raise Type_error ~msg:[%message "Occurs check failed"];
+      then (
+        let env = Type_param.Env_of_vars.create () in
+        Compilation_error.raise
+          Type_error
+          ~msg:
+            [%message
+              "Occurs check failed"
+                ~type1:
+                  (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
+                    : Sexp.t)
+                ~type2:
+                  (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
+                    : Sexp.t)]);
       check_var_vs_type
         ~names
         ~types
@@ -563,10 +625,22 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
         ~set_substitution:Substitution.set_effects
         ~refresh:refresh_effects
-    | None, Some supertype_var ->
+    | (None | Some _), Some supertype_var ->
       (* FIXME: Robust effect occurs check *)
       if occurs_in_effects supertype_var subtype
-      then Compilation_error.raise Type_error ~msg:[%message "Occurs check failed"];
+      then (
+        let env = Type_param.Env_of_vars.create () in
+        Compilation_error.raise
+          Type_error
+          ~msg:
+            [%message
+              "Occurs check failed"
+                ~type1:
+                  (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
+                    : Sexp.t)
+                ~type2:
+                  (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
+                    : Sexp.t)]);
       check_var_vs_type
         ~names
         ~types
@@ -713,9 +787,9 @@ let generalize types outer_type =
     : Module_path.absolute Type_scheme.t
     =
     (* FIXME: cleanup *)
-    print_s
-      [%message "generalize_internal" (typ : Internal_type.t) (polarity : Polarity.t)];
-    match typ with
+    (* print_s
+      [%message "generalize_internal" (typ : Internal_type.t) (polarity : Polarity.t)]; *)
+    match (typ : Internal_type.t) with
     | Var var -> Var (generalize_type_var ~env ~in_progress ~polarity ~var)
     | Function (args, effects, res) ->
       Function
@@ -892,50 +966,87 @@ let generalize types outer_type =
             , List.map args ~f:(generalize_internal types ~env ~in_progress ~polarity) )))
   in
   (* FIXME: cleanup *)
-  print_s [%message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
-  generalize_internal
-    types
-    outer_type
-    ~env:(Type_param.Env_of_vars.create ())
-    ~in_progress:Polar_var.Set.empty
-    ~polarity:Positive
+  eprint_s
+    [%message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
+  let result =
+    generalize_internal
+      types
+      (Substitution.apply_to_type types.substitution outer_type)
+      ~env:(Type_param.Env_of_vars.create ())
+      ~in_progress:Polar_var.Set.empty
+      ~polarity:Positive
+  in
+  eprint_s
+    [%message
+      "generalize result"
+        (outer_type : Internal_type.t)
+        (result : Module_path.absolute Type_scheme.t)];
+  result
 ;;
 
 let%expect_test "unification cycles" =
   let types = create () in
   let names = Name_bindings.core in
-  let print_constraints () =
-    [%test_pred: Substitution.t] Substitution.is_empty types.substitution;
-    Constraints.print (types.constraints : Constraints.t)
-  in
-  print_constraints ();
-  [%expect {| |}];
   let v0 = Internal_type.fresh_var () in
   let v1 = Internal_type.fresh_var () in
   let v2 = Internal_type.fresh_var () in
   let v3 = Internal_type.fresh_var () in
+  let print_constraints () =
+    [%test_pred: Substitution.t] Substitution.is_empty types.substitution;
+    Constraints.print types.constraints;
+    let var_partitions =
+      [ 0; 1; 2; 3 ]
+      |> List.map
+           ~f:(Constraints.find_vars_with_same_shape types.constraints << Type_var.of_int)
+      |> List.fold ~init:[] ~f:(fun var_partitions vars ->
+           let matching_partitions =
+             List.filter_mapi var_partitions ~f:(fun i partition ->
+               let matching_var_count = Set.count vars ~f:(Set.mem partition) in
+               if matching_var_count = 0
+               then None
+               else if matching_var_count = Set.length vars
+               then Some i
+               else failwith "Mismatch")
+           in
+           match matching_partitions with
+           | [] -> vars :: var_partitions
+           | [ partition_index ] ->
+             List.mapi var_partitions ~f:(fun i partition ->
+               if i = partition_index
+               then Set.fold vars ~init:partition ~f:Set.add
+               else partition)
+           | _ :: _ :: _ -> failwith "More than one matching partition")
+    in
+    print_s [%message (var_partitions : Type_var.Set.t list)]
+  in
+  print_constraints ();
+  [%expect {| (var_partitions (($3) ($2) ($1) ($0))) |}];
   constrain ~names ~types ~subtype:v0 ~supertype:v1;
   print_constraints ();
   [%expect {|
-    $0 <: $1 |}];
+    $0 <: $1
+    (var_partitions (($3) ($2) ($0 $1))) |}];
   constrain ~names ~types ~subtype:v1 ~supertype:v2;
   print_constraints ();
   [%expect {|
     $0 <: $1, $2
-    $1 <: $2 |}];
+    $1 <: $2
+    (var_partitions (($3) ($0 $1 $2))) |}];
   constrain ~names ~types ~subtype:v2 ~supertype:v3;
   print_constraints ();
-  [%expect {|
+  [%expect
+    {|
     $0 <: $1, $2, $3
     $1 <: $2, $3
-    $2 <: $3 |}];
+    $2 <: $3
+    (var_partitions (($0 $1 $2 $3))) |}];
   constrain ~names ~types ~subtype:v3 ~supertype:v0;
-  (* FIXME: No 1 < 0 etc. ? Shouldn't there be more constraints? *)
   print_constraints ();
   [%expect
     {|
     $0 <: $0, $1, $2, $3
     $1 <: $0, $1, $2, $3
     $2 <: $0, $1, $2, $3
-    $3 <: $0, $1, $2, $3 |}]
+    $3 <: $0, $1, $2, $3
+    (var_partitions (($0 $1 $2 $3))) |}]
 ;;

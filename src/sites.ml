@@ -8,7 +8,6 @@ let look_up_in_site dirs ~file =
   with
   | Some file -> file
   | None ->
-    print_s [%message "" ~ls:(Sys_unix.ls_dir "/home/james/Umber/_build" : string list)];
     compiler_bug
       [%message "Failed to find file in site" (file : string) (dirs : string list)]
 ;;

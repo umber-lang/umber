@@ -18,3 +18,4 @@ include Hashable.Make (U)
 module Id = Unique_id.Int ()
 
 let create = Id.create >> Id.to_int_exn
+let of_int = Fn.id

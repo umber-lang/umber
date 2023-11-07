@@ -167,12 +167,12 @@ module Pattern = struct
 
   let generalize ~names ~types pat_names typ ~shadowing_allowed =
     (* FIXME: cleanup *)
-    (* print_s
+    eprint_s
       [%message
         "Pattern.generalize"
           (pat_names : Pattern.Names.t)
           (typ : Internal_type.t)
-          (types : Type_bindings.t)]; *)
+          (types : Type_bindings.t)];
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let inferred_scheme =
@@ -232,7 +232,8 @@ module Expr = struct
         * Internal_type.t
         * Internal_type.effects
       =
-      print_s [%message "Typed.Expr.of_untyped" (expr : Untyped.Expr.t Node.t)];
+      (* FIXME: cleanup *)
+      (* print_s [%message "Typed.Expr.of_untyped" (expr : Untyped.Expr.t Node.t)]; *)
       let node e = Node.create e (Node.span expr) in
       Node.with_value expr ~f:(fun expr ->
         match (expr : Untyped.Expr.t) with
@@ -1010,7 +1011,8 @@ module Module = struct
     let representative_span =
       get_spans (Nonempty.hd bindings) |> Tuple2.uncurry Span.combine
     in
-    print_s
+    (* FIXME: cleanup *)
+    (* print_s
       [%message
         "typing bindings"
           (bindings
@@ -1018,7 +1020,7 @@ module Module = struct
                * (Internal_type.t * Name_bindings.Name_entry.t Value_name.Map.t))
                Node.t
               * Untyped.Expr.t Node.t)
-              Nonempty.t)];
+              Nonempty.t)]; *)
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings ~names ~types bindings ~add_effects:(fun effects ->
         (* No effects are handled at toplevel, so get rid of any produced effects. *)
