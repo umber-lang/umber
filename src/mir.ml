@@ -133,8 +133,10 @@ module Extern_decl = struct
 end
 
 (* TODO: This doesn't handle polymorphic types particularly smartly. Should think about
-   whether that matters. *)
-let rec arity_of_type ~names : Module_path.absolute Type_scheme.t -> int = function
+   whether that matters. Actually, since this is only used for extern declarations, we
+   don't need to be super clever about this. *)
+let rec arity_of_type ~names (type_ : Module_path.absolute Type_scheme.type_) =
+  match type_ with
   | Var _ | Tuple _ -> 0
   | Type_app (type_name, _) ->
     (match
@@ -223,7 +225,7 @@ end = struct
                 (name : Value_name.Absolute.t)
                 (entry : Name_bindings.Name_entry.t)])
       in
-      External { arity = arity_of_type ~names:t.name_bindings scheme }
+      External { arity = arity_of_type ~names:t.name_bindings (fst scheme) }
     in
     let extern_info : Extern_info.t =
       match extern_name with
@@ -330,8 +332,8 @@ end = struct
         "Constructor info lookup failed" (type_ : Module_path.absolute Type_scheme.t)]
   ;;
 
-  let rec find_cnstr_info_internal t type_ =
-    match (type_ : Module_path.absolute Type_scheme.t) with
+  let rec find_cnstr_info_internal t (type_ : Module_path.absolute Type_scheme.t) =
+    match fst type_ with
     | Type_app (type_name, _args) ->
       let decl =
         snd

@@ -6,20 +6,28 @@ open Names
 (* FIXME: Remove type unions. We should be able to simplify the types by unifying and
    simplifying constraints. *)
 
-type 'n t =
+type 'n type_ =
   | Var of Type_param_name.t
-  | Type_app of 'n Type_name.Qualified.t * 'n t list
-  | Tuple of 'n t list
-  | Function of 'n t Nonempty.t * 'n effects option * 'n t
-  | Union of 'n t Nonempty.t
-  | Intersection of 'n t Nonempty.t
+  | Type_app of 'n Type_name.Qualified.t * 'n type_ list
+  | Tuple of 'n type_ list
+  | Function of 'n type_ Nonempty.t * 'n effects option * 'n type_
+  | Union of 'n type_ Nonempty.t
+  | Intersection of 'n type_ Nonempty.t
 
 and 'n effects =
-  | Effect of 'n Effect_name.Qualified.t * 'n t list
+  | Effect of 'n Effect_name.Qualified.t * 'n type_ list
   | Effect_var of Type_param_name.t
   | Effect_union of 'n effects Nonempty.t
   | Effect_intersection of 'n effects Nonempty.t
 [@@deriving hash, compare, equal, sexp]
+
+type 'n constraint_ =
+  { subtype : 'n type_
+  ; supertype : 'n type_
+  }
+[@@deriving hash, compare, equal, sexp]
+
+type 'n t = 'n type_ * 'n constraint_ list [@@deriving hash, compare, equal, sexp]
 
 (* FIXME: cleanup *)
 
@@ -56,6 +64,17 @@ and map_effects effects ~f ~type_name ~effect_name =
     Effect_union (Nonempty.map effects ~f:(map_effects ~f ~type_name ~effect_name))
   | Effect_intersection effects ->
     Effect_intersection (Nonempty.map effects ~f:(map_effects ~f ~type_name ~effect_name))
+;;
+
+let map' ?f ((type_, constraints) : _ t) ~type_name ~effect_name =
+  let type_ = map type_ ?f ~type_name ~effect_name in
+  let constraints =
+    List.map constraints ~f:(fun { subtype; supertype } ->
+      { subtype = map subtype ?f ~type_name ~effect_name
+      ; supertype = map supertype ?f ~type_name ~effect_name
+      })
+  in
+  type_, constraints
 ;;
 
 let rec fold_until typ ~init ~f =

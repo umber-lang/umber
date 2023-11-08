@@ -87,7 +87,7 @@ and ('pat, 'expr, 'name) def =
   | Impl of
       Trait_bound.t
       * Trait_name.t
-      * 'name Type_scheme.t Nonempty.t
+      * 'name Type_scheme.type_ Nonempty.t
       * ('pat, 'expr, 'name) def Node.t list
 [@@deriving sexp_of]
 

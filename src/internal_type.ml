@@ -136,7 +136,7 @@ let exists_var typ ~f =
 let no_effects = { effects = Effect_name.Absolute.Map.empty; effect_var = None }
 
 let of_type_scheme =
-  let rec of_type_scheme ~params (scheme : Module_path.absolute Type_scheme.t) =
+  let rec of_type_scheme ~params (scheme : Module_path.absolute Type_scheme.type_) =
     match scheme with
     | Var param -> Var (Type_param.Env_to_vars.find_or_add params param)
     | Type_app (type_name, args) ->
@@ -168,5 +168,11 @@ let of_type_scheme =
          inconvenient. *)
       failwith "TODO: conversion from union and intersection types"
   in
-  fun ?(params = Type_param.Env_to_vars.create ()) scheme -> of_type_scheme ~params scheme
+  fun ?(params = Type_param.Env_to_vars.create ()) scheme ->
+    (* FIXME: We need to do this conversion in [Type_bindings] or somehow else pass
+       through the constraints. *)
+    let scheme, constraints = scheme in
+    if not (List.is_empty constraints)
+    then failwith "TODO: Constraints in Internal_type.of_type_scheme";
+    of_type_scheme ~params scheme
 ;;

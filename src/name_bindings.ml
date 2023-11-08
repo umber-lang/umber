@@ -825,6 +825,13 @@ let import_all_absolute t (path : Module_path.Absolute.t) =
 let import_all t path = import_all_absolute t (absolutify_path t path)
 
 let absolutify_type_scheme t type_ =
+  Type_scheme.map'
+    type_
+    ~type_name:(absolutify_type_name t)
+    ~effect_name:(absolutify_effect_name t)
+;;
+
+let absolutify_type_scheme' t type_ =
   Type_scheme.map
     type_
     ~type_name:(absolutify_type_name t)
@@ -889,8 +896,8 @@ let add_extern t name fixity typ extern_name ~constrain =
   add_val_or_extern t name fixity typ ~extern_name ~constrain ~type_source:Extern_declared
 ;;
 
-let absolutify_type_decl t = Type_decl.map_exprs ~f:(absolutify_type_scheme t)
-let absolutify_effect t = Effect.map_exprs ~f:(absolutify_type_scheme t)
+let absolutify_type_decl t = Type_decl.map_exprs ~f:(absolutify_type_scheme' t)
+let absolutify_effect t = Effect.map_exprs ~f:(absolutify_type_scheme' t)
 
 let add_to_types types name decl ~err_msg =
   Map.update types name ~f:(function
@@ -919,7 +926,7 @@ let add_type_decl t type_name decl =
         (match decl with
          | params, Variants cnstrs ->
            (* Add constructors as functions to the namespace *)
-           let result_type : _ Type_scheme.t =
+           let result_type : _ Type_scheme.type_ =
              let path = current_path t in
              let params =
                List.map (params :> Type_param_name.t list) ~f:Type_scheme.var
@@ -928,11 +935,12 @@ let add_type_decl t type_name decl =
            in
            List.fold cnstrs ~init:bindings.names ~f:(fun names (cnstr_name, args) ->
              let entry =
-               (* TODO: This should have an effect for allocation. *)
                Name_entry.val_declared
                  (match Nonempty.of_list args with
-                  | Some args -> Function (args, None, result_type)
-                  | None -> result_type)
+                  | Some args ->
+                    (* TODO: This should probably have an effect for allocation. *)
+                    Function (args, None, result_type), []
+                  | None -> result_type, [])
              in
              Map.set names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry))
          | _ -> bindings.names)
@@ -979,7 +987,7 @@ let add_effect t effect_name (effect : _ Effect.t) ~constrain =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let scheme : _ Type_scheme.t = Function (args, Some effects, result) in
+          let scheme : _ Type_scheme.t = Function (args, Some effects, result), [] in
           let new_entry = Name_entry.val_declared scheme in
           add_name_entry names name scheme new_entry ~constrain)
     }

@@ -131,11 +131,14 @@ module Pattern = struct
         pat_names, (As (pat, name), typ)
       | Type_annotation (pat, ((_ : Trait_bound.t), annotated_type)) ->
         (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
+        (* FIXME: I think we need to propagate relevant constraints from the parent. *)
+        let annotated_type = fst annotated_type in
         let annotated_type =
           Type_scheme.map
             annotated_type
             ~type_name:(Name_bindings.absolutify_type_name names)
             ~effect_name:(Name_bindings.absolutify_effect_name names)
+          |> (fun type_ -> type_, [])
           |> Internal_type.of_type_scheme
         in
         let pat_names, (pat, inferred_type) =
@@ -426,10 +429,13 @@ module Expr = struct
             Node.with_value
               annotated_type
               ~f:(fun ((_ : Trait_bound.t), annotated_type) ->
+              (* FIXME: Handle constraints *)
+              let annotated_type = fst annotated_type in
               Type_scheme.map
                 annotated_type
                 ~type_name:(Name_bindings.absolutify_type_name names)
                 ~effect_name:(Name_bindings.absolutify_effect_name names)
+              |> (fun type_ -> type_, [])
               |> Internal_type.of_type_scheme)
           in
           let expr, inferred_type, expr_effects = of_untyped ~names ~types ~f_name expr in
@@ -847,7 +853,7 @@ module Module = struct
     (* TODO: can rewrite this with [Type.Expr.map] *)
     (* TODO: This could stop checking for cyclic aliases early if it reaches a type in
        another file. (There should be a separate check for cyclic imports.) *)
-    let rec loop ~names ~aliases_seen (alias : Module_path.absolute Type_scheme.t) =
+    let rec loop ~names ~aliases_seen (alias : Module_path.absolute Type_scheme.type_) =
       match alias with
       | Type_app (name, args) ->
         let type_entry = Name_bindings.find_absolute_type_entry names name in
@@ -867,14 +873,25 @@ module Module = struct
            else loop ~names ~aliases_seen:(Set.add aliases_seen id) alias
          | Abstract | Variants _ | Record _ -> ());
         List.iter args ~f:(loop ~names ~aliases_seen)
-      | Function (args, _effects, body) ->
-        (* FIXME: Check for function types that are cyclic via their effects. *)
+      | Function (args, effects, body) ->
         Nonempty.iter args ~f:(loop ~names ~aliases_seen);
+        Option.iter effects ~f:(loop_effects ~names ~aliases_seen);
         loop ~names ~aliases_seen body
       | Tuple items -> List.iter items ~f:(loop ~names ~aliases_seen)
       | Union items | Intersection items ->
         Nonempty.iter items ~f:(loop ~names ~aliases_seen)
       | Var _ -> ()
+    and loop_effects
+      ~names
+      ~aliases_seen
+      (effects : Module_path.absolute Type_scheme.effects)
+      =
+      match effects with
+      | Effect ((_ : Effect_name.Absolute.t), args) ->
+        List.iter args ~f:(loop ~names ~aliases_seen)
+      | Effect_union effects | Effect_intersection effects ->
+        Nonempty.iter effects ~f:(loop_effects ~names ~aliases_seen)
+      | Effect_var _ -> ()
     in
     loop ~names ~aliases_seen:Name_bindings.Type_entry.Id.Set.empty alias
   ;;

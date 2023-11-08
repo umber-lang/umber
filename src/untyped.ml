@@ -161,19 +161,22 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
     Compilation_error.raise
       Other
       ~msg:[%message "Fixity declarations are not supported on effect operations"]
-  | Common_sig (Val (name, None, type_)) ->
-    (match type_ with
-     | [], Function (_, Some _, _) ->
+  | Common_sig (Val (name, None, ((trait_bounds, (scheme, constraints)) as type_))) ->
+    if not (List.is_empty trait_bounds)
+    then failwith "TODO: trait bounds on effect operations";
+    if not (List.is_empty constraints)
+    then failwith "TODO: constraints on effect operations";
+    (match scheme with
+     | Function (_, Some _, _) ->
        Compilation_error.raise
          Other
          ~msg:
            [%message
              "Effect operations can't perform effects" (type_ : _ Type_scheme.Bounded.t)]
-     | [], Function (args, None, result) ->
+     | Function (args, None, result) ->
        (* FIXME: Check for free params. Should be done elsewhere. *)
        { name; args; result }
-     | _ :: _, _ -> failwith "TODO: trait bounds on effect operations"
-     | [], (Var _ | Type_app _ | Tuple _ | Union _ | Intersection _) ->
+     | Var _ | Type_app _ | Tuple _ | Union _ | Intersection _ ->
        Compilation_error.raise
          Other
          ~msg:

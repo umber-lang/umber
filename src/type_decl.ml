@@ -1,15 +1,17 @@
 open! Import
 open Names
 
+(* TODO: Should type declarations allow constraints? *)
+
 type 'n decl =
   | Abstract
-  | Alias of 'n Type_scheme.t
+  | Alias of 'n Type_scheme.type_
   (* TODO: variant constructors should probably support fixity declarations *)
-  | Variants of (Cnstr_name.t * 'n Type_scheme.t list) list
+  | Variants of (Cnstr_name.t * 'n Type_scheme.type_ list) list
   (* TODO: probably just make records a type expression - you can trivially get nominal
      records with a single variant and an inline record. One problem with this is you
      can no longer define recursive record types, which is a bit annoying. *)
-  | Record of (Value_name.t * 'n Type_scheme.t) Nonempty.t
+  | Record of (Value_name.t * 'n Type_scheme.type_) Nonempty.t
 [@@deriving compare, equal, hash, sexp]
 
 type 'n t = Type_param_name.t Unique_list.t * 'n decl

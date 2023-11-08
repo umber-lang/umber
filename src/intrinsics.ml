@@ -27,7 +27,7 @@ module Make_variants (T : sig
   val cnstrs : string list
 end) : Variants = struct
   let name = Type_name.of_string_unchecked T.name
-  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), [])
+  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), []), []
 
   let cnstrs =
     List.map T.cnstrs ~f:(fun cnstr_name ->
@@ -47,7 +47,7 @@ module Make_abstract (T : sig
 end) : Abstract = struct
   let name = Type_name.of_string_unchecked T.name
   let decl = Unique_list.empty, Type_decl.Abstract
-  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), [])
+  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), []), []
 end
 
 module Bool = struct

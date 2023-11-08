@@ -235,6 +235,10 @@ type_expr:
   | t = type_non_fun { t }
   | t = type_fun { t }
 
+(* TODO: Parse constraints using "where" *)
+%inline type_expr_constrained:
+  | type_ = type_expr { type_, [] }
+
 (* TODO: Consider having trait bounds use brackets [] instead of parens (). I think it
    looks a little clearer and would also be easier to parse. *)
 %inline trait_bound:
@@ -243,7 +247,7 @@ type_expr:
     { List.map bounds ~f:(Tuple2.map_fst ~f:Trait_name.of_ustring_unchecked) }
 
 %inline type_expr_bounded:
-  | bound = loption(trait_bound); t = type_expr { (bound, t) }
+  | bound = loption(trait_bound); t = type_expr_constrained { (bound, t) }
 
 type_cnstr_decl:
   | cnstr = UPPER_NAME; args = list(type_term)
@@ -297,8 +301,8 @@ import_stmt:
 stmt_common:
   | VAL; name = val_name; fix = parens(fixity)?; colon; t = type_expr_bounded
     { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
-  | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = type_expr; EQUALS;
-    s = STRING
+  | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = type_expr_constrained;
+    EQUALS; s = STRING
     { Module.Extern (
         Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
   | TYPE; name = UPPER_NAME; params = type_params; decl = preceded(EQUALS, type_decl)?
