@@ -5,6 +5,13 @@ type t [@@deriving sexp_of]
 
 val create : unit -> t
 
+val instantiate_type_scheme
+  :  ?params:Type_param.Env_to_vars.t
+  -> names:Name_bindings.t
+  -> types:t
+  -> Module_path.absolute Type_scheme.t
+  -> Internal_type.t
+
 val constrain
   :  names:Name_bindings.t
   -> types:t

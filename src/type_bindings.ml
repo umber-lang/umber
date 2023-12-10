@@ -78,6 +78,12 @@ module Constraints : sig
   (* FIXME: Make this interface less confusing*)
   val remove_vars : t -> Type_var.t -> Type_var.Set.t -> unit
   val find_vars_with_same_shape : t -> Type_var.t -> Type_var.Set.t
+
+  val to_constraint_list
+    :  t
+    -> params:Type_param.Env_of_vars.t
+    -> Module_path.absolute Type_scheme.constraint_ list
+
   val print : t -> unit
 end = struct
   type t =
@@ -119,6 +125,16 @@ end = struct
       Hash_set.fold ~init:vars (get_bounds bounds var) ~f:Set.add
     in
     Type_var.Set.singleton var |> add_vars lower_bounds |> add_vars upper_bounds
+  ;;
+
+  let to_constraint_list t ~params =
+    Hashtbl.to_alist t.upper_bounds
+    |> List.concat_map ~f:(fun (subtype, supertypes) ->
+         let subtype = Type_param.Env_of_vars.find_or_add params subtype in
+         Hash_set.to_list supertypes
+         |> List.map ~f:(fun supertype : _ Type_scheme.constraint_ ->
+              let supertype = Type_param.Env_of_vars.find_or_add params supertype in
+              { subtype = Var subtype; supertype = Var supertype }))
   ;;
 
   let print t =
@@ -360,11 +376,12 @@ let check_var_vs_type
 
 let rec constrain ~names ~types ~subtype ~supertype =
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
+    (* TODO: Isn't this code setting up [params] redundant? *)
     let params = Type_param.Env_to_vars.create () in
     List.iter
       (param_list :> Type_param_name.t list)
       ~f:(fun p -> ignore (Type_param.Env_to_vars.find_or_add params p : Type_var.t));
-    Internal_type.of_type_scheme expr ~params
+    instantiate_type_scheme ~names ~types expr ~params
   in
   let lookup_type names name args =
     let type_entry = Name_bindings.find_absolute_type_entry names name in
@@ -421,12 +438,16 @@ let rec constrain ~names ~types ~subtype ~supertype =
       let type_entry1 = lookup_type names name1 args1 in
       (match Name_bindings.Type_entry.decl type_entry1 with
        | params, Alias expr ->
-         constrain ~names ~types ~subtype:(instantiate_alias params expr) ~supertype
+         constrain ~names ~types ~subtype:(instantiate_alias params (expr, [])) ~supertype
        | (_ : _ Type_decl.t) ->
          let type_entry2 = lookup_type names name2 args2 in
          (match Name_bindings.Type_entry.decl type_entry2 with
           | params, Alias expr ->
-            constrain ~names ~types ~subtype ~supertype:(instantiate_alias params expr)
+            constrain
+              ~names
+              ~types
+              ~subtype
+              ~supertype:(instantiate_alias params (expr, []))
           | (_ : _ Type_decl.t) ->
             if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
             then type_error "Type application mismatch" subtype supertype;
@@ -439,12 +460,12 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Type_app (name, args), (Tuple _ | Function _ | Partial_function _) ->
       (match Name_bindings.Type_entry.decl (lookup_type names name args) with
        | params, Alias expr ->
-         constrain ~names ~types ~subtype:(instantiate_alias params expr) ~supertype
+         constrain ~names ~types ~subtype:(instantiate_alias params (expr, [])) ~supertype
        | _ -> type_error "Type application mismatch" subtype supertype)
     | (Tuple _ | Function _ | Partial_function _), Type_app (name, args) ->
       (match Name_bindings.Type_entry.decl (lookup_type names name args) with
        | params, Alias expr ->
-         constrain ~names ~types ~subtype ~supertype:(instantiate_alias params expr)
+         constrain ~names ~types ~subtype ~supertype:(instantiate_alias params (expr, []))
        | _ -> type_error "Type application mismatch" subtype supertype)
     | Function (args1, _effect_row1, res1), Function (args2, _effect_row2, res2) ->
       (* FIXME: We aren't constraining the effect rows here! (Also not in the other cases
@@ -655,6 +676,60 @@ and constrain_effects ~names ~types ~subtype ~supertype =
 
 and constrain_effects_to_be_total ~names ~types effects =
   constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
+
+and instantiate_type_scheme =
+  let rec instantiate_type_scheme
+    ~names
+    ~types
+    ~params
+    (scheme : Module_path.absolute Type_scheme.type_)
+    : Internal_type.t
+    =
+    match scheme with
+    | Var param -> Var (Type_param.Env_to_vars.find_or_add params param)
+    | Type_app (type_name, args) ->
+      Type_app
+        (type_name, List.map args ~f:(instantiate_type_scheme ~names ~types ~params))
+    | Tuple fields ->
+      Tuple (List.map fields ~f:(instantiate_type_scheme ~names ~types ~params))
+    | Function (args, effects, result) ->
+      let args = Nonempty.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
+      let effects : Internal_type.effects =
+        match effects with
+        | None -> { effects = Effect_name.Absolute.Map.empty; effect_var = None }
+        | Some (Effect (effect_name, args)) ->
+          { effects =
+              Effect_name.Absolute.Map.singleton
+                effect_name
+                (List.map args ~f:(instantiate_type_scheme ~names ~types ~params))
+          ; effect_var = None
+          }
+        | Some (Effect_var param) ->
+          let var = Type_param.Env_to_vars.find_or_add params param in
+          { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
+        | Some (Effect_union _ | Effect_intersection _) ->
+          (* FIXME: Handle this *)
+          failwith
+            "TODO: Handle effect unions and intersections (maybe need to add constraints \
+             to the type bindings?)"
+      in
+      Function (args, effects, instantiate_type_scheme ~names ~types ~params result)
+    | Union _ | Intersection _ ->
+      (* FIXME: Need to add constraints to the type bindings. Might make using this pretty
+         inconvenient. *)
+      failwith "TODO: conversion from union and intersection types"
+  in
+  fun ?(params = Type_param.Env_to_vars.create ())
+      ~names
+      ~types
+      ((scheme, constraints) : Module_path.absolute Type_scheme.t) ->
+    List.iter constraints ~f:(fun { subtype; supertype } ->
+      constrain
+        ~names
+        ~types
+        ~subtype:(instantiate_type_scheme ~names ~types ~params subtype)
+        ~supertype:(instantiate_type_scheme ~names ~types ~params supertype));
+    instantiate_type_scheme ~names ~types scheme ~params
 ;;
 
 (* FIXME: write effect type inference:
@@ -784,7 +859,7 @@ let generalize types outer_type =
         collapse_var_bounds types var bounds ~env ~in_progress ~polarity *)
   in
   let rec generalize_internal types typ ~env ~in_progress ~(polarity : Polarity.t)
-    : Module_path.absolute Type_scheme.t
+    : Module_path.absolute Type_scheme.type_
     =
     (* FIXME: cleanup *)
     (* print_s
@@ -968,14 +1043,16 @@ let generalize types outer_type =
   (* FIXME: cleanup *)
   eprint_s
     [%message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
-  let result =
+  let env = Type_param.Env_of_vars.create () in
+  let scheme =
     generalize_internal
       types
       (Substitution.apply_to_type types.substitution outer_type)
-      ~env:(Type_param.Env_of_vars.create ())
+      ~env
       ~in_progress:Polar_var.Set.empty
       ~polarity:Positive
   in
+  let result = scheme, Constraints.to_constraint_list types.constraints ~params:env in
   eprint_s
     [%message
       "generalize result"

@@ -15,7 +15,9 @@ module Pattern = struct
       : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
       = function
       | Constant lit ->
-        pat_names, (Constant lit, Internal_type.of_type_scheme (Literal.typ lit))
+        ( pat_names
+        , ( Constant lit
+          , Type_bindings.instantiate_type_scheme ~names ~types (Literal.typ lit) ) )
       | Catch_all name ->
         let pat_names, typ =
           match name with
@@ -132,14 +134,14 @@ module Pattern = struct
       | Type_annotation (pat, ((_ : Trait_bound.t), annotated_type)) ->
         (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
         (* FIXME: I think we need to propagate relevant constraints from the parent. *)
-        let annotated_type = fst annotated_type in
         let annotated_type =
-          Type_scheme.map
-            annotated_type
-            ~type_name:(Name_bindings.absolutify_type_name names)
-            ~effect_name:(Name_bindings.absolutify_effect_name names)
-          |> (fun type_ -> type_, [])
-          |> Internal_type.of_type_scheme
+          Type_bindings.instantiate_type_scheme
+            ~names
+            ~types
+            (Type_scheme.map'
+               annotated_type
+               ~type_name:(Name_bindings.absolutify_type_name names)
+               ~effect_name:(Name_bindings.absolutify_effect_name names))
         in
         let pat_names, (pat, inferred_type) =
           of_untyped_with_names ~names ~types pat_names pat
@@ -179,6 +181,8 @@ module Pattern = struct
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let inferred_scheme =
+          (* FIXME: Sometimes we instantiate and then re-generalize a type here. That
+             seems silly. *)
           Type_bindings.generalize types (Name_bindings.Name_entry.typ entry)
         in
         Name_bindings.set_inferred_scheme
@@ -242,7 +246,7 @@ module Expr = struct
         match (expr : Untyped.Expr.t) with
         | Literal lit ->
           ( node (Literal lit)
-          , Internal_type.of_type_scheme (Literal.typ lit)
+          , Type_bindings.instantiate_type_scheme ~names ~types (Literal.typ lit)
           , Internal_type.no_effects )
         | Name name ->
           let name, name_entry = Name_bindings.find_entry_with_path names name in
@@ -313,7 +317,9 @@ module Expr = struct
           collect_effects ~names ~types (fun ~add_effects ->
             let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
             add_effects cond_effects;
-            let bool_type = Internal_type.of_type_scheme Intrinsics.Bool.typ in
+            let bool_type =
+              Type_bindings.instantiate_type_scheme ~names ~types Intrinsics.Bool.typ
+            in
             Type_bindings.constrain ~names ~types ~subtype:cond_type ~supertype:bool_type;
             let (then_, then_type, then_effects), (else_, else_type, else_effects) =
               ( of_untyped ~names ~types ~f_name then_
@@ -429,14 +435,13 @@ module Expr = struct
             Node.with_value
               annotated_type
               ~f:(fun ((_ : Trait_bound.t), annotated_type) ->
-              (* FIXME: Handle constraints *)
-              let annotated_type = fst annotated_type in
-              Type_scheme.map
-                annotated_type
-                ~type_name:(Name_bindings.absolutify_type_name names)
-                ~effect_name:(Name_bindings.absolutify_effect_name names)
-              |> (fun type_ -> type_, [])
-              |> Internal_type.of_type_scheme)
+              Type_bindings.instantiate_type_scheme
+                ~names
+                ~types
+                (Type_scheme.map'
+                   annotated_type
+                   ~type_name:(Name_bindings.absolutify_type_name names)
+                   ~effect_name:(Name_bindings.absolutify_effect_name names)))
           in
           let expr, inferred_type, expr_effects = of_untyped ~names ~types ~f_name expr in
           Type_bindings.constrain

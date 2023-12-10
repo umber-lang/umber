@@ -33,7 +33,7 @@ module Cnstr_info : sig
      callsites generally do that, which leads to looking up each constructor separately. *)
 
   val tag : t -> Cnstr.t -> Cnstr_tag.t
-  val arg_type : t -> Cnstr.t -> Block_index.t -> Module_path.absolute Type_scheme.t
+  val arg_type : t -> Cnstr.t -> Block_index.t -> Module_path.absolute Type_scheme.type_
   val cnstrs : t -> Cnstr.t list
 
   val fold
@@ -43,20 +43,20 @@ module Cnstr_info : sig
          ('acc
           -> Cnstr.t
           -> Cnstr_tag.t
-          -> Module_path.absolute Type_scheme.t list
+          -> Module_path.absolute Type_scheme.type_ list
           -> 'acc)
     -> 'acc
 
-  val of_variants : (Cnstr_name.t * Module_path.absolute Type_scheme.t list) list -> t
-  val of_tuple : Module_path.absolute Type_scheme.t list -> t
+  val of_variants : (Cnstr_name.t * Module_path.absolute Type_scheme.type_ list) list -> t
+  val of_tuple : Module_path.absolute Type_scheme.type_ list -> t
 end = struct
   type t =
     | Variants of
         { constant_cnstrs : Cnstr_name.t list
         ; non_constant_cnstrs :
-            (Cnstr_name.t * Module_path.absolute Type_scheme.t list) list
+            (Cnstr_name.t * Module_path.absolute Type_scheme.type_ list) list
         }
-    | Tuple of Module_path.absolute Type_scheme.t list
+    | Tuple of Module_path.absolute Type_scheme.type_ list
   [@@deriving sexp_of]
 
   let of_variants variants =
@@ -175,7 +175,7 @@ module Context : sig
   val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
   val current_path : t -> Module_path.Absolute.t
-  val find_cnstr_info : t -> Module_path.absolute Type_scheme.t -> Cnstr_info.t
+  val find_cnstr_info : t -> Module_path.absolute Type_scheme.type_ -> Cnstr_info.t
 
   val find_cnstr_info_from_decl
     :  t
@@ -329,11 +329,11 @@ end = struct
   let cnstr_info_lookup_failed type_ =
     compiler_bug
       [%message
-        "Constructor info lookup failed" (type_ : Module_path.absolute Type_scheme.t)]
+        "Constructor info lookup failed" (type_ : Module_path.absolute Type_scheme.type_)]
   ;;
 
-  let rec find_cnstr_info_internal t (type_ : Module_path.absolute Type_scheme.t) =
-    match fst type_ with
+  let rec find_cnstr_info_internal t (type_ : Module_path.absolute Type_scheme.type_) =
+    match type_ with
     | Type_app (type_name, _args) ->
       let decl =
         snd
@@ -360,7 +360,8 @@ end = struct
     Option.value_or_thunk (find_cnstr_info_internal t type_) ~default:(fun () ->
       compiler_bug
         [%message
-          "Constructor info lookup failed" (type_ : Module_path.absolute Type_scheme.t)])
+          "Constructor info lookup failed"
+            (type_ : Module_path.absolute Type_scheme.type_)])
   ;;
 end
 
@@ -387,7 +388,7 @@ module Simple_pattern : sig
     val missing_cases
       :  t
       -> ctx:Context.t
-      -> input_type:Module_path.absolute Type_scheme.t
+      -> input_type:Module_path.absolute Type_scheme.type_
       -> simple_pattern list
   end
 end = struct
@@ -871,7 +872,7 @@ module Expr = struct
     ~args_and_types
     ~current_path
     =
-    match fun_type with
+    match fst fun_type with
     | Type_app _ | Tuple _ | Var _ ->
       compiler_bug [%message "Non-funtion type in function call"]
     | Union _ | Intersection _ ->
@@ -881,7 +882,7 @@ module Expr = struct
     | Function
         ( fun_arg_types
         , (_effects : _ Type_scheme.effects option)
-        , (_return_type : _ Type_scheme.t) ) ->
+        , (_return_type : _ Type_scheme.type_) ) ->
       (match snd (Nonempty.zip fun_arg_types args_and_types) with
        | Same_length -> `Already_fully_applied
        | Right_trailing _ ->
@@ -910,7 +911,9 @@ module Expr = struct
              let name = Constant_names.synthetic_arg i in
              let arg_pattern = Node.dummy_span (Pattern.Catch_all (Some name)) in
              let arg_name = Node.dummy_span (Typed.Expr.Name (current_path, name)) in
-             (arg_name, arg_type), arg_pattern)
+             (* FIXME: Just putting no constraints on [arg_type] here is dodgy. Sort out
+                what's meant to be going on here. *)
+             (arg_name, (arg_type, [])), arg_pattern)
            |> Nonempty.unzip
          in
          let args = Nonempty.append applied_args unapplied_args in
@@ -975,8 +978,11 @@ module Expr = struct
            let fun_call fun_ =
              let arg_types = Nonempty.map ~f:snd args_and_types in
              (* FIXME: We lost the effect information. We don't actually use it, though.
-             For now, just making the effect total. *)
-             let fun_type : _ Type_scheme.t = Function (arg_types, None, body_type) in
+                For now, just making the effect total. *)
+             (* FIXME: Dummy empty constraints *)
+             let fun_type : _ Type_scheme.t =
+               Function (Nonempty.map arg_types ~f:fst, None, fst body_type), []
+             in
              let fun_ = of_typed_expr ~ctx fun_ fun_type in
              let args =
                Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
@@ -998,7 +1004,7 @@ module Expr = struct
                (* Special-case constructor applications to make use of [Make_block]. *)
                (match Value_name.to_cnstr_name name with
                 | Ok cnstr_name ->
-                  let cnstr_info = Context.find_cnstr_info ctx expr_type in
+                  let cnstr_info = Context.find_cnstr_info ctx (fst expr_type) in
                   let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
                   let fields, field_types =
                     List.unzip (Nonempty.to_list args_and_types)
@@ -1006,7 +1012,10 @@ module Expr = struct
                   make_block ~ctx ~tag ~fields ~field_types
                 | Error _ -> fun_call fun_)
              | _ -> fun_call fun_))
-      | Lambda (args, body), Function (arg_types, _effect_row, body_type) ->
+      | Lambda (args, body), (Function (arg_types, _effect_row, body_type), _constraints)
+        ->
+        (* FIXME: Need to use the constraints here. Also need the params to associate
+           correctly. *)
         add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound
       | Match (expr, input_type, arms), output_type ->
         let input_expr =

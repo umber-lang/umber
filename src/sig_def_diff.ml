@@ -87,7 +87,7 @@ let create_skolemized_type ~names =
 (** Skolemization means replacing all type variables in a type expression with fresh
     abstract types. e.g. `a -> b -> c` becomes something like `A -> B -> C` where `A`,
     `B`, and `C` are fresh abstract types. *)
-let skolemize ~names ~types_by_param scheme =
+let skolemize ~names ~types ~types_by_param scheme =
   let types_by_param, create_skolemized_type =
     match types_by_param with
     | None -> Type_param.Table.create (), create_skolemized_type
@@ -97,22 +97,22 @@ let skolemize ~names ~types_by_param scheme =
           compiler_bug
             [%message
               "Missing declaration for skolemized param"
-                (scheme : _ Type_scheme.type_)
+                (scheme : _ Type_scheme.t)
                 (types_by_param : _ Type_scheme.type_ Type_param.Table.t)] )
   in
   let names = ref names in
   let type_ =
-    Type_scheme.map scheme ~type_name:Fn.id ~effect_name:Fn.id ~f:(function
-      | Var param ->
-        Halt
-          (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
-             let names', type_ = create_skolemized_type ~names:!names in
-             names := names';
-             type_))
-      | type_ -> Defer type_)
-    (* FIXME: Handle constraints*)
-    |> (fun type_ -> type_, [])
-    |> Internal_type.of_type_scheme
+    Type_bindings.instantiate_type_scheme
+      ~names:!names
+      ~types
+      (Type_scheme.map' scheme ~type_name:Fn.id ~effect_name:Fn.id ~f:(function
+        | Var param ->
+          Halt
+            (Hashtbl.find_or_add types_by_param param ~default:(fun () ->
+               let names', type_ = create_skolemized_type ~names:!names in
+               names := names';
+               type_))
+        | type_ -> Defer type_))
   in
   !names, type_
 ;;
@@ -120,14 +120,10 @@ let skolemize ~names ~types_by_param scheme =
 (** A `val` item in a signature is compatible with a `let` in a defintion if the
     signature is a "more specific" version of the defintion. We can check this by
     skolemizing the signature, instatiating the defintion, and then unifying the two. *)
-let check_val_type_schemes
-  ~names
-  ({ sig_ = sig_scheme, _sig_constraints; def = def_scheme } : _ By_kind.t)
-  =
-  (* FIXME: Handle constraints properly *)
-  let names, sig_type = skolemize ~names sig_scheme ~types_by_param:None in
-  let def_type = Internal_type.of_type_scheme def_scheme in
+let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
   let types = Type_bindings.create () in
+  let names, sig_type = skolemize ~names ~types sig_scheme ~types_by_param:None in
+  let def_type = Type_bindings.instantiate_type_scheme ~names ~types def_scheme in
   Type_bindings.constrain ~names ~types ~subtype:sig_type ~supertype:def_type
 ;;
 
@@ -141,8 +137,12 @@ let check_type_decl_schemes
   ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t)
   =
   let types = Type_bindings.create () in
-  let names, sig_type = skolemize ~names ~types_by_param:(Some sig_params) sig_scheme in
-  let names, def_type = skolemize ~names ~types_by_param:(Some def_params) def_scheme in
+  let names, sig_type =
+    skolemize ~names ~types ~types_by_param:(Some sig_params) sig_scheme
+  in
+  let names, def_type =
+    skolemize ~names ~types ~types_by_param:(Some def_params) def_scheme
+  in
   Type_bindings.constrain ~names ~types ~subtype:sig_type ~supertype:def_type
 ;;
 
@@ -208,12 +208,16 @@ let compatible_type_decls
         ~names
         ~sig_params
         ~def_params
-        { sig_ = sig_scheme; def = def_scheme }
+        { sig_ = sig_scheme, []; def = def_scheme, [] }
     | Variants cnstrs1, Variants cnstrs2 ->
       iter2 cnstrs1 cnstrs2 ~f:(fun (cnstr1, args1) (cnstr2, args2) ->
         if not (Cnstr_name.equal cnstr1 cnstr2) then raise Compatibility_error;
-        iter2 args1 args2 ~f:(fun sig_ def ->
-          check_type_decl_schemes ~names ~sig_params ~def_params { sig_; def }))
+        iter2 args1 args2 ~f:(fun sig_scheme def_scheme ->
+          check_type_decl_schemes
+            ~names
+            ~sig_params
+            ~def_params
+            { sig_ = sig_scheme, []; def = def_scheme, [] }))
     | Record _, Record _ -> failwith "TODO: record types in compatibility checks"
     (* Records, variants and (in definitions) abstract type declarations always introduce
        new types, so they are never compatible with aliases. *)

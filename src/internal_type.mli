@@ -42,8 +42,3 @@ val fold_vars : t -> init:'acc -> f:('acc -> Type_var.t -> 'acc) -> 'acc
 val for_all_vars : t -> f:(Type_var.t -> bool) -> bool
 val exists_var : t -> f:(Type_var.t -> bool) -> bool
 val no_effects : effects
-
-val of_type_scheme
-  :  ?params:Type_param.Env_to_vars.t
-  -> Module_path.absolute Type_scheme.t
-  -> t

@@ -45,6 +45,7 @@ module Name_entry = struct
 
   let identical entry entry' = not (Set.are_disjoint entry.ids entry'.ids)
 
+  (* FIXME: Now what are we going to do with this function? *)
   let typ entry =
     match entry.typ with
     | Type typ -> typ
@@ -948,6 +949,11 @@ let add_type_decl t type_name decl =
   in
   update_current t ~f:{ f }
 ;;
+
+(* FIXME: This AST handling stuff being in Name_bindings feels like kind of a
+   responsibility explosion. It also makes us want to have circular dependencies between
+   Name_bindings and Type_bindings. Should probably make another module for this to go in
+   or put it in typed.ml. *)
 
 (* FIXME: use new logic similar to val/extern/let. Also we could probably share code. *)
 let add_name_entry names name scheme new_entry ~constrain =
