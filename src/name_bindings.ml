@@ -36,7 +36,7 @@ module Name_entry = struct
   type t =
     { ids : Id.Set.t
          [@default Id.Set.singleton (Id.create ())] [@sexp_drop_default fun _ _ -> true]
-    ; typ : Type_or_scheme.t
+    ; type_ : Type_or_scheme.t
     ; type_source : Type_source.t [@default Val_declared] [@sexp_drop_default.equal]
     ; fixity : Fixity.t option [@sexp.option]
     ; extern_name : Extern_name.t option [@sexp.option]
@@ -45,32 +45,19 @@ module Name_entry = struct
 
   let identical entry entry' = not (Set.are_disjoint entry.ids entry'.ids)
 
-  (* FIXME: Now what are we going to do with this function? *)
-  let typ entry =
-    match entry.typ with
-    | Type typ -> typ
-    | Scheme scheme -> Internal_type.of_type_scheme scheme
-  ;;
-
-  let scheme entry =
-    match entry.typ with
-    | Scheme scheme -> Some scheme
-    | Type _ -> None
-  ;;
-
-  let val_declared ?fixity ?extern_name typ =
+  let val_declared ?fixity ?extern_name type_ =
     { ids = Id.Set.singleton (Id.create ())
     ; type_source = Val_declared
-    ; typ = Scheme typ
+    ; type_ = Scheme type_
     ; fixity
     ; extern_name
     }
   ;;
 
-  let create ?fixity ~type_source typ =
+  let create ?fixity ~type_source type_ =
     { ids = Id.Set.singleton (Id.create ())
     ; type_source
-    ; typ = Type typ
+    ; type_ = Type type_
     ; fixity
     ; extern_name = None
     }
@@ -79,17 +66,17 @@ module Name_entry = struct
   let placeholder () = create ~type_source:Placeholder (Internal_type.fresh_var ())
 
   let merge entry entry' =
-    let preferred, typ, other =
+    let preferred, type_, other =
       match
         Ordering.of_int (Type_source.compare entry.type_source entry'.type_source)
       with
-      | Greater -> entry, entry.typ, entry'
-      | Less -> entry', entry'.typ, entry
+      | Greater -> entry, entry.type_, entry'
+      | Less -> entry', entry'.type_, entry
       | Equal ->
         let typ =
-          match entry.typ, entry'.typ with
-          | Type _, Scheme _ | Scheme _, Scheme _ | Type _, Type _ -> entry'.typ
-          | Scheme _, Type _ -> entry.typ
+          match entry.type_, entry'.type_ with
+          | Type _, Scheme _ | Scheme _, Scheme _ | Type _, Type _ -> entry'.type_
+          | Scheme _, Type _ -> entry.type_
         in
         entry', typ, entry
     in
@@ -100,7 +87,7 @@ module Name_entry = struct
     in
     let pick getter = Option.first_some (getter preferred) (getter other) in
     { ids = Set.union entry.ids entry'.ids
-    ; typ
+    ; type_
     ; type_source
     ; fixity = pick fixity
     ; extern_name = pick extern_name
@@ -547,8 +534,10 @@ let resolve_name_or_import t (entry : _ Or_imported.t) =
   | Imported path -> find_absolute_entry t path
 ;;
 
-let find_type t name = find_entry t name |> Name_entry.typ
-let find_cnstr_type t = Value_name.Qualified.of_cnstr_name >> find_type t
+let find_cnstr_type t cnstr_name =
+  Value_name.Qualified.of_cnstr_name cnstr_name |> find_entry t |> Name_entry.type_
+;;
+
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
 let ( (find_type_entry_with_path, find_absolute_type_entry_with_path)
@@ -865,14 +854,14 @@ let add_val_or_extern
                  Name_error
                  ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
             constrain
-              ~subtype:(Name_entry.typ existing_entry)
-              ~supertype:(Internal_type.of_type_scheme scheme);
+              ~subtype:existing_entry.type_
+              ~supertype:(Name_entry.Type_or_scheme.Scheme scheme);
             Local
               (Name_entry.merge
                  existing_entry
                  { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
                  ; type_source
-                 ; typ = Scheme scheme
+                 ; type_ = Scheme scheme
                  ; fixity
                  ; extern_name
                  })
@@ -963,8 +952,8 @@ let add_name_entry names name scheme new_entry ~constrain =
     | Some (Or_imported.Local existing_entry) ->
       (* FIXME: We should be asserting that the existing entry is a placeholder. *)
       constrain
-        ~subtype:(Internal_type.of_type_scheme scheme)
-        ~supertype:(Name_entry.typ existing_entry);
+        ~subtype:(Name_entry.Type_or_scheme.Scheme scheme)
+        ~supertype:(Name_entry.type_ existing_entry);
       Local (Name_entry.merge existing_entry new_entry)
     | Some (Imported imported_name) ->
       name_error
@@ -1006,7 +995,7 @@ let set_inferred_scheme t name scheme ~shadowing_allowed ~check_existing =
     let inferred_entry : Name_entry.t =
       { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
       ; type_source = Let_inferred
-      ; typ = Scheme scheme
+      ; type_ = Scheme scheme
       ; fixity = None
       ; extern_name = None
       }

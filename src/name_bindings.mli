@@ -14,8 +14,14 @@ module Name_entry : sig
     [@@deriving compare, enumerate, equal, sexp, variants]
   end
 
-  val typ : t -> Internal_type.t
-  val scheme : t -> Module_path.absolute Type_scheme.t option
+  module Type_or_scheme : sig
+    type t =
+      | Type of Internal_type.t
+      | Scheme of Module_path.absolute Type_scheme.t
+    [@@deriving equal, sexp]
+  end
+
+  val type_ : t -> Type_or_scheme.t
   val type_source : t -> Type_source.t
   val fixity : t -> Fixity.t option
   val extern_name : t -> Extern_name.t option
@@ -54,8 +60,7 @@ val find_entry_with_path
   -> Value_name.Relative.t
   -> Value_name.Absolute.t * Name_entry.t
 
-val find_type : t -> Value_name.Relative.t -> Internal_type.t
-val find_cnstr_type : t -> Cnstr_name.Relative.t -> Internal_type.t
+val find_cnstr_type : t -> Cnstr_name.Relative.t -> Name_entry.Type_or_scheme.t
 val find_fixity : t -> Value_name.Relative.t -> Fixity.t
 
 val set_inferred_scheme
@@ -142,7 +147,10 @@ val add_val
   -> Value_name.t
   -> Fixity.t option
   -> Module_path.absolute Type_scheme.Bounded.t
-  -> constrain:(subtype:Internal_type.t -> supertype:Internal_type.t -> unit)
+  -> constrain:
+       (subtype:Name_entry.Type_or_scheme.t
+        -> supertype:Name_entry.Type_or_scheme.t
+        -> unit)
   -> t
 
 val add_extern
@@ -151,7 +159,10 @@ val add_extern
   -> Fixity.t option
   -> Module_path.absolute Type_scheme.Bounded.t
   -> Extern_name.t
-  -> constrain:(subtype:Internal_type.t -> supertype:Internal_type.t -> unit)
+  -> constrain:
+       (subtype:Name_entry.Type_or_scheme.t
+        -> supertype:Name_entry.Type_or_scheme.t
+        -> unit)
   -> t
 
 val add_type_decl : t -> Type_name.t -> Module_path.absolute Type_decl.t -> t
@@ -160,7 +171,10 @@ val add_effect
   :  t
   -> Effect_name.t
   -> Module_path.absolute Effect.t
-  -> constrain:(subtype:Internal_type.t -> supertype:Internal_type.t -> unit)
+  -> constrain:
+       (subtype:Name_entry.Type_or_scheme.t
+        -> supertype:Name_entry.Type_or_scheme.t
+        -> unit)
   -> t
 
 module Sigs_or_defs : sig

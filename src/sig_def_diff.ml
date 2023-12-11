@@ -148,11 +148,13 @@ let check_type_decl_schemes
 
 let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
   let get_scheme entry =
-    Option.value_or_thunk (Name_bindings.Name_entry.scheme entry) ~default:(fun () ->
+    match Name_bindings.Name_entry.type_ entry with
+    | Scheme scheme -> scheme
+    | Type _ ->
       compiler_bug
         [%message
           "Type binding not generalized when diffing sigs/defs"
-            (entry : Name_bindings.Name_entry.t)])
+            (entry : Name_bindings.Name_entry.t)]
   in
   let compatible_fixities =
     Comparable.lift [%equal: Fixity.t option] ~f:Name_bindings.Name_entry.fixity

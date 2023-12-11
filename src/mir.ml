@@ -218,12 +218,14 @@ end = struct
     let extern_name = Name_bindings.Name_entry.extern_name entry in
     let fallback_to_external () : Extern_info.t =
       let scheme =
-        Option.value_or_thunk (Name_bindings.Name_entry.scheme entry) ~default:(fun () ->
+        match Name_bindings.Name_entry.type_ entry with
+        | Scheme scheme -> scheme
+        | Type _ ->
           compiler_bug
             [%message
               "Didn't find type scheme for external name entry"
                 (name : Value_name.Absolute.t)
-                (entry : Name_bindings.Name_entry.t)])
+                (entry : Name_bindings.Name_entry.t)]
       in
       External { arity = arity_of_type ~names:t.name_bindings (fst scheme) }
     in

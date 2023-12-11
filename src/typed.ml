@@ -29,7 +29,11 @@ module Pattern = struct
       | Cnstr_appl (cnstr, args) ->
         (* TODO: inferring unqualified name given type information *)
         let expected_arg_types, body_type =
-          match Name_bindings.find_cnstr_type names cnstr with
+          let cnstr_type =
+            Name_bindings.find_cnstr_type names cnstr
+            |> Type_bindings.instantiate_type_or_scheme ~names ~types
+          in
+          match cnstr_type with
           | Function (arg_types, _effect, body_type) ->
             Nonempty.to_list arg_types, body_type
           | body_type -> [], body_type
@@ -110,16 +114,16 @@ module Pattern = struct
              (Map.equal
                 (fun entry1 entry2 ->
                   let entry_type = Internal_type.fresh_var () in
-                  Type_bindings.constrain
+                  Type_bindings.constrain'
                     ~names
                     ~types
-                    ~subtype:(Name_bindings.Name_entry.typ entry1)
-                    ~supertype:entry_type;
-                  Type_bindings.constrain
+                    ~subtype:(Name_bindings.Name_entry.type_ entry1)
+                    ~supertype:(Type entry_type);
+                  Type_bindings.constrain'
                     ~names
                     ~types
-                    ~subtype:(Name_bindings.Name_entry.typ entry2)
-                    ~supertype:entry_type;
+                    ~subtype:(Name_bindings.Name_entry.type_ entry2)
+                    ~supertype:(Type entry_type);
                   true)
                 pat_names1
                 pat_names2)
@@ -181,9 +185,9 @@ module Pattern = struct
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let inferred_scheme =
-          (* FIXME: Sometimes we instantiate and then re-generalize a type here. That
-             seems silly. *)
-          Type_bindings.generalize types (Name_bindings.Name_entry.typ entry)
+          match Name_bindings.Name_entry.type_ entry with
+          | Scheme scheme -> scheme
+          | Type type_ -> Type_bindings.generalize types type_
         in
         Name_bindings.set_inferred_scheme
           names
@@ -191,9 +195,9 @@ module Pattern = struct
           inferred_scheme
           ~shadowing_allowed
           ~check_existing:(fun existing_entry ->
-          match Name_bindings.Name_entry.scheme existing_entry with
-          | None -> ()
-          | Some existing_scheme ->
+          match Name_bindings.Name_entry.type_ existing_entry with
+          | Type _ -> ()
+          | Scheme existing_scheme ->
             Sig_def_diff.check_val_scheme_vs_inferred_scheme
               ~names
               ~val_scheme:existing_scheme
@@ -251,9 +255,11 @@ module Expr = struct
         | Name name ->
           let name, name_entry = Name_bindings.find_entry_with_path names name in
           f_name name name_entry;
-          ( node (Name name)
-          , Name_bindings.Name_entry.typ name_entry
-          , Internal_type.no_effects )
+          let type_ =
+            Name_bindings.Name_entry.type_ name_entry
+            |> Type_bindings.instantiate_type_or_scheme ~names ~types
+          in
+          node (Name name), type_, Internal_type.no_effects
         | Qualified (path, expr) ->
           let names = Name_bindings.import_all names path in
           of_untyped ~names ~types ~f_name expr
@@ -847,7 +853,7 @@ module Module = struct
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
       | Effect (effect_name, effect) ->
-        let constrain = Type_bindings.constrain ~names ~types in
+        let constrain = Type_bindings.constrain' ~names ~types in
         Name_bindings.add_effect names effect_name effect ~constrain
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ | Import _ -> names)
@@ -917,10 +923,10 @@ module Module = struct
     =
     let handle_common ~names = function
       | Val (name, fixity, typ) ->
-        let constrain = Type_bindings.constrain ~names ~types in
+        let constrain = Type_bindings.constrain' ~names ~types in
         Name_bindings.add_val names name fixity typ ~constrain
       | Extern (name, fixity, typ, extern_name) ->
-        let constrain = Type_bindings.constrain ~names ~types in
+        let constrain = Type_bindings.constrain' ~names ~types in
         Name_bindings.add_extern names name fixity ([], typ) extern_name ~constrain
       | Type_decl (_, (_, Alias alias)) ->
         check_cyclic_type_alias ~names alias;
@@ -954,9 +960,9 @@ module Module = struct
             names
             pat_names
             ~combine:(fun _ existing_entry new_entry ->
-            let existing_type = Name_bindings.Name_entry.typ existing_entry in
-            let new_type = Name_bindings.Name_entry.typ new_entry in
-            Type_bindings.constrain
+            let existing_type = Name_bindings.Name_entry.type_ existing_entry in
+            let new_type = Name_bindings.Name_entry.type_ new_entry in
+            Type_bindings.constrain'
               ~names
               ~types
               ~subtype:new_type

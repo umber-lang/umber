@@ -12,11 +12,25 @@ val instantiate_type_scheme
   -> Module_path.absolute Type_scheme.t
   -> Internal_type.t
 
+val instantiate_type_or_scheme
+  :  ?params:Type_param.Env_to_vars.t
+  -> names:Name_bindings.t
+  -> types:t
+  -> Name_bindings.Name_entry.Type_or_scheme.t
+  -> Internal_type.t
+
 val constrain
   :  names:Name_bindings.t
   -> types:t
   -> subtype:Internal_type.t
   -> supertype:Internal_type.t
+  -> unit
+
+val constrain'
+  :  names:Name_bindings.t
+  -> types:t
+  -> subtype:Name_bindings.Name_entry.Type_or_scheme.t
+  -> supertype:Name_bindings.Name_entry.Type_or_scheme.t
   -> unit
 
 val constrain_effects

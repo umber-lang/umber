@@ -732,6 +732,25 @@ and instantiate_type_scheme =
     instantiate_type_scheme ~names ~types scheme ~params
 ;;
 
+let instantiate_type_or_scheme
+  ?params
+  ~names
+  ~types
+  (type_or_scheme : Name_bindings.Name_entry.Type_or_scheme.t)
+  =
+  match type_or_scheme with
+  | Type type_ -> type_
+  | Scheme scheme -> instantiate_type_scheme ?params ~names ~types scheme
+;;
+
+let constrain' ~names ~types ~subtype ~supertype =
+  constrain
+    ~names
+    ~types
+    ~subtype:(instantiate_type_or_scheme ~names ~types subtype)
+    ~supertype:(instantiate_type_or_scheme ~names ~types supertype)
+;;
+
 (* FIXME: write effect type inference:
    Example:
 
