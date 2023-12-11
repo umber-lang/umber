@@ -807,7 +807,7 @@ module Expr = struct
       bindings
       ~init:(ctx_for_body, init)
       ~f:(fun (ctx_for_body, acc) (binding, names_bound) ->
-      let pat, expr, typ = extract_binding binding in
+      let pat, expr, ((typ, _constraints) : _ Type_scheme.t) = extract_binding binding in
       let just_bound : Just_bound.t =
         if rec_
         then (
@@ -955,7 +955,7 @@ module Expr = struct
     let rec of_typed_expr ?just_bound ~ctx expr expr_type =
       match
         ( (expr : Module_path.absolute Type_scheme.t Typed.Expr.t)
-        , (expr_type : _ Type_scheme.t) )
+        , (expr_type : _ Type_scheme.type_) )
       with
       | Literal lit, _ -> Primitive lit
       | Name name, _ ->
@@ -981,14 +981,13 @@ module Expr = struct
              let arg_types = Nonempty.map ~f:snd args_and_types in
              (* FIXME: We lost the effect information. We don't actually use it, though.
                 For now, just making the effect total. *)
-             (* FIXME: Dummy empty constraints *)
-             let fun_type : _ Type_scheme.t =
-               Function (Nonempty.map arg_types ~f:fst, None, fst body_type), []
+             let fun_type : _ Type_scheme.type_ =
+               Function (Nonempty.map arg_types ~f:fst, None, body_type)
              in
              let fun_ = of_typed_expr ~ctx fun_ fun_type in
              let args =
                Nonempty.map args_and_types ~f:(fun (arg, arg_type) ->
-                 Node.with_value arg ~f:(fun arg -> of_typed_expr ~ctx arg arg_type))
+                 Node.with_value arg ~f:(fun arg -> of_typed_expr ~ctx arg (fst arg_type)))
              in
              match fun_ with
              | Name fun_name -> Fun_call (fun_name, args)
@@ -1006,22 +1005,20 @@ module Expr = struct
                (* Special-case constructor applications to make use of [Make_block]. *)
                (match Value_name.to_cnstr_name name with
                 | Ok cnstr_name ->
-                  let cnstr_info = Context.find_cnstr_info ctx (fst expr_type) in
+                  let cnstr_info = Context.find_cnstr_info ctx expr_type in
                   let tag = Cnstr_info.tag cnstr_info (Named cnstr_name) in
                   let fields, field_types =
                     List.unzip (Nonempty.to_list args_and_types)
                   in
+                  let field_types = List.map field_types ~f:fst in
                   make_block ~ctx ~tag ~fields ~field_types
                 | Error _ -> fun_call fun_)
              | _ -> fun_call fun_))
-      | Lambda (args, body), (Function (arg_types, _effect_row, body_type), _constraints)
-        ->
-        (* FIXME: Need to use the constraints here. Also need the params to associate
-           correctly. *)
+      | Lambda (args, body), Function (arg_types, _effect_row, body_type) ->
         add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound
       | Match (expr, input_type, arms), output_type ->
         let input_expr =
-          Node.with_value expr ~f:(fun expr -> of_typed_expr ~ctx expr input_type)
+          Node.with_value expr ~f:(fun expr -> of_typed_expr ~ctx expr (fst input_type))
         in
         if is_atomic input_expr
         then
@@ -1057,7 +1054,10 @@ module Expr = struct
             ~ctx_for_body
             ~rec_
             ~init:[]
-            ~add_let:(fun bindings name mir_expr (_ : Module_path.absolute Type_scheme.t) ->
+            ~add_let:(fun bindings
+                          name
+                          mir_expr
+                          (_ : Module_path.absolute Type_scheme.type_) ->
               (name, mir_expr) :: bindings)
             ~extract_binding:(fun (pat_and_type, expr) ->
               Node.map pat_and_type ~f:fst, expr, Node.with_value pat_and_type ~f:snd)
@@ -1092,7 +1092,9 @@ module Expr = struct
       | ( Lambda _, (Var _ | Type_app _ | Tuple _)
         | Tuple _, (Var _ | Type_app _ | Function _) ) as expr ->
         compiler_bug
-          [%message "Incompatible expr and type" (expr : Typed.Expr.generalized)]
+          [%message
+            "Incompatible expr and type"
+              (expr : _ Type_scheme.t Typed.Expr.t * _ Type_scheme.type_)]
       | _, (Union _ | Intersection _) ->
         (* FIXME: fix *)
         failwith "TODO: handle mir conversion for union and intersection types"
@@ -1230,7 +1232,13 @@ module Expr = struct
             of_typed_expr ~ctx field_expr field_type))
       in
       Make_block { tag; fields }
-    and handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms =
+    and handle_match_arms
+      ~ctx
+      ~input_expr
+      ~input_type:((input_type, _constraints) : _ Type_scheme.t)
+      ~output_type
+      arms
+      =
       let rec loop_one_arm ~pattern ~output_expr ~coverage arms =
         let patterns = Node.with_value pattern ~f:Simple_pattern.flatten_typed_pattern in
         let coverage' = Simple_pattern.Coverage.of_patterns patterns in
@@ -1492,8 +1500,8 @@ let of_typed_module =
         | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
           let name = Context.find_value_name_assert_external ctx value_name in
           ( ctx
-          , Extern_decl { name; extern_name; arity = arity_of_type ~names type_ } :: stmts
-          )
+          , Extern_decl { name; extern_name; arity = arity_of_type ~names (fst type_) }
+            :: stmts )
         | Common_def (Effect _ | Val _ | Trait_sig _ | Import _) -> ctx, stmts))
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
