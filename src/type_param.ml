@@ -32,17 +32,15 @@ module Env_of_vars : sig
 end = struct
   type nonrec t =
     { table : (Type_var.t, Type_param_name.t) Hashtbl.t
-    ; mutable next_param : Type_param_name.t
+    ; mutable next_param_index : int
     }
 
-  let create () =
-    { table = Hashtbl.create (module Type_var); next_param = Type_param_name.default }
-  ;;
+  let create () = { table = Hashtbl.create (module Type_var); next_param_index = 0 }
 
   let find_or_add t =
     Hashtbl.find_or_add t.table ~default:(fun () ->
-      let param = t.next_param in
-      t.next_param <- Type_param_name.next t.next_param;
+      let param = Type_param_name.generate_nth t.next_param_index in
+      t.next_param_index <- t.next_param_index + 1;
       param)
   ;;
 end

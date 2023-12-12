@@ -453,18 +453,19 @@ end
 module Type_param_name : sig
   include Name_qualified
 
+  (** Generate a parameter name based on a non-negative integer. Starts with 0 -> "a".
+      Then goes "a", "b", ..., "z", "a1", "b1", ..., "z1", "a2", "b2", ... *)
+  val generate_nth : int -> t
+
   val default : t
-  val next : t -> t
 end = struct
   include Lower_name_qualified
 
-  let default = of_string_unchecked "a"
+  (* let default = of_string_unchecked "a"
 
   (* Generates names like: "a", .., "z", "aa", "ab", .. *)
-  let next param =
-    let param = to_ustring param in
-    let buf = Buffer.create (Ustring.length param) in
-    let rec loop buf param len =
+  let next
+    (* let rec loop buf param len =
       if Int.(len - 1 < Ustring.length param)
       then (
         let letter = Ustring.get param (len - 1) in
@@ -477,8 +478,55 @@ end = struct
           Buffer.add_char buf 'a')
       else Buffer.add_char buf 'a'
     in
-    loop buf param (Ustring.length param);
-    of_string_unchecked (Buffer.contents buf)
+    fun param ->
+      let param = to_ustring param in
+      let buf = Buffer.create (Ustring.length param) in
+      loop buf param (Ustring.length param);
+      of_string_unchecked (Buffer.contents buf) *)
+      param
+    =
+    let param = to_ustring param in
+    if Ustring.is_empty param
+    then default
+    else (
+      let new_param =
+        match Uchar.to_char (Ustring.get param (Ustring.length param - 1)) with
+        | Some ('a' .. 'y' as letter) ->
+          let next_letter = Uchar.of_char (Char.unsafe_of_int (Char.to_int letter + 1)) in
+          let new_param = Ustring.to_array param |> Array.copy in
+          new_param.(Array.length new_param - 1) <- next_letter;
+          new_param
+        | Some _ | None ->
+          Array.init
+            (Ustring.length param + 1)
+            ~f:(fun i ->
+              if Int.O.(i < Ustring.length param)
+              then Ustring.get param i
+              else Uchar.of_char 'a')
+      in
+      of_ustring_unchecked (Ustring.of_array_unchecked new_param))
+  ;; *)
+
+  let generate_nth n =
+    let letter = Uchar.of_char (Char.of_int_exn (Char.to_int 'a' + (n % 26))) in
+    let number = n / 26 in
+    of_ustring_unchecked
+      (if Int.equal number 0
+       then Ustring.of_uchar letter
+       else Ustring.of_string_exn (Uchar.to_string letter ^ Int.to_string number))
+  ;;
+
+  let default = generate_nth 0
+  let%test _ = default = of_string_unchecked "a"
+
+  let%expect_test "generate type param names" =
+    let param_names = List.init 30 ~f:generate_nth in
+    print_s [%sexp (param_names : t list)];
+    [%expect {| (a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1) |}];
+    print_s [%sexp (generate_nth 52 : t)];
+    [%expect {| a2 |}];
+    print_s [%sexp (generate_nth 53 : t)];
+    [%expect {| b2 |}]
   ;;
 end
 

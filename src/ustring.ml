@@ -62,6 +62,7 @@ let make len x = Array.create ~len x
 let of_array_unchecked = Fn.id
 let of_ustring = Fn.id
 let to_ustring = Fn.id
+let of_uchar c = of_array_unchecked [| c |]
 let print ?(out = stdout) s = Out_channel.output_string out (to_string s)
 
 let print_endline ?(out = stdout) s =

@@ -21,6 +21,7 @@ val of_string_exn : string -> t
 val of_ustring : t -> t
 val to_string : t -> string
 val to_ustring : t -> t
+val of_uchar : Uchar.t -> t
 val add_to_buffer : Buffer.t -> t -> unit
 val add_substring_to_buffer : Buffer.t -> t -> pos:int -> len:int -> unit
 val print : ?out:Out_channel.t -> t -> unit
