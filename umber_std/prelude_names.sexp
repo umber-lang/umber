@@ -1,8 +1,10 @@
 ((current_path "Std(d)")
  (toplevel
   ((names
-    ((True (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %true))))
-     (False (Local ((typ (Scheme (Type_app Bool ()))) (extern_name %false))))))
+    ((True
+      (Local ((type_ (Scheme ((Type_app Bool ()) ()))) (extern_name %true))))
+     (False
+      (Local ((type_ (Scheme ((Type_app Bool ()) ()))) (extern_name %false))))))
    (types
     ((Int ((Local (() Abstract))))
      (Bool ((Local (() (Variants ((False ()) (True ())))))))
@@ -47,31 +49,34 @@
                   (Some (Imported Std.Prelude.Option.Some))
                   (sqrt
                    (Local
-                    ((typ
+                    ((type_
                       (Scheme
-                       (Function ((Type_app Std.Prelude.Float.Float ())) ()
-                        (Type_app Std.Prelude.Float.Float ())))))))
+                       ((Function ((Type_app Std.Prelude.Float.Float ())) ()
+                         (Type_app Std.Prelude.Float.Float ()))
+                        ()))))))
                   (print
                    (Local
-                    ((typ
+                    ((type_
                       (Scheme
-                       (Function ((Type_app String ())) () (Tuple ()))))
+                       ((Function ((Type_app String ())) () (Tuple ())) ())))
                      (type_source Extern_declared)
                      (extern_name umber_print_endline))))
                   (print_int
                    (Local
-                    ((typ
+                    ((type_
                       (Scheme
-                       (Function ((Type_app Std.Prelude.Int.Int ())) ()
-                        (Tuple ()))))
+                       ((Function ((Type_app Std.Prelude.Int.Int ())) ()
+                         (Tuple ()))
+                        ())))
                      (type_source Extern_declared)
                      (extern_name umber_print_int))))
                   (print_bool
                    (Local
-                    ((typ
+                    ((type_
                       (Scheme
-                       (Function ((Type_app Std.Prelude.Bool.Bool ())) ()
-                        (Tuple ()))))
+                       ((Function ((Type_app Std.Prelude.Bool.Bool ())) ()
+                         (Tuple ()))
+                        ())))
                      (type_source Extern_declared)
                      (extern_name umber_print_bool))))))
                 (types ()) (effects ())
@@ -82,10 +87,11 @@
                      ((names
                        ((to_string
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Type_app Std.Prelude.Int.Int ())) ()
-                              (Type_app String ())))))))))
+                             ((Function ((Type_app Std.Prelude.Int.Int ()))
+                               () (Type_app String ()))
+                              ()))))))))
                       (types
                        ((Int ((Local (() (Alias (Type_app Int ()))))))
                         (PrimitiveInt ((Imported Int)))))
@@ -96,10 +102,11 @@
                      ((names
                        ((to_string
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Type_app Std.Prelude.Bool.Bool ()))
-                              () (Type_app String ())))))))))
+                             ((Function ((Type_app Std.Prelude.Bool.Bool ()))
+                               () (Type_app String ()))
+                              ()))))))))
                       (types
                        ((Bool ((Local (() (Alias (Type_app Bool ()))))))
                         (PrimitiveBool ((Imported Bool)))))
@@ -110,49 +117,54 @@
                      ((names
                        ((Nil
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Type_app Std.Prelude.List.List ((Var a))))))))
+                             ((Type_app Std.Prelude.List.List ((Var a))) ()))))))
                         (map
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Function ((Var a)) () (Var b)))
-                              () (Type_app Std.Prelude.List.List ((Var b)))))))))
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Function ((Var a)) () (Var b)))
+                               () (Type_app Std.Prelude.List.List ((Var b))))
+                              ()))))))
                         (Cons
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Var a)
-                               (Type_app Std.Prelude.List.List ((Var a))))
-                              () (Type_app Std.Prelude.List.List ((Var a)))))))))
+                             ((Function
+                               ((Var a)
+                                (Type_app Std.Prelude.List.List ((Var a))))
+                               () (Type_app Std.Prelude.List.List ((Var a))))
+                              ()))))))
                         (append
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Type_app Std.Prelude.List.List ((Var a))))
-                              () (Type_app Std.Prelude.List.List ((Var a)))))))))
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Type_app Std.Prelude.List.List ((Var a))))
+                               () (Type_app Std.Prelude.List.List ((Var a))))
+                              ()))))))
                         (reverse
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.List.List ((Var a)))) ()
-                              (Type_app Std.Prelude.List.List ((Var a)))))))))
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a))))
+                               () (Type_app Std.Prelude.List.List ((Var a))))
+                              ()))))))
                         (concat_map
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Function ((Var a)) ()
-                                (Type_app Std.Prelude.List.List ((Var b)))))
-                              () (Type_app Std.Prelude.List.List ((Var b)))))))))))
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Function ((Var a)) ()
+                                 (Type_app Std.Prelude.List.List ((Var b)))))
+                               () (Type_app Std.Prelude.List.List ((Var b))))
+                              ()))))))))
                       (types
                        ((List
                          ((Local
@@ -169,41 +181,46 @@
                      ((names
                        ((+
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              () (Type_app Std.Prelude.Float.Float ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Float.Float ())
+                                (Type_app Std.Prelude.Float.Float ()))
+                               () (Type_app Std.Prelude.Float.Float ()))
+                              ())))
                            (fixity (Left 6)))))
                         (pi
                          (Local
-                          ((typ
-                            (Scheme (Type_app Std.Prelude.Float.Float ()))))))
+                          ((type_
+                            (Scheme
+                             ((Type_app Std.Prelude.Float.Float ()) ()))))))
                         (abs
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              () (Type_app Std.Prelude.Float.Float ())))))))
+                             ((Function
+                               ((Type_app Std.Prelude.Float.Float ())
+                                (Type_app Std.Prelude.Float.Float ()))
+                               () (Type_app Std.Prelude.Float.Float ()))
+                              ()))))))
                         (cos
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              () (Type_app Std.Prelude.Float.Float ())))))))
+                             ((Function
+                               ((Type_app Std.Prelude.Float.Float ())
+                                (Type_app Std.Prelude.Float.Float ()))
+                               () (Type_app Std.Prelude.Float.Float ()))
+                              ()))))))
                         (sin
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              () (Type_app Std.Prelude.Float.Float ())))))))))
+                             ((Function
+                               ((Type_app Std.Prelude.Float.Float ())
+                                (Type_app Std.Prelude.Float.Float ()))
+                               () (Type_app Std.Prelude.Float.Float ()))
+                              ()))))))))
                       (types
                        ((Float ((Local (() (Alias (Type_app Float ()))))))
                         (PrimitiveFloat ((Imported Float)))))
@@ -214,15 +231,17 @@
                      ((names
                        ((None
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Type_app Std.Prelude.Option.Option ((Var a))))))))
+                             ((Type_app Std.Prelude.Option.Option ((Var a)))
+                              ()))))))
                         (Some
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Var a)) ()
-                              (Type_app Std.Prelude.Option.Option ((Var a)))))))))))
+                             ((Function ((Var a)) ()
+                               (Type_app Std.Prelude.Option.Option ((Var a))))
+                              ()))))))))
                       (types
                        ((Option
                          ((Local
@@ -234,191 +253,213 @@
                      ((names
                        ((%
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              () (Type_app Std.Prelude.Int.Int ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Int.Int ())
+                                (Type_app Std.Prelude.Int.Int ()))
+                               () (Type_app Std.Prelude.Int.Int ()))
+                              ())))
                            (fixity (Left 7)))))
                         (*
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              () (Type_app Std.Prelude.Int.Int ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Int.Int ())
+                                (Type_app Std.Prelude.Int.Int ()))
+                               () (Type_app Std.Prelude.Int.Int ()))
+                              ())))
                            (fixity (Left 7)))))
                         (+
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              () (Type_app Std.Prelude.Int.Int ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Int.Int ())
+                                (Type_app Std.Prelude.Int.Int ()))
+                               () (Type_app Std.Prelude.Int.Int ()))
+                              ())))
                            (fixity (Left 6)))))
                         (-
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              () (Type_app Std.Prelude.Int.Int ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Int.Int ())
+                                (Type_app Std.Prelude.Int.Int ()))
+                               () (Type_app Std.Prelude.Int.Int ()))
+                              ())))
                            (fixity (Left 6)))))
                         (.
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Function ((Var b)) () (Var c))
-                               (Function ((Var a)) () (Var b)) (Var a))
-                              () (Var c))))
+                             ((Function
+                               ((Function ((Var b)) () (Var c))
+                                (Function ((Var a)) () (Var b)) (Var a))
+                               () (Var c))
+                              ())))
                            (fixity (Right 9)))))
                         (";"
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Tuple ()) (Var a)) () (Var a))))
+                             ((Function ((Tuple ()) (Var a)) () (Var a)) ())))
                            (fixity (Left 0)))))
                         (<
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Var a) (Var a)) ()
-                              (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function ((Var a) (Var a)) ()
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Non_assoc 4)))))
                         (>
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Var a) (Var a)) ()
-                              (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function ((Var a) (Var a)) ()
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Non_assoc 4)))))
                         (^
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              () (Type_app Std.Prelude.Int.Int ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Int.Int ())
+                                (Type_app Std.Prelude.Int.Int ()))
+                               () (Type_app Std.Prelude.Int.Int ()))
+                              ())))
                            (fixity (Right 8)))))
                         (!=
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Var a) (Var a)) ()
-                              (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function ((Var a) (Var a)) ()
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Non_assoc 4)))))
                         (&&
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Bool.Bool ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
-                              () (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Bool.Bool ())
+                                (Type_app Std.Prelude.Bool.Bool ()))
+                               () (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Left 3)))))
                         (*.
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              () (Type_app Std.Prelude.Float.Float ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Float.Float ())
+                                (Type_app Std.Prelude.Float.Float ()))
+                               () (Type_app Std.Prelude.Float.Float ()))
+                              ())))
                            (fixity (Left 7)))))
                         (++
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app String ()) (Type_app String ())) ()
-                              (Type_app String ()))))
+                             ((Function
+                               ((Type_app String ()) (Type_app String ())) ()
+                               (Type_app String ()))
+                              ())))
                            (fixity (Left 5)))))
                         (+.
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              () (Type_app Std.Prelude.Float.Float ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Float.Float ())
+                                (Type_app Std.Prelude.Float.Float ()))
+                               () (Type_app Std.Prelude.Float.Float ()))
+                              ())))
                            (fixity (Left 6)))))
                         (-.
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              () (Type_app Std.Prelude.Float.Float ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Float.Float ())
+                                (Type_app Std.Prelude.Float.Float ()))
+                               () (Type_app Std.Prelude.Float.Float ()))
+                              ())))
                            (fixity (Left 6)))))
                         (::
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Var a)
-                               (Type_app Std.Prelude.List.List ((Var a))))
-                              () (Type_app Std.Prelude.List.List ((Var a))))))
+                             ((Function
+                               ((Var a)
+                                (Type_app Std.Prelude.List.List ((Var a))))
+                               () (Type_app Std.Prelude.List.List ((Var a))))
+                              ())))
                            (fixity (Right 5)))))
                         (<=
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Var a) (Var a)) ()
-                              (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function ((Var a) (Var a)) ()
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Non_assoc 4)))))
                         (==
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Var a) (Var a)) ()
-                              (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function ((Var a) (Var a)) ()
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Non_assoc 4)))))
                         (>=
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Var a) (Var a)) ()
-                              (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function ((Var a) (Var a)) ()
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Non_assoc 4)))))
                         (|>
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Var a) (Function ((Var a)) () (Var b))) ()
-                              (Var b))))
+                             ((Function
+                               ((Var a) (Function ((Var a)) () (Var b))) ()
+                               (Var b))
+                              ())))
                            (fixity (Left 0)))))
                         (||
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Bool.Bool ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
-                              () (Type_app Std.Prelude.Bool.Bool ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Bool.Bool ())
+                                (Type_app Std.Prelude.Bool.Bool ()))
+                               () (Type_app Std.Prelude.Bool.Bool ()))
+                              ())))
                            (fixity (Left 2)))))
                         (mod
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              () (Type_app Std.Prelude.Int.Int ()))))
+                             ((Function
+                               ((Type_app Std.Prelude.Int.Int ())
+                                (Type_app Std.Prelude.Int.Int ()))
+                               () (Type_app Std.Prelude.Int.Int ()))
+                              ())))
                            (fixity (Left 7)))))
                         (not
                          (Local
-                          ((typ
+                          ((type_
                             (Scheme
-                             (Function ((Type_app Std.Prelude.Bool.Bool ()))
-                              () (Type_app Std.Prelude.Bool.Bool ())))))))))
+                             ((Function ((Type_app Std.Prelude.Bool.Bool ()))
+                               () (Type_app Std.Prelude.Bool.Bool ()))
+                              ()))))))))
                       (types ()) (effects ()) (modules ())))))))))
               ((names
                 ((% (Imported Std.Prelude.Operators.%))
@@ -446,32 +487,36 @@
                  (not (Imported Std.Prelude.Operators.not))
                  (sqrt
                   (Local
-                   ((typ
+                   ((type_
                      (Scheme
-                      (Function ((Type_app Std.Prelude.Float.Float ())) ()
-                       (Type_app Std.Prelude.Float.Float ()))))
+                      ((Function ((Type_app Std.Prelude.Float.Float ())) ()
+                        (Type_app Std.Prelude.Float.Float ()))
+                       ())))
                     (type_source Extern_declared)
                     (extern_name umber_float_sqrt))))
                  (print
                   (Local
-                   ((typ
-                     (Scheme (Function ((Type_app String ())) () (Tuple ()))))
+                   ((type_
+                     (Scheme
+                      ((Function ((Type_app String ())) () (Tuple ())) ())))
                     (type_source Extern_declared)
                     (extern_name umber_print_endline))))
                  (print_int
                   (Local
-                   ((typ
+                   ((type_
                      (Scheme
-                      (Function ((Type_app Std.Prelude.Int.Int ())) ()
-                       (Tuple ()))))
+                      ((Function ((Type_app Std.Prelude.Int.Int ())) ()
+                        (Tuple ()))
+                       ())))
                     (type_source Extern_declared)
                     (extern_name umber_print_int))))
                  (print_bool
                   (Local
-                   ((typ
+                   ((type_
                      (Scheme
-                      (Function ((Type_app Std.Prelude.Bool.Bool ())) ()
-                       (Tuple ()))))
+                      ((Function ((Type_app Std.Prelude.Bool.Bool ())) ()
+                        (Tuple ()))
+                       ())))
                     (type_source Extern_declared)
                     (extern_name umber_print_bool))))))
                (types ()) (effects ())
@@ -482,10 +527,11 @@
                     ((names
                       ((to_string
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Type_app Std.Prelude.Int.Int ())) ()
-                             (Type_app String ()))))
+                            ((Function ((Type_app Std.Prelude.Int.Int ())) ()
+                              (Type_app String ()))
+                             ())))
                           (type_source Extern_declared)
                           (extern_name umber_int_to_string))))))
                      (types
@@ -498,10 +544,11 @@
                     ((names
                       ((to_string
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Type_app Bool ())) ()
-                             (Type_app String ()))))
+                            ((Function ((Type_app Bool ())) ()
+                              (Type_app String ()))
+                             ())))
                           (type_source Let_inferred))))))
                      (types
                       ((Bool ((Local (() (Alias (Type_app Bool ()))))))
@@ -513,61 +560,67 @@
                     ((names
                       ((Nil
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Type_app Std.Prelude.List.List ((Var a))))))))
+                            ((Type_app Std.Prelude.List.List ((Var a))) ()))))))
                        (map
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.List.List ((Var b)))
-                              (Function ((Var d)) () (Var c)))
-                             () (Var a))))
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var b)))
+                               (Function ((Var d)) () (Var c)))
+                              () (Var a))
+                             ())))
                           (type_source Let_inferred))))
                        (Cons
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Var a)
-                              (Type_app Std.Prelude.List.List ((Var a))))
-                             () (Type_app Std.Prelude.List.List ((Var a)))))))))
+                            ((Function
+                              ((Var a)
+                               (Type_app Std.Prelude.List.List ((Var a))))
+                              () (Type_app Std.Prelude.List.List ((Var a))))
+                             ()))))))
                        (append
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.List.List ((Var b)))
-                              (Type_app Std.Prelude.List.List ((Var c))))
-                             () (Var a))))
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var b)))
+                               (Type_app Std.Prelude.List.List ((Var c))))
+                              () (Var a))
+                             ())))
                           (type_source Let_inferred))))
                        (reverse
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.List.List ((Var b)))) ()
-                             (Var a))))
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var b)))) ()
+                              (Var a))
+                             ())))
                           (type_source Let_inferred))))
                        (concat_map
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.List.List ((Var b)))
-                              (Function ((Var d)) ()
-                               (Type_app Std.Prelude.List.List ((Var c)))))
-                             () (Var a))))
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var b)))
+                               (Function ((Var d)) ()
+                                (Type_app Std.Prelude.List.List ((Var c)))))
+                              () (Var a))
+                             ())))
                           (type_source Let_inferred))))
                        (rev_append
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.List.List ((Var b)))
-                              (Type_app Std.Prelude.List.List ((Var c))))
-                             () (Var a))))
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var b)))
+                               (Type_app Std.Prelude.List.List ((Var c))))
+                              () (Var a))
+                             ())))
                           (type_source Let_inferred))))))
                      (types
                       ((List
@@ -585,48 +638,53 @@
                     ((names
                       ((+
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Float.Float ())
-                              (Type_app Std.Prelude.Float.Float ()))
-                             () (Type_app Std.Prelude.Float.Float ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              () (Type_app Std.Prelude.Float.Float ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_add))))
                        (pi
                         (Local
-                         ((typ
-                           (Scheme (Type_app Std.Prelude.Float.Float ())))
+                         ((type_
+                           (Scheme
+                            ((Type_app Std.Prelude.Float.Float ()) ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_pi))))
                        (abs
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Float.Float ())
-                              (Type_app Std.Prelude.Float.Float ()))
-                             () (Type_app Std.Prelude.Float.Float ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              () (Type_app Std.Prelude.Float.Float ()))
+                             ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_abs))))
                        (cos
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Float.Float ())
-                              (Type_app Std.Prelude.Float.Float ()))
-                             () (Type_app Std.Prelude.Float.Float ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              () (Type_app Std.Prelude.Float.Float ()))
+                             ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_cos))))
                        (sin
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Float.Float ())
-                              (Type_app Std.Prelude.Float.Float ()))
-                             () (Type_app Std.Prelude.Float.Float ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              () (Type_app Std.Prelude.Float.Float ()))
+                             ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_sin))))))
                      (types
@@ -639,15 +697,17 @@
                     ((names
                       ((None
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Type_app Std.Prelude.Option.Option ((Var a))))))))
+                            ((Type_app Std.Prelude.Option.Option ((Var a)))
+                             ()))))))
                        (Some
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Var a)) ()
-                             (Type_app Std.Prelude.Option.Option ((Var a)))))))))))
+                            ((Function ((Var a)) ()
+                              (Type_app Std.Prelude.Option.Option ((Var a))))
+                             ()))))))))
                      (types
                       ((Option
                         ((Local
@@ -659,206 +719,228 @@
                     ((names
                       ((%
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Int.Int ())
-                              (Type_app Std.Prelude.Int.Int ()))
-                             () (Type_app Std.Prelude.Int.Int ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              () (Type_app Std.Prelude.Int.Int ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_rem))))
                        (*
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Int.Int ())
-                              (Type_app Std.Prelude.Int.Int ()))
-                             () (Type_app Std.Prelude.Int.Int ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              () (Type_app Std.Prelude.Int.Int ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_mul))))
                        (+
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Int.Int ())
-                              (Type_app Std.Prelude.Int.Int ()))
-                             () (Type_app Std.Prelude.Int.Int ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              () (Type_app Std.Prelude.Int.Int ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_add))))
                        (-
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Int.Int ())
-                              (Type_app Std.Prelude.Int.Int ()))
-                             () (Type_app Std.Prelude.Int.Int ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              () (Type_app Std.Prelude.Int.Int ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_sub))))
                        (.
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Function ((Var b)) () (Var c))
-                              (Function ((Var a)) () (Var b)) (Var a))
-                             () (Var c))))
+                            ((Function
+                              ((Function ((Var b)) () (Var c))
+                               (Function ((Var a)) () (Var b)) (Var a))
+                              () (Var c))
+                             ())))
                           (type_source Val_and_let) (fixity (Right 9)))))
                        (";"
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Tuple ()) (Var a)) () (Var a))))
+                            ((Function ((Tuple ()) (Var a)) () (Var a)) ())))
                           (type_source Val_and_let) (fixity (Left 0)))))
                        (<
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Var a) (Var a)) ()
-                             (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function ((Var a) (Var a)) ()
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lt))))
                        (>
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Var a) (Var a)) ()
-                             (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function ((Var a) (Var a)) ()
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gt))))
                        (^
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Int.Int ())
-                              (Type_app Std.Prelude.Int.Int ()))
-                             () (Type_app Std.Prelude.Int.Int ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              () (Type_app Std.Prelude.Int.Int ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Right 8))
                           (extern_name umber_int_pow))))
                        (!=
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Var a) (Var a)) ()
-                             (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function ((Var a) (Var a)) ()
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_neq))))
                        (&&
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Bool.Bool ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
-                             () (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Bool.Bool ())
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              () (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Val_and_let) (fixity (Left 3)))))
                        (*.
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Float.Float ())
-                              (Type_app Std.Prelude.Float.Float ()))
-                             () (Type_app Std.Prelude.Float.Float ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              () (Type_app Std.Prelude.Float.Float ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_float_mul))))
                        (++
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app String ()) (Type_app String ())) ()
-                             (Type_app String ()))))
+                            ((Function
+                              ((Type_app String ()) (Type_app String ())) ()
+                              (Type_app String ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 5))
                           (extern_name umber_string_append))))
                        (+.
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Float.Float ())
-                              (Type_app Std.Prelude.Float.Float ()))
-                             () (Type_app Std.Prelude.Float.Float ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              () (Type_app Std.Prelude.Float.Float ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_add))))
                        (-.
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Float.Float ())
-                              (Type_app Std.Prelude.Float.Float ()))
-                             () (Type_app Std.Prelude.Float.Float ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Float.Float ())
+                               (Type_app Std.Prelude.Float.Float ()))
+                              () (Type_app Std.Prelude.Float.Float ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_sub))))
                        (::
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Var a)
-                              (Type_app Std.Prelude.List.List ((Var a))))
-                             () (Type_app Std.Prelude.List.List ((Var a))))))
+                            ((Function
+                              ((Var a)
+                               (Type_app Std.Prelude.List.List ((Var a))))
+                              () (Type_app Std.Prelude.List.List ((Var a))))
+                             ())))
                           (type_source Val_and_let) (fixity (Right 5)))))
                        (<=
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Var a) (Var a)) ()
-                             (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function ((Var a) (Var a)) ()
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lte))))
                        (==
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Var a) (Var a)) ()
-                             (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function ((Var a) (Var a)) ()
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_eq))))
                        (>=
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Var a) (Var a)) ()
-                             (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function ((Var a) (Var a)) ()
+                              (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gte))))
                        (|>
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Var a) (Function ((Var a)) () (Var b))) ()
-                             (Var b))))
+                            ((Function
+                              ((Var a) (Function ((Var a)) () (Var b))) ()
+                              (Var b))
+                             ())))
                           (type_source Val_and_let) (fixity (Left 0)))))
                        (||
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Bool.Bool ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
-                             () (Type_app Std.Prelude.Bool.Bool ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Bool.Bool ())
+                               (Type_app Std.Prelude.Bool.Bool ()))
+                              () (Type_app Std.Prelude.Bool.Bool ()))
+                             ())))
                           (type_source Val_and_let) (fixity (Left 2)))))
                        (mod
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function
-                             ((Type_app Std.Prelude.Int.Int ())
-                              (Type_app Std.Prelude.Int.Int ()))
-                             () (Type_app Std.Prelude.Int.Int ()))))
+                            ((Function
+                              ((Type_app Std.Prelude.Int.Int ())
+                               (Type_app Std.Prelude.Int.Int ()))
+                              () (Type_app Std.Prelude.Int.Int ()))
+                             ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_mod))))
                        (not
                         (Local
-                         ((typ
+                         ((type_
                            (Scheme
-                            (Function ((Type_app Bool ())) ()
-                             (Type_app Bool ()))))
+                            ((Function ((Type_app Bool ())) ()
+                              (Type_app Bool ()))
+                             ())))
                           (type_source Let_inferred))))))
                      (types ()) (effects ()) (modules ()))))))))))))))))))))))

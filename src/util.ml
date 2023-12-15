@@ -103,6 +103,29 @@ end = struct
   ;;
 end
 
+module Map : sig
+  include module type of Map
+
+  val fold_until
+    :  ('k, 'v, _) t
+    -> init:'acc
+    -> f:(key:'k -> data:'v -> 'acc -> ('acc, 'final) Fold_action.t)
+    -> ('acc, 'final) Fold_action.t
+end = struct
+  include Map
+
+  let fold_until t ~init ~f =
+    Map.fold_until
+      t
+      ~init
+      ~f:(fun ~key ~data init ->
+        match (f ~key ~data init : _ Fold_action.t) with
+        | Continue x -> Continue x
+        | Stop _ as stop -> Stop stop)
+      ~finish:Fold_action.continue
+  ;;
+end
+
 exception Compiler_bug of Sexp.t [@@deriving sexp_of]
 
 let compiler_bug msg = raise (Compiler_bug msg)

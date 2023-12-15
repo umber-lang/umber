@@ -102,14 +102,21 @@ let rec fold_until typ ~init ~f =
      | Var _ -> continue
      | Type_app (_, fields) | Tuple fields ->
        List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
-     | Function (args, _, body) ->
-       (* FIXME: Ignoring effects *)
+     | Function (args, effects, body) ->
        let%bind.Fold_action init =
          Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
        in
+       let%bind.Fold_action init = fold_effects_until effects ~init ~f in
        fold_until body ~init ~f
-     | Partial_function (args, _, _) ->
-       Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f))
+     | Partial_function (args, effects, _) ->
+       let%bind.Fold_action init =
+         Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
+       in
+       fold_effects_until effects ~init ~f)
+
+and fold_effects_until { effects; effect_var = _ } ~init ~f =
+  Map.fold_until effects ~init ~f:(fun ~key:_ ~data:args init ->
+    List.fold_until args ~init ~f)
 ;;
 
 let fold_vars typ ~init ~f =
