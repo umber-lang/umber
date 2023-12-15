@@ -130,11 +130,17 @@ end = struct
   let to_constraint_list t ~params =
     Hashtbl.to_alist t.upper_bounds
     |> List.concat_map ~f:(fun (subtype, supertypes) ->
-         let subtype = Type_param.Env_of_vars.find_or_add params subtype in
-         Hash_set.to_list supertypes
-         |> List.map ~f:(fun supertype : _ Type_scheme.constraint_ ->
-              let supertype = Type_param.Env_of_vars.find_or_add params supertype in
-              { subtype = Var subtype; supertype = Var supertype }))
+         match Type_param.Env_of_vars.find params subtype with
+         | None -> []
+         | Some subtype ->
+           Hash_set.to_list supertypes
+           |> List.filter_map ~f:(fun supertype : _ Type_scheme.constraint_ option ->
+                match Type_param.Env_of_vars.find params supertype with
+                | None -> None
+                | Some supertype ->
+                  if Type_param_name.equal subtype supertype
+                  then None
+                  else Some { subtype = Var subtype; supertype = Var supertype }))
   ;;
 
   let print t =
@@ -184,10 +190,7 @@ end = struct
 
   let rec apply_to_type t type_ =
     Internal_type.map type_ ~f:(function
-      | Var var ->
-        (* FIXME: Should this be Retry? No, I don't think we want to recursively apply
-           the substitution, do we? *)
-        Halt (apply_to_type_var t var)
+      | Var var -> Halt (apply_to_type_var t var)
       | Function (args, effects, result) ->
         Halt
           (Function
@@ -200,9 +203,9 @@ end = struct
         (match apply_to_type_var t result_var with
          | Var result_var -> Halt (Partial_function (args, effects, result_var))
          | Partial_function (args', effects', result_var) as result_type ->
-           (* FIXME: Effects must be pure for us to combine partial functions.
-              PROBLEM: We might not know at this stage whether effects are pure. For now,
-              let's do something naive. *)
+           (* Effects must be pure for us to combine partial functions. However, we don't
+              know at this stage whether effects are pure. For now, let's do something
+              naive. *)
            if Internal_type.equal_effects effects Internal_type.no_effects
            then Halt (Partial_function (Nonempty.append args args', effects', result_var))
            else Halt (Function (args, effects, result_type))
@@ -213,17 +216,36 @@ end = struct
   and apply_to_effects t ({ effects; effect_var } : Internal_type.effects)
     : Internal_type.effects
     =
-    let new_effects =
-      let%bind.Option effect_var = effect_var in
-      match%map.Option Hashtbl.find t effect_var with
-      | Effects effects -> effects
-      | Type _ -> compiler_bug [%message "Expected effects, got type"]
-    in
-    (* FIXME: apply substitutions to effect vars. We should be able to do that, right? *)
-    { effects = Map.map effects ~f:(List.map ~f:(apply_to_type t))
-    ; effect_var = (if Option.is_some new_effects then None else effect_var)
-    }
+    let effects = Map.map effects ~f:(List.map ~f:(apply_to_type t)) in
+    match Option.bind effect_var ~f:(Hashtbl.find t) with
+    | None -> { effects; effect_var }
+    | Some (Effects { effects = new_effects; effect_var = new_effect_var }) ->
+      { effects =
+          Map.merge_skewed
+            effects
+            new_effects
+            ~combine:(fun ~key:effect_name args args' ->
+            (* TODO: We almost surely want some kind of unification here. *)
+            if [%equal: Internal_type.t list] args args'
+            then args
+            else
+              Compilation_error.raise
+                Type_error
+                ~msg:
+                  [%message
+                    "Multiple instances of the same effect with differing types"
+                      (effect_name : Effect_name.Absolute.t)
+                      (args : Internal_type.t list)
+                      (args' : Internal_type.t list)])
+      ; effect_var = new_effect_var
+      }
+    | Some (Type _) -> compiler_bug [%message "Expected effects, got type"]
   ;;
+
+  (* FIXME: apply substitutions to effect vars. We should be able to do that, right? *)
+  (* { effects = 
+    ; effect_var = (if Option.is_some new_effects then None else effect_var)
+    } *)
 
   let compose t t' =
     Hashtbl.merge_into ~src:t' ~dst:t ~f:(fun ~key:_ new_value old_value ->
@@ -289,12 +311,8 @@ let iter2_types xs ys ~subtype ~supertype ~f =
   | Unequal_lengths -> type_error "Type item length mismatch" subtype supertype
 ;;
 
-(* FIXME: cleanup *)
-(* let get_var_bounds =
-  Hashtbl.find_or_add ~default:(fun () ->
-    { lower_bounds = Queue.create (); upper_bounds = Queue.create () })
-;; *)
-
+(* FIXME: Also need to refresh effect vars, not leave them out! Where did the effect var
+   in List.um go afte refreshing? *)
 let refresh_type type_ =
   let vars = Type_var.Table.create () in
   let refresh_var = Hashtbl.find_or_add vars ~default:Type_var.create in
@@ -359,6 +377,7 @@ let check_var_vs_type
       set_substitution substitution var (refresh type_));
     substitution
   in
+  (* FIXME: cleanup *)
   eprint_s
     [%message
       "check_var_vs_type"
@@ -1062,6 +1081,9 @@ let generalize types outer_type =
   (* FIXME: cleanup *)
   eprint_s
     [%message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
+  (* FIXME: We give different names to the params in different places in the same
+     statement. We should have 1 type-bindings per statement, and probably just one param
+     name generator for that. *)
   let env = Type_param.Env_of_vars.create () in
   let scheme =
     generalize_internal
@@ -1071,7 +1093,9 @@ let generalize types outer_type =
       ~in_progress:Polar_var.Set.empty
       ~polarity:Positive
   in
-  let result = scheme, Constraints.to_constraint_list types.constraints ~params:env in
+  (* FIXME: Constraints are not propagating correctly. *)
+  let constraints = Constraints.to_constraint_list types.constraints ~params:env in
+  let result = scheme, constraints in
   eprint_s
     [%message
       "generalize result"

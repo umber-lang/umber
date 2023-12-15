@@ -54,8 +54,8 @@ let map_vars typ ~f =
     | Var v -> Halt (Var (f v))
     | Function (args, effects, result) ->
       Defer (Function (args, map_effects effects, result))
-    | Partial_function (args, effects, result) ->
-      Defer (Partial_function (args, map_effects effects, result))
+    | Partial_function (args, effects, v) ->
+      Defer (Partial_function (args, map_effects effects, f v))
     | (Type_app _ | Tuple _) as type_ -> Defer type_)
 ;;
 

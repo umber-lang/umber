@@ -174,6 +174,9 @@ module Pattern = struct
     names, pat
   ;;
 
+  (* FIXME: cleanup *)
+  let eprint_s = ignore
+
   let generalize ~names ~types pat_names typ ~shadowing_allowed =
     (* FIXME: cleanup *)
     eprint_s
