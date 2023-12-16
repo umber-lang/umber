@@ -145,9 +145,16 @@ let rec arity_of_type ~names (type_ : Module_path.absolute Type_scheme.type_) =
      | Abstract | Variants _ | Record _ -> 0
      | Alias type_ -> arity_of_type ~names type_)
   | Function (args, _, _) -> Nonempty.length args
-  | Union _ | Intersection _ ->
-    (* FIXME: fix *)
-    failwith "TODO: handle arity for union and intersection types"
+  | Union types | Intersection types ->
+    let type_arities = Nonempty.map types ~f:(arity_of_type ~names) in
+    (match List.all_equal (Nonempty.to_list type_arities) ~equal:Int.equal with
+     | Some arity -> arity
+     | None ->
+       compiler_bug
+         [%message
+           "Conflicting arities for union or intersection type"
+             (type_ : _ Type_scheme.type_)
+             (type_arities : int Nonempty.t)])
 ;;
 
 module Context : sig
@@ -348,7 +355,6 @@ end = struct
     | Tuple args -> Some (Cnstr_info.of_tuple args)
     | Function _ | Var _ -> cnstr_info_lookup_failed type_
     | Union _ | Intersection _ ->
-      (* FIXME: fix *)
       failwith "TODO: handle cnstr info lookup for union and intersection types"
 
   and find_cnstr_info_from_decl t decl ~follow_aliases =
@@ -878,7 +884,6 @@ module Expr = struct
     | Type_app _ | Tuple _ | Var _ ->
       compiler_bug [%message "Non-funtion type in function call"]
     | Union _ | Intersection _ ->
-      (* FIXME: fix *)
       failwith
         "TODO: handle rewriting partial application for union and intersection types"
     | Function
@@ -913,8 +918,8 @@ module Expr = struct
              let name = Constant_names.synthetic_arg i in
              let arg_pattern = Node.dummy_span (Pattern.Catch_all (Some name)) in
              let arg_name = Node.dummy_span (Typed.Expr.Name (current_path, name)) in
-             (* FIXME: Just putting no constraints on [arg_type] here is dodgy. Sort out
-                what's meant to be going on here. *)
+             (* Setting zero constraints on [arg_type] is a bit dodgy, but we don't use
+                the constraints so it's fine. *)
              (arg_name, (arg_type, [])), arg_pattern)
            |> Nonempty.unzip
          in
@@ -979,9 +984,9 @@ module Expr = struct
          | `Already_fully_applied ->
            let fun_call fun_ =
              let arg_types = Nonempty.map ~f:snd args_and_types in
-             (* FIXME: We lost the effect information. We don't actually use it, though.
-                For now, just making the effect total. *)
              let fun_type : _ Type_scheme.type_ =
+               (* Effect information is not preserved here. This is ~fine because we don't
+                  actually use it. *)
                Function (Nonempty.map arg_types ~f:fst, None, body_type)
              in
              let fun_ = of_typed_expr ~ctx fun_ fun_type in
@@ -1096,7 +1101,6 @@ module Expr = struct
             "Incompatible expr and type"
               (expr : _ Type_scheme.t Typed.Expr.t * _ Type_scheme.type_)]
       | _, (Union _ | Intersection _) ->
-        (* FIXME: fix *)
         failwith "TODO: handle mir conversion for union and intersection types"
     and add_lambda ~ctx ~args ~arg_types ~body ~body_type ~just_bound =
       (* Keep track of the parent context before binding any variables. This lets us

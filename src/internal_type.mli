@@ -1,7 +1,6 @@
 open Import
 open Names
 
-(* FIXME: Effects should use a separate var type. *)
 type t =
   | Var of Type_var.t
   | Type_app of Type_name.Absolute.t * t list

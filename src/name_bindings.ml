@@ -185,8 +185,6 @@ module Path = struct
   let to_module_path t = List.map t ~f:fst |> Module_path.Relative.of_module_names
 end
 
-(* FIXME: Probably separate effects and types. They should have different namespaces. *)
-
 type t =
   { current_path : Path.t
   ; toplevel : defs
@@ -895,6 +893,12 @@ let add_to_types types name decl ~err_msg =
     | Some _ -> name_error ~msg:err_msg (Type_name.to_ustring name))
 ;;
 
+let add_to_effects effects name decl ~err_msg =
+  Map.update effects name ~f:(function
+    | None | Some None -> decl
+    | Some _ -> name_error ~msg:err_msg (Effect_name.to_ustring name))
+;;
+
 let add_type_decl t type_name decl =
   let f bindings =
     if not (Type_decl.no_free_params decl)
@@ -939,18 +943,23 @@ let add_type_decl t type_name decl =
   update_current t ~f:{ f }
 ;;
 
-(* FIXME: This AST handling stuff being in Name_bindings feels like kind of a
+(* TODO: This AST handling stuff being in Name_bindings feels like kind of a
    responsibility explosion. It also makes us want to have circular dependencies between
    Name_bindings and Type_bindings. Should probably make another module for this to go in
    or put it in typed.ml. *)
 
-(* FIXME: use new logic similar to val/extern/let. Also we could probably share code. *)
+(* TODO: use new logic similar to val/extern/let. Also we could probably share code. *)
 let add_name_entry names name scheme new_entry ~constrain =
   Map.update names name ~f:(function
     | None ->
       compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
-    | Some (Or_imported.Local existing_entry) ->
-      (* FIXME: We should be asserting that the existing entry is a placeholder. *)
+    | Some (Local existing_entry : (Name_entry.t, _) Or_imported.t) ->
+      (match existing_entry.type_source with
+       | Placeholder -> ()
+       | _ ->
+         compiler_bug
+           [%message
+             "Unexpected non-placeholder name entry" (existing_entry : Name_entry.t)]);
       constrain
         ~subtype:(Name_entry.Type_or_scheme.Scheme scheme)
         ~supertype:(Name_entry.type_ existing_entry);
@@ -970,14 +979,13 @@ let add_effect t effect_name (effect : _ Effect.t) ~constrain =
       Effect ((current_path t, effect_name), List.map effect.params ~f:Type_scheme.var)
     in
     { bindings with
-      (* FIXME: add to effects *)
-      (* types =
-        add_to_types
-          bindings.types
-          (Effect_name.to_type_name effect_name)
-          (Some (Local (Effect effect)))
-          ~err_msg:"Duplicate effect declarations" *)
-      names =
+      effects =
+        add_to_effects
+          bindings.effects
+          effect_name
+          (Some (Local (Effect_entry.create effect)))
+          ~err_msg:"Duplicate effect declarations"
+    ; names =
         Effect.fold_operations
           effect
           ~init:bindings.names
@@ -1062,12 +1070,17 @@ let add_type_decl_placeholder t type_name (decl : _ Type_decl.t) =
   update_current t ~f:{ f }
 ;;
 
-let add_effect_placeholder t _effect_name effect =
-  (* TODO: This could be more efficient if it just did all the updates in one go. *)
-  (* FIXME: Put effects in their own category *)
-  (* let t = add_type_decl_placeholder t (Effect_name.to_type_name effect_name) in *)
-  Effect.fold_operations effect ~init:t ~f:(fun t operation ->
-    add_name_placeholder t operation.name)
+let add_effect_placeholder t effect_name effect =
+  let f bindings =
+    { bindings with
+      effects =
+        add_to_effects bindings.effects effect_name None ~err_msg:"Duplicate effect name"
+    ; names =
+        Effect.fold_operations effect ~init:bindings.names ~f:(fun names operation ->
+          add_name_placeholder_internal names operation.name)
+    }
+  in
+  update_current t ~f:{ f }
 ;;
 
 let fold_local_names t ~init ~f =
