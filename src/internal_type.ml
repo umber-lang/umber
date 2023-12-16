@@ -23,6 +23,10 @@ let fresh_var () = Var (Type_var.create ())
 let var v = Var v
 let tuple list = Tuple list
 
+let effects_of_var var =
+  { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
+;;
+
 let rec map typ ~f =
   match (f typ : _ Map_action.t) with
   | Halt typ -> typ

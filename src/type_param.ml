@@ -25,7 +25,7 @@ end = struct
 end
 
 module Env_of_vars : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val create : unit -> t
   val find_or_add : t -> Type_var.t -> Type_param_name.t
@@ -36,6 +36,7 @@ end = struct
     ; mutable next_param_index : int
     }
 
+  let sexp_of_t t = [%sexp (t.table : (Type_var.t, Type_param_name.t) Hashtbl.t)]
   let create () = { table = Hashtbl.create (module Type_var); next_param_index = 0 }
 
   let find_or_add t =

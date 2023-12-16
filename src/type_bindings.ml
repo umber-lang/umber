@@ -335,7 +335,6 @@ let check_var_vs_type
   ~set_substitution
   ~refresh
   =
-  (* FIXME: simplify `orient` - How? *)
   let orient f ~var ~type_ =
     match var_side with
     | `Left -> f (to_var var) type_
@@ -381,8 +380,14 @@ let check_var_vs_type
         (vars_with_same_shape : Type_var.Set.t)
         (new_var_substitution : Substitution.t)];
   Substitution.compose types.substitution new_var_substitution;
-  orient ~var ~type_ (fun subtype supertype ->
-    constrain ~names ~types ~subtype ~supertype);
+  (* After applying the substitution, add constraints between the refreshed types and
+     their original. The refreshed type will be substituted in using the substitution to
+     take the place of the var. *)
+  Set.iter vars_with_same_shape ~f:(fun var ->
+    orient ~var ~type_ (fun subtype supertype ->
+      constrain ~names ~types ~subtype ~supertype));
+  (* FIXME: Should we be skipping this constrain check if v = v'?
+     (Maybe we should put an extra check in [constrain] for that case actually.) *)
   Set.iter vars_with_same_shape ~f:(fun v ->
     Set.iter vars_with_same_shape ~f:(fun v' ->
       constrain ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
@@ -403,7 +408,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
-  print_s
+  eprint_s
     [%message
       "Type_bindings.constrain (pre-substitution)"
         (subtype : Internal_type.t)
@@ -412,13 +417,12 @@ let rec constrain ~names ~types ~subtype ~supertype =
         (types.substitution : Substitution.t)];
   (* It's important to apply the substitution before checking [constrained_types] since
      the substitution can change as we do more [constrain] calls. *)
-  (* FIXME: Substitution erasing effect vars *)
   let subtype = Substitution.apply_to_type types.substitution subtype in
   let supertype = Substitution.apply_to_type types.substitution supertype in
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     (* FIXME: cleanup *)
-    print_s
+    eprint_s
       [%message
         "Type_bindings.constrain (post-substitution)"
           (subtype : Internal_type.t)
@@ -563,7 +567,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Partial_function _, Tuple _ -> type_error "Types do not match" subtype supertype)
 
 and constrain_effects ~names ~types ~subtype ~supertype =
-  print_s
+  eprint_s
     [%message
       "Type_bindings.constrain_effects (pre-substitution)"
         (subtype : Internal_type.effects)
@@ -574,7 +578,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
   let supertype = Substitution.apply_to_effects types.substitution supertype in
   if not (Hash_set.mem types.constrained_effects (subtype, supertype))
   then (
-    print_s
+    eprint_s
       [%message
         "Type_bindings.constrain_effects (post-substitution)"
           (subtype : Internal_type.effects)
@@ -618,11 +622,13 @@ and constrain_effects ~names ~types ~subtype ~supertype =
         ~init:(Effect_name.Absolute.Map.empty, Effect_name.Absolute.Map.empty)
         ~data_equal:(fun _ _ -> false)
         ~f:(fun (subtype_only, supertype_only) (effect_name, diff) ->
-          (* FIXME: Somehow need to unify the unmatched parts with the variable *)
+          (* Refresh the types of the arguments for use in new substitutions below. *)
           match diff with
           | `Left args ->
+            let args = List.map args ~f:refresh_type in
             Map.add_exn subtype_only ~key:effect_name ~data:args, supertype_only
           | `Right args ->
+            let args = List.map args ~f:refresh_type in
             subtype_only, Map.add_exn supertype_only ~key:effect_name ~data:args
           | `Unequal (args1, args2) ->
             (match
@@ -636,34 +642,47 @@ and constrain_effects ~names ~types ~subtype ~supertype =
                compiler_bug [%message "Unequal number of arguments to effect types"]))
     in
     (* FIXME: Following paper, rewriting this part *)
-    if Map.is_empty subtype_only && Map.is_empty supertype_only
-    then (
+    let constrain_effect_vars types ~subtype_var ~supertype_var =
       match subtype_var, supertype_var with
       | Some subtype, Some supertype ->
         Constraints.add types.constraints ~subtype ~supertype
       | None, None | None, Some _ -> ()
       | Some subtype_var, None ->
-        Substitution.set_effects types.substitution subtype_var Internal_type.no_effects)
+        Substitution.set_effects types.substitution subtype_var Internal_type.no_effects
+    in
+    if Map.is_empty subtype_only && Map.is_empty supertype_only
+    then constrain_effect_vars types ~subtype_var ~supertype_var
     else (
       (* FIXME: Not handling union of O and O', see paper. *)
+      (* FIXME: Creating new type vars but not adding any constraints for them. *)
+      let new_subtype_var = Option.map subtype_var ~f:(fun _ -> Type_var.create ()) in
+      let new_supertype_var = Option.map supertype_var ~f:(fun _ -> Type_var.create ()) in
       let supertype_only_substitution =
         let substitution = Substitution.create () in
-        Option.iter subtype_var ~f:(fun subtype_var ->
-          Substitution.set_effects
-            substitution
-            subtype_var
-            { effects = supertype_only; effect_var = Some (Type_var.create ()) });
+        if not (Map.is_empty supertype_only)
+        then
+          Option.iter subtype_var ~f:(fun subtype_var ->
+            Substitution.set_effects
+              substitution
+              subtype_var
+              { effects = supertype_only; effect_var = new_subtype_var });
         substitution
       in
       let subtype_only_substitution =
         let substitution = Substitution.create () in
-        Option.iter supertype_var ~f:(fun supertype_var ->
-          Substitution.set_effects
-            substitution
-            supertype_var
-            { effects = subtype_only; effect_var = Some (Type_var.create ()) });
+        if not (Map.is_empty subtype_only)
+        then
+          Option.iter supertype_var ~f:(fun supertype_var ->
+            Substitution.set_effects
+              substitution
+              supertype_var
+              { effects = subtype_only; effect_var = new_supertype_var });
         substitution
       in
+      constrain_effect_vars
+        types
+        ~subtype_var:new_subtype_var
+        ~supertype_var:new_supertype_var;
       (* Remove all constraints between vars of the same shape as either var here. *)
       let vars_with_same_shape_as_subtype_var =
         match subtype_var with
@@ -970,9 +989,6 @@ let generalize types outer_type =
   let rec generalize_internal types typ ~env ~in_progress ~(polarity : Polarity.t)
     : Module_path.absolute Type_scheme.type_
     =
-    (* FIXME: cleanup *)
-    (* print_s
-      [%message "generalize_internal" (typ : Internal_type.t) (polarity : Polarity.t)]; *)
     match (typ : Internal_type.t) with
     | Var var -> Var (generalize_type_var ~env ~in_progress ~polarity ~var)
     | Function (args, effects, res) ->
@@ -1047,73 +1063,107 @@ let generalize types outer_type =
     [%message
       "generalize result"
         (outer_type : Internal_type.t)
-        (result : Module_path.absolute Type_scheme.t)];
+        (result : Module_path.absolute Type_scheme.t)
+        (env : Type_param.Env_of_vars.t)];
   result
 ;;
 
-let%expect_test "unification cycles" =
-  let types = create () in
-  let names = Name_bindings.core in
-  let v0 = Internal_type.fresh_var () in
-  let v1 = Internal_type.fresh_var () in
-  let v2 = Internal_type.fresh_var () in
-  let v3 = Internal_type.fresh_var () in
-  let print_constraints () =
-    [%test_pred: Substitution.t] Substitution.is_empty types.substitution;
-    Constraints.print types.constraints;
-    let var_partitions =
-      [ 0; 1; 2; 3 ]
-      |> List.map
-           ~f:(Constraints.find_vars_with_same_shape types.constraints << Type_var.of_int)
-      |> List.fold ~init:[] ~f:(fun var_partitions vars ->
-           let matching_partitions =
-             List.filter_mapi var_partitions ~f:(fun i partition ->
-               let matching_var_count = Set.count vars ~f:(Set.mem partition) in
-               if matching_var_count = 0
-               then None
-               else if matching_var_count = Set.length vars
-               then Some i
-               else failwith "Mismatch")
-           in
-           match matching_partitions with
-           | [] -> vars :: var_partitions
-           | [ partition_index ] ->
-             List.mapi var_partitions ~f:(fun i partition ->
-               if i = partition_index
-               then Set.fold vars ~init:partition ~f:Set.add
-               else partition)
-           | _ :: _ :: _ -> failwith "More than one matching partition")
-    in
-    print_s [%message (var_partitions : Type_var.Set.t list)]
-  in
-  print_constraints ();
-  [%expect {| (var_partitions (($3) ($2) ($1) ($0))) |}];
-  constrain ~names ~types ~subtype:v0 ~supertype:v1;
-  print_constraints ();
-  [%expect {|
-    $0 <: $1
-    (var_partitions (($3) ($2) ($0 $1))) |}];
-  constrain ~names ~types ~subtype:v1 ~supertype:v2;
-  print_constraints ();
-  [%expect {|
-    $0 <: $1, $2
-    $1 <: $2
-    (var_partitions (($3) ($0 $1 $2))) |}];
-  constrain ~names ~types ~subtype:v2 ~supertype:v3;
-  print_constraints ();
-  [%expect
-    {|
-    $0 <: $1, $2, $3
-    $1 <: $2, $3
-    $2 <: $3
-    (var_partitions (($0 $1 $2 $3))) |}];
-  constrain ~names ~types ~subtype:v3 ~supertype:v0;
-  print_constraints ();
-  [%expect
-    {|
-    $0 <: $0, $1, $2, $3
-    $1 <: $0, $1, $2, $3
-    $2 <: $0, $1, $2, $3
-    $3 <: $0, $1, $2, $3
-    (var_partitions (($0 $1 $2 $3))) |}]
+let%test_module _ =
+  (module struct
+    let make_vars n =
+      let vars = Array.init n ~f:(fun (_ : int) -> Type_var.create ()) in
+      stage (fun i -> vars.(i))
+    ;;
+
+    let%expect_test "unification cycles" =
+      let types = create () in
+      let names = Name_bindings.core in
+      let v = unstage (make_vars 4) >> Internal_type.var in
+      let print_constraints () =
+        [%test_pred: Substitution.t] Substitution.is_empty types.substitution;
+        Constraints.print types.constraints;
+        let var_partitions =
+          [ 0; 1; 2; 3 ]
+          |> List.map
+               ~f:
+                 (Constraints.find_vars_with_same_shape types.constraints
+                  << Type_var.of_int)
+          |> List.fold ~init:[] ~f:(fun var_partitions vars ->
+               let matching_partitions =
+                 List.filter_mapi var_partitions ~f:(fun i partition ->
+                   let matching_var_count = Set.count vars ~f:(Set.mem partition) in
+                   if matching_var_count = 0
+                   then None
+                   else if matching_var_count = Set.length vars
+                   then Some i
+                   else failwith "Mismatch")
+               in
+               match matching_partitions with
+               | [] -> vars :: var_partitions
+               | [ partition_index ] ->
+                 List.mapi var_partitions ~f:(fun i partition ->
+                   if i = partition_index
+                   then Set.fold vars ~init:partition ~f:Set.add
+                   else partition)
+               | _ :: _ :: _ -> failwith "More than one matching partition")
+        in
+        print_s [%message (var_partitions : Type_var.Set.t list)]
+      in
+      print_constraints ();
+      [%expect {| (var_partitions (($3) ($2) ($1) ($0))) |}];
+      constrain ~names ~types ~subtype:(v 0) ~supertype:(v 1);
+      print_constraints ();
+      [%expect {|
+        $0 <: $1
+        (var_partitions (($3) ($2) ($0 $1))) |}];
+      constrain ~names ~types ~subtype:(v 1) ~supertype:(v 2);
+      print_constraints ();
+      [%expect
+        {|
+        $0 <: $1, $2
+        $1 <: $2
+        (var_partitions (($3) ($0 $1 $2))) |}];
+      constrain ~names ~types ~subtype:(v 2) ~supertype:(v 3);
+      print_constraints ();
+      [%expect
+        {|
+        $0 <: $1, $2, $3
+        $1 <: $2, $3
+        $2 <: $3
+        (var_partitions (($0 $1 $2 $3))) |}];
+      constrain ~names ~types ~subtype:(v 3) ~supertype:(v 0);
+      print_constraints ();
+      [%expect
+        {|
+        $0 <: $0, $1, $2, $3
+        $1 <: $0, $1, $2, $3
+        $2 <: $0, $1, $2, $3
+        $3 <: $0, $1, $2, $3
+        (var_partitions (($0 $1 $2 $3))) |}]
+    ;;
+
+    let%expect_test "simple [constrain] example" =
+      let types = create () in
+      let names = Name_bindings.core in
+      let v = unstage (make_vars 3) in
+      let bool_type = instantiate_type_scheme ~names ~types Intrinsics.Bool.typ in
+      (* [v0 <: (v1 -> <v2> Bool)] *)
+      constrain
+        ~names
+        ~types
+        ~subtype:(Var (v 0))
+        ~supertype:
+          (Function ([ Var (v 1) ], Internal_type.effects_of_var (v 2), bool_type));
+      print_s [%message (types.substitution : Substitution.t)];
+      Constraints.print types.constraints;
+      [%expect
+        {|
+        (types.substitution
+         (($0
+           (Type
+            (Function ((Var $4)) ((effects ()) (effect_var ($3))) (Type_app Bool ()))))))
+        $1 <: $4
+        $3 <: $2, $3 |}]
+    ;;
+  end)
 ;;

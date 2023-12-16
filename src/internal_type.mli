@@ -19,6 +19,7 @@ include Hashable.S with type t := t
 val fresh_var : unit -> t
 val var : Type_var.t -> t
 val tuple : t list -> t
+val effects_of_var : Type_var.t -> effects
 val map : t -> f:(t -> (t, t) Map_action.t) -> t
 val map_vars : t -> f:(Type_var.t -> Type_var.t) -> t
 

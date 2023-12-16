@@ -237,6 +237,7 @@ module Expr = struct
       in
       let (expr : _ t Node.t), (typ : Internal_type.t) =
         f ~add_effects:(fun subtype ->
+          eprint_s [%message "add_effects" ~effects:(subtype : Internal_type.effects)];
           Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects)
       in
       expr, typ, effects
@@ -320,9 +321,6 @@ module Expr = struct
           , Function (arg_types, body_effects, body_type)
           , Internal_type.no_effects )
         | If (cond, then_, else_) ->
-          (* FIXME: Places with multiple branches e.g. if, match, now can't rely on the
-           types of the two branches being unified to be equivalent, and arbitrarily
-           picking one. They need to get the supertype (for e.g functions). *)
           collect_effects ~names ~types (fun ~add_effects ->
             let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
             add_effects cond_effects;

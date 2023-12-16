@@ -24,7 +24,7 @@ module Env_to_vars : sig
 end
 
 module Env_of_vars : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val create : unit -> t
   val find_or_add : t -> Type_var.t -> Type_param_name.t
