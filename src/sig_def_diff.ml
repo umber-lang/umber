@@ -7,6 +7,7 @@ type 'a diff =
   | Incompatible of 'a * 'a
 [@@deriving sexp_of]
 
+(* FIXME: Add effect diffs. *)
 type t =
   { name_diff : (Value_name.t * Name_bindings.Name_entry.t diff) Sequence.t
   ; type_diff : (Type_name.t * Module_path.absolute Type_decl.t diff) Sequence.t

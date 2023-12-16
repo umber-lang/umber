@@ -29,8 +29,6 @@ type 'n constraint_ =
 
 type 'n t = 'n type_ * 'n constraint_ list [@@deriving hash, compare, equal, sexp]
 
-(* FIXME: cleanup *)
-
 let var v = Var v
 let tuple ts = Tuple ts
 let union ts = Union ts
@@ -87,12 +85,24 @@ let rec fold_until typ ~init ~f =
        List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
      | Union types | Intersection types ->
        Nonempty.fold_until types ~init ~f:(fun init -> fold_until ~init ~f)
-     | Function (args, _, body) ->
-       (* FIXME: Ignoring effects *)
+     | Function (args, effects, body) ->
        let%bind.Fold_action init =
          Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
        in
+       let%bind.Fold_action init =
+         match effects with
+         | None -> Continue init
+         | Some effects -> fold_effects_until effects ~init ~f
+       in
        fold_until body ~init ~f)
+
+and fold_effects_until effects ~init ~f =
+  match effects with
+  | Effect_var _ -> Continue init
+  | Effect (_, args) -> List.fold_until args ~init ~f
+  | Effect_union effects | Effect_intersection effects ->
+    Nonempty.fold_until effects ~init ~f:(fun init effects ->
+      fold_effects_until effects ~init ~f)
 ;;
 
 let fold_vars typ ~init ~f =
