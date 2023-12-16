@@ -312,7 +312,8 @@ let refresh_type type_ =
   Internal_type.map_vars type_ ~f:refresh_var
 ;;
 
-let refresh_effects ({ effects; effect_var } : Internal_type.effects)
+(* FIXME: cleanup *)
+(* let refresh_effects ({ effects; effect_var } : Internal_type.effects)
   : Internal_type.effects
   =
   let vars = Type_var.Table.create () in
@@ -320,8 +321,9 @@ let refresh_effects ({ effects; effect_var } : Internal_type.effects)
   { effects = Map.map effects ~f:(List.map ~f:(Internal_type.map_vars ~f:refresh_var))
   ; effect_var = Option.map effect_var ~f:refresh_var
   }
-;;
+;; *)
 
+(* FIXME: Just use this for types, not effects *)
 let check_var_vs_type
   ~names
   ~types
@@ -388,7 +390,7 @@ let check_var_vs_type
 
 let rec constrain ~names ~types ~subtype ~supertype =
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
-    (* TODO: Isn't this code setting up [params] redundant? *)
+    (* FIXME: Isn't this code setting up [params] redundant? *)
     let params = Type_param.Env_to_vars.create () in
     List.iter
       (param_list :> Type_param_name.t list)
@@ -401,19 +403,28 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
+  print_s
+    [%message
+      "Type_bindings.constrain (pre-substitution)"
+        (subtype : Internal_type.t)
+        (supertype : Internal_type.t)
+        (types.constraints : Constraints.t)
+        (types.substitution : Substitution.t)];
   (* It's important to apply the substitution before checking [constrained_types] since
      the substitution can change as we do more [constrain] calls. *)
+  (* FIXME: Substitution erasing effect vars *)
   let subtype = Substitution.apply_to_type types.substitution subtype in
   let supertype = Substitution.apply_to_type types.substitution supertype in
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     (* FIXME: cleanup *)
-    eprint_s
+    print_s
       [%message
-        "Type_bindings.constrain"
+        "Type_bindings.constrain (post-substitution)"
           (subtype : Internal_type.t)
           (supertype : Internal_type.t)
-          (types : t)];
+          (types.constraints : Constraints.t)
+          (types.substitution : Substitution.t)];
     Hash_set.add types.constrained_types (subtype, supertype);
     match subtype, supertype with
     | Var var1, Var var2 ->
@@ -552,14 +563,25 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Partial_function _, Tuple _ -> type_error "Types do not match" subtype supertype)
 
 and constrain_effects ~names ~types ~subtype ~supertype =
+  print_s
+    [%message
+      "Type_bindings.constrain_effects (pre-substitution)"
+        (subtype : Internal_type.effects)
+        (supertype : Internal_type.effects)
+        (types.constraints : Constraints.t)
+        (types.substitution : Substitution.t)];
+  let subtype = Substitution.apply_to_effects types.substitution subtype in
+  let supertype = Substitution.apply_to_effects types.substitution supertype in
   if not (Hash_set.mem types.constrained_effects (subtype, supertype))
   then (
+    print_s
+      [%message
+        "Type_bindings.constrain_effects (post-substitution)"
+          (subtype : Internal_type.effects)
+          (supertype : Internal_type.effects)
+          (types.constraints : Constraints.t)
+          (types.substitution : Substitution.t)];
     Hash_set.add types.constrained_effects (subtype, supertype);
-    (* FIXME: Must apply the current substitution to all generated constraints.
-       Should this substitution be applied before checking the constrained_types cache?
-       Probably. *)
-    let subtype = Substitution.apply_to_effects types.substitution subtype in
-    let supertype = Substitution.apply_to_effects types.substitution supertype in
     let ({ effects = subtype_effects; effect_var = subtype_var } : Internal_type.effects) =
       subtype
     and ({ effects = supertype_effects; effect_var = supertype_var }
@@ -567,9 +589,6 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       =
       supertype
     in
-    (* FIXME: I think we need to just use variables only? Otherwise we'd have to represent
-       subtracting some effects from a variable here. Maybe we have to do that anyway, to be
-       able to represent handling effects, though. Yeah, we do. *)
     (* FIXME: Ok, what's going on in this function? 
        We want to unify the known effects and the effect variables. Conceptually, if we have
        <e1, a> <: <e2, b>, we want to constrain like this: (a - e1) <: (b - e2).
@@ -592,17 +611,19 @@ and constrain_effects ~names ~types ~subtype ~supertype =
        through some janky modifications of substitution/constraints, this can make
        progress? We need to apply substitutions, similarly to for regular types.
     *)
-    let subtype_only =
+    let subtype_only, supertype_only =
       Map.fold_symmetric_diff
         subtype_effects
         supertype_effects
-        ~init:Effect_name.Absolute.Map.empty
+        ~init:(Effect_name.Absolute.Map.empty, Effect_name.Absolute.Map.empty)
         ~data_equal:(fun _ _ -> false)
-        ~f:(fun subtype_only (effect_name, diff) ->
+        ~f:(fun (subtype_only, supertype_only) (effect_name, diff) ->
           (* FIXME: Somehow need to unify the unmatched parts with the variable *)
           match diff with
-          | `Left args -> Map.add_exn subtype_only ~key:effect_name ~data:args
-          | `Right _ -> subtype_only
+          | `Left args ->
+            Map.add_exn subtype_only ~key:effect_name ~data:args, supertype_only
+          | `Right args ->
+            subtype_only, Map.add_exn supertype_only ~key:effect_name ~data:args
           | `Unequal (args1, args2) ->
             (match
                (* TODO: Handle type parameter variance for effects. *)
@@ -610,79 +631,138 @@ and constrain_effects ~names ~types ~subtype ~supertype =
                  constrain ~names ~types ~subtype:arg1 ~supertype:arg2;
                  constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
              with
-             | Ok () -> subtype_only
+             | Ok () -> subtype_only, supertype_only
              | Unequal_lengths ->
                compiler_bug [%message "Unequal number of arguments to effect types"]))
     in
-    let check_subtype_only_is_empty () =
-      if not (Map.is_empty subtype_only)
-      then
-        Compilation_error.raise
-          Type_error
-          ~msg:
-            [%message
-              "Found more effects than expected"
-                ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
-    in
-    match subtype_var, supertype_var with
-    | None, None -> check_subtype_only_is_empty ()
-    | Some subtype_var, Some supertype_var when Type_var.equal subtype_var supertype_var
-      -> check_subtype_only_is_empty ()
-    | Some subtype_var, None ->
-      check_subtype_only_is_empty ();
-      (* FIXME: Robust effect occurs check *)
-      if occurs_in_effects subtype_var supertype
-      then (
-        let env = Type_param.Env_of_vars.create () in
-        Compilation_error.raise
-          Type_error
-          ~msg:
-            [%message
-              "Occurs check failed"
-                ~type1:
-                  (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
-                    : Sexp.t)
-                ~type2:
-                  (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
-                    : Sexp.t)]);
-      check_var_vs_type
-        ~names
-        ~types
-        ~var:subtype_var
-        ~type_:supertype
-        ~var_side:`Left
-        ~constrain:constrain_effects
-        ~to_var:(fun var : Internal_type.effects ->
-          { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
-        ~set_substitution:Substitution.set_effects
-        ~refresh:refresh_effects
-    | (None | Some _), Some supertype_var ->
-      (* FIXME: Robust effect occurs check *)
-      if occurs_in_effects supertype_var subtype
-      then (
-        let env = Type_param.Env_of_vars.create () in
-        Compilation_error.raise
-          Type_error
-          ~msg:
-            [%message
-              "Occurs check failed"
-                ~type1:
-                  (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
-                    : Sexp.t)
-                ~type2:
-                  (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
-                    : Sexp.t)]);
-      check_var_vs_type
-        ~names
-        ~types
-        ~var:supertype_var
-        ~type_:subtype
-        ~var_side:`Right
-        ~constrain:constrain_effects
-        ~to_var:(fun var : Internal_type.effects ->
-          { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
-        ~set_substitution:Substitution.set_effects
-        ~refresh:refresh_effects)
+    (* FIXME: Following paper, rewriting this part *)
+    if Map.is_empty subtype_only && Map.is_empty supertype_only
+    then (
+      match subtype_var, supertype_var with
+      | Some subtype, Some supertype ->
+        Constraints.add types.constraints ~subtype ~supertype
+      | None, None | None, Some _ -> ()
+      | Some subtype_var, None ->
+        Substitution.set_effects types.substitution subtype_var Internal_type.no_effects)
+    else (
+      (* FIXME: Not handling union of O and O', see paper. *)
+      let supertype_only_substitution =
+        let substitution = Substitution.create () in
+        Option.iter subtype_var ~f:(fun subtype_var ->
+          Substitution.set_effects
+            substitution
+            subtype_var
+            { effects = supertype_only; effect_var = Some (Type_var.create ()) });
+        substitution
+      in
+      let subtype_only_substitution =
+        let substitution = Substitution.create () in
+        Option.iter supertype_var ~f:(fun supertype_var ->
+          Substitution.set_effects
+            substitution
+            supertype_var
+            { effects = subtype_only; effect_var = Some (Type_var.create ()) });
+        substitution
+      in
+      (* Remove all constraints between vars of the same shape as either var here. *)
+      let vars_with_same_shape_as_subtype_var =
+        match subtype_var with
+        | Some var -> Constraints.find_vars_with_same_shape types.constraints var
+        | None -> Type_var.Set.empty
+      in
+      Set.iter vars_with_same_shape_as_subtype_var ~f:(fun var ->
+        Constraints.remove_vars types.constraints var vars_with_same_shape_as_subtype_var);
+      let vars_with_same_shape_as_supertype_var =
+        match supertype_var with
+        | Some var -> Constraints.find_vars_with_same_shape types.constraints var
+        | None -> Type_var.Set.empty
+      in
+      Set.iter vars_with_same_shape_as_supertype_var ~f:(fun var ->
+        Constraints.remove_vars
+          types.constraints
+          var
+          vars_with_same_shape_as_supertype_var);
+      Substitution.compose types.substitution subtype_only_substitution;
+      Substitution.compose types.substitution supertype_only_substitution
+      (* FIXME: Do we need an occurs check for effects? *)
+      (* FIXME: cleanup *)
+      (* let check_subtype_only_is_empty () =
+        if not (Map.is_empty subtype_only)
+        then
+          Compilation_error.raise
+            Type_error
+            ~msg:
+              [%message
+                "Found more effects than expected"
+                  ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
+      in
+      match subtype_var, supertype_var with
+      | None, None -> check_subtype_only_is_empty ()
+      | Some subtype_var, Some supertype_var when Type_var.equal subtype_var supertype_var
+        -> check_subtype_only_is_empty ()
+      | Some subtype_var, None ->
+        check_subtype_only_is_empty ();
+        (* FIXME: Robust effect occurs check *)
+        if occurs_in_effects subtype_var supertype
+        then (
+          let env = Type_param.Env_of_vars.create () in
+          Compilation_error.raise
+            Type_error
+            ~msg:
+              [%message
+                "Occurs check failed"
+                  ~type1:
+                    (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
+                      : Sexp.t)
+                  ~type2:
+                    (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
+                      : Sexp.t)]);
+        (* FIXME: Take the supertype only effects and add them to the subtype_var *)
+        check_var_vs_type
+          ~names
+          ~types
+          ~var:subtype_var
+          ~type_:supertype
+          ~var_side:`Left
+          ~constrain:constrain_effects
+          ~to_var:(fun var : Internal_type.effects ->
+            { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
+          ~set_substitution:Substitution.set_effects
+          ~refresh:refresh_effects
+      | (None | Some _), Some supertype_var ->
+        (* FIXME: When doing None <: Some var, I think we might be constraining the shape
+         of the var improperly. Stating that something is a supertype of total should be
+         a no-op. *)
+        (* FIXME: Robust effect occurs check *)
+        if occurs_in_effects supertype_var subtype
+        then (
+          let env = Type_param.Env_of_vars.create () in
+          Compilation_error.raise
+            Type_error
+            ~msg:
+              [%message
+                "Occurs check failed"
+                  ~type1:
+                    (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
+                      : Sexp.t)
+                  ~type2:
+                    (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
+                      : Sexp.t)]);
+        (* FIXME: If there's no suptype var, add the subtype_only effects as a subtype of
+         supertype_var. If there is a subtype_var, how do we reconcile the effects diff?
+         We need to somehow match up the subtype_only/supertype_only effects with the
+         subtype and supertype vars. *)
+        check_var_vs_type
+          ~names
+          ~types
+          ~var:supertype_var
+          ~type_:subtype
+          ~var_side:`Right
+          ~constrain:constrain_effects
+          ~to_var:(fun var : Internal_type.effects ->
+            { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
+          ~set_substitution:Substitution.set_effects
+          ~refresh:refresh_effects *)))
 
 and constrain_effects_to_be_total ~names ~types effects =
   constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
