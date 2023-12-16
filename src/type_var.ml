@@ -15,7 +15,17 @@ end
 include U
 include Comparable.Make (U)
 include Hashable.Make (U)
-module Id = Unique_id.Int ()
 
-let create = Id.create >> Id.to_int_exn
+let next = ref 0
+
+let create () =
+  let current = !next in
+  incr next;
+  current
+;;
+
 let of_int = Fn.id
+
+module For_testing = struct
+  let reset_ids () = next := 0
+end

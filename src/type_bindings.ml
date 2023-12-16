@@ -622,13 +622,10 @@ and constrain_effects ~names ~types ~subtype ~supertype =
         ~init:(Effect_name.Absolute.Map.empty, Effect_name.Absolute.Map.empty)
         ~data_equal:(fun _ _ -> false)
         ~f:(fun (subtype_only, supertype_only) (effect_name, diff) ->
-          (* Refresh the types of the arguments for use in new substitutions below. *)
           match diff with
           | `Left args ->
-            let args = List.map args ~f:refresh_type in
             Map.add_exn subtype_only ~key:effect_name ~data:args, supertype_only
           | `Right args ->
-            let args = List.map args ~f:refresh_type in
             subtype_only, Map.add_exn supertype_only ~key:effect_name ~data:args
           | `Unequal (args1, args2) ->
             (match
@@ -650,35 +647,35 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       | Some subtype_var, None ->
         Substitution.set_effects types.substitution subtype_var Internal_type.no_effects
     in
+    let create_substitution ~effects ~var ~new_var =
+      let substitution = Substitution.create () in
+      if not (Map.is_empty effects)
+      then
+        Option.iter var ~f:(fun var ->
+          let effects = Map.map effects ~f:(List.map ~f:refresh_type) in
+          (* FIXME: add constraints, similar to the type case. *)
+          Substitution.set_effects substitution var { effects; effect_var = new_var });
+      substitution
+    in
     if Map.is_empty subtype_only && Map.is_empty supertype_only
     then constrain_effect_vars types ~subtype_var ~supertype_var
     else (
       (* FIXME: Not handling union of O and O', see paper. *)
-      (* FIXME: Creating new type vars but not adding any constraints for them. *)
       let new_subtype_var = Option.map subtype_var ~f:(fun _ -> Type_var.create ()) in
       let new_supertype_var = Option.map supertype_var ~f:(fun _ -> Type_var.create ()) in
       let supertype_only_substitution =
-        let substitution = Substitution.create () in
-        if not (Map.is_empty supertype_only)
-        then
-          Option.iter subtype_var ~f:(fun subtype_var ->
-            Substitution.set_effects
-              substitution
-              subtype_var
-              { effects = supertype_only; effect_var = new_subtype_var });
-        substitution
+        create_substitution
+          ~effects:supertype_only
+          ~var:subtype_var
+          ~new_var:new_subtype_var
       in
       let subtype_only_substitution =
-        let substitution = Substitution.create () in
-        if not (Map.is_empty subtype_only)
-        then
-          Option.iter supertype_var ~f:(fun supertype_var ->
-            Substitution.set_effects
-              substitution
-              supertype_var
-              { effects = subtype_only; effect_var = new_supertype_var });
-        substitution
+        create_substitution
+          ~effects:subtype_only
+          ~var:supertype_var
+          ~new_var:new_supertype_var
       in
+      (* FIXME: Not sure if this is right, or all we need. *)
       constrain_effect_vars
         types
         ~subtype_var:new_subtype_var
@@ -702,7 +699,14 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           var
           vars_with_same_shape_as_supertype_var);
       Substitution.compose types.substitution subtype_only_substitution;
-      Substitution.compose types.substitution supertype_only_substitution
+      Substitution.compose types.substitution supertype_only_substitution;
+      let to_var = Internal_type.effects_of_var in
+      Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v ->
+        Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v' ->
+          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')));
+      Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v ->
+        Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v' ->
+          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
       (* FIXME: Do we need an occurs check for effects? *)
       (* FIXME: cleanup *)
       (* let check_subtype_only_is_empty () =
@@ -1071,6 +1075,7 @@ let generalize types outer_type =
 let%test_module _ =
   (module struct
     let make_vars n =
+      Type_var.For_testing.reset_ids ();
       let vars = Array.init n ~f:(fun (_ : int) -> Type_var.create ()) in
       stage (fun i -> vars.(i))
     ;;
@@ -1156,6 +1161,9 @@ let%test_module _ =
           (Function ([ Var (v 1) ], Internal_type.effects_of_var (v 2), bool_type));
       print_s [%message (types.substitution : Substitution.t)];
       Constraints.print types.constraints;
+      (* FIXME: Why is it not consistent whether e.g. $3 <: $3 is included? Could this be
+         a bug? (I think we always want to represent these inequalities, but maybe we
+         don't need to store them.) *)
       [%expect
         {|
         (types.substitution
@@ -1164,6 +1172,92 @@ let%test_module _ =
             (Function ((Var $4)) ((effects ()) (effect_var ($3))) (Type_app Bool ()))))))
         $1 <: $4
         $3 <: $2, $3 |}]
+    ;;
+
+    let%expect_test "simple [constrain_effects] example" =
+      let types = create () in
+      let names = Name_bindings.core in
+      let foo_effect_name = Effect_name.of_string_exn "Foo" in
+      let bar_effect_name = Effect_name.of_string_exn "Bar" in
+      (* let intrinsic_type (module T : Intrinsics.Type) ~convert_path =
+        Type_scheme.map
+          (fst T.typ)
+          ~type_name:(Tuple2.map_fst ~f:convert_path)
+          ~effect_name:(Tuple2.map_fst ~f:convert_path)
+      in *)
+      (* let foo_effect ~convert_path : _ Effect.t =
+        (* [val foo : String -> ()] *)
+        { params = []
+        ; operations =
+            Some
+              [ { name = Value_name.of_string_exn "foo"
+                ; args = [ intrinsic_type (module Intrinsics.String) ~convert_path ]
+                ; result = Tuple []
+                }
+              ]
+        }
+      in
+      let bar_effect ~convert_path : _ Effect.t =
+        (* [val bar : a -> (a, Int)] *)
+        let param_a = Type_param_name.of_string_exn "a" in
+        { params = [ param_a ]
+        ; operations =
+            Some
+              [ { name = Value_name.of_string_exn "bar"
+                ; args = [ Var param_a ]
+                ; result =
+                    Tuple
+                      [ Var param_a
+                      ; intrinsic_type (module Intrinsics.String) ~convert_path
+                      ]
+                }
+              ]
+        }
+      in *)
+      (* let relative_of_absolute absolute =
+        Module_path.Relative.of_module_names
+          (absolute : Module_path.Absolute.t :> Module_name.t list)
+      in
+      let names =
+        List.fold
+          [ ( foo_effect_name
+            , foo_effect ~convert_path:relative_of_absolute
+            , foo_effect ~convert_path:Fn.id )
+          ; ( bar_effect_name
+            , bar_effect ~convert_path:relative_of_absolute
+            , bar_effect ~convert_path:Fn.id )
+          ]
+          ~init:names
+          ~f:(fun names (effect_name, effect_relative, effect_absolute) ->
+            let names =
+              Name_bindings.add_effect_placeholder names effect_name effect_relative
+            in
+            Name_bindings.add_effect
+              names
+              effect_name
+              effect_absolute
+              ~constrain:(constrain' ~names ~types))
+      in *)
+      let v = unstage (make_vars 3) in
+      constrain_effects
+        ~names
+        ~types
+        ~subtype:
+          { effects =
+              Effect_name.Absolute.Map.singleton
+                (Module_path.Absolute.empty, foo_effect_name)
+                []
+          ; effect_var = Some (v 0)
+          }
+        ~supertype:
+          { effects =
+              Effect_name.Absolute.Map.singleton
+                (Module_path.Absolute.empty, bar_effect_name)
+                [ Internal_type.Var (v 2) ]
+          ; effect_var = Some (v 1)
+          };
+      print_s [%message (types.substitution : Substitution.t)];
+      Constraints.print types.constraints
     ;;
   end)
 ;;
