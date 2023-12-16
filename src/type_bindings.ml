@@ -242,11 +242,6 @@ end = struct
     | Some (Type _) -> compiler_bug [%message "Expected effects, got type"]
   ;;
 
-  (* FIXME: apply substitutions to effect vars. We should be able to do that, right? *)
-  (* { effects = 
-    ; effect_var = (if Option.is_some new_effects then None else effect_var)
-    } *)
-
   let compose t t' =
     Hashtbl.merge_into ~src:t' ~dst:t ~f:(fun ~key:_ new_value old_value ->
       Set_to
@@ -311,8 +306,6 @@ let iter2_types xs ys ~subtype ~supertype ~f =
   | Unequal_lengths -> type_error "Type item length mismatch" subtype supertype
 ;;
 
-(* FIXME: Also need to refresh effect vars, not leave them out! Where did the effect var
-   in List.um go afte refreshing? *)
 let refresh_type type_ =
   let vars = Type_var.Table.create () in
   let refresh_var = Hashtbl.find_or_add vars ~default:Type_var.create in
@@ -408,6 +401,10 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
+  (* It's important to apply the substitution before checking [constrained_types] since
+     the substitution can change as we do more [constrain] calls. *)
+  let subtype = Substitution.apply_to_type types.substitution subtype in
+  let supertype = Substitution.apply_to_type types.substitution supertype in
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     (* FIXME: cleanup *)
@@ -418,11 +415,6 @@ let rec constrain ~names ~types ~subtype ~supertype =
           (supertype : Internal_type.t)
           (types : t)];
     Hash_set.add types.constrained_types (subtype, supertype);
-    (* FIXME: Must apply the current substitution to all generated constraints.
-       Should this substitution be applied before checking the constrained_types cache?
-       Probably. *)
-    let subtype = Substitution.apply_to_type types.substitution subtype in
-    let supertype = Substitution.apply_to_type types.substitution supertype in
     match subtype, supertype with
     | Var var1, Var var2 ->
       if not (Type_var.equal var1 var2)
@@ -486,73 +478,72 @@ let rec constrain ~names ~types ~subtype ~supertype =
        | params, Alias expr ->
          constrain ~names ~types ~subtype ~supertype:(instantiate_alias params (expr, []))
        | _ -> type_error "Type application mismatch" subtype supertype)
-    | Function (args1, _effect_row1, res1), Function (args2, _effect_row2, res2) ->
-      (* FIXME: We aren't constraining the effect rows here! (Also not in the other cases
-         either.) It's also pretty unclear how subtyping on effect rows should work. This
-         doesn't seem to make sense as-is. *)
+    | Function (args1, effects1, res1), Function (args2, effects2, res2) ->
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
        with
        | Same_length -> ()
        | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch subtype supertype);
+      constrain_effects ~names ~types ~subtype:effects1 ~supertype:effects2;
       constrain ~names ~types ~subtype:res1 ~supertype:res2
-    | ( Partial_function (args1, effect_row1, id1)
-      , Partial_function (args2, effect_row2, id2) ) ->
+    | Partial_function (args1, effects1, var1), Partial_function (args2, effects2, var2)
+      ->
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
        with
        | Left_trailing args1_trailing ->
-         (* FIXME: Left fun has more args, right fun is under-applied and must be total. *)
-         constrain_effects_to_be_total ~names ~types effect_row2;
-         (* FIXME: what's the subtyping direction for the remainder of function args? 
-            Maybe it should work like returning a value, so covariant? *)
+         (* The left function has more arguments, so the right function is currently
+            under-applied and must be total at this point. *)
+         constrain_effects_to_be_total ~names ~types effects2;
          constrain
            ~names
            ~types
-           ~subtype:(Partial_function (args1_trailing, effect_row1, id1))
-           ~supertype:(Var id2)
+           ~subtype:(Partial_function (args1_trailing, effects1, var1))
+           ~supertype:(Var var2)
        | Right_trailing args2_trailing ->
-         constrain_effects_to_be_total ~names ~types effect_row1;
+         (* Similar to the above case, the left function is under-applied, so its effects
+            must be total. *)
+         constrain_effects_to_be_total ~names ~types effects2;
          constrain
            ~names
            ~types
-           ~subtype:(Var id1)
-           ~supertype:(Partial_function (args2_trailing, effect_row2, id2))
-       | Same_length -> constrain ~names ~types ~subtype:(Var id1) ~supertype:(Var id2))
-    | Partial_function (args1, effect_row1, id), Function (args2, effect_row2, res) ->
+           ~subtype:(Var var1)
+           ~supertype:(Partial_function (args2_trailing, effects2, var2))
+       | Same_length -> constrain ~names ~types ~subtype:(Var var1) ~supertype:(Var var2))
+    | Partial_function (args1, effects1, var), Function (args2, effects2, res) ->
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
        with
        | Left_trailing _ -> fun_arg_number_mismatch subtype supertype
        | Right_trailing args2_trailing ->
-         constrain_effects_to_be_total ~names ~types effect_row1;
-         let id' = Type_var.create () in
-         constrain ~names ~types ~subtype:(Var id') ~supertype:res;
+         constrain_effects_to_be_total ~names ~types effects1;
+         let var' = Type_var.create () in
+         constrain ~names ~types ~subtype:(Var var') ~supertype:res;
          constrain
            ~names
            ~types
-           ~subtype:(Var id)
-           ~supertype:(Partial_function (args2_trailing, effect_row2, id'))
-       | Same_length -> constrain ~names ~types ~subtype:(Var id) ~supertype:res)
-    | Function (args1, effect_row1, res), Partial_function (args2, effect_row2, id) ->
+           ~subtype:(Var var)
+           ~supertype:(Partial_function (args2_trailing, effects2, var'))
+       | Same_length -> constrain ~names ~types ~subtype:(Var var) ~supertype:res)
+    | Function (args1, effects1, res), Partial_function (args2, effects2, var) ->
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
        with
        | Left_trailing args1_trailing ->
-         constrain_effects_to_be_total ~names ~types effect_row2;
-         let id' = Type_var.create () in
-         constrain ~names ~types ~subtype:res ~supertype:(Var id');
+         constrain_effects_to_be_total ~names ~types effects2;
+         let var' = Type_var.create () in
+         constrain ~names ~types ~subtype:res ~supertype:(Var var');
          constrain
            ~names
            ~types
-           ~subtype:(Partial_function (args1_trailing, effect_row1, id'))
-           ~supertype:(Var id)
+           ~subtype:(Partial_function (args1_trailing, effects1, var'))
+           ~supertype:(Var var)
        | Right_trailing _ -> fun_arg_number_mismatch subtype supertype
-       | Same_length -> constrain ~names ~types ~subtype:res ~supertype:(Var id))
+       | Same_length -> constrain ~names ~types ~subtype:res ~supertype:(Var var))
     | Tuple xs, Tuple ys ->
       iter2_types xs ys ~subtype ~supertype ~f:(fun arg1 arg2 ->
         constrain ~names ~types ~subtype:arg1 ~supertype:arg2)
@@ -928,135 +919,11 @@ let generalize types outer_type =
                  ~polarity:(Polarity.flip polarity))
         , generalize_effects_internal types effects ~env ~in_progress ~polarity
         , Var (generalize_type_var ~env ~in_progress ~polarity ~var:result_var) )
-      (* combine_partial_functions types args effects id ~env ~in_progress ~polarity *)
     | Type_app (name, fields) ->
       Type_app
         (name, List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
     | Tuple fields ->
       Tuple (List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
-  (* FIXME: cleanup/remove *)
-  (* and _find_var_bounds _types var ~polarity =
-    (* FIXME: var bounds kinda aren't a thing anymore? What should we do here? *)
-    match Hashtbl.find (failwith "type vars") var with
-    (* FIXME: How do we do substitution for type variables now that we have effect
-          types? I think we need to encode the constraints in the type expression, maybe?
-          Hmm, I think all the lower/upper bounds are going to look basically the same,
-          modulo effect types. So, roughly, the lowermost bound produces the fewest
-          effects, and the uppermost bound produces the most.  *)
-    (* FIXME: Can we avoid infinite recursion without supporting recursive types?
-          Maybe we could eagerly collapse upper/lower bounds into single types? Slightly
-          annoying since we'd need to introduce the concept of polarity to [constrain],
-          but it might work? It should be fine to always start at Positive. But this might
-          effectively be eager substitution which could be questionable. *)
-    (* FIXME: union/intersection (at least currently) don't work for type variables, so
-          the below is always going to fail (if it doesn't infinitely recurse).
-          We can't handle vars being in bounds with other types. *)
-    (* FIXME: example
-          We want `(::) : a, List a -> List a` and have `(::) : 124`
-
-          Constraints:
-          124
-            > 143, List 143 -> List 143
-            < 125, List 125 -> List 125
-          125
-            < 143; 143
-          143
-            < 125
-
-          Are 124 < 143 and 143 < 125 supposed to be impossible constraints to generate?
-          Maybe that's the problem? Not sure.
-
-          The algorithm in the paper would give:
-          
-
-          Maybe we just don't need subtyping?? I think we want it so that when we return
-          things that contain functions, the types can be implicitly upcasted to contain 
-          any effect. We could theoretically do that with Koka's row types which are 
-          given fresh type variables for each use. We want the inferred effect types to be
-          nice though.
-       *)
-    | Some { lower_bounds; upper_bounds } ->
-      Queue.to_list
-        (match polarity with
-         | Positive -> lower_bounds
-         | Negative -> upper_bounds)
-    | None -> [] *)
-  (* and collapse_var_bounds types var bounds ~env ~in_progress ~polarity =
-    let combine_types =
-      match polarity with
-      | Positive -> Type_scheme.union
-      | Negative -> Type_scheme.intersection
-    in
-    (* FIXME: The algorithm from the paper includes [typ], the type itself, in the
-     union/intersection of the bounds. Do we have to do that? (I think yes) *)
-    let bounds : _ Type_scheme.t Nonempty.t =
-      Var (Type_param.Env_of_vars.find_or_add env var)
-      :: List.map bounds ~f:(generalize_internal types ~env ~in_progress ~polarity)
-    in
-    (* FIXME: Also need to simplify away type variables. *)
-    combine_types bounds *)
-  (* FIXME: Implement this *)
-  (* and substitute_effects types {effects ; effect_vars} ~polarity =
-  let () =
-    (* FIXME: deduplicate var handling code with regular types *)
-    match Hashtbl.find types.effect_vars id with
-    | Some { lower_bounds; upper_bounds } ->
-      let bounds, combine_types =
-        match polarity with
-        | Positive -> lower_bounds, union_types
-        | Negative -> upper_bounds, intersect_types
-      in
-      (* FIXME: The algorithm from the paper includes [typ], the type itself, in the
-            union/intersection of the bounds. Do we have to do that? (I think yes) *)
-      (match Queue.to_list bounds with
-       | [] -> Halt typ
-       | bounds ->
-         (* FIXME: Combining types won't work when there are var and non-var
-               constraints. Need to figure out something for that. *)
-         Halt
-           (List.map bounds ~f:(substitute_internal types ~polarity)
-            |> List.reduce_exn ~f:combine_types))
-    | None -> Halt typ
-  in
-  () *)
-
-  (* FIXME: The way we handle partial functions seems pretty sus. I don't think we can
-   properly distinguish between a partial function that then gets later applied in the
-   same function, or a function that really returns another function. Which one should we
-   assume? *)
-  (* and combine_partial_functions types args effects id ~env ~in_progress ~polarity =
-    (* FIXME: We need to determine if [id] is constrained to the same shape as some
-       function type (either subtype or supertype). Actually, I think what should happen
-       is that the var gets substituted with a function type already. *)
-    (* FIXME: Does this make any sense? In the var case we're just returning a var instead
-     of the function?? *)
-    (* FIXME: We should put some simplification steps in [find_var_bounds] so this
-     identification of [Partial_function]s actually works. *)
-    match find_var_bounds types id ~polarity with
-    | [ Partial_function (args', effects', id') ] ->
-      (* FIXME: Do we need this? (Surely yes) *)
-      (* constrain_effects_to_be_total ~names ~types effect_row; *)
-      let args_combined = Nonempty.(args @ args') in
-      combine_partial_functions
-        types
-        args_combined
-        effects'
-        id'
-        ~env
-        ~in_progress:(Set.add in_progress (polarity, id))
-        ~polarity
-    | bounds ->
-      Function
-        ( Nonempty.map
-            args
-            ~f:
-              (generalize_internal
-                 types
-                 ~env
-                 ~in_progress
-                 ~polarity:(Polarity.flip polarity))
-        , generalize_effects_internal types effects ~env ~in_progress ~polarity
-        , collapse_var_bounds types id bounds ~env ~in_progress ~polarity ) *)
   and generalize_effects_internal types effects ~env ~in_progress ~polarity =
     match effects with
     | { effects; effect_var = None } ->
