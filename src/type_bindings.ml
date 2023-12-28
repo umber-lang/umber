@@ -147,10 +147,13 @@ end = struct
     Hashtbl.to_alist t.upper_bounds
     |> List.sort ~compare:[%compare: Type_var.t * _]
     |> List.iter ~f:(fun (subtype, supertypes) ->
-         if not (Hash_set.is_empty supertypes)
+         let supertypes =
+           Type_var.Set.of_hash_set supertypes |> Fn.flip Set.remove subtype
+         in
+         if not (Set.is_empty supertypes)
          then (
            let supertypes =
-             Hash_set.to_list supertypes
+             Set.to_list supertypes
              |> List.sort ~compare:Type_var.compare
              |> List.map ~f:Type_var.to_string
              |> String.concat ~sep:", "
@@ -1140,10 +1143,10 @@ let%test_module _ =
       print_constraints ();
       [%expect
         {|
-        $0 <: $0, $1, $2, $3
-        $1 <: $0, $1, $2, $3
-        $2 <: $0, $1, $2, $3
-        $3 <: $0, $1, $2, $3
+        $0 <: $1, $2, $3
+        $1 <: $0, $2, $3
+        $2 <: $0, $1, $3
+        $3 <: $0, $1, $2
         (var_partitions (($0 $1 $2 $3))) |}]
     ;;
 
@@ -1161,9 +1164,6 @@ let%test_module _ =
           (Function ([ Var (v 1) ], Internal_type.effects_of_var (v 2), bool_type));
       print_s [%message (types.substitution : Substitution.t)];
       Constraints.print types.constraints;
-      (* FIXME: Why is it not consistent whether e.g. $3 <: $3 is included? Could this be
-         a bug? (I think we always want to represent these inequalities, but maybe we
-         don't need to store them.) *)
       [%expect
         {|
         (types.substitution
@@ -1171,7 +1171,7 @@ let%test_module _ =
            (Type
             (Function ((Var $4)) ((effects ()) (effect_var ($3))) (Type_app Bool ()))))))
         $1 <: $4
-        $3 <: $2, $3 |}]
+        $3 <: $2 |}]
     ;;
 
     let%expect_test "simple [constrain_effects] example" =
@@ -1257,7 +1257,15 @@ let%test_module _ =
           ; effect_var = Some (v 1)
           };
       print_s [%message (types.substitution : Substitution.t)];
-      Constraints.print types.constraints
+      Constraints.print types.constraints;
+      (* FIXME: This isn't quite right. $5 is unconstrained, it should match $2, which
+         isn't mentioned anywhere. *)
+      [%expect
+        {|
+        (types.substitution
+         (($0 (Effects ((effects ((Bar ((Var $5))))) (effect_var ($3)))))
+          ($1 (Effects ((effects ((Foo ()))) (effect_var ($4)))))))
+        $3 <: $4 |}]
     ;;
   end)
 ;;
