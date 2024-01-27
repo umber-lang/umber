@@ -650,13 +650,20 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       | Some subtype_var, None ->
         Substitution.set_effects types.substitution subtype_var Internal_type.no_effects
     in
-    let create_substitution ~effects ~var ~new_var =
+    let create_substitution ~effects ~var ~new_var ~effects_subtyping_dir =
       let substitution = Substitution.create () in
       if not (Map.is_empty effects)
       then
         Option.iter var ~f:(fun var ->
-          let effects = Map.map effects ~f:(List.map ~f:refresh_type) in
-          (* FIXME: add constraints, similar to the type case. *)
+          let effects =
+            Map.map effects ~f:(fun args ->
+              List.map args ~f:(fun arg ->
+                let arg' = refresh_type arg in
+                (match effects_subtyping_dir with
+                 | `Subtype -> constrain ~names ~types ~subtype:arg ~supertype:arg'
+                 | `Supertype -> constrain ~names ~types ~subtype:arg' ~supertype:arg);
+                arg'))
+          in
           Substitution.set_effects substitution var { effects; effect_var = new_var });
       substitution
     in
@@ -671,12 +678,14 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           ~effects:supertype_only
           ~var:subtype_var
           ~new_var:new_subtype_var
+          ~effects_subtyping_dir:`Supertype
       in
       let subtype_only_substitution =
         create_substitution
           ~effects:subtype_only
           ~var:supertype_var
           ~new_var:new_supertype_var
+          ~effects_subtyping_dir:`Subtype
       in
       (* FIXME: Not sure if this is right, or all we need. *)
       constrain_effect_vars
@@ -1239,6 +1248,7 @@ let%test_module _ =
               ~constrain:(constrain' ~names ~types))
       in *)
       let v = unstage (make_vars 3) in
+      (* <Foo, v0> <: <Bar v2, v1> *)
       constrain_effects
         ~names
         ~types
@@ -1258,14 +1268,13 @@ let%test_module _ =
           };
       print_s [%message (types.substitution : Substitution.t)];
       Constraints.print types.constraints;
-      (* FIXME: This isn't quite right. $5 is unconstrained, it should match $2, which
-         isn't mentioned anywhere. *)
       [%expect
         {|
         (types.substitution
          (($0 (Effects ((effects ((Bar ((Var $5))))) (effect_var ($3)))))
           ($1 (Effects ((effects ((Foo ()))) (effect_var ($4)))))))
-        $3 <: $4 |}]
+        $3 <: $4
+        $5 <: $2 |}]
     ;;
   end)
 ;;
