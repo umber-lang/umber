@@ -78,6 +78,7 @@ module Constraints : sig
   (* FIXME: Make this interface less confusing*)
   val remove_vars : t -> Type_var.t -> Type_var.Set.t -> unit
   val find_vars_with_same_shape : t -> Type_var.t -> Type_var.Set.t
+  val lower_bounds : t -> Type_var.t -> Type_var.Set.t
 
   val to_constraint_list
     :  t
@@ -120,11 +121,20 @@ end = struct
     Hash_set.filter_inplace (get_bounds upper_bounds var) ~f:(not << Set.mem vars)
   ;;
 
+  let add_vars_from_bounds bounds var vars =
+    Hash_set.fold ~init:vars (get_bounds bounds var) ~f:Set.add
+  ;;
+
   let find_vars_with_same_shape { lower_bounds; upper_bounds } var =
-    let add_vars bounds vars =
-      Hash_set.fold ~init:vars (get_bounds bounds var) ~f:Set.add
-    in
-    Type_var.Set.singleton var |> add_vars lower_bounds |> add_vars upper_bounds
+    Type_var.Set.empty
+    |> add_vars_from_bounds lower_bounds var
+    |> add_vars_from_bounds upper_bounds var
+  ;;
+
+  let lower_bounds t var =
+    Type_var.Set.empty
+    |> add_vars_from_bounds t.lower_bounds var
+    |> Fn.flip Set.remove var
   ;;
 
   let to_constraint_list t ~params =
@@ -987,75 +997,106 @@ end
    variables we introduce can be shared between multiple type expressions in the same
    expresion/statement. *)
 let generalize types outer_type =
-  let generalize_type_var ~env ~in_progress ~polarity ~var =
-    if Set.mem in_progress (polarity, var)
-    then
-      Compilation_error.raise
-        Type_error
-        ~msg:
-          [%message
-            "Recursive type"
-              ~recursive_var:(polarity, var : Polar_var.t)
-              (outer_type : Internal_type.t)]
-    else Type_param.Env_of_vars.find_or_add env var
-    (* let bounds = find_var_bounds types var ~polarity in
-        let in_progress = Set.add in_progress (polarity, var) in
-        collapse_var_bounds types var bounds ~env ~in_progress ~polarity *)
+  (* FIXME: Probably use positive_vars *)
+  let negative_vars, _positive_vars =
+    let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
+      match polarity with
+      | Positive -> negative_vars, Set.add positive_vars var
+      | Negative -> Set.add negative_vars var, positive_vars
+    in
+    let rec loop acc ~polarity (typ : Internal_type.t) =
+      match typ with
+      | Var var -> loop_var acc var ~polarity
+      | Function (args, effects, res) ->
+        let acc =
+          Nonempty.fold args ~init:acc ~f:(loop ~polarity:(Polarity.flip polarity))
+        in
+        let acc = loop_effects acc ~polarity effects in
+        loop acc ~polarity res
+      | Partial_function (args, effects, result_var) ->
+        let acc =
+          Nonempty.fold args ~init:acc ~f:(loop ~polarity:(Polarity.flip polarity))
+        in
+        let acc = loop_effects acc ~polarity effects in
+        loop_var acc ~polarity result_var
+      | Type_app (_, fields) ->
+        (* TODO: Handle type variable variance. *)
+        List.fold fields ~init:acc ~f:(loop ~polarity)
+      | Tuple fields -> List.fold fields ~init:acc ~f:(loop ~polarity)
+    and loop_effects acc ~polarity { effects; effect_var } =
+      let acc =
+        Map.fold effects ~init:acc ~f:(fun ~key:_ ~data:args acc ->
+          List.fold args ~init:acc ~f:(loop ~polarity))
+      in
+      Option.fold effect_var ~init:acc ~f:(loop_var ~polarity)
+    in
+    loop (Type_var.Set.empty, Type_var.Set.empty) ~polarity:Positive outer_type
   in
-  let rec generalize_internal types typ ~env ~in_progress ~(polarity : Polarity.t)
+  let generalize_type_var types var ~env ~polarity:(_ : Polarity.t)
     : Module_path.absolute Type_scheme.type_
     =
+    (* match polarity with
+    | Positive ->
+      (* Replace a positive instance of a type variable with the union of its negative
+         lower bounds. *)
+      (match
+         Set.inter (Constraints.lower_bounds types.constraints var) negative_vars
+         |> Set.to_list
+         |> Nonempty.of_list
+       with
+       | None -> Var (Type_param.Env_of_vars.find_or_add env var)
+       | Some vars ->
+         (* FIXME: Could it be that some of these vars also end up getting replaced later?
+            Then what should we do? *)
+         Union
+           (Nonempty.map vars ~f:(fun var ->
+              Type_scheme.Var (Type_param.Env_of_vars.find_or_add env var))))
+    | Negative ->  *)
+    let _ = negative_vars in
+    let _ = types in
+    let _ = Constraints.lower_bounds in
+    Var (Type_param.Env_of_vars.find_or_add env var)
+  in
+  let rec generalize_internal types typ ~env ~polarity =
     match (typ : Internal_type.t) with
-    | Var var -> Var (generalize_type_var ~env ~in_progress ~polarity ~var)
+    | Var var -> generalize_type_var types ~env ~polarity var
     | Function (args, effects, res) ->
       Function
-        ( Nonempty.map
-            args
-            ~f:
-              (generalize_internal
-                 types
-                 ~env
-                 ~in_progress
-                 ~polarity:(Polarity.flip polarity))
-        , generalize_effects_internal types effects ~env ~in_progress ~polarity
-        , generalize_internal types res ~env ~in_progress ~polarity )
+        ( Nonempty.map args ~f:(generalize_internal types ~env ~polarity)
+        , generalize_effects_internal types effects ~env ~polarity
+        , generalize_internal types res ~env ~polarity )
     | Partial_function (args, effects, result_var) ->
       Function
-        ( Nonempty.map
-            args
-            ~f:
-              (generalize_internal
-                 types
-                 ~env
-                 ~in_progress
-                 ~polarity:(Polarity.flip polarity))
-        , generalize_effects_internal types effects ~env ~in_progress ~polarity
-        , Var (generalize_type_var ~env ~in_progress ~polarity ~var:result_var) )
+        ( Nonempty.map args ~f:(generalize_internal types ~env ~polarity)
+        , generalize_effects_internal types effects ~env ~polarity
+        , generalize_type_var types ~env ~polarity result_var )
     | Type_app (name, fields) ->
-      Type_app
-        (name, List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
+      Type_app (name, List.map fields ~f:(generalize_internal types ~env ~polarity))
     | Tuple fields ->
-      Tuple (List.map fields ~f:(generalize_internal types ~env ~in_progress ~polarity))
-  and generalize_effects_internal types effects ~env ~in_progress ~polarity =
-    match effects with
-    | { effects; effect_var = None } ->
+      Tuple (List.map fields ~f:(generalize_internal types ~env ~polarity))
+  and generalize_effects_internal types { effects; effect_var } ~env ~polarity =
+    let effects =
       Option.map
-        (convert_effect_map types effects ~env ~in_progress ~polarity)
-        ~f:Type_scheme.effect_union
-    | { effects; effect_var = Some effect_var } ->
-      let effect_var = Type_param.Env_of_vars.find_or_add env effect_var in
-      (match convert_effect_map types effects ~env ~in_progress ~polarity with
-       | None -> Some (Effect_var effect_var)
-       | Some effects ->
-         Some (Effect_union (Effect_var effect_var :: Nonempty.to_list effects)))
-  and convert_effect_map types effects ~env ~in_progress ~polarity =
-    Option.map
-      (Nonempty.of_list (Map.to_alist effects))
-      ~f:(fun effects ->
-        Nonempty.map effects ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
-          Effect
-            ( effect_name
-            , List.map args ~f:(generalize_internal types ~env ~in_progress ~polarity) )))
+        (Nonempty.of_list (Map.to_alist effects))
+        ~f:(fun effects ->
+          Nonempty.map effects ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
+            Effect
+              (effect_name, List.map args ~f:(generalize_internal types ~env ~polarity))))
+    in
+    let effect_var =
+      Option.bind effect_var ~f:(fun effect_var ->
+        (* FIXME: Simplify effect vars so we don't end up with unnecessary ones. e.g. in
+           Bool.to_string. Need to replace all positive effect vars by the union of their
+           lower bounds.  *)
+        let effect_var = Type_param.Env_of_vars.find_or_add env effect_var in
+        Some effect_var)
+    in
+    match effects, effect_var with
+    | None, None -> None
+    | Some effects, None -> Some (Effect_union effects)
+    | None, Some effect_var -> Some (Effect_var effect_var)
+    | Some effects, Some effect_var ->
+      Some (Effect_union (Effect_var effect_var :: Nonempty.to_list effects))
   in
   (* FIXME: cleanup *)
   eprint_s
@@ -1069,10 +1110,13 @@ let generalize types outer_type =
       types
       (Substitution.apply_to_type types.substitution outer_type)
       ~env
-      ~in_progress:Polar_var.Set.empty
       ~polarity:Positive
   in
-  (* FIXME: Constraints are not propagating correctly. *)
+  (* FIXME: Constraints are not propagating correctly.
+     Want to replace positive instances of vars with the union of their negative lower
+     bounds. (might do this for negative instances of vars too, not sure).
+     Then we need to think about what to to do with the constraints. (Only include ones
+     between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   let result = scheme, constraints in
   eprint_s
