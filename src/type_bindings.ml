@@ -97,7 +97,12 @@ end = struct
     { lower_bounds = Type_var.Table.create (); upper_bounds = Type_var.Table.create () }
   ;;
 
-  let get_bounds = Hashtbl.find_or_add ~default:Type_var.Hash_set.create
+  let get_bounds bounds var =
+    Hashtbl.find_or_add bounds var ~default:(fun () ->
+      let vars = Type_var.Hash_set.create () in
+      Hash_set.add vars var;
+      vars)
+  ;;
 
   let add_bounds { lower_bounds; upper_bounds } ~subtype ~supertype =
     Hash_set.add (get_bounds upper_bounds subtype) supertype;
@@ -421,7 +426,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
-  eprint_s
+  print_s
     [%message
       "Type_bindings.constrain (pre-substitution)"
         (subtype : Internal_type.t)
@@ -435,7 +440,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     (* FIXME: cleanup *)
-    eprint_s
+    print_s
       [%message
         "Type_bindings.constrain (post-substitution)"
           (subtype : Internal_type.t)
@@ -1032,10 +1037,10 @@ let generalize types outer_type =
     in
     loop (Type_var.Set.empty, Type_var.Set.empty) ~polarity:Positive outer_type
   in
-  let generalize_type_var types var ~env ~polarity:(_ : Polarity.t)
+  let generalize_type_var types var ~env ~(polarity : Polarity.t)
     : Module_path.absolute Type_scheme.type_
     =
-    (* match polarity with
+    match polarity with
     | Positive ->
       (* Replace a positive instance of a type variable with the union of its negative
          lower bounds. *)
@@ -1044,18 +1049,18 @@ let generalize types outer_type =
          |> Set.to_list
          |> Nonempty.of_list
        with
-       | None -> Var (Type_param.Env_of_vars.find_or_add env var)
+       | None ->
+         (* FIXME: This should be Bottom/Never (equivalent to empty union). Let's make
+            that a primitive? Ah, yeah, you actually need it to be a primitive (or allow
+            empty union) to have the subtyping work properly. *)
+         Var (Type_param.Env_of_vars.find_or_add env var)
        | Some vars ->
          (* FIXME: Could it be that some of these vars also end up getting replaced later?
             Then what should we do? *)
          Union
            (Nonempty.map vars ~f:(fun var ->
               Type_scheme.Var (Type_param.Env_of_vars.find_or_add env var))))
-    | Negative ->  *)
-    let _ = negative_vars in
-    let _ = types in
-    let _ = Constraints.lower_bounds in
-    Var (Type_param.Env_of_vars.find_or_add env var)
+    | Negative -> Var (Type_param.Env_of_vars.find_or_add env var)
   in
   let rec generalize_internal types typ ~env ~polarity =
     match (typ : Internal_type.t) with
@@ -1105,13 +1110,8 @@ let generalize types outer_type =
      statement. We should have 1 type-bindings per statement, and probably just one param
      name generator for that. *)
   let env = Type_param.Env_of_vars.create () in
-  let scheme =
-    generalize_internal
-      types
-      (Substitution.apply_to_type types.substitution outer_type)
-      ~env
-      ~polarity:Positive
-  in
+  let substituted_type = Substitution.apply_to_type types.substitution outer_type in
+  let scheme = generalize_internal types substituted_type ~env ~polarity:Positive in
   (* FIXME: Constraints are not propagating correctly.
      Want to replace positive instances of vars with the union of their negative lower
      bounds. (might do this for negative instances of vars too, not sure).
@@ -1119,12 +1119,15 @@ let generalize types outer_type =
      between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   let result = scheme, constraints in
-  eprint_s
+  Constraints.print types.constraints;
+  print_s
     [%message
       "generalize result"
         (outer_type : Internal_type.t)
+        (substituted_type : Internal_type.t)
         (result : Module_path.absolute Type_scheme.t)
-        (env : Type_param.Env_of_vars.t)];
+        (env : Type_param.Env_of_vars.t)
+        (types.substitution : Substitution.t)];
   result
 ;;
 
