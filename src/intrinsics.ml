@@ -40,15 +40,21 @@ end) : Variants = struct
   ;;
 end
 
-module type Abstract = Type
+module Make_type (T : sig
+  val name : string
+  val decl : Module_path.absolute Type_decl.t
+end) : Type = struct
+  let name = Type_name.of_string_unchecked T.name
+  let decl = T.decl
+  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), []), []
+end
 
 module Make_abstract (T : sig
   val name : string
-end) : Abstract = struct
-  let name = Type_name.of_string_unchecked T.name
+end) : Type = Make_type (struct
+  let name = T.name
   let decl = Unique_list.empty, Type_decl.Abstract
-  let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), []), []
-end
+end)
 
 module Bool = struct
   include Make_variants (struct
@@ -79,6 +85,8 @@ end)
 module String = Make_abstract (struct
   let name = "String"
 end)
+
+(* TODO: Add intrinsics for Never and Any (Bottom and Top) *)
 
 let all : (module Type) list =
   [ (module Bool); (module Int); (module Float); (module Char); (module String) ]

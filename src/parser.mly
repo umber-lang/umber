@@ -229,7 +229,7 @@ type_fun_args:
 %inline type_fun:
   | args = type_fun_args; ARROW; body = type_non_fun
     (* TODO: Implement effect syntax in function types. *)
-    { Type_scheme.Function (args, None, body) }
+    { Type_scheme.Function (args, Effect_union [], body) }
 
 type_expr:
   | t = type_non_fun { t }

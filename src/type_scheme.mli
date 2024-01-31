@@ -5,15 +5,15 @@ type 'n type_ =
   | Var of Type_param_name.t
   | Type_app of 'n Type_name.Qualified.t * 'n type_ list
   | Tuple of 'n type_ list
-  | Function of 'n type_ Nonempty.t * 'n effects option * 'n type_
-  | Union of 'n type_ Nonempty.t
-  | Intersection of 'n type_ Nonempty.t
+  | Function of 'n type_ Nonempty.t * 'n effects * 'n type_
+  | Union of 'n type_ list
+  | Intersection of 'n type_ list
 
 and 'n effects =
   | Effect of 'n Effect_name.Qualified.t * 'n type_ list
   | Effect_var of Type_param_name.t
-  | Effect_union of 'n effects Nonempty.t
-  | Effect_intersection of 'n effects Nonempty.t
+  | Effect_union of 'n effects list
+  | Effect_intersection of 'n effects list
 [@@deriving hash, compare, equal, sexp]
 
 type 'n constraint_ =
@@ -26,9 +26,10 @@ type 'n t = 'n type_ * 'n constraint_ list [@@deriving hash, compare, equal, sex
 
 val var : Type_param_name.t -> 'n type_
 val tuple : 'n type_ list -> 'n type_
-val union : 'n type_ Nonempty.t -> 'n type_
-val intersection : 'n type_ Nonempty.t -> 'n type_
-val effect_union : 'n effects Nonempty.t -> 'n effects
+val union : 'n type_ list -> 'n type_
+val intersection : 'n type_ list -> 'n type_
+val effect_var : Type_param_name.t -> 'n effects
+val effect_union : 'n effects list -> 'n effects
 
 val map
   :  ?f:('n1 type_ -> ('n1 type_, 'n2 type_) Map_action.t)

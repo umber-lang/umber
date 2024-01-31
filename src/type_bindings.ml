@@ -426,7 +426,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
-  print_s
+  eprint_s
     [%message
       "Type_bindings.constrain (pre-substitution)"
         (subtype : Internal_type.t)
@@ -440,7 +440,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     (* FIXME: cleanup *)
-    print_s
+    eprint_s
       [%message
         "Type_bindings.constrain (post-substitution)"
           (subtype : Internal_type.t)
@@ -836,28 +836,36 @@ and instantiate_type_scheme =
       let args = Nonempty.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
       let effects : Internal_type.effects =
         match effects with
-        | None -> { effects = Effect_name.Absolute.Map.empty; effect_var = None }
-        | Some (Effect (effect_name, args)) ->
+        | Effect (effect_name, args) ->
           { effects =
               Effect_name.Absolute.Map.singleton
                 effect_name
                 (List.map args ~f:(instantiate_type_scheme ~names ~types ~params))
           ; effect_var = None
           }
-        | Some (Effect_var param) ->
+        | Effect_var param ->
           let var = Type_param.Env_to_vars.find_or_add params param in
           { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
-        | Some (Effect_union _ | Effect_intersection _) ->
+        | Effect_union [] ->
+          { effects = Effect_name.Absolute.Map.empty; effect_var = None }
+        | Effect_union _ | Effect_intersection _ ->
           (* FIXME: Handle this *)
           failwith
             "TODO: Handle effect unions and intersections (maybe need to add constraints \
              to the type bindings?)"
       in
       Function (args, effects, instantiate_type_scheme ~names ~types ~params result)
-    | Union _ | Intersection _ ->
+    | Union [] ->
+      (* The empty union is the bottom type, the type which is a subtype of all other
+         types. We can get equivalent behavior by using an unconstrained type variable. *)
+      Var (Type_var.create ())
+    | Union types | Intersection types ->
       (* FIXME: Need to add constraints to the type bindings. Might make using this pretty
          inconvenient. *)
-      failwith "TODO: conversion from union and intersection types"
+      raise_s
+        [%message
+          "TODO: conversion from union and intersection types"
+            (types : _ Type_scheme.type_ list)]
   in
   fun ?(params = Type_param.Env_to_vars.create ())
       ~names
@@ -1037,30 +1045,45 @@ let generalize types outer_type =
     in
     loop (Type_var.Set.empty, Type_var.Set.empty) ~polarity:Positive outer_type
   in
-  let generalize_type_var types var ~env ~(polarity : Polarity.t)
-    : Module_path.absolute Type_scheme.type_
+  let aux_generalize_type_var
+    types
+    v
+    ~env
+    ~(polarity : Polarity.t)
+    ~union
+    ~var
+    ~on_empty_union
     =
     match polarity with
     | Positive ->
       (* Replace a positive instance of a type variable with the union of its negative
          lower bounds. *)
-      (match
-         Set.inter (Constraints.lower_bounds types.constraints var) negative_vars
-         |> Set.to_list
-         |> Nonempty.of_list
-       with
-       | None ->
-         (* FIXME: This should be Bottom/Never (equivalent to empty union). Let's make
-            that a primitive? Ah, yeah, you actually need it to be a primitive (or allow
-            empty union) to have the subtyping work properly. *)
-         Var (Type_param.Env_of_vars.find_or_add env var)
-       | Some vars ->
+      let vars =
+        Set.inter (Constraints.lower_bounds types.constraints v) negative_vars
+        |> Set.to_list
+      in
+      (match vars, on_empty_union with
+       | [], `Make_var -> var (Type_param.Env_of_vars.find_or_add env v)
+       | ([] as vars), `Make_union | (_ :: _ as vars), (`Make_var | `Make_union) ->
          (* FIXME: Could it be that some of these vars also end up getting replaced later?
-            Then what should we do? *)
-         Union
-           (Nonempty.map vars ~f:(fun var ->
-              Type_scheme.Var (Type_param.Env_of_vars.find_or_add env var))))
-    | Negative -> Var (Type_param.Env_of_vars.find_or_add env var)
+         Then what should we do? *)
+         union (List.map vars ~f:(var << Type_param.Env_of_vars.find_or_add env)))
+    | Negative -> var (Type_param.Env_of_vars.find_or_add env v)
+  in
+  let generalize_type_var =
+    aux_generalize_type_var
+      ~union:Type_scheme.union
+      ~var:Type_scheme.var
+      ~on_empty_union:
+        (* It's clearer to have regular type variables than empty unions. *)
+        `Make_var
+  in
+  (* FIXME: Does this work with effect vars in higher-order functions? *)
+  let generalize_effect_var =
+    aux_generalize_type_var
+      ~union:Type_scheme.effect_union
+      ~var:Type_scheme.effect_var
+      ~on_empty_union:`Make_union (* It's more intuitive to deal in effect unions. *)
   in
   let rec generalize_internal types typ ~env ~polarity =
     match (typ : Internal_type.t) with
@@ -1081,27 +1104,19 @@ let generalize types outer_type =
       Tuple (List.map fields ~f:(generalize_internal types ~env ~polarity))
   and generalize_effects_internal types { effects; effect_var } ~env ~polarity =
     let effects =
-      Option.map
-        (Nonempty.of_list (Map.to_alist effects))
-        ~f:(fun effects ->
-          Nonempty.map effects ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
-            Effect
-              (effect_name, List.map args ~f:(generalize_internal types ~env ~polarity))))
+      List.map
+        (Map.to_alist effects)
+        ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
+        Effect (effect_name, List.map args ~f:(generalize_internal types ~env ~polarity)))
     in
-    let effect_var =
-      Option.bind effect_var ~f:(fun effect_var ->
-        (* FIXME: Simplify effect vars so we don't end up with unnecessary ones. e.g. in
-           Bool.to_string. Need to replace all positive effect vars by the union of their
-           lower bounds.  *)
-        let effect_var = Type_param.Env_of_vars.find_or_add env effect_var in
-        Some effect_var)
+    let effects_from_effect_var =
+      match effect_var with
+      | Some effect_var -> generalize_effect_var types effect_var ~env ~polarity
+      | None -> Effect_union []
     in
-    match effects, effect_var with
-    | None, None -> None
-    | Some effects, None -> Some (Effect_union effects)
-    | None, Some effect_var -> Some (Effect_var effect_var)
-    | Some effects, Some effect_var ->
-      Some (Effect_union (Effect_var effect_var :: Nonempty.to_list effects))
+    match effects_from_effect_var with
+    | Effect_union effects' -> Effect_union (effects' @ effects)
+    | (Effect _ | Effect_var _ | Effect_intersection _) as e -> Effect_union (e :: effects)
   in
   (* FIXME: cleanup *)
   eprint_s
@@ -1119,8 +1134,8 @@ let generalize types outer_type =
      between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   let result = scheme, constraints in
-  Constraints.print types.constraints;
-  print_s
+  (* Constraints.print types.constraints; *)
+  eprint_s
     [%message
       "generalize result"
         (outer_type : Internal_type.t)
@@ -1235,65 +1250,6 @@ let%test_module _ =
       let names = Name_bindings.core in
       let foo_effect_name = Effect_name.of_string_exn "Foo" in
       let bar_effect_name = Effect_name.of_string_exn "Bar" in
-      (* let intrinsic_type (module T : Intrinsics.Type) ~convert_path =
-        Type_scheme.map
-          (fst T.typ)
-          ~type_name:(Tuple2.map_fst ~f:convert_path)
-          ~effect_name:(Tuple2.map_fst ~f:convert_path)
-      in *)
-      (* let foo_effect ~convert_path : _ Effect.t =
-        (* [val foo : String -> ()] *)
-        { params = []
-        ; operations =
-            Some
-              [ { name = Value_name.of_string_exn "foo"
-                ; args = [ intrinsic_type (module Intrinsics.String) ~convert_path ]
-                ; result = Tuple []
-                }
-              ]
-        }
-      in
-      let bar_effect ~convert_path : _ Effect.t =
-        (* [val bar : a -> (a, Int)] *)
-        let param_a = Type_param_name.of_string_exn "a" in
-        { params = [ param_a ]
-        ; operations =
-            Some
-              [ { name = Value_name.of_string_exn "bar"
-                ; args = [ Var param_a ]
-                ; result =
-                    Tuple
-                      [ Var param_a
-                      ; intrinsic_type (module Intrinsics.String) ~convert_path
-                      ]
-                }
-              ]
-        }
-      in *)
-      (* let relative_of_absolute absolute =
-        Module_path.Relative.of_module_names
-          (absolute : Module_path.Absolute.t :> Module_name.t list)
-      in
-      let names =
-        List.fold
-          [ ( foo_effect_name
-            , foo_effect ~convert_path:relative_of_absolute
-            , foo_effect ~convert_path:Fn.id )
-          ; ( bar_effect_name
-            , bar_effect ~convert_path:relative_of_absolute
-            , bar_effect ~convert_path:Fn.id )
-          ]
-          ~init:names
-          ~f:(fun names (effect_name, effect_relative, effect_absolute) ->
-            let names =
-              Name_bindings.add_effect_placeholder names effect_name effect_relative
-            in
-            Name_bindings.add_effect
-              names
-              effect_name
-              effect_absolute
-              ~constrain:(constrain' ~names ~types))
-      in *)
       let v = unstage (make_vars 3) in
       (* <Foo, v0> <: <Bar v2, v1> *)
       constrain_effects

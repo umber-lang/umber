@@ -933,7 +933,7 @@ let add_type_decl t type_name decl =
                  (match Nonempty.of_list args with
                   | Some args ->
                     (* TODO: This should probably have an effect for allocation. *)
-                    Function (args, None, result_type), []
+                    Function (args, Effect_union [], result_type), []
                   | None -> result_type, [])
              in
              Map.set names ~key:(Value_name.of_cnstr_name cnstr_name) ~data:(Local entry))
@@ -990,7 +990,7 @@ let add_effect t effect_name (effect : _ Effect.t) ~constrain =
           effect
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
-          let scheme : _ Type_scheme.t = Function (args, Some effects, result), [] in
+          let scheme : _ Type_scheme.t = Function (args, effects, result), [] in
           let new_entry = Name_entry.val_declared scheme in
           add_name_entry names name scheme new_entry ~constrain)
     }

@@ -146,15 +146,15 @@ let rec arity_of_type ~names (type_ : Module_path.absolute Type_scheme.type_) =
      | Alias type_ -> arity_of_type ~names type_)
   | Function (args, _, _) -> Nonempty.length args
   | Union types | Intersection types ->
-    let type_arities = Nonempty.map types ~f:(arity_of_type ~names) in
-    (match List.all_equal (Nonempty.to_list type_arities) ~equal:Int.equal with
+    let type_arities = List.map types ~f:(arity_of_type ~names) in
+    (match List.all_equal type_arities ~equal:Int.equal with
      | Some arity -> arity
      | None ->
        compiler_bug
          [%message
            "Conflicting arities for union or intersection type"
              (type_ : _ Type_scheme.type_)
-             (type_arities : int Nonempty.t)])
+             (type_arities : int list)])
 ;;
 
 module Context : sig
@@ -888,7 +888,7 @@ module Expr = struct
         "TODO: handle rewriting partial application for union and intersection types"
     | Function
         ( fun_arg_types
-        , (_effects : _ Type_scheme.effects option)
+        , (_effects : _ Type_scheme.effects)
         , (_return_type : _ Type_scheme.type_) ) ->
       (match snd (Nonempty.zip fun_arg_types args_and_types) with
        | Same_length -> `Already_fully_applied
@@ -987,7 +987,7 @@ module Expr = struct
              let fun_type : _ Type_scheme.type_ =
                (* Effect information is not preserved here. This is ~fine because we don't
                   actually use it. *)
-               Function (Nonempty.map arg_types ~f:fst, None, body_type)
+               Function (Nonempty.map arg_types ~f:fst, Effect_union [], body_type)
              in
              let fun_ = of_typed_expr ~ctx fun_ fun_type in
              let args =

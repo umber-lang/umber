@@ -10,15 +10,15 @@ type 'n type_ =
   | Var of Type_param_name.t
   | Type_app of 'n Type_name.Qualified.t * 'n type_ list
   | Tuple of 'n type_ list
-  | Function of 'n type_ Nonempty.t * 'n effects option * 'n type_
-  | Union of 'n type_ Nonempty.t
-  | Intersection of 'n type_ Nonempty.t
+  | Function of 'n type_ Nonempty.t * 'n effects * 'n type_
+  | Union of 'n type_ list
+  | Intersection of 'n type_ list
 
 and 'n effects =
   | Effect of 'n Effect_name.Qualified.t * 'n type_ list
   | Effect_var of Type_param_name.t
-  | Effect_union of 'n effects Nonempty.t
-  | Effect_intersection of 'n effects Nonempty.t
+  | Effect_union of 'n effects list
+  | Effect_intersection of 'n effects list
 [@@deriving hash, compare, equal, sexp]
 
 type 'n constraint_ =
@@ -33,6 +33,7 @@ let var v = Var v
 let tuple ts = Tuple ts
 let union ts = Union ts
 let intersection ts = Intersection ts
+let effect_var v = Effect_var v
 let effect_union ts = Effect_union ts
 
 let rec map ?(f = Map_action.defer) typ ~type_name ~effect_name =
@@ -47,11 +48,11 @@ let rec map ?(f = Map_action.defer) typ ~type_name ~effect_name =
      | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~type_name ~effect_name))
      | Function (args, effects, body) ->
        let args = Nonempty.map args ~f:(map ~f ~type_name ~effect_name) in
-       let effects = Option.map effects ~f:(map_effects ~f ~type_name ~effect_name) in
+       let effects = map_effects effects ~f ~type_name ~effect_name in
        Function (args, effects, map ~f ~type_name ~effect_name body)
-     | Union types -> Union (Nonempty.map types ~f:(map ~f ~type_name ~effect_name))
+     | Union types -> Union (List.map types ~f:(map ~f ~type_name ~effect_name))
      | Intersection types ->
-       Intersection (Nonempty.map types ~f:(map ~f ~type_name ~effect_name)))
+       Intersection (List.map types ~f:(map ~f ~type_name ~effect_name)))
 
 and map_effects effects ~f ~type_name ~effect_name =
   match effects with
@@ -59,9 +60,9 @@ and map_effects effects ~f ~type_name ~effect_name =
   | Effect (name, args) ->
     Effect (effect_name name, List.map args ~f:(map ~f ~type_name ~effect_name))
   | Effect_union effects ->
-    Effect_union (Nonempty.map effects ~f:(map_effects ~f ~type_name ~effect_name))
+    Effect_union (List.map effects ~f:(map_effects ~f ~type_name ~effect_name))
   | Effect_intersection effects ->
-    Effect_intersection (Nonempty.map effects ~f:(map_effects ~f ~type_name ~effect_name))
+    Effect_intersection (List.map effects ~f:(map_effects ~f ~type_name ~effect_name))
 ;;
 
 let map' ?f ((type_, constraints) : _ t) ~type_name ~effect_name =
@@ -84,16 +85,12 @@ let rec fold_until typ ~init ~f =
      | Type_app (_, fields) | Tuple fields ->
        List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
      | Union types | Intersection types ->
-       Nonempty.fold_until types ~init ~f:(fun init -> fold_until ~init ~f)
+       List.fold_until types ~init ~f:(fun init -> fold_until ~init ~f)
      | Function (args, effects, body) ->
        let%bind.Fold_action init =
          Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
        in
-       let%bind.Fold_action init =
-         match effects with
-         | None -> Continue init
-         | Some effects -> fold_effects_until effects ~init ~f
-       in
+       let%bind.Fold_action init = fold_effects_until effects ~init ~f in
        fold_until body ~init ~f)
 
 and fold_effects_until effects ~init ~f =
@@ -101,7 +98,7 @@ and fold_effects_until effects ~init ~f =
   | Effect_var _ -> Continue init
   | Effect (_, args) -> List.fold_until args ~init ~f
   | Effect_union effects | Effect_intersection effects ->
-    Nonempty.fold_until effects ~init ~f:(fun init effects ->
+    List.fold_until effects ~init ~f:(fun init effects ->
       fold_effects_until effects ~init ~f)
 ;;
 

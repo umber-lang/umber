@@ -167,15 +167,15 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
     if not (List.is_empty constraints)
     then failwith "TODO: constraints on effect operations";
     (match scheme with
-     | Function (_, Some _, _) ->
+     | Function (args, Effect_union [], result) ->
+       (* FIXME: Check for free params. Should be done elsewhere. *)
+       { name; args; result }
+     | Function (_, _, _) ->
        Compilation_error.raise
          Other
          ~msg:
            [%message
              "Effect operations can't perform effects" (type_ : _ Type_scheme.Bounded.t)]
-     | Function (args, None, result) ->
-       (* FIXME: Check for free params. Should be done elsewhere. *)
-       { name; args; result }
      | Var _ | Type_app _ | Tuple _ | Union _ | Intersection _ ->
        Compilation_error.raise
          Other
