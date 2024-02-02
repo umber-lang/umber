@@ -684,6 +684,14 @@ and constrain_effects ~names ~types ~subtype ~supertype =
     in
     if Map.is_empty subtype_only && Map.is_empty supertype_only
     then constrain_effect_vars types ~subtype_var ~supertype_var
+    else if (not (Map.is_empty subtype_only)) && Option.is_none supertype_var
+    then
+      Compilation_error.raise
+        Type_error
+        ~msg:
+          [%message
+            "Found more effects than expected"
+              ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
     else (
       (* FIXME: Not handling union of O and O', see paper. *)
       let new_subtype_var = Option.map subtype_var ~f:(fun _ -> Type_var.create ()) in
@@ -1090,12 +1098,16 @@ let generalize types outer_type =
     | Var var -> generalize_type_var types ~env ~polarity var
     | Function (args, effects, res) ->
       Function
-        ( Nonempty.map args ~f:(generalize_internal types ~env ~polarity)
+        ( Nonempty.map
+            args
+            ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
         , generalize_effects_internal types effects ~env ~polarity
         , generalize_internal types res ~env ~polarity )
     | Partial_function (args, effects, result_var) ->
       Function
-        ( Nonempty.map args ~f:(generalize_internal types ~env ~polarity)
+        ( Nonempty.map
+            args
+            ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
         , generalize_effects_internal types effects ~env ~polarity
         , generalize_type_var types ~env ~polarity result_var )
     | Type_app (name, fields) ->
@@ -1134,8 +1146,8 @@ let generalize types outer_type =
      between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   let result = scheme, constraints in
-  (* Constraints.print types.constraints; *)
-  eprint_s
+  Constraints.print types.constraints;
+  print_s
     [%message
       "generalize result"
         (outer_type : Internal_type.t)
@@ -1245,11 +1257,12 @@ let%test_module _ =
         $3 <: $2 |}]
     ;;
 
+    let foo_effect_name = Effect_name.of_string_exn "Foo"
+    let bar_effect_name = Effect_name.of_string_exn "Bar"
+
     let%expect_test "simple [constrain_effects] example" =
       let types = create () in
       let names = Name_bindings.core in
-      let foo_effect_name = Effect_name.of_string_exn "Foo" in
-      let bar_effect_name = Effect_name.of_string_exn "Bar" in
       let v = unstage (make_vars 3) in
       (* <Foo, v0> <: <Bar v2, v1> *)
       constrain_effects
@@ -1278,6 +1291,39 @@ let%test_module _ =
           ($1 (Effects ((effects ((Foo ()))) (effect_var ($4)))))))
         $3 <: $4
         $5 <: $2 |}]
+    ;;
+
+    let%expect_test "sanity check for effects subtyping semantics" =
+      let types = create () in
+      let names = Name_bindings.core in
+      (* <Foo> <: <Foo, Bar> succeeds and produces no constraints. *)
+      let foo : Internal_type.effects =
+        { effects =
+            Effect_name.Absolute.Map.singleton
+              (Module_path.Absolute.empty, foo_effect_name)
+              []
+        ; effect_var = None
+        }
+      in
+      let foo_bar : Internal_type.effects =
+        { effects =
+            Effect_name.Absolute.Map.of_alist_exn
+              [ (Module_path.Absolute.empty, foo_effect_name), []
+              ; (Module_path.Absolute.empty, bar_effect_name), []
+              ]
+        ; effect_var = None
+        }
+      in
+      constrain_effects ~names ~types ~subtype:foo ~supertype:foo_bar;
+      print_s [%message (types.substitution : Substitution.t)];
+      Constraints.print types.constraints;
+      [%expect {| (types.substitution ()) |}];
+      (* <Foo,Bar> <: <Foo> fails with a type error. *)
+      Compilation_error.try_with' (fun () ->
+        constrain_effects ~names ~types ~subtype:foo_bar ~supertype:foo)
+      |> Result.iter_error ~f:(fun error ->
+           print_s [%sexp ({ error with backtrace = None } : Compilation_error.t)]);
+      [%expect {| ((kind Type_error) (msg ("Found more effects than expected" ((Bar ()))))) |}]
     ;;
   end)
 ;;

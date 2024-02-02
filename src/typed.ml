@@ -175,7 +175,7 @@ module Pattern = struct
   ;;
 
   (* FIXME: cleanup *)
-  let eprint_s = ignore
+  (* let eprint_s = ignore *)
 
   let generalize ~names ~types pat_names typ ~shadowing_allowed =
     (* FIXME: cleanup *)
@@ -238,7 +238,7 @@ module Expr = struct
       let (expr : _ t Node.t), (typ : Internal_type.t) =
         f ~add_effects:(fun subtype ->
           (* FIXME: cleanup *)
-          (* eprint_s [%message "add_effects" ~effects:(subtype : Internal_type.effects)]; *)
+          eprint_s [%message "add_effects" ~effects:(subtype : Internal_type.effects)];
           Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects)
       in
       expr, typ, effects
@@ -269,6 +269,16 @@ module Expr = struct
           let names = Name_bindings.import_all names path in
           of_untyped ~names ~types ~f_name expr
         | Fun_call (fun_, args) ->
+          (* FIXME: Is supertype right here? I think so?
+
+             E.g. if we have <Fun>, <Arg>, <Call> we need to get e = <Fun,Arg,Call>
+             so e :> <Fun>, <Arg>, <Call>
+
+             Upcasting is always safe. It's always safe to add effects to a function type
+             => that's the subtyping direction.
+
+             We need to have (() -> <Foo> ()) <: (() -> <Foo,Bar> ())
+          *)
           (* FIXME: IDEA: We want to come up with a type representing all the effects
            potentially produced by this expression. This is a supertype of effects
            produced by individual components of the expression:
