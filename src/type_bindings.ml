@@ -2,7 +2,7 @@ open! Import
 open! Names
 
 (* FIXME: cleanup *)
-let eprint_s = ignore
+(* let eprint_s = ignore *)
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -538,13 +538,15 @@ let rec constrain ~names ~types ~subtype ~supertype =
        | Right_trailing args2_trailing ->
          (* Similar to the above case, the left function is under-applied, so its effects
             must be total. *)
-         constrain_effects_to_be_total ~names ~types effects2;
+         constrain_effects_to_be_total ~names ~types effects1;
          constrain
            ~names
            ~types
            ~subtype:(Var var1)
            ~supertype:(Partial_function (args2_trailing, effects2, var2))
-       | Same_length -> constrain ~names ~types ~subtype:(Var var1) ~supertype:(Var var2))
+       | Same_length ->
+         constrain_effects ~names ~types ~subtype:effects1 ~supertype:effects2;
+         constrain ~names ~types ~subtype:(Var var1) ~supertype:(Var var2))
     | Partial_function (args1, effects1, var), Function (args2, effects2, res) ->
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
@@ -560,7 +562,9 @@ let rec constrain ~names ~types ~subtype ~supertype =
            ~types
            ~subtype:(Var var)
            ~supertype:(Partial_function (args2_trailing, effects2, var'))
-       | Same_length -> constrain ~names ~types ~subtype:(Var var) ~supertype:res)
+       | Same_length ->
+         constrain_effects ~names ~types ~subtype:effects1 ~supertype:effects2;
+         constrain ~names ~types ~subtype:(Var var) ~supertype:res)
     | Function (args1, effects1, res), Partial_function (args2, effects2, var) ->
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
@@ -576,7 +580,9 @@ let rec constrain ~names ~types ~subtype ~supertype =
            ~subtype:(Partial_function (args1_trailing, effects1, var'))
            ~supertype:(Var var)
        | Right_trailing _ -> fun_arg_number_mismatch subtype supertype
-       | Same_length -> constrain ~names ~types ~subtype:res ~supertype:(Var var))
+       | Same_length ->
+         constrain_effects ~names ~types ~subtype:effects1 ~supertype:effects2;
+         constrain ~names ~types ~subtype:res ~supertype:(Var var))
     | Tuple xs, Tuple ys ->
       iter2_types xs ys ~subtype ~supertype ~f:(fun arg1 arg2 ->
         constrain ~names ~types ~subtype:arg1 ~supertype:arg2)
@@ -857,10 +863,12 @@ and instantiate_type_scheme =
         | Effect_union [] ->
           { effects = Effect_name.Absolute.Map.empty; effect_var = None }
         | Effect_union _ | Effect_intersection _ ->
-          (* FIXME: Handle this *)
-          failwith
-            "TODO: Handle effect unions and intersections (maybe need to add constraints \
-             to the type bindings?)"
+          (* FIXME: Handle this. Also clean up handling of unions above *)
+          raise_s
+            [%message
+              "TODO: Handle effect unions and intersections (maybe need to add \
+               constraints to the type bindings?)"
+                (effects : _ Type_scheme.effects)]
       in
       Function (args, effects, instantiate_type_scheme ~names ~types ~params result)
     | Union [] ->
@@ -873,7 +881,7 @@ and instantiate_type_scheme =
       raise_s
         [%message
           "TODO: conversion from union and intersection types"
-            (types : _ Type_scheme.type_ list)]
+            (types : _ Type_scheme.type_ Non_single_list.t)]
   in
   fun ?(params = Type_param.Env_to_vars.create ())
       ~names
@@ -1019,7 +1027,39 @@ end
    expresion/statement. *)
 let generalize types outer_type =
   (* FIXME: Probably use positive_vars *)
-  let negative_vars, _positive_vars =
+  (* FIXME: As we substitute vars around, the set of negative ones can change, right?. We
+     don't know about the vars that don't appear in the expression at this moment.
+     Hmm, maybe any subtype of a negative var should also count as negative, maybe?
+     Maybe we should simplify the type vars as a separate step. Then we wouldn't have to
+     worry about constraints at that point. We definitely need to do this step after
+     substitution, at least.
+     
+     Another thing: gc'ed constraints should only include those of the form  a- <: a+
+     where a- is from N and a+ is from P. P = pos(A) + neg(Ai) for all other types Ai.
+     Same for N.
+     Parameters can be both positive and negative.
+     
+     I think this only works if you keep the constraints associated with a specific type
+     expression (?). But for inference we need to look at constraints in each let binding.
+     
+     I think we might need to:
+     - Track polarity in typed.ml and pass it in to [constrain] so we can keep track of
+       the set of positive and negative vars (vars can be both btw). Actually maybe
+       the polarity outside of this module is always positive? No! We need to check
+       expressions inside function args. 
+     - Use 1 Type_bindings per expression (at what scope?). Not sure about this. I think
+       it should be more of an optimization we can do later.
+     - Consider shape equality only between P v N where P = pos(A) v neg(Ai for other (?) 
+       Ai) and N = neg(A) v pos(Ai for other Ai)
+       
+     Whenever we mint a new var, are we sure we'll track its polarity correctly? I guess
+     vars will get passed to [constrain] so handling it there should be fine.
+     
+     Another idea: For now, just use replace positive vars with the union of *all* their
+     lower bounds, disregarding polarity. Hopefully this can type simple examples well,
+     and help me understand better why polarity matters if it types something badly.
+  *)
+  let negative_vars, positive_vars =
     let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
       match polarity with
       | Positive -> negative_vars, Set.add positive_vars var
@@ -1053,6 +1093,8 @@ let generalize types outer_type =
     in
     loop (Type_var.Set.empty, Type_var.Set.empty) ~polarity:Positive outer_type
   in
+  eprint_s
+    [%message "vars" (outer_type : Internal_type.t) (negative_vars : Type_var.Set.t)];
   let aux_generalize_type_var
     types
     v
@@ -1064,18 +1106,27 @@ let generalize types outer_type =
     =
     match polarity with
     | Positive ->
+      (* FIXME: Conservatively also using positive bounds - amounts to only variables
+         mentioned in the original substituted type. *)
       (* Replace a positive instance of a type variable with the union of its negative
          lower bounds. *)
       let vars =
         Set.inter (Constraints.lower_bounds types.constraints v) negative_vars
+        |> Set.inter positive_vars
         |> Set.to_list
       in
       (match vars, on_empty_union with
        | [], `Make_var -> var (Type_param.Env_of_vars.find_or_add env v)
-       | ([] as vars), `Make_union | (_ :: _ as vars), (`Make_var | `Make_union) ->
+       | [ v' ], (`Make_var | `Make_union) ->
+         var (Type_param.Env_of_vars.find_or_add env v')
+       | v1 :: v2 :: vars, (`Make_var | `Make_union) ->
          (* FIXME: Could it be that some of these vars also end up getting replaced later?
-         Then what should we do? *)
-         union (List.map vars ~f:(var << Type_param.Env_of_vars.find_or_add env)))
+            Then what should we do? *)
+         union
+           (Non_single_list.map
+              (v1 :: v2 :: vars)
+              ~f:(var << Type_param.Env_of_vars.find_or_add env))
+       | [], `Make_union -> union [])
     | Negative -> var (Type_param.Env_of_vars.find_or_add env v)
   in
   let generalize_type_var =
@@ -1086,12 +1137,16 @@ let generalize types outer_type =
         (* It's clearer to have regular type variables than empty unions. *)
         `Make_var
   in
-  (* FIXME: Does this work with effect vars in higher-order functions? *)
+  (* FIXME: Does this work with effect vars in higher-order functions? Seems like no.
+     
+     For some reason we are getting empty unions for lower bounds, but when I make it use
+     the var instead the constraints show up - is lower_bounds wrong? Oh wait - it's the
+     union of the *negative* lower bounds.  *)
   let generalize_effect_var =
     aux_generalize_type_var
       ~union:Type_scheme.effect_union
-      ~var:Type_scheme.effect_var
-      ~on_empty_union:`Make_union (* It's more intuitive to deal in effect unions. *)
+      ~var:Type_scheme.effect_var (* FIXME: revert *)
+      ~on_empty_union:`Make_var (* It's more intuitive to deal in effect unions. *)
   in
   let rec generalize_internal types typ ~env ~polarity =
     match (typ : Internal_type.t) with
@@ -1126,9 +1181,7 @@ let generalize types outer_type =
       | Some effect_var -> generalize_effect_var types effect_var ~env ~polarity
       | None -> Effect_union []
     in
-    match effects_from_effect_var with
-    | Effect_union effects' -> Effect_union (effects' @ effects)
-    | (Effect _ | Effect_var _ | Effect_intersection _) as e -> Effect_union (e :: effects)
+    Type_scheme.effect_union_list (effects_from_effect_var :: effects)
   in
   (* FIXME: cleanup *)
   eprint_s
@@ -1146,8 +1199,8 @@ let generalize types outer_type =
      between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   let result = scheme, constraints in
-  Constraints.print types.constraints;
-  print_s
+  (* Constraints.print types.constraints; *)
+  eprint_s
     [%message
       "generalize result"
         (outer_type : Internal_type.t)
@@ -1323,7 +1376,8 @@ let%test_module _ =
         constrain_effects ~names ~types ~subtype:foo_bar ~supertype:foo)
       |> Result.iter_error ~f:(fun error ->
            print_s [%sexp ({ error with backtrace = None } : Compilation_error.t)]);
-      [%expect {| ((kind Type_error) (msg ("Found more effects than expected" ((Bar ()))))) |}]
+      [%expect
+        {| ((kind Type_error) (msg ("Found more effects than expected" ((Bar ()))))) |}]
     ;;
   end)
 ;;

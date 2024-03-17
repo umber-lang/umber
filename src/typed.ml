@@ -238,7 +238,7 @@ module Expr = struct
       let (expr : _ t Node.t), (typ : Internal_type.t) =
         f ~add_effects:(fun subtype ->
           (* FIXME: cleanup *)
-          eprint_s [%message "add_effects" ~effects:(subtype : Internal_type.effects)];
+          (* eprint_s [%message "add_effects" ~effects:(subtype : Internal_type.effects)]; *)
           Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects)
       in
       expr, typ, effects
@@ -901,7 +901,8 @@ module Module = struct
         loop_effects effects ~names ~aliases_seen;
         loop ~names ~aliases_seen body
       | Tuple items -> List.iter items ~f:(loop ~names ~aliases_seen)
-      | Union items | Intersection items -> List.iter items ~f:(loop ~names ~aliases_seen)
+      | Union items | Intersection items ->
+        Non_single_list.iter items ~f:(loop ~names ~aliases_seen)
       | Var _ -> ()
     and loop_effects
       ~names
@@ -912,7 +913,7 @@ module Module = struct
       | Effect ((_ : Effect_name.Absolute.t), args) ->
         List.iter args ~f:(loop ~names ~aliases_seen)
       | Effect_union effects | Effect_intersection effects ->
-        List.iter effects ~f:(loop_effects ~names ~aliases_seen)
+        Non_single_list.iter effects ~f:(loop_effects ~names ~aliases_seen)
       | Effect_var _ -> ()
     in
     loop ~names ~aliases_seen:Name_bindings.Type_entry.Id.Set.empty alias

@@ -146,6 +146,7 @@ let rec arity_of_type ~names (type_ : Module_path.absolute Type_scheme.type_) =
      | Alias type_ -> arity_of_type ~names type_)
   | Function (args, _, _) -> Nonempty.length args
   | Union types | Intersection types ->
+    let types = Non_single_list.to_list types in
     let type_arities = List.map types ~f:(arity_of_type ~names) in
     (match List.all_equal type_arities ~equal:Int.equal with
      | Some arity -> arity
