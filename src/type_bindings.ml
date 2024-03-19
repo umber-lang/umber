@@ -865,40 +865,69 @@ and instantiate_type_scheme =
       Tuple (List.map fields ~f:(instantiate_type_scheme ~names ~types ~params))
     | Function (args, effects, result) ->
       let args = Nonempty.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
-      let effects : Internal_type.effects =
-        match effects with
-        | Effect (effect_name, args) ->
-          { effects =
-              Effect_name.Absolute.Map.singleton
-                effect_name
-                (List.map args ~f:(instantiate_type_scheme ~names ~types ~params))
-          ; effect_var = None
-          }
-        | Effect_var param ->
-          let var = Type_param.Env_to_vars.find_or_add params param in
-          { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
-        | Effect_union [] ->
-          { effects = Effect_name.Absolute.Map.empty; effect_var = None }
-        | Effect_union _ | Effect_intersection _ ->
-          (* FIXME: Handle this. Also clean up handling of unions above *)
-          raise_s
-            [%message
-              "TODO: Handle effect unions and intersections (maybe need to add \
-               constraints to the type bindings?)"
-                (effects : _ Type_scheme.effects)]
-      in
+      let effects = instantiate_effect_type_scheme ~names ~types ~params effects in
       Function (args, effects, instantiate_type_scheme ~names ~types ~params result)
     | Union [] ->
       (* The empty union is the bottom type, the type which is a subtype of all other
          types. We can get equivalent behavior by using an unconstrained type variable. *)
       Var (Type_var.create ())
-    | Union types | Intersection types ->
-      (* FIXME: Need to add constraints to the type bindings. Might make using this pretty
-         inconvenient. *)
-      raise_s
-        [%message
-          "TODO: conversion from union and intersection types"
-            (types : _ Type_scheme.type_ Non_single_list.t)]
+    | Union args ->
+      let var = Internal_type.fresh_var () in
+      let args =
+        Non_single_list.map args ~f:(instantiate_type_scheme ~names ~types ~params)
+      in
+      Non_single_list.iter args ~f:(fun subtype ->
+        constrain ~names ~types ~subtype ~supertype:var);
+      var
+    | Intersection args ->
+      (* FIXME: We get the same behavior with empty intersections and unions, which
+         doesn't seem right?. (Maybe polarity restricts the type expressions we create so
+         it's fine somehow?). *)
+      let var = Internal_type.fresh_var () in
+      let args =
+        Non_single_list.map args ~f:(instantiate_type_scheme ~names ~types ~params)
+      in
+      Non_single_list.iter args ~f:(fun supertype ->
+        constrain ~names ~types ~subtype:var ~supertype);
+      var
+  and instantiate_effect_type_scheme ~names ~types ~params effects =
+    match effects with
+    | Effect (effect_name, args) ->
+      { effects =
+          Effect_name.Absolute.Map.singleton
+            effect_name
+            (List.map args ~f:(instantiate_type_scheme ~names ~types ~params))
+      ; effect_var = None
+      }
+    | Effect_var param ->
+      let var = Type_param.Env_to_vars.find_or_add params param in
+      { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
+    | Effect_union [] | Effect_intersection [] ->
+      { effects = Effect_name.Absolute.Map.empty; effect_var = None }
+    | Effect_union args ->
+      let var : Internal_type.effects =
+        { effects = Effect_name.Absolute.Map.empty
+        ; effect_var = Some (Type_var.create ())
+        }
+      in
+      let args =
+        Non_single_list.map args ~f:(instantiate_effect_type_scheme ~names ~types ~params)
+      in
+      Non_single_list.iter args ~f:(fun subtype ->
+        constrain_effects ~names ~types ~subtype ~supertype:var);
+      var
+    | Effect_intersection args ->
+      let var : Internal_type.effects =
+        { effects = Effect_name.Absolute.Map.empty
+        ; effect_var = Some (Type_var.create ())
+        }
+      in
+      let args =
+        Non_single_list.map args ~f:(instantiate_effect_type_scheme ~names ~types ~params)
+      in
+      Non_single_list.iter args ~f:(fun supertype ->
+        constrain_effects ~names ~types ~subtype:var ~supertype);
+      var
   in
   fun ?(params = Type_param.Env_to_vars.create ())
       ~names
@@ -1083,8 +1112,8 @@ let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_
   let replace_var var ~(polarity : Polarity.t) ~make_var ~union ~intersection =
     let bounds_map, combine =
       match polarity with
-      | Positive -> negative_lower_bounds, intersection
-      | Negative -> positive_upper_bounds, union
+      | Positive -> negative_lower_bounds, union
+      | Negative -> positive_upper_bounds, intersection
     in
     Map.find bounds_map var
     |> Option.value ~default:[]
