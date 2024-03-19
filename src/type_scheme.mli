@@ -19,13 +19,13 @@ and 'n effects =
   | Effect_intersection of 'n effects Non_single_list.t
 [@@deriving hash, compare, equal, sexp]
 
-type 'n constraint_ =
-  { subtype : 'n type_
-  ; supertype : 'n type_
+type constraint_ =
+  { subtype : Type_param.t
+  ; supertype : Type_param.t
   }
 [@@deriving hash, compare, equal, sexp]
 
-type 'n t = 'n type_ * 'n constraint_ list [@@deriving hash, compare, equal, sexp]
+type 'n t = 'n type_ * constraint_ list [@@deriving hash, compare, equal, sexp]
 
 val var : Type_param_name.t -> 'n type_
 val tuple : 'n type_ list -> 'n type_
@@ -35,9 +35,11 @@ val intersection : 'n type_ Non_single_list.t -> 'n type_
 val effect_var : Type_param_name.t -> 'n effects
 val effect_union : 'n effects Non_single_list.t -> 'n effects
 val effect_union_list : 'n effects list -> 'n effects
+val effect_intersection : 'n effects Non_single_list.t -> 'n effects
 
 val map
   :  ?f:('n1 type_ -> ('n1 type_, 'n2 type_) Map_action.t)
+  -> ?f_effects:('n1 effects -> ('n1 effects, 'n2 effects) Map_action.t)
   -> 'n1 type_
   -> type_name:('n1 Type_name.Qualified.t -> 'n2 Type_name.Qualified.t)
   -> effect_name:('n1 Effect_name.Qualified.t -> 'n2 Effect_name.Qualified.t)
@@ -45,10 +47,19 @@ val map
 
 val map'
   :  ?f:('n1 type_ -> ('n1 type_, 'n2 type_) Map_action.t)
+  -> ?f_effects:('n1 effects -> ('n1 effects, 'n2 effects) Map_action.t)
   -> 'n1 t
   -> type_name:('n1 Type_name.Qualified.t -> 'n2 Type_name.Qualified.t)
   -> effect_name:('n1 Effect_name.Qualified.t -> 'n2 Effect_name.Qualified.t)
   -> 'n2 t
+
+val map_effects
+  :  ?f:('n1 type_ -> ('n1 type_, 'n2 type_) Map_action.t)
+  -> ?f_effects:('n1 effects -> ('n1 effects, 'n2 effects) Map_action.t)
+  -> 'n1 effects
+  -> type_name:('n1 Type_name.Qualified.t -> 'n2 Type_name.Qualified.t)
+  -> effect_name:('n1 Effect_name.Qualified.t -> 'n2 Effect_name.Qualified.t)
+  -> 'n2 effects
 
 val fold_until
   :  'n type_

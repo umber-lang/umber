@@ -2,7 +2,7 @@ open! Import
 open! Names
 
 (* FIXME: cleanup *)
-(* let eprint_s = ignore *)
+let eprint_s = ignore
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -78,12 +78,11 @@ module Constraints : sig
   (* FIXME: Make this interface less confusing*)
   val remove_vars : t -> Type_var.t -> Type_var.Set.t -> unit
   val find_vars_with_same_shape : t -> Type_var.t -> Type_var.Set.t
-  val lower_bounds : t -> Type_var.t -> Type_var.Set.t
 
   val to_constraint_list
     :  t
     -> params:Type_param.Env_of_vars.t
-    -> Module_path.absolute Type_scheme.constraint_ list
+    -> Type_scheme.constraint_ list
 
   val print : t -> unit
 end = struct
@@ -109,10 +108,14 @@ end = struct
     Hash_set.add (get_bounds lower_bounds supertype) subtype
   ;;
 
+  (* FIXME: Actually, only keep constraints of the form a- <: b+ *)
   (* If we get a constraint [a <: b], we also need to add all constraints transitively
      implied by that, so that the constraints remain closed under logical implication.
      So we need to add all constraints of the form a' <: b' for all a' <: a and b' >: b. *)
   let add t ~subtype ~supertype =
+    (* FIXME: remove *)
+    if Hashtbl.length t.lower_bounds > 10000 || Hashtbl.length t.upper_bounds > 10000
+    then failwith "Blew up";
     List.iter
       (subtype :: Hash_set.to_list (get_bounds t.lower_bounds subtype))
       ~f:(fun subtype' ->
@@ -136,12 +139,6 @@ end = struct
     |> add_vars_from_bounds upper_bounds var
   ;;
 
-  let lower_bounds t var =
-    Type_var.Set.empty
-    |> add_vars_from_bounds t.lower_bounds var
-    |> Fn.flip Set.remove var
-  ;;
-
   let to_constraint_list t ~params =
     Hashtbl.to_alist t.upper_bounds
     |> List.concat_map ~f:(fun (subtype, supertypes) ->
@@ -149,13 +146,13 @@ end = struct
          | None -> []
          | Some subtype ->
            Hash_set.to_list supertypes
-           |> List.filter_map ~f:(fun supertype : _ Type_scheme.constraint_ option ->
+           |> List.filter_map ~f:(fun supertype : Type_scheme.constraint_ option ->
                 match Type_param.Env_of_vars.find params supertype with
                 | None -> None
                 | Some supertype ->
                   if Type_param_name.equal subtype supertype
                   then None
-                  else Some { subtype = Var subtype; supertype = Var supertype }))
+                  else Some { subtype; supertype }))
   ;;
 
   let print t =
@@ -272,9 +269,27 @@ end = struct
   let is_empty = Hashtbl.is_empty
 end
 
+module Polarity = struct
+  module T = struct
+    type t =
+      | Positive
+      | Negative
+    [@@deriving sexp, compare]
+
+    let flip = function
+      | Positive -> Negative
+      | Negative -> Positive
+    ;;
+  end
+
+  include T
+  include Comparable.Make (T)
+end
+
 type t =
   { constraints : Constraints.t
   ; substitution : Substitution.t
+  ; polarities : Polarity.t Type_var.Table.t
   ; constrained_types : Type_pair.Hash_set.t
   ; constrained_effects : Effect_type_pair.Hash_set.t
   }
@@ -283,6 +298,7 @@ type t =
 let create () =
   { constraints = Constraints.create ()
   ; substitution = Substitution.create ()
+  ; polarities = Type_var.Table.create ()
   ; constrained_types = Type_pair.Hash_set.create ()
   ; constrained_effects = Effect_type_pair.Hash_set.create ()
   }
@@ -411,6 +427,7 @@ let check_var_vs_type
       constrain ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
 ;;
 
+(* FIXME: Doesn't each type kind of have its own polarity? How do we find that out? *)
 let rec constrain ~names ~types ~subtype ~supertype =
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     (* FIXME: Isn't this code setting up [params] redundant? *)
@@ -428,7 +445,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
   in
   eprint_s
     [%message
-      "Type_bindings.constrain (pre-substitution)"
+      "Type_bindings.constrain_internal (pre-substitution)"
         (subtype : Internal_type.t)
         (supertype : Internal_type.t)
         (types.constraints : Constraints.t)
@@ -891,8 +908,8 @@ and instantiate_type_scheme =
       constrain
         ~names
         ~types
-        ~subtype:(instantiate_type_scheme ~names ~types ~params subtype)
-        ~supertype:(instantiate_type_scheme ~names ~types ~params supertype));
+        ~subtype:(instantiate_type_scheme ~names ~types ~params (Var subtype))
+        ~supertype:(instantiate_type_scheme ~names ~types ~params (Var supertype)));
     instantiate_type_scheme ~names ~types scheme ~params
 ;;
 
@@ -985,23 +1002,6 @@ and intersect_types t1 t2 =
 and union_effects _ _ = failwith "FIXME: union_effects"
 and intersect_effects _ _ = failwith "FIXME: intersect_effects" *)
 
-module Polarity = struct
-  module T = struct
-    type t =
-      | Positive
-      | Negative
-    [@@deriving sexp, compare]
-
-    let flip = function
-      | Positive -> Negative
-      | Negative -> Positive
-    ;;
-  end
-
-  include T
-  include Comparable.Make (T)
-end
-
 module Polar_var = struct
   include Tuple.Make (Polarity) (Type_var)
   include Tuple.Comparable (Polarity) (Type_var)
@@ -1018,6 +1018,128 @@ end
    - When decomposing, we need to replace the variable with its new bound. Maybe we could
      do this iteratively as we unify normally?
    *)
+
+(* FIXME: Idea: Let's keep things simple for now, since this is hard to implement:
+   - Have generalize be dumb and just apply the substitution and surface the constraints.
+     All the relevant constraints will be included (because the Constraints.t contains the
+     transitive closure of all constraints)
+   - Once we have a set list of variables, we can easily figure out the polarities and
+     upper/lower bounds, then replace each positive variable with the union of its
+     negative lower bounds (and maybe the same for negative variables).
+
+   Later if we want to optimize it we can try to push the a- <: b+ thing (GC) earlier. My
+   main point of confusion is idk how variable polarity can be determined when thinking
+   about many type expressions (a variable's polarity depends on the type it appears in).
+*)
+let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t) =
+  let negative_vars, positive_vars =
+    let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
+      match polarity with
+      | Positive -> negative_vars, Set.add positive_vars var
+      | Negative -> Set.add negative_vars var, positive_vars
+    in
+    let rec loop acc ~polarity (typ : _ Type_scheme.type_) =
+      match typ with
+      | Var var -> loop_var acc var ~polarity
+      | Function (args, effects, res) ->
+        let acc =
+          Nonempty.fold args ~init:acc ~f:(loop ~polarity:(Polarity.flip polarity))
+        in
+        let acc = loop_effects acc ~polarity effects in
+        loop acc ~polarity res
+      | Type_app (_, fields) ->
+        (* TODO: Handle type variable variance. *)
+        List.fold fields ~init:acc ~f:(loop ~polarity)
+      | Tuple fields -> List.fold fields ~init:acc ~f:(loop ~polarity)
+      | Union types | Intersection types ->
+        Non_single_list.fold types ~init:acc ~f:(loop ~polarity)
+    and loop_effects acc ~polarity (effects : _ Type_scheme.effects) =
+      match effects with
+      | Effect (_name, args) ->
+        (* TODO: Handle effect variable variance. *)
+        List.fold args ~init:acc ~f:(loop ~polarity)
+      | Effect_var var -> loop_var acc var ~polarity
+      | Effect_union effects | Effect_intersection effects ->
+        Non_single_list.fold effects ~init:acc ~f:(loop_effects ~polarity)
+    in
+    loop (Type_param.Set.empty, Type_param.Set.empty) ~polarity:Positive outer_type
+  in
+  eprint_s
+    [%message
+      "vars"
+        (outer_type : _ Type_scheme.type_)
+        (negative_vars : Type_param.Set.t)
+        (positive_vars : Type_param.Set.t)];
+  let negative_lower_bounds =
+    List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)
+    |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
+    |> Map.map ~f:(Set.inter negative_vars >> Set.to_list)
+  in
+  let positive_upper_bounds =
+    List.map constraints ~f:(fun { subtype; supertype } -> subtype, supertype)
+    |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
+    |> Map.map ~f:(Set.inter positive_vars >> Set.to_list)
+  in
+  let replace_var var ~(polarity : Polarity.t) ~make_var ~union ~intersection =
+    let bounds_map, combine =
+      match polarity with
+      | Positive -> negative_lower_bounds, intersection
+      | Negative -> positive_upper_bounds, union
+    in
+    Map.find bounds_map var
+    |> Option.value ~default:[]
+    |> List.map ~f:make_var
+    |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id
+  in
+  let type_ =
+    let type_name = Fn.id in
+    let effect_name = Fn.id in
+    let rec f (type_ : _ Type_scheme.type_) ~(polarity : Polarity.t)
+      : (_ Type_scheme.type_, _ Type_scheme.type_) Map_action.t
+      =
+      match type_ with
+      | Var var ->
+        Halt
+          (replace_var
+             var
+             ~polarity
+             ~make_var:Type_scheme.var
+             ~intersection:Type_scheme.intersection
+             ~union:Type_scheme.union)
+      | Function (args, effects, result) ->
+        let args =
+          Nonempty.map args ~f:(Type_scheme.map ~f:(f ~polarity) ~type_name ~effect_name)
+        in
+        let effects =
+          Type_scheme.map_effects
+            effects
+            ~f:(f ~polarity:(Polarity.flip polarity))
+            ~f_effects:(f_effects ~polarity)
+            ~type_name
+            ~effect_name
+        in
+        let result = Type_scheme.map ~f:(f ~polarity) ~type_name ~effect_name result in
+        Halt (Function (args, effects, result))
+      (* TODO: Handle variance in type parameters to flip polarity *)
+      | (Type_app _ | Tuple _ | Union _ | Intersection _) as type_ -> Defer type_
+    and f_effects (effects : _ Type_scheme.effects) ~polarity =
+      match effects with
+      | Effect_var var ->
+        Halt
+          (replace_var
+             var
+             ~polarity
+             ~make_var:Type_scheme.effect_var
+             ~union:Type_scheme.effect_union
+             ~intersection:Type_scheme.effect_intersection)
+      | (Effect _ | Effect_union _ | Effect_intersection _) as effects -> Defer effects
+    in
+    Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
+  in
+  (* All of the constraints are made moot by replacing vars with the union of their
+     relevant bounds, so there will be none left. *)
+  type_, []
+;;
 
 (* FIXME: How does generalization work now? We need to reify the information from the
    gathered constraints and substitution. Yes, we need to (optionally) simplify the 
@@ -1059,7 +1181,11 @@ let generalize types outer_type =
      lower bounds, disregarding polarity. Hopefully this can type simple examples well,
      and help me understand better why polarity matters if it types something badly.
   *)
-  let negative_vars, positive_vars =
+  (* FIXME: In terms of which constraints we need to include, we know that all transitive
+     constraints are available so only constraints between all present variables are
+     needed. We can garbage-collect constraints in a separate simplification step.
+  *)
+  (* let negative_vars, positive_vars =
     let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
       match polarity with
       | Positive -> negative_vars, Set.add positive_vars var
@@ -1094,17 +1220,18 @@ let generalize types outer_type =
     loop (Type_var.Set.empty, Type_var.Set.empty) ~polarity:Positive outer_type
   in
   eprint_s
-    [%message "vars" (outer_type : Internal_type.t) (negative_vars : Type_var.Set.t)];
+    [%message "vars" (outer_type : Internal_type.t) (negative_vars : Type_var.Set.t)]; *)
+  (* FIXME: cleanup *)
   let aux_generalize_type_var
-    types
+    _types
     v
     ~env
-    ~(polarity : Polarity.t)
-    ~union
+    ~polarity:(_ : Polarity.t)
+    ~union:_
     ~var
-    ~on_empty_union
+    ~on_empty_union:_
     =
-    match polarity with
+    (* match polarity with
     | Positive ->
       (* FIXME: Conservatively also using positive bounds - amounts to only variables
          mentioned in the original substituted type. *)
@@ -1127,7 +1254,8 @@ let generalize types outer_type =
               (v1 :: v2 :: vars)
               ~f:(var << Type_param.Env_of_vars.find_or_add env))
        | [], `Make_union -> union [])
-    | Negative -> var (Type_param.Env_of_vars.find_or_add env v)
+    | Negative ->  *)
+    var (Type_param.Env_of_vars.find_or_add env v)
   in
   let generalize_type_var =
     aux_generalize_type_var
@@ -1198,13 +1326,14 @@ let generalize types outer_type =
      Then we need to think about what to to do with the constraints. (Only include ones
      between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
-  let result = scheme, constraints in
+  let result = simplify_constraints (scheme, constraints) in
   (* Constraints.print types.constraints; *)
   eprint_s
     [%message
       "generalize result"
         (outer_type : Internal_type.t)
         (substituted_type : Internal_type.t)
+        ~generalized_type:(scheme, constraints : Module_path.absolute Type_scheme.t)
         (result : Module_path.absolute Type_scheme.t)
         (env : Type_param.Env_of_vars.t)
         (types.substitution : Substitution.t)];

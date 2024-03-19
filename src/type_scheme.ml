@@ -21,13 +21,13 @@ and 'n effects =
   | Effect_intersection of 'n effects Non_single_list.t
 [@@deriving hash, compare, equal, sexp]
 
-type 'n constraint_ =
-  { subtype : 'n type_
-  ; supertype : 'n type_
+type constraint_ =
+  { subtype : Type_param.t
+  ; supertype : Type_param.t
   }
 [@@deriving hash, compare, equal, sexp]
 
-type 'n t = 'n type_ * 'n constraint_ list [@@deriving hash, compare, equal, sexp]
+type 'n t = 'n type_ * constraint_ list [@@deriving hash, compare, equal, sexp]
 
 let var v = Var v
 let tuple ts = Tuple ts
@@ -35,51 +35,71 @@ let union ts = Union ts
 let intersection ts = Intersection ts
 let effect_var v = Effect_var v
 let effect_union ts = Effect_union ts
+let effect_intersection ts = Effect_intersection ts
 let union_list = Non_single_list.of_list_convert ~make:union ~singleton:Fn.id
 
 let effect_union_list =
   Non_single_list.of_list_convert ~make:effect_union ~singleton:Fn.id
 ;;
 
-let rec map ?(f = Map_action.defer) typ ~type_name ~effect_name =
+let rec map
+  ?(f = Map_action.defer)
+  ?(f_effects = Map_action.defer)
+  typ
+  ~type_name
+  ~effect_name
+  =
   match f typ with
   | Halt typ -> typ
-  | Retry typ -> map typ ~f ~type_name ~effect_name
+  | Retry typ -> map typ ~f ~f_effects ~type_name ~effect_name
   | Defer typ ->
     (match typ with
      | Var _ as typ -> typ
      | Type_app (name, fields) ->
-       Type_app (type_name name, List.map fields ~f:(map ~f ~type_name ~effect_name))
-     | Tuple fields -> Tuple (List.map fields ~f:(map ~f ~type_name ~effect_name))
-     | Function (args, effects, body) ->
-       let args = Nonempty.map args ~f:(map ~f ~type_name ~effect_name) in
-       let effects = map_effects effects ~f ~type_name ~effect_name in
-       Function (args, effects, map ~f ~type_name ~effect_name body)
+       Type_app
+         (type_name name, List.map fields ~f:(map ~f ~f_effects ~type_name ~effect_name))
+     | Tuple fields ->
+       Tuple (List.map fields ~f:(map ~f ~f_effects ~type_name ~effect_name))
+     | Function (args, effects, result) ->
+       let args = Nonempty.map args ~f:(map ~f ~f_effects ~type_name ~effect_name) in
+       let effects = map_effects ~f ~f_effects effects ~type_name ~effect_name in
+       Function (args, effects, map ~f ~f_effects ~type_name ~effect_name result)
      | Union types ->
-       Union (Non_single_list.map types ~f:(map ~f ~type_name ~effect_name))
+       Union (Non_single_list.map types ~f:(map ~f ~f_effects ~type_name ~effect_name))
      | Intersection types ->
-       Intersection (Non_single_list.map types ~f:(map ~f ~type_name ~effect_name)))
+       Intersection
+         (Non_single_list.map types ~f:(map ~f ~f_effects ~type_name ~effect_name)))
 
-and map_effects effects ~f ~type_name ~effect_name =
-  match effects with
-  | Effect_var _ as effects -> effects
-  | Effect (name, args) ->
-    Effect (effect_name name, List.map args ~f:(map ~f ~type_name ~effect_name))
-  | Effect_union effects ->
-    Effect_union (Non_single_list.map effects ~f:(map_effects ~f ~type_name ~effect_name))
-  | Effect_intersection effects ->
-    Effect_intersection
-      (Non_single_list.map effects ~f:(map_effects ~f ~type_name ~effect_name))
+and map_effects
+  ?(f = Map_action.defer)
+  ?(f_effects = Map_action.defer)
+  effects
+  ~type_name
+  ~effect_name
+  =
+  match f_effects effects with
+  | Halt effects -> effects
+  | Retry effects -> map_effects effects ~f ~f_effects ~type_name ~effect_name
+  | Defer effects ->
+    (match effects with
+     | Effect_var _ as effects -> effects
+     | Effect (name, args) ->
+       Effect
+         (effect_name name, List.map args ~f:(map ~f ~f_effects ~type_name ~effect_name))
+     | Effect_union effects ->
+       Effect_union
+         (Non_single_list.map
+            effects
+            ~f:(map_effects ~f ~f_effects ~type_name ~effect_name))
+     | Effect_intersection effects ->
+       Effect_intersection
+         (Non_single_list.map
+            effects
+            ~f:(map_effects ~f ~f_effects ~type_name ~effect_name)))
 ;;
 
-let map' ?f ((type_, constraints) : _ t) ~type_name ~effect_name =
-  let type_ = map type_ ?f ~type_name ~effect_name in
-  let constraints =
-    List.map constraints ~f:(fun { subtype; supertype } ->
-      { subtype = map subtype ?f ~type_name ~effect_name
-      ; supertype = map supertype ?f ~type_name ~effect_name
-      })
-  in
+let map' ?f ?f_effects ((type_, constraints) : _ t) ~type_name ~effect_name =
+  let type_ = map type_ ?f ?f_effects ~type_name ~effect_name in
   type_, constraints
 ;;
 

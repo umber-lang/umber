@@ -175,7 +175,7 @@ module Pattern = struct
   ;;
 
   (* FIXME: cleanup *)
-  (* let eprint_s = ignore *)
+  let eprint_s = ignore
 
   let generalize ~names ~types pat_names typ ~shadowing_allowed =
     (* FIXME: cleanup *)
@@ -431,6 +431,7 @@ module Expr = struct
                 names, false, bindings)
             in
             let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
+            (* eprint_s [%message (body_effects : Internal_type.effects)]; *)
             add_effects body_effects;
             node (Let { rec_; bindings; body }), body_type)
         | Tuple items ->
