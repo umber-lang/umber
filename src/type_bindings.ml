@@ -1089,8 +1089,9 @@ end
    about many type expressions (a variable's polarity depends on the type it appears in).
 *)
 (* FIXME: re-enable this *)
-let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t)
-  =
+(* FIXME: Maybe just don't bother with intersections, unions seem like what we want in
+   practice. *)
+let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t) =
   let negative_vars, positive_vars =
     let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
       match polarity with
@@ -1134,7 +1135,7 @@ let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type
     |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
     |> Map.map ~f:(Set.inter negative_vars >> Set.to_list)
   in
-  let positive_upper_bounds =
+  let _positive_upper_bounds =
     List.map constraints ~f:(fun { subtype; supertype } -> subtype, supertype)
     |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
     |> Map.map ~f:(Set.inter positive_vars >> Set.to_list)
@@ -1144,19 +1145,19 @@ let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type
     ~(polarity : Polarity.t)
     ~make_var
     ~union
-    ~intersection
+    ~intersection:_
     ~on_unconstrained
     =
-    let bounds_map, combine =
-      match polarity with
-      | Positive -> negative_lower_bounds, union
-      | Negative -> positive_upper_bounds, intersection
-    in
-    match Map.find bounds_map var |> Option.value ~default:[], on_unconstrained with
-    | [], `Keep_var -> make_var var
-    | vars, (`Use_union_or_intersection | `Keep_var) ->
-      List.map vars ~f:make_var
-      |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id
+    (* FIXME: cleanup around union/intersection handling *)
+    match polarity with
+    | Negative -> make_var var
+    | Positive ->
+      let bounds_map, combine = negative_lower_bounds, union in
+      (match Map.find bounds_map var |> Option.value ~default:[], on_unconstrained with
+       | [], `Keep_var -> make_var var
+       | vars, (`Use_union_or_intersection | `Keep_var) ->
+         List.map vars ~f:make_var
+         |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id)
   in
   let type_ =
     let type_name = Fn.id in
@@ -1211,9 +1212,16 @@ let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type
     Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
   in
   (* FIXME: Actually maybe some constraints could still be relevant? Think about this. *)
+  let remaining_vars =
+    Type_scheme.fold_vars type_ ~init:Type_param.Set.empty ~f:Set.add
+  in
+  let constraints =
+    List.filter constraints ~f:(fun { subtype; supertype } ->
+      Set.mem remaining_vars subtype && Set.mem remaining_vars supertype)
+  in
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
-  type_, []
+  type_, constraints
 ;;
 
 (* FIXME: How does generalization work now? We need to reify the information from the
@@ -1280,8 +1288,8 @@ let generalize types outer_type =
      between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   (* FIXME: cleanup *)
-  let result = scheme, constraints in
-  (* let result = simplify_constraints (scheme, constraints) in *)
+  (* let result = scheme, constraints in *)
+  let result = simplify_constraints (scheme, constraints) in
   (* Constraints.print types.constraints; *)
   eprint_s
     [%message
@@ -1462,6 +1470,53 @@ let%test_module _ =
            print_s [%sexp ({ error with backtrace = None } : Compilation_error.t)]);
       [%expect
         {| ((kind Type_error) (msg ("Found more effects than expected" ((Bar ()))))) |}]
+    ;;
+  end)
+;;
+
+let%test_module "simplify_constraints" =
+  (module struct
+    let parse_var s = Type_param.t_of_sexp (Atom s)
+    let v = Type_scheme.var << parse_var
+    let ev i = Type_scheme.effect_var (parse_var [%string "e%{i#Int}"])
+
+    let ( <: ) s1 s2 : Type_scheme.constraint_ =
+      { subtype = parse_var s1; supertype = parse_var s2 }
+    ;;
+
+    let list arg = Type_scheme.Type_app (Type_name.Absolute.of_string "List", [ arg ])
+
+    let run_test original_type =
+      print_s
+        [%sexp
+          { original_type : _ Type_scheme.t
+          ; simplified_type = (simplify_constraints original_type : _ Type_scheme.t)
+          }]
+    ;;
+
+    let%expect_test "List.map" =
+      run_test
+        ( Function
+            ( [ list (v "a"); Function ([ list (v "b") ], ev 1, list (v "c")) ]
+            , ev 2
+            , v "d" )
+        , [ "a" <: "b"; "e1" <: "e2"; "c" <: "d" ] );
+      [%expect {|
+        ((original_type
+          ((Function
+            ((Type_app List ((Var a)))
+             (Function ((Type_app List ((Var b)))) (Effect_var e1)
+              (Type_app List ((Var c)))))
+            (Effect_var e2) (Var d))
+           (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
+            ((subtype c) (supertype d)))))
+         (simplified_type
+          ((Function
+            ((Type_app List ((Var a)))
+             (Function ((Type_app List ((Var a)))) (Effect_var e1)
+              (Type_app List ((Var c)))))
+            (Effect_var e1) (Var c))
+           ()))) |}]
     ;;
   end)
 ;;

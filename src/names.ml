@@ -507,6 +507,8 @@ end = struct
       of_ustring_unchecked (Ustring.of_array_unchecked new_param))
   ;; *)
 
+  (* TODO: Consider having effect vars use 'e1', 'e2', etc. and regular type vars skip
+     'e'. This would make inferred types easier to read. *)
   let generate_nth n =
     let letter = Uchar.of_char (Char.of_int_exn (Char.to_int 'a' + (n % 26))) in
     let number = n / 26 in
