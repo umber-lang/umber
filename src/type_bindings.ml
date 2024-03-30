@@ -289,16 +289,14 @@ end
 type t =
   { constraints : Constraints.t
   ; substitution : Substitution.t
-  ; polarities : Polarity.t Type_var.Table.t
-  ; constrained_types : Type_pair.Hash_set.t
-  ; constrained_effects : Effect_type_pair.Hash_set.t
+  ; constrained_types : Type_pair.Hash_set.t [@sexp_drop_if const true]
+  ; constrained_effects : Effect_type_pair.Hash_set.t [@sexp_drop_if const true]
   }
 [@@deriving sexp_of]
 
 let create () =
   { constraints = Constraints.create ()
   ; substitution = Substitution.create ()
-  ; polarities = Type_var.Table.create ()
   ; constrained_types = Type_pair.Hash_set.create ()
   ; constrained_effects = Effect_type_pair.Hash_set.create ()
   }
@@ -461,9 +459,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
       [%message
         "Type_bindings.constrain (post-substitution)"
           (subtype : Internal_type.t)
-          (supertype : Internal_type.t)
-          (types.constraints : Constraints.t)
-          (types.substitution : Substitution.t)];
+          (supertype : Internal_type.t)];
     Hash_set.add types.constrained_types (subtype, supertype);
     match subtype, supertype with
     | Var var1, Var var2 ->
@@ -512,12 +508,13 @@ let rec constrain ~names ~types ~subtype ~supertype =
           | (_ : _ Type_decl.t) ->
             if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
             then type_error "Type application mismatch" subtype supertype;
+            (* FIXME: Improve this *)
             (* TODO: We don't know what the variance of the type parameters to the type are,
              so we conservatively assume they are invariant. Implement inference and
              manual specification of type parameter variance, similar to what OCaml does. *)
             iter2_types args1 args2 ~subtype ~supertype ~f:(fun arg1 arg2 ->
-              constrain ~names ~types ~subtype:arg1 ~supertype:arg2;
-              constrain ~names ~types ~subtype:arg2 ~supertype:arg1)))
+              constrain ~names ~types ~subtype:arg1 ~supertype:arg2
+              (* constrain ~names ~types ~subtype:arg2 ~supertype:arg1 *))))
     | Type_app (name, args), (Tuple _ | Function _ | Partial_function _) ->
       (match Name_bindings.Type_entry.decl (lookup_type names name args) with
        | params, Alias expr ->
@@ -623,9 +620,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       [%message
         "Type_bindings.constrain_effects (post-substitution)"
           (subtype : Internal_type.effects)
-          (supertype : Internal_type.effects)
-          (types.constraints : Constraints.t)
-          (types.substitution : Substitution.t)];
+          (supertype : Internal_type.effects)];
     Hash_set.add types.constrained_effects (subtype, supertype);
     let ({ effects = subtype_effects; effect_var = subtype_var } : Internal_type.effects) =
       subtype
@@ -1036,6 +1031,8 @@ module Polar_var = struct
   include Tuple.Comparable (Polarity) (Type_var)
 end
 
+(* FIXME: Type [append] correctly, must be missing something elsewhere. *)
+
 (* FIXME: Simplify constrains. See https://arxiv.org/pdf/1312.2334.pdf.
    
    IDEA:
@@ -1060,7 +1057,9 @@ end
    main point of confusion is idk how variable polarity can be determined when thinking
    about many type expressions (a variable's polarity depends on the type it appears in).
 *)
-let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t) =
+(* FIXME: Re-enable this, and have regular type vars instead of bottom/top. *)
+let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t)
+  =
   let negative_vars, positive_vars =
     let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
       match polarity with
@@ -1137,12 +1136,17 @@ let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_
              ~union:Type_scheme.union)
       | Function (args, effects, result) ->
         let args =
-          Nonempty.map args ~f:(Type_scheme.map ~f:(f ~polarity) ~type_name ~effect_name)
+          Nonempty.map args ~f:(fun arg ->
+            Type_scheme.map
+              arg
+              ~f:(f ~polarity:(Polarity.flip polarity))
+              ~type_name
+              ~effect_name)
         in
         let effects =
           Type_scheme.map_effects
             effects
-            ~f:(f ~polarity:(Polarity.flip polarity))
+            ~f:(f ~polarity)
             ~f_effects:(f_effects ~polarity)
             ~type_name
             ~effect_name
@@ -1165,6 +1169,7 @@ let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_
     in
     Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
   in
+  (* FIXME: Actually maybe some constraints could still be relevant? Think about this. *)
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
   type_, []
@@ -1355,7 +1360,9 @@ let generalize types outer_type =
      Then we need to think about what to to do with the constraints. (Only include ones
      between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
-  let result = simplify_constraints (scheme, constraints) in
+  (* FIXME: cleanup *)
+  let result = scheme, constraints in
+  (* let result = simplify_constraints (scheme, constraints) in *)
   (* Constraints.print types.constraints; *)
   eprint_s
     [%message
@@ -1539,3 +1546,7 @@ let%test_module _ =
     ;;
   end)
 ;;
+
+(* TODO: Write some code to verify that the inferred types are correct which is run after
+   type inference and asserts correctness. Then we could more easily catch bugs and even
+   test the type inference pass with quickcheck/other fuzzing. *)

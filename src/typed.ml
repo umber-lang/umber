@@ -3,6 +3,9 @@ open Names
 
 let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 
+(* FIXME: cleanup *)
+let eprint_s = ignore
+
 module Pattern = struct
   include Pattern
 
@@ -25,6 +28,9 @@ module Pattern = struct
             Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder
           | None -> pat_names, Internal_type.fresh_var ()
         in
+        eprint_s
+          [%message
+            "pattern bound variable" (name : Value_name.t option) (typ : Internal_type.t)];
         pat_names, (Catch_all name, typ)
       | Cnstr_appl (cnstr, args) ->
         (* TODO: inferring unqualified name given type information *)
@@ -47,11 +53,13 @@ module Pattern = struct
              let pat_names, (arg, actual_arg_type) =
                of_untyped_with_names ~names ~types pat_names arg
              in
+             (* The actual type of the argument must be a supertype of the expected type
+                since we are deconstructing rather than applying the constructor. *)
              Type_bindings.constrain
                ~names
                ~types
-               ~subtype:actual_arg_type
-               ~supertype:expected_arg_type;
+               ~subtype:expected_arg_type
+               ~supertype:actual_arg_type;
              pat_names, arg :: args)
          with
          | Ok (pat_names, args) ->
@@ -173,9 +181,6 @@ module Pattern = struct
     in
     names, pat
   ;;
-
-  (* FIXME: cleanup *)
-  let eprint_s = ignore
 
   let generalize ~names ~types pat_names typ ~shadowing_allowed =
     (* FIXME: cleanup *)
@@ -328,6 +333,7 @@ module Expr = struct
           in
           let args, arg_types = Nonempty.unzip args_and_types in
           let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
+          eprint_s [%message (body_type : Internal_type.t)];
           ( node (Lambda (args, body))
           , Function (arg_types, body_effects, body_type)
           , Internal_type.no_effects )
@@ -495,6 +501,11 @@ module Expr = struct
       let bindings =
         Nonempty.map bindings ~f:(fun (pat, expr) ->
           let expr, expr_type, expr_effects = of_untyped expr ~f_name ~names ~types in
+          eprint_s
+            [%message
+              "typed binding"
+                (pat : (Pattern.t * (Internal_type.t * _)) Node.t)
+                (expr_type : Internal_type.t)];
           add_effects expr_effects;
           Node.with_value pat ~f:(fun (_, (pat_type, _)) ->
             Type_bindings.constrain ~names ~types ~subtype:expr_type ~supertype:pat_type);
