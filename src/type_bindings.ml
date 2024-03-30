@@ -196,13 +196,6 @@ end = struct
   let set_type t var type_ = Hashtbl.set t ~key:var ~data:(Type type_)
   let set_effects t var effects = Hashtbl.set t ~key:var ~data:(Effects effects)
 
-  let apply_to_type_var t var =
-    match Hashtbl.find t var with
-    | Some (Type type_) -> type_
-    | None -> Var var
-    | Some (Effects _) -> compiler_bug [%message "Expected type, got effects"]
-  ;;
-
   let rec apply_to_type t type_ =
     Internal_type.map type_ ~f:(function
       | Var var -> Halt (apply_to_type_var t var)
@@ -232,9 +225,11 @@ end = struct
     : Internal_type.effects
     =
     let effects = Map.map effects ~f:(List.map ~f:(apply_to_type t)) in
-    match Option.bind effect_var ~f:(Hashtbl.find t) with
+    match Option.map effect_var ~f:(apply_to_effect_var t) with
     | None -> { effects; effect_var }
-    | Some (Effects { effects = new_effects; effect_var = new_effect_var }) ->
+    | Some
+        ({ effects = new_effects; effect_var = new_effect_var } : Internal_type.effects)
+      ->
       { effects =
           Map.merge_skewed
             effects
@@ -254,16 +249,52 @@ end = struct
                       (args' : Internal_type.t list)])
       ; effect_var = new_effect_var
       }
+
+  and apply_to_type_var t var =
+    match Hashtbl.find t var with
+    | Some (Type type_) -> apply_to_type t type_
+    | None -> Var var
+    | Some (Effects _) -> compiler_bug [%message "Expected type, got effects"]
+
+  and apply_to_effect_var t var =
+    match Hashtbl.find t var with
+    | Some (Effects effects) -> apply_to_effects t effects
+    | None -> { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
     | Some (Type _) -> compiler_bug [%message "Expected effects, got type"]
   ;;
 
+  (* FIXME: This won't fully compose types such that doing a single application reaches a
+     fixpoint.
+     
+     Ah, actually I think the problem is that adding a mapping to a new var would
+     necessitate updating *all* previous values. Maybe we can just follow the values as
+     we go.
+
+     Problem:
+        (substitution
+        (($0
+          (Type
+          (Partial_function ((Type_app Int ()))
+            ((effects ()) (effect_var ($12))) $11)))
+        ($1
+          (Type
+          (Partial_function ((Type_app Int ()))
+            ((effects ()) (effect_var ($14))) $13)))
+        ($2 (Type (Type_app Int ()))) ($4 (Type (Type_app Float ())))
+        ($6 (Type (Type_app Float ()))) ($7 (Type (Type_app Int ())))
+        ($9 (Type (Type_app Float ()))) ($11 (Type (Type_app Float ())))
+        ($13 (Type (Type_app Float ()))))))))
+    ("generalize result" (outer_type (Var $1))
+    (substituted_type
+      (Partial_function ((Type_app Int ())) ((effects ()) (effect_var ($14)))
+      $13))
+     *)
   let compose t t' =
-    Hashtbl.merge_into ~src:t' ~dst:t ~f:(fun ~key:_ new_value old_value ->
-      Set_to
-        (match old_value with
-         | None -> new_value
-         | Some (Type type_) -> Type (apply_to_type t' type_)
-         | Some (Effects effects) -> Effects (apply_to_effects t' effects)))
+    Hashtbl.iteri t' ~f:(fun ~key:var ~data:new_value ->
+      Hashtbl.update t var ~f:(function
+        | None -> new_value
+        | Some (Type type_) -> Type (apply_to_type t' type_)
+        | Some (Effects effects) -> Effects (apply_to_effects t' effects)))
   ;;
 
   let is_empty = Hashtbl.is_empty

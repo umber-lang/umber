@@ -378,6 +378,7 @@ module Expr = struct
             let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
             add_effects expr_effects;
             let result_type = Internal_type.fresh_var () in
+            eprint_s [%message "typing match" (result_type : Internal_type.t)];
             let branches =
               Nonempty.map branches ~f:(fun (pat, branch) ->
                 let pat_span = Node.span pat in
