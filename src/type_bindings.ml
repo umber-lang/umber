@@ -1057,7 +1057,7 @@ end
    main point of confusion is idk how variable polarity can be determined when thinking
    about many type expressions (a variable's polarity depends on the type it appears in).
 *)
-(* FIXME: Re-enable this, and have regular type vars instead of bottom/top. *)
+(* FIXME: re-enable this *)
 let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t)
   =
   let negative_vars, positive_vars =
@@ -1108,16 +1108,24 @@ let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type
     |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
     |> Map.map ~f:(Set.inter positive_vars >> Set.to_list)
   in
-  let replace_var var ~(polarity : Polarity.t) ~make_var ~union ~intersection =
+  let replace_var
+    var
+    ~(polarity : Polarity.t)
+    ~make_var
+    ~union
+    ~intersection
+    ~on_unconstrained
+    =
     let bounds_map, combine =
       match polarity with
       | Positive -> negative_lower_bounds, union
       | Negative -> positive_upper_bounds, intersection
     in
-    Map.find bounds_map var
-    |> Option.value ~default:[]
-    |> List.map ~f:make_var
-    |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id
+    match Map.find bounds_map var |> Option.value ~default:[], on_unconstrained with
+    | [], `Keep_var -> make_var var
+    | vars, (`Use_union_or_intersection | `Keep_var) ->
+      List.map vars ~f:make_var
+      |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id
   in
   let type_ =
     let type_name = Fn.id in
@@ -1133,7 +1141,8 @@ let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type
              ~polarity
              ~make_var:Type_scheme.var
              ~intersection:Type_scheme.intersection
-             ~union:Type_scheme.union)
+             ~union:Type_scheme.union
+             ~on_unconstrained:`Keep_var)
       | Function (args, effects, result) ->
         let args =
           Nonempty.map args ~f:(fun arg ->
@@ -1164,7 +1173,8 @@ let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type
              ~polarity
              ~make_var:Type_scheme.effect_var
              ~union:Type_scheme.effect_union
-             ~intersection:Type_scheme.effect_intersection)
+             ~intersection:Type_scheme.effect_intersection
+             ~on_unconstrained:`Use_union_or_intersection)
       | (Effect _ | Effect_union _ | Effect_intersection _) as effects -> Defer effects
     in
     Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
@@ -1182,151 +1192,29 @@ let _simplify_constraints ((outer_type, constraints) : Module_path.absolute Type
    variables we introduce can be shared between multiple type expressions in the same
    expresion/statement. *)
 let generalize types outer_type =
-  (* FIXME: Probably use positive_vars *)
-  (* FIXME: As we substitute vars around, the set of negative ones can change, right?. We
-     don't know about the vars that don't appear in the expression at this moment.
-     Hmm, maybe any subtype of a negative var should also count as negative, maybe?
-     Maybe we should simplify the type vars as a separate step. Then we wouldn't have to
-     worry about constraints at that point. We definitely need to do this step after
-     substitution, at least.
-     
-     Another thing: gc'ed constraints should only include those of the form  a- <: a+
-     where a- is from N and a+ is from P. P = pos(A) + neg(Ai) for all other types Ai.
-     Same for N.
-     Parameters can be both positive and negative.
-     
-     I think this only works if you keep the constraints associated with a specific type
-     expression (?). But for inference we need to look at constraints in each let binding.
-     
-     I think we might need to:
-     - Track polarity in typed.ml and pass it in to [constrain] so we can keep track of
-       the set of positive and negative vars (vars can be both btw). Actually maybe
-       the polarity outside of this module is always positive? No! We need to check
-       expressions inside function args. 
-     - Use 1 Type_bindings per expression (at what scope?). Not sure about this. I think
-       it should be more of an optimization we can do later.
-     - Consider shape equality only between P v N where P = pos(A) v neg(Ai for other (?) 
-       Ai) and N = neg(A) v pos(Ai for other Ai)
-       
-     Whenever we mint a new var, are we sure we'll track its polarity correctly? I guess
-     vars will get passed to [constrain] so handling it there should be fine.
-     
-     Another idea: For now, just use replace positive vars with the union of *all* their
-     lower bounds, disregarding polarity. Hopefully this can type simple examples well,
-     and help me understand better why polarity matters if it types something badly.
-  *)
-  (* FIXME: In terms of which constraints we need to include, we know that all transitive
-     constraints are available so only constraints between all present variables are
-     needed. We can garbage-collect constraints in a separate simplification step.
-  *)
-  (* let negative_vars, positive_vars =
-    let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
-      match polarity with
-      | Positive -> negative_vars, Set.add positive_vars var
-      | Negative -> Set.add negative_vars var, positive_vars
-    in
-    let rec loop acc ~polarity (typ : Internal_type.t) =
-      match typ with
-      | Var var -> loop_var acc var ~polarity
-      | Function (args, effects, res) ->
-        let acc =
-          Nonempty.fold args ~init:acc ~f:(loop ~polarity:(Polarity.flip polarity))
-        in
-        let acc = loop_effects acc ~polarity effects in
-        loop acc ~polarity res
-      | Partial_function (args, effects, result_var) ->
-        let acc =
-          Nonempty.fold args ~init:acc ~f:(loop ~polarity:(Polarity.flip polarity))
-        in
-        let acc = loop_effects acc ~polarity effects in
-        loop_var acc ~polarity result_var
-      | Type_app (_, fields) ->
-        (* TODO: Handle type variable variance. *)
-        List.fold fields ~init:acc ~f:(loop ~polarity)
-      | Tuple fields -> List.fold fields ~init:acc ~f:(loop ~polarity)
-    and loop_effects acc ~polarity { effects; effect_var } =
-      let acc =
-        Map.fold effects ~init:acc ~f:(fun ~key:_ ~data:args acc ->
-          List.fold args ~init:acc ~f:(loop ~polarity))
-      in
-      Option.fold effect_var ~init:acc ~f:(loop_var ~polarity)
-    in
-    loop (Type_var.Set.empty, Type_var.Set.empty) ~polarity:Positive outer_type
-  in
-  eprint_s
-    [%message "vars" (outer_type : Internal_type.t) (negative_vars : Type_var.Set.t)]; *)
-  (* FIXME: cleanup *)
-  let aux_generalize_type_var
-    _types
-    v
-    ~env
-    ~polarity:(_ : Polarity.t)
-    ~union:_
-    ~var
-    ~on_empty_union:_
+  let rec generalize_internal types typ ~env ~polarity
+    : Module_path.absolute Type_scheme.type_
     =
-    (* match polarity with
-    | Positive ->
-      (* FIXME: Conservatively also using positive bounds - amounts to only variables
-         mentioned in the original substituted type. *)
-      (* Replace a positive instance of a type variable with the union of its negative
-         lower bounds. *)
-      let vars =
-        Set.inter (Constraints.lower_bounds types.constraints v) negative_vars
-        |> Set.inter positive_vars
-        |> Set.to_list
-      in
-      (match vars, on_empty_union with
-       | [], `Make_var -> var (Type_param.Env_of_vars.find_or_add env v)
-       | [ v' ], (`Make_var | `Make_union) ->
-         var (Type_param.Env_of_vars.find_or_add env v')
-       | v1 :: v2 :: vars, (`Make_var | `Make_union) ->
-         (* FIXME: Could it be that some of these vars also end up getting replaced later?
-            Then what should we do? *)
-         union
-           (Non_single_list.map
-              (v1 :: v2 :: vars)
-              ~f:(var << Type_param.Env_of_vars.find_or_add env))
-       | [], `Make_union -> union [])
-    | Negative ->  *)
-    var (Type_param.Env_of_vars.find_or_add env v)
-  in
-  let generalize_type_var =
-    aux_generalize_type_var
-      ~union:Type_scheme.union
-      ~var:Type_scheme.var
-      ~on_empty_union:
-        (* It's clearer to have regular type variables than empty unions. *)
-        `Make_var
-  in
-  (* FIXME: Does this work with effect vars in higher-order functions? Seems like no.
-     
-     For some reason we are getting empty unions for lower bounds, but when I make it use
-     the var instead the constraints show up - is lower_bounds wrong? Oh wait - it's the
-     union of the *negative* lower bounds.  *)
-  let generalize_effect_var =
-    aux_generalize_type_var
-      ~union:Type_scheme.effect_union
-      ~var:Type_scheme.effect_var (* FIXME: revert *)
-      ~on_empty_union:`Make_var (* It's more intuitive to deal in effect unions. *)
-  in
-  let rec generalize_internal types typ ~env ~polarity =
     match (typ : Internal_type.t) with
-    | Var var -> generalize_type_var types ~env ~polarity var
+    | Var var -> Var (Type_param.Env_of_vars.find_or_add env var)
     | Function (args, effects, res) ->
-      Function
-        ( Nonempty.map
-            args
-            ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
-        , generalize_effects_internal types effects ~env ~polarity
-        , generalize_internal types res ~env ~polarity )
+      let args =
+        Nonempty.map
+          args
+          ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
+      in
+      let effects = generalize_effects_internal types effects ~env ~polarity in
+      let res = generalize_internal types res ~env ~polarity in
+      Function (args, effects, res)
     | Partial_function (args, effects, result_var) ->
-      Function
-        ( Nonempty.map
-            args
-            ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
-        , generalize_effects_internal types effects ~env ~polarity
-        , generalize_type_var types ~env ~polarity result_var )
+      let args =
+        Nonempty.map
+          args
+          ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
+      in
+      let effects = generalize_effects_internal types effects ~env ~polarity in
+      let result_var = Type_param.Env_of_vars.find_or_add env result_var in
+      Function (args, effects, Var result_var)
     | Type_app (name, fields) ->
       Type_app (name, List.map fields ~f:(generalize_internal types ~env ~polarity))
     | Tuple fields ->
@@ -1338,9 +1226,9 @@ let generalize types outer_type =
         ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
         Effect (effect_name, List.map args ~f:(generalize_internal types ~env ~polarity)))
     in
-    let effects_from_effect_var =
+    let effects_from_effect_var : Module_path.absolute Type_scheme.effects =
       match effect_var with
-      | Some effect_var -> generalize_effect_var types effect_var ~env ~polarity
+      | Some var -> Effect_var (Type_param.Env_of_vars.find_or_add env var)
       | None -> Effect_union []
     in
     Type_scheme.effect_union_list (effects_from_effect_var :: effects)

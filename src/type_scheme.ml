@@ -38,6 +38,7 @@ let effect_union ts = Effect_union ts
 let effect_intersection ts = Effect_intersection ts
 let union_list = Non_single_list.of_list_convert ~make:union ~singleton:Fn.id
 
+(* TODO: This function and similar ones should expand nested unions. *)
 let effect_union_list =
   Non_single_list.of_list_convert ~make:effect_union ~singleton:Fn.id
 ;;
