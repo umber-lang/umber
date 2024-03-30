@@ -162,7 +162,7 @@ module Float = {
 }
 
 module List = {
-  # `rev_append xs ys` reveres `xs` and concatenates it with `ys`
+  # `rev_append xs ys` reverses `xs` and concatenates it with `ys`
   let rev_append xs ys =
     match xs
     | Nil -> ys
