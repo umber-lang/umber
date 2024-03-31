@@ -118,6 +118,9 @@ let skolemize ~names ~types ~types_by_param scheme =
   !names, type_
 ;;
 
+(* TODO: This doesn't check that constraints are compatible - we'd need to also map those.
+   Also applies to check_val_scheme_vs_inferred_scheme. This is sound because
+   [Type_bindings.generalize] never produces a type with any constraints. *)
 (** A `val` item in a signature is compatible with a `let` in a defintion if the
     signature is a "more specific" version of the defintion. We can check this by
     skolemizing the signature, instatiating the defintion, and then unifying the two. *)

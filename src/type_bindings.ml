@@ -1091,6 +1091,17 @@ end
 (* FIXME: re-enable this *)
 (* FIXME: Maybe just don't bother with intersections, unions seem like what we want in
    practice. *)
+(* FIXME: Simplification ideas from simple-sub:
+   - Do co-occurence analysis: for each variable, find out which variables it always
+     co-occurs with
+   - Partition the variables into equivalence classes based on mutually always co-occuring
+     and pick one from each class to keep.
+     - Co-occurence comes from subbing in unions/intersections. We have enough information
+       from the sets of positive/negative vars and upper/lower bounds to calculate it
+   - Variables sandwiched by another variable (e.g. a <: b and b <: a) can be unified with
+     that variable too (shows up in co-occurence analysis as co-occuring in both positive
+     and negative positions with another var)
+*)
 let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t) =
   let negative_vars, positive_vars =
     let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
@@ -1130,30 +1141,89 @@ let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_
         (outer_type : _ Type_scheme.type_)
         (negative_vars : Type_param.Set.t)
         (positive_vars : Type_param.Set.t)];
-  let negative_lower_bounds =
+  let lower_bounds =
     List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)
     |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
-    |> Map.map ~f:(Set.inter negative_vars >> Set.to_list)
   in
-  let _positive_upper_bounds =
+  let negative_lower_bounds = Map.map lower_bounds ~f:(Set.inter negative_vars) in
+  let upper_bounds =
     List.map constraints ~f:(fun { subtype; supertype } -> subtype, supertype)
     |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
-    |> Map.map ~f:(Set.inter positive_vars >> Set.to_list)
+  in
+  let positive_upper_bounds = Map.map upper_bounds ~f:(Set.inter positive_vars) in
+  let get_relevant_var_bounds var ~(polarity : Polarity.t) =
+    let bounds_map =
+      match polarity with
+      | Positive -> negative_lower_bounds
+      | Negative -> positive_upper_bounds
+    in
+    Map.find bounds_map var |> Option.value ~default:Type_param.Set.empty
+  in
+  let all_vars = Set.union positive_vars negative_vars in
+  let var_classes = Map.of_key_set all_vars ~f:Union_find.create in
+  (* Union all variables which mutually always co-occur. *)
+  let co_occurences_by_var =
+    let co_occurences = Type_param.Map.empty in
+    let co_occurences =
+      Set.fold positive_vars ~init:co_occurences ~f:(fun co_occurences var ->
+        let vars = get_relevant_var_bounds var ~polarity:Positive in
+        Map.update co_occurences var ~f:(function
+          | None -> vars
+          | Some existing_vars -> Set.inter existing_vars vars))
+    in
+    Set.fold negative_vars ~init:co_occurences ~f:(fun co_occurences var ->
+      let vars = get_relevant_var_bounds var ~polarity:Negative in
+      Map.update co_occurences var ~f:(function
+        | None -> vars
+        | Some existing_vars -> Set.inter existing_vars vars))
+  in
+  Map.iteri co_occurences_by_var ~f:(fun ~key:var ~data:co_occuring_vars ->
+    let var_class = Map.find_exn var_classes var in
+    let mutually_co_occuring_vars =
+      Set.filter co_occuring_vars ~f:(fun var' ->
+        Map.find co_occurences_by_var var'
+        |> Option.value_map ~f:(Fn.flip Set.mem var) ~default:false)
+    in
+    Set.iter mutually_co_occuring_vars ~f:(fun var' ->
+      Union_find.union var_class (Map.find_exn var_classes var')));
+  (* Union variables which are sandwiched together - variables like a where a <: b and
+     a >: b. *)
+  Map.iteri var_classes ~f:(fun ~key:var ~data:var_class ->
+    let lower_bounds =
+      Map.find lower_bounds var |> Option.value ~default:Type_param.Set.empty
+    in
+    let upper_bounds =
+      Map.find upper_bounds var |> Option.value ~default:Type_param.Set.empty
+    in
+    Set.iter (Set.inter lower_bounds upper_bounds) ~f:(fun var' ->
+      Union_find.union var_class (Map.find_exn var_classes var')));
+  let var_replacements =
+    Map.filter_mapi var_classes ~f:(fun ~key:var ~data:var_class ->
+      let replaced_var = Union_find.get var_class in
+      if Type_param.equal var replaced_var then None else Some replaced_var)
   in
   let replace_var
     var
     ~(polarity : Polarity.t)
     ~make_var
     ~union
-    ~intersection:_
+    ~intersection
     ~on_unconstrained
     =
-    (* FIXME: cleanup around union/intersection handling *)
-    match polarity with
-    | Negative -> make_var var
-    | Positive ->
-      let bounds_map, combine = negative_lower_bounds, union in
-      (match Map.find bounds_map var |> Option.value ~default:[], on_unconstrained with
+    match Map.find var_replacements var with
+    | Some replaced_var -> make_var replaced_var
+    | None ->
+      let bounds =
+        get_relevant_var_bounds var ~polarity
+        |> Type_param.Set.map ~f:(fun var ->
+             Map.find var_replacements var |> Option.value ~default:var)
+      in
+      let combine =
+        match polarity with
+        | Positive -> union
+        | Negative -> intersection
+      in
+      (match Set.to_list bounds, on_unconstrained with
        | [], `Keep_var -> make_var var
        | vars, (`Use_union_or_intersection | `Keep_var) ->
          List.map vars ~f:make_var
@@ -1212,16 +1282,26 @@ let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_
     Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
   in
   (* FIXME: Actually maybe some constraints could still be relevant? Think about this. *)
-  let remaining_vars =
+  (* let remaining_vars =
     Type_scheme.fold_vars type_ ~init:Type_param.Set.empty ~f:Set.add
-  in
-  let constraints =
+  in *)
+  (* FIXME: This isn't discharging constraints correctly. I guess we want to remove lower
+     bound constraints from positive vars? *)
+  (* let constraints =
     List.filter constraints ~f:(fun { subtype; supertype } ->
       Set.mem remaining_vars subtype && Set.mem remaining_vars supertype)
   in
+  (* TODO: Sig_def_diff doesn't check constraints are compatible, which would cause
+     unsoundness, so just ban constraints here for now. *)
+  if not (List.is_empty constraints)
+  then
+    compiler_bug
+      [%message
+        "Constraints remaining after simplifying type"
+          (type_, constraints : _ Type_scheme.t)]; *)
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
-  type_, constraints
+  type_, []
 ;;
 
 (* FIXME: How does generalization work now? We need to reify the information from the
@@ -1484,6 +1564,7 @@ let%test_module "simplify_constraints" =
       { subtype = parse_var s1; supertype = parse_var s2 }
     ;;
 
+    let bool = fst Intrinsics.Bool.typ
     let list arg = Type_scheme.Type_app (Type_name.Absolute.of_string "List", [ arg ])
 
     let run_test original_type =
@@ -1501,7 +1582,8 @@ let%test_module "simplify_constraints" =
             , ev 2
             , v "d" )
         , [ "a" <: "b"; "e1" <: "e2"; "c" <: "d" ] );
-      [%expect {|
+      [%expect
+        {|
         ((original_type
           ((Function
             ((Type_app List ((Var a)))
@@ -1516,6 +1598,18 @@ let%test_module "simplify_constraints" =
              (Function ((Type_app List ((Var a)))) (Effect_var e1)
               (Type_app List ((Var c)))))
             (Effect_var e1) (Var c))
+           ()))) |}]
+    ;;
+
+    let%expect_test "if" =
+      run_test (Function ([ bool; v "a"; v "b" ], ev 1, v "c"), [ "a" <: "c"; "b" <: "c" ]);
+      [%expect
+        {|
+        ((original_type
+          ((Function ((Type_app Bool ()) (Var a) (Var b)) (Effect_var e1) (Var c))
+           (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
+         (simplified_type
+          ((Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a))
            ()))) |}]
     ;;
   end)
