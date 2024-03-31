@@ -1326,12 +1326,12 @@ let generalize types outer_type =
         ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
         Effect (effect_name, List.map args ~f:(generalize_internal types ~env ~polarity)))
     in
-    let effects_from_effect_var : Module_path.absolute Type_scheme.effects =
+    let effects_from_effect_var : Module_path.absolute Type_scheme.effects option =
       match effect_var with
-      | Some var -> Effect_var (Type_param.Env_of_vars.find_or_add env var)
-      | None -> Effect_union []
+      | Some var -> Some (Effect_var (Type_param.Env_of_vars.find_or_add env var))
+      | None -> None
     in
-    Type_scheme.effect_union_list (effects_from_effect_var :: effects)
+    Type_scheme.effect_union_list (Option.to_list effects_from_effect_var @ effects)
   in
   (* FIXME: cleanup *)
   eprint_s

@@ -31,14 +31,27 @@ type 'n t = 'n type_ * constraint_ list [@@deriving hash, compare, equal, sexp]
 
 let var v = Var v
 let tuple ts = Tuple ts
+
+(* FIXME: Union and intersection functions should expand nested unions/intersections.
+   Except maybe we just replace Union/Intersection with Merged or something because
+   it doesn't make sense to e.g. have an intersection in a positive position
+   (can't happen based on how we generate them). *)
+
 let union ts = Union ts
 let intersection ts = Intersection ts
 let effect_var v = Effect_var v
-let effect_union ts = Effect_union ts
+
+let effect_union_list ts =
+  List.concat_map ts ~f:(function
+    | Effect_union ts -> Non_single_list.to_list ts
+    | (Effect _ | Effect_var _ | Effect_intersection _) as e -> [ e ])
+  |> Non_single_list.of_list_convert ~make:(fun ts -> Effect_union ts) ~singleton:Fn.id
+;;
+
+let effect_union ts = effect_union_list (Non_single_list.to_list ts)
 let effect_intersection ts = Effect_intersection ts
 let union_list = Non_single_list.of_list_convert ~make:union ~singleton:Fn.id
 
-(* TODO: This function and similar ones should expand nested unions. *)
 let effect_union_list =
   Non_single_list.of_list_convert ~make:effect_union ~singleton:Fn.id
 ;;
@@ -88,7 +101,7 @@ and map_effects
        Effect
          (effect_name name, List.map args ~f:(map ~f ~f_effects ~type_name ~effect_name))
      | Effect_union effects ->
-       Effect_union
+       effect_union
          (Non_single_list.map
             effects
             ~f:(map_effects ~f ~f_effects ~type_name ~effect_name))
