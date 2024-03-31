@@ -179,7 +179,7 @@ val add_effect
 
 module Sigs_or_defs : sig
   type name_bindings = t
-  type t
+  type t [@@deriving sexp_of]
 
   (* TODO: instead of having sets of keys + lookup functions, could we not just return maps? *)
   val value_names : t -> Value_name.Set.t

@@ -284,19 +284,6 @@ module Expr = struct
 
              We need to have (() -> <Foo> ()) <: (() -> <Foo,Bar> ())
           *)
-          (* FIXME: IDEA: We want to come up with a type representing all the effects
-           potentially produced by this expression. This is a supertype of effects
-           produced by individual components of the expression:
-           In this case:
-           - The function expression
-           - Each function argument expression
-           - The effects produced by the call itself
-           
-           We get to this supertype by unioning the effects of the subexpressions. We
-           don't want to unify the effect variables because we actually want a supertype.
-           If you have e.g. `if cond then foo else bar` we don't want to force `foo` and
-           `bar` to produce exactly the same effects. Effects have true automatic
-           subtyping like that. *)
           collect_effects ~names ~types (fun ~add_effects ->
             let fun_, fun_type, fun_effects = of_untyped ~names ~types ~f_name fun_ in
             add_effects fun_effects;
@@ -314,6 +301,31 @@ module Expr = struct
               }
             in
             add_effects call_effects;
+            (* FIXME: Is this subtyping doing the correct thing? Seems very sus, e.g.:
+               
+               val foo : a, a -> Bool
+
+               foo 1 3.14 => try (a, a -> Bool) <: (Int, Float -> a)
+
+               ~> (($1, $1) -> Bool) <: (Int, Float -> $2)
+                  ~> Int <: $1
+                  ~> Float <: $1 (shouldn't it error here? maybe it's fine then?)
+                  ~> Bool <: $2
+
+               OR, for x <= y, try (a, a -> Bool) <: (b, c -> d)
+
+               ~> (($5, $5) -> Bool) <: ($2, $3 -> <$7> $6)
+                  ~> $2 <: $5
+                  ~> $3 <: $5
+                  ~> Bool <: $6
+
+                Ah, the constraints against $5 end up getting thrown away at the end since
+                $5 isn't mentioned in the final type.
+                
+                - Maybe we need to do something special when instantiating types?
+                - Shouldn't $2 and $3 have the same shape since they both have the same
+                  shape as $5? That's not how the implementation works atm
+            *)
             Type_bindings.constrain
               ~names
               ~types
@@ -811,6 +823,10 @@ module Module = struct
     if !import_mentioned_prelude || not include_std
     then names
     else
+      (* TODO: This always imports the prelude into all sigs and defs, even empty ones.
+         [Sig_def_diff.check] then checks these for *every* module. We should really have
+         a way to import bindings without "including" them. Maybe [include] and [import]
+         or some @exporting annotation on an import or something. *)
       List.fold [ `Sig; `Def ] ~init:names ~f:(fun names place ->
         Name_bindings.with_submodule
           names

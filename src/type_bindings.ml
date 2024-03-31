@@ -129,14 +129,38 @@ end = struct
     Hash_set.filter_inplace (get_bounds upper_bounds var) ~f:(not << Set.mem vars)
   ;;
 
-  let add_vars_from_bounds bounds var vars =
-    Hash_set.fold ~init:vars (get_bounds bounds var) ~f:Set.add
-  ;;
+  (* FIXME: I don't think this captures everything. 
+     An equivalence relation must be reflexive, symmetric, and transitive.
 
+     If we define a ~= b as (a <: b | a :> b), we have:
+
+     a ~= a
+     <=> (a <: a | a :> a) which is true
+
+     a ~= b
+     <=> (a <: b | a :> b)
+     => (b <: a | b :> a)
+     => b ~= a
+
+     a ~= b & b ~= c
+     => (a <: b | a :> b) & (b <: c | b :> c) 
+
+     We need to keep collecting all the reachable bounds through all variables. (I think?)
+  *)
   let find_vars_with_same_shape { lower_bounds; upper_bounds } var =
-    Type_var.Set.empty
-    |> add_vars_from_bounds lower_bounds var
-    |> add_vars_from_bounds upper_bounds var
+    let rec loop collected_vars var =
+      let add_vars_from_bounds bounds collected_vars =
+        Hash_set.fold
+          (get_bounds bounds var)
+          ~init:collected_vars
+          ~f:(fun collected_vars var ->
+          if Set.mem collected_vars var then collected_vars else loop collected_vars var)
+      in
+      Set.add collected_vars var
+      |> add_vars_from_bounds lower_bounds
+      |> add_vars_from_bounds upper_bounds
+    in
+    loop Type_var.Set.empty var
   ;;
 
   let to_constraint_list t ~params =
@@ -1357,8 +1381,8 @@ let generalize types outer_type =
       "generalize result"
         (outer_type : Internal_type.t)
         (substituted_type : Internal_type.t)
-        ~generalized_type:(scheme, constraints : Module_path.absolute Type_scheme.t)
-        (result : Module_path.absolute Type_scheme.t)
+        ~pre_simplified_type:(scheme, constraints : Module_path.absolute Type_scheme.t)
+        ~simplified_type:(result : Module_path.absolute Type_scheme.t)
         (env : Type_param.Env_of_vars.t)
         (types.substitution : Substitution.t)];
   result
@@ -1531,6 +1555,17 @@ let%test_module _ =
            print_s [%sexp ({ error with backtrace = None } : Compilation_error.t)]);
       [%expect
         {| ((kind Type_error) (msg ("Found more effects than expected" ((Bar ()))))) |}]
+    ;;
+
+    let%expect_test "the 'same shape' equivalence relation is properly transitive" =
+      let v = unstage (make_vars 3) in
+      let constraints = Constraints.create () in
+      List.iter
+        [ 0, 2; 1, 2 ]
+        ~f:(fun (a, b) -> Constraints.add constraints ~subtype:(v a) ~supertype:(v b));
+      print_s
+        [%sexp (Constraints.find_vars_with_same_shape constraints (v 0) : Type_var.Set.t)];
+      [%expect {| ($0 $1 $2) |}]
     ;;
   end)
 ;;

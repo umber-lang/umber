@@ -1182,7 +1182,7 @@ let find_sigs_and_defs t path module_name =
 
 module Sigs_or_defs = struct
   type name_bindings = t
-  type t = sigs_or_defs
+  type t = sigs_or_defs [@@deriving sexp_of]
 
   let names = function
     | Sigs { names; _ } | Defs { names; _ } -> names
