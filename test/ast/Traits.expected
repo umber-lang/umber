@@ -2,14 +2,16 @@
  ((Common_def (Import ((kind Absolute) (paths (Name Date)))))
   (Trait Eq (a)
    ((Common_sig
-     (Val == () (() (Function ((Var a) (Var a)) (Type_app Bool ()))))))
+     (Val == ()
+      (()
+       ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ())))))
    ())
   (Common_def
    (Type_decl Person
     (() (Record ((name (Type_app String ())) (dob (Type_app Date ())))))))
   (Let (rec_ true)
    (bindings
-    (((Type_annotation (Catch_all (p)) (() (Type_app Person ())))
+    (((Type_annotation (Catch_all (p)) (() ((Type_app Person ()) ())))
       (Record_literal
        ((name ((Literal (String Bob))))
         (dob

@@ -2,7 +2,7 @@
  ((Let (rec_ true)
    (bindings
     (((Catch_all (n))
-      (Type_annotation (Literal (Int 1)) (() (Type_app Int ())))))))
+      (Type_annotation (Literal (Int 1)) (() ((Type_app Int ()) ())))))))
   (Common_def
    (Type_decl Direction
     (() (Variants ((North ()) (South ()) (East ()) (West ()))))))
@@ -13,7 +13,10 @@
        (((Cnstr_appl North ()) (Name True)) ((Catch_all ()) (Name False))))))))
   (Common_def
    (Val first_letter ()
-    (() (Function ((Type_app Direction ())) (Type_app Char ())))))
+    (()
+     ((Function ((Type_app Direction ())) (Effect_union ())
+       (Type_app Char ()))
+      ()))))
   (Let (rec_ true)
    (bindings
     (((Catch_all (first_letter))
@@ -67,7 +70,10 @@
    (Type_decl Option ((a) (Variants ((Some ((Var a))) (None ()))))))
   (Common_def
    (Val value ()
-    (() (Function ((Type_app Option ((Var a))) (Var a)) (Var a)))))
+    (()
+     ((Function ((Type_app Option ((Var a))) (Var a)) (Effect_union ())
+       (Var a))
+      ()))))
   (Let (rec_ true)
    (bindings
     (((Catch_all (value))

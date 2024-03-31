@@ -3,6 +3,6 @@
    (bindings
     (((Tuple ())
       ((Fun_call (Name Std.Prelude.print)
-        (Function ((Type_app String ())) (Tuple ()))
-        (((Literal (String "Hello world!")) (Type_app String ()))))
-       (Tuple ()))))))))
+        ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
+        (((Literal (String "Hello world!")) ((Type_app String ()) ()))))
+       ((Tuple ()) ()))))))))

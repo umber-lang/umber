@@ -1,3 +1,4 @@
 (ErrorInexhaustivePattern ()
  ((Let (rec_ false)
-   (bindings (((Constant (Int 1)) ((Literal (Int 1)) (Type_app Int ()))))))))
+   (bindings
+    (((Constant (Int 1)) ((Literal (Int 1)) ((Type_app Int ()) ()))))))))

@@ -130,6 +130,7 @@ and fold_effects_until effects ~init ~f =
       fold_effects_until effects ~init ~f)
 ;;
 
+(* FIXME: These functions don't include effect vars *)
 let fold_vars typ ~init ~f =
   fold_until typ ~init ~f:(fun acc -> function
     | Var var -> Continue (f acc var)

@@ -3,13 +3,15 @@
   (msg
    ("Type mismatch"
     (expected
-     (Function
-      ((Type_app Std.Prelude.List.List ((Var a)))
-       (Function ((Var a)) (Var a)))
-      (Type_app Std.Prelude.List.List ((Var b)))))
+     ((Function
+       ((Type_app Std.Prelude.List.List ((Var a)))
+        (Function ((Var a)) (Effect_union ()) (Var a)))
+       (Effect_union ()) (Type_app Std.Prelude.List.List ((Var b))))
+      ()))
     (inferred
-     (Function
-      ((Type_app Std.Prelude.List.List ((Var a)))
-       (Function ((Var a)) (Var a)))
-      (Type_app Std.Prelude.List.List ((Var a)))))))
+     ((Function
+       ((Type_app Std.Prelude.List.List ((Var b)))
+        (Function ((Var a)) (Effect_union ()) (Var b)))
+       (Effect_union ()) (Type_app Std.Prelude.List.List ((Var a))))
+      ()))))
   (filename ErrorInconsistentValType.um) (span 6:5-6:8)))

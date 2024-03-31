@@ -1281,32 +1281,13 @@ let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_
     in
     Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
   in
-  (* FIXME: Actually maybe some constraints could still be relevant? Think about this. *)
-  (* let remaining_vars =
-    Type_scheme.fold_vars type_ ~init:Type_param.Set.empty ~f:Set.add
-  in *)
-  (* FIXME: This isn't discharging constraints correctly. I guess we want to remove lower
-     bound constraints from positive vars? *)
-  (* let constraints =
-    List.filter constraints ~f:(fun { subtype; supertype } ->
-      Set.mem remaining_vars subtype && Set.mem remaining_vars supertype)
-  in
-  (* TODO: Sig_def_diff doesn't check constraints are compatible, which would cause
-     unsoundness, so just ban constraints here for now. *)
-  if not (List.is_empty constraints)
-  then
-    compiler_bug
-      [%message
-        "Constraints remaining after simplifying type"
-          (type_, constraints : _ Type_scheme.t)]; *)
+  (* TODO: Rename replaced variables in the type to give nicer types. e.g. rename (a, c)
+     -> (a, b). *)
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
   type_, []
 ;;
 
-(* FIXME: How does generalization work now? We need to reify the information from the
-   gathered constraints and substitution. Yes, we need to (optionally) simplify the 
-   constraints, then apply the substitution, and return the constraints. *)
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
    expresion/statement. *)

@@ -19,7 +19,10 @@
         ((kind (Relative (nth_parent 2))) (paths (Module A ((Name Foo)))))))))))
   (Common_sig
    (Val * ((Left 7))
-    (() (Function ((Type_app Int ()) (Type_app Int ())) (Type_app Int ()))))))
+    (()
+     ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
+       (Type_app Int ()))
+      ())))))
  ((Common_def
    (Import
     ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Float)))))))))

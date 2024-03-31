@@ -7,7 +7,9 @@
       (bindings
        (((Catch_all (of_a))
          ((Lambda ((Catch_all ("")))
-           (Match (Name Constructors.B.) (Type_app Constructors.A.Foo ())
+           (Match (Name Constructors.B.)
+            ((Type_app Constructors.A.Foo ()) ())
             (((Cnstr_appl Constructors.A.Foo ()) (Name Constructors.B.Foo)))))
-          (Function ((Type_app Constructors.A.Foo ()))
-           (Type_app Constructors.B.Foo ()))))))))))))
+          ((Function ((Type_app Constructors.A.Foo ())) (Effect_union ())
+            (Type_app Constructors.B.Foo ()))
+           ())))))))))))

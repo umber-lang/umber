@@ -12,20 +12,22 @@
         (Incompatible (() (Variants ((Rainy ()) (Sunny ()))))
          (() (Variants ((Rainy ()))))))
        (BadRename
-        (Incompatible ((a b) (Alias (Function ((Var a)) (Var b))))
-         ((a b) (Alias (Function ((Var a)) (Var a))))))
+        (Incompatible
+         ((a b) (Alias (Function ((Var a)) (Effect_union ()) (Var b))))
+         ((a b) (Alias (Function ((Var a)) (Effect_union ()) (Var a))))))
        (LessGeneral
         (Incompatible
          ((a)
           (Alias
-           (Function ((Type_app Std.Prelude.Int.Int ()))
+           (Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
             (Type_app Std.Prelude.Int.Int ()))))
-         ((a) (Alias (Function ((Var a)) (Var a))))))
+         ((a) (Alias (Function ((Var a)) (Effect_union ()) (Var a))))))
        (MoreGeneral
-        (Incompatible ((a) (Alias (Function ((Var a)) (Var a))))
+        (Incompatible
+         ((a) (Alias (Function ((Var a)) (Effect_union ()) (Var a))))
          ((a)
           (Alias
-           (Function ((Type_app Std.Prelude.Int.Int ()))
+           (Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
             (Type_app Std.Prelude.Int.Int ()))))))
        (DifferentArity
         (Incompatible ((a) Abstract) (() (Alias (Type_app String ())))))))
@@ -35,8 +37,8 @@
          ((name_diff
            ((a
              (Incompatible
-              ((typ (Scheme (Type_app ErrorIncompatibleSig.A.A ()))))
-              ((typ (Scheme (Type_app String ())))
+              ((type_ (Scheme ((Type_app ErrorIncompatibleSig.A.A ()) ()))))
+              ((type_ (Scheme ((Type_app String ()) ())))
                (type_source Let_inferred))))))
           (type_diff ()) (module_diff ()))))
        (MissingModule Missing_module))))))

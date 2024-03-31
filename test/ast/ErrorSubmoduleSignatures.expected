@@ -6,12 +6,17 @@
     ((name_diff
       ((bark
         (Incompatible
-         ((typ
+         ((type_
            (Scheme
-            (Function ((Type_app ErrorSubmoduleSignatures.Village.Dog ()))
-             (Type_app ErrorSubmoduleSignatures.Village.Dog ())))))
-         ((typ
-           (Scheme (Function ((Type_app String ())) (Type_app String ()))))
+            ((Function ((Type_app ErrorSubmoduleSignatures.Village.Dog ()))
+              (Effect_union ())
+              (Type_app ErrorSubmoduleSignatures.Village.Dog ()))
+             ()))))
+         ((type_
+           (Scheme
+            ((Function ((Type_app String ())) (Effect_union ())
+              (Type_app String ()))
+             ())))
           (type_source Let_inferred))))))
      (type_diff ()) (module_diff ()))))
   (filename ErrorSubmoduleSignatures.um) (span 1:1-13:2)))

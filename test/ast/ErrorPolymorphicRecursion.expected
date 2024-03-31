@@ -1,6 +1,8 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ("Occurs check failed" (type1 (Partial_function ((Type_app Bool ())) a))
-    (type2 (Var a))))
+   ("Occurs check failed" (type1 (Var b))
+    (type2
+     (Partial_function ((Type_app Bool ())) ((effects ()) (effect_var (a)))
+      b))))
   (filename ErrorPolymorphicRecursion.um) (span 5:5-5:7)))

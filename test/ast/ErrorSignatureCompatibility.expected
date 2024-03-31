@@ -6,30 +6,41 @@
     ((name_diff
       ((double'
         (Incompatible
-         ((typ
-           (Scheme (Function ((Type_app String ())) (Type_app String ())))))
-         ((typ
+         ((type_
            (Scheme
-            (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
-             (Type_app ErrorSignatureCompatibility.A.Int ()))))
+            ((Function ((Type_app String ())) (Effect_union ())
+              (Type_app String ()))
+             ()))))
+         ((type_
+           (Scheme
+            ((Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
+              (Effect_union ())
+              (Type_app ErrorSignatureCompatibility.A.Int ()))
+             ())))
           (type_source Let_inferred))))
        (plus_one
-        (Incompatible ((typ (Scheme (Function ((Var a)) (Var a)))))
-         ((typ
+        (Incompatible
+         ((type_
+           (Scheme ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))
+         ((type_
            (Scheme
-            (Function ((Type_app Std.Prelude.Int.Int ()))
-             (Type_app Std.Prelude.Int.Int ()))))
+            ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
+              (Type_app Std.Prelude.Int.Int ()))
+             ())))
           (type_source Let_inferred))))
        (plus_one'
         (Incompatible
-         ((typ
+         ((type_
            (Scheme
-            (Function ((Type_app Std.Prelude.Int.Int ()))
-             (Type_app Std.Prelude.Int.Int ())))))
-         ((typ
+            ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
+              (Type_app Std.Prelude.Int.Int ()))
+             ()))))
+         ((type_
            (Scheme
-            (Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
-             (Type_app ErrorSignatureCompatibility.A.Int ()))))
+            ((Function ((Type_app ErrorSignatureCompatibility.A.Int ()))
+              (Effect_union ())
+              (Type_app ErrorSignatureCompatibility.A.Int ()))
+             ())))
           (type_source Let_inferred))))))
      (type_diff
       ((Tuple
@@ -37,8 +48,10 @@
          ((a b) (Alias (Tuple ((Var a) (Var a)))))))
        (InconsistentVarUse
         (Incompatible
-         ((a b) (Variants ((Foo ((Function ((Var a)) (Var b)))))))
-         ((a b) (Variants ((Foo ((Function ((Var b)) (Var a)))))))))))
+         ((a b)
+          (Variants ((Foo ((Function ((Var a)) (Effect_union ()) (Var b)))))))
+         ((a b)
+          (Variants ((Foo ((Function ((Var b)) (Effect_union ()) (Var a)))))))))))
      (module_diff
       ((A
         (Module_diff
