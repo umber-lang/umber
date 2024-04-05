@@ -37,24 +37,48 @@ let tuple ts = Tuple ts
    it doesn't make sense to e.g. have an intersection in a positive position
    (can't happen based on how we generate them). *)
 
-let union ts = Union ts
-let intersection ts = Intersection ts
-let effect_var v = Effect_var v
+let union_list ts =
+  List.concat_map ts ~f:(function
+    | Union ts -> Non_single_list.to_list ts
+    | (Var _ | Type_app _ | Function _ | Tuple _ | Intersection _) as e -> [ e ])
+  |> List.dedup_and_sort ~compare:[%compare: _ type_]
+  |> Non_single_list.of_list_convert ~make:(fun ts -> Union ts) ~singleton:Fn.id
+;;
+
+let union ts = union_list (Non_single_list.to_list ts)
+
+let intersection_list ts =
+  List.concat_map ts ~f:(function
+    | Intersection ts -> Non_single_list.to_list ts
+    | (Var _ | Type_app _ | Function _ | Tuple _ | Union _) as e -> [ e ])
+  |> List.dedup_and_sort ~compare:[%compare: _ type_]
+  |> Non_single_list.of_list_convert ~make:(fun ts -> Intersection ts) ~singleton:Fn.id
+;;
+
+let intersection ts = intersection_list (Non_single_list.to_list ts)
 
 let effect_union_list ts =
   List.concat_map ts ~f:(function
     | Effect_union ts -> Non_single_list.to_list ts
     | (Effect _ | Effect_var _ | Effect_intersection _) as e -> [ e ])
+  |> List.dedup_and_sort ~compare:[%compare: _ effects]
   |> Non_single_list.of_list_convert ~make:(fun ts -> Effect_union ts) ~singleton:Fn.id
 ;;
 
 let effect_union ts = effect_union_list (Non_single_list.to_list ts)
-let effect_intersection ts = Effect_intersection ts
-let union_list = Non_single_list.of_list_convert ~make:union ~singleton:Fn.id
 
-let effect_union_list =
-  Non_single_list.of_list_convert ~make:effect_union ~singleton:Fn.id
+let effect_intersection_list ts =
+  List.concat_map ts ~f:(function
+    | Effect_intersection ts -> Non_single_list.to_list ts
+    | (Effect _ | Effect_var _ | Effect_union _) as e -> [ e ])
+  |> List.dedup_and_sort ~compare:[%compare: _ effects]
+  |> Non_single_list.of_list_convert
+       ~make:(fun ts -> Effect_intersection ts)
+       ~singleton:Fn.id
 ;;
+
+let effect_intersection ts = effect_intersection_list (Non_single_list.to_list ts)
+let effect_var v = Effect_var v
 
 let rec map
   ?(f = Map_action.defer)
@@ -79,9 +103,9 @@ let rec map
        let effects = map_effects ~f ~f_effects effects ~type_name ~effect_name in
        Function (args, effects, map ~f ~f_effects ~type_name ~effect_name result)
      | Union types ->
-       Union (Non_single_list.map types ~f:(map ~f ~f_effects ~type_name ~effect_name))
+       union (Non_single_list.map types ~f:(map ~f ~f_effects ~type_name ~effect_name))
      | Intersection types ->
-       Intersection
+       intersection
          (Non_single_list.map types ~f:(map ~f ~f_effects ~type_name ~effect_name)))
 
 and map_effects
@@ -106,10 +130,24 @@ and map_effects
             effects
             ~f:(map_effects ~f ~f_effects ~type_name ~effect_name))
      | Effect_intersection effects ->
-       Effect_intersection
+       effect_intersection
          (Non_single_list.map
             effects
             ~f:(map_effects ~f ~f_effects ~type_name ~effect_name)))
+;;
+
+let map_vars type_ ~f =
+  map
+    type_
+    ~type_name:Fn.id
+    ~effect_name:Fn.id
+    ~f:(function
+      | Var v -> Halt (Var (f v))
+      | (Type_app _ | Tuple _ | Function _ | Union _ | Intersection _) as type_ ->
+        Defer type_)
+    ~f_effects:(function
+      | Effect_var v -> Halt (Effect_var (f v))
+      | (Effect _ | Effect_union _ | Effect_intersection _) as effects -> Defer effects)
 ;;
 
 let map' ?f ?f_effects ((type_, constraints) : _ t) ~type_name ~effect_name =
@@ -117,52 +155,66 @@ let map' ?f ?f_effects ((type_, constraints) : _ t) ~type_name ~effect_name =
   type_, constraints
 ;;
 
-let rec fold_until typ ~init ~f =
+let rec fold_until typ ~init ~f ~f_effects =
   match (f init typ : _ Fold_action.t) with
   | Stop _ as stop -> stop
-  | Continue init as continue ->
+  | Continue (`Halt acc) -> Continue acc
+  | Continue (`Defer init) ->
     (match typ with
-     | Var _ -> continue
+     | Var _ -> Continue init
      | Type_app (_, fields) | Tuple fields ->
-       List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
+       List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f ~f_effects)
      | Union types | Intersection types ->
-       Non_single_list.fold_until types ~init ~f:(fun init -> fold_until ~init ~f)
+       Non_single_list.fold_until types ~init ~f:(fun init ->
+         fold_until ~init ~f ~f_effects)
      | Function (args, effects, body) ->
        let%bind.Fold_action init =
-         Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
+         Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f ~f_effects)
        in
-       let%bind.Fold_action init = fold_effects_until effects ~init ~f in
-       fold_until body ~init ~f)
+       let%bind.Fold_action init = fold_effects_until effects ~init ~f ~f_effects in
+       fold_until body ~init ~f ~f_effects)
 
-and fold_effects_until effects ~init ~f =
-  match effects with
-  | Effect_var _ -> Continue init
-  | Effect (_, args) -> List.fold_until args ~init ~f
-  | Effect_union effects | Effect_intersection effects ->
-    Non_single_list.fold_until effects ~init ~f:(fun init effects ->
-      fold_effects_until effects ~init ~f)
+and fold_effects_until effects ~init ~f ~f_effects =
+  match (f_effects init effects : _ Fold_action.t) with
+  | Stop _ as stop -> stop
+  | Continue (`Halt acc) -> Continue acc
+  | Continue (`Defer init) ->
+    (match effects with
+     | Effect_var _ -> Continue init
+     | Effect (_, args) ->
+       List.fold_until args ~init ~f:(fun init -> fold_until ~init ~f ~f_effects)
+     | Effect_union effects | Effect_intersection effects ->
+       Non_single_list.fold_until effects ~init ~f:(fun init effects ->
+         fold_effects_until effects ~init ~f ~f_effects))
 ;;
 
-(* FIXME: These functions don't include effect vars *)
 let fold_vars typ ~init ~f =
-  fold_until typ ~init ~f:(fun acc -> function
-    | Var var -> Continue (f acc var)
-    | _ -> Continue acc)
+  fold_until
+    typ
+    ~init
+    ~f:(fun acc -> function
+         | Var var -> Continue (`Halt (f acc var))
+         | _ -> Continue (`Defer acc))
+    ~f_effects:(fun acc -> function
+                 | Effect_var var -> Continue (`Halt (f acc var))
+                 | _ -> Continue (`Defer acc))
   |> Fold_action.id
 ;;
 
 let for_all_vars typ ~f =
-  fold_until typ ~init:true ~f:(fun _ -> function
-    | Var var -> if f var then Continue true else Stop false
-    | _ -> Continue true)
-  |> Fold_action.id
-;;
-
-let exists_var typ ~f =
-  fold_until typ ~init:false ~f:(fun _ -> function
-    | Var var -> if f var then Stop true else Continue false
-    | _ -> Continue false)
-  |> Fold_action.id
+  match
+    fold_until
+      typ
+      ~init:()
+      ~f:(fun () -> function
+           | Var var -> if f var then Continue (`Halt ()) else Stop ()
+           | _ -> Continue (`Defer ()))
+      ~f_effects:(fun () -> function
+                   | Effect_var var -> if f var then Continue (`Halt ()) else Stop ()
+                   | _ -> Continue (`Defer ()))
+  with
+  | Continue () -> true
+  | Stop () -> false
 ;;
 
 module Bounded = struct

@@ -4,7 +4,7 @@ open Names
 let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 
 (* FIXME: cleanup *)
-let eprint_s = ignore
+(* let eprint_s = ignore *)
 
 module Pattern = struct
   include Pattern

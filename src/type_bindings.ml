@@ -2,7 +2,7 @@ open! Import
 open! Names
 
 (* FIXME: cleanup *)
-let eprint_s = ignore
+(* let eprint_s = ignore *)
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -166,17 +166,18 @@ end = struct
   let to_constraint_list t ~params =
     Hashtbl.to_alist t.upper_bounds
     |> List.concat_map ~f:(fun (subtype, supertypes) ->
-         match Type_param.Env_of_vars.find params subtype with
-         | None -> []
-         | Some subtype ->
-           Hash_set.to_list supertypes
-           |> List.filter_map ~f:(fun supertype : Type_scheme.constraint_ option ->
-                match Type_param.Env_of_vars.find params supertype with
-                | None -> None
-                | Some supertype ->
-                  if Type_param_name.equal subtype supertype
-                  then None
-                  else Some { subtype; supertype }))
+         let subtype_relevant = Type_param.Env_of_vars.mem params subtype in
+         let subtype = Type_param.Env_of_vars.find_or_add params subtype in
+         Hash_set.to_list supertypes
+         |> List.filter_map ~f:(fun supertype : Type_scheme.constraint_ option ->
+              let supertype_relevant = Type_param.Env_of_vars.mem params supertype in
+              if subtype_relevant || supertype_relevant
+              then (
+                let supertype = Type_param.Env_of_vars.find_or_add params supertype in
+                if Type_param_name.equal subtype supertype
+                then None
+                else Some { subtype; supertype })
+              else None))
   ;;
 
   let print t =
@@ -1081,14 +1082,14 @@ and intersect_types t1 t2 =
 and union_effects _ _ = failwith "FIXME: union_effects"
 and intersect_effects _ _ = failwith "FIXME: intersect_effects" *)
 
+(* FIXME: Remove *)
 module Polar_var = struct
   include Tuple.Make (Polarity) (Type_var)
   include Tuple.Comparable (Polarity) (Type_var)
 end
 
-(* FIXME: Type [append] correctly, must be missing something elsewhere. *)
-
-(* FIXME: Simplify constrains. See https://arxiv.org/pdf/1312.2334.pdf.
+module Simplification = struct
+  (* FIXME: Simplify constraints. See https://arxiv.org/pdf/1312.2334.pdf.
    
    IDEA:
    - unify constraints by decomposition. For each bound on a type parameter which is a
@@ -1100,160 +1101,138 @@ end
      do this iteratively as we unify normally?
    *)
 
-(* FIXME: Idea: Let's keep things simple for now, since this is hard to implement:
-   - Have generalize be dumb and just apply the substitution and surface the constraints.
-     All the relevant constraints will be included (because the Constraints.t contains the
-     transitive closure of all constraints)
-   - Once we have a set list of variables, we can easily figure out the polarities and
-     upper/lower bounds, then replace each positive variable with the union of its
-     negative lower bounds (and maybe the same for negative variables).
+  module By_polarity = struct
+    type 'a t =
+      { positive : 'a
+      ; negative : 'a
+      }
+    [@@deriving sexp]
 
-   Later if we want to optimize it we can try to push the a- <: b+ thing (GC) earlier. My
-   main point of confusion is idk how variable polarity can be determined when thinking
-   about many type expressions (a variable's polarity depends on the type it appears in).
-*)
-(* FIXME: re-enable this *)
-(* FIXME: Maybe just don't bother with intersections, unions seem like what we want in
-   practice. *)
-(* FIXME: Simplification ideas from simple-sub:
-   - Do co-occurence analysis: for each variable, find out which variables it always
-     co-occurs with
-   - Partition the variables into equivalence classes based on mutually always co-occuring
-     and pick one from each class to keep.
-     - Co-occurence comes from subbing in unions/intersections. We have enough information
-       from the sets of positive/negative vars and upper/lower bounds to calculate it
-   - Variables sandwiched by another variable (e.g. a <: b and b <: a) can be unified with
-     that variable too (shows up in co-occurence analysis as co-occuring in both positive
-     and negative positions with another var)
-*)
-let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_scheme.t) =
-  let negative_vars, positive_vars =
-    let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
+    let update t ~(polarity : Polarity.t) ~f =
       match polarity with
-      | Positive -> negative_vars, Set.add positive_vars var
-      | Negative -> Set.add negative_vars var, positive_vars
+      | Positive -> { t with positive = f t.positive }
+      | Negative -> { t with negative = f t.negative }
+    ;;
+
+    let iter { positive; negative } ~f =
+      f positive ~polarity:Polarity.Positive;
+      f negative ~polarity:Polarity.Negative
+    ;;
+  end
+
+  let fold_type_with_polarity type_ ~init ~f ~f_effects : _ Fold_action.t =
+    (* TODO: Do we need to consider type variable variance for effect type constructors? *)
+    let result =
+      Type_scheme.fold_until
+        type_
+        ~init:(Polarity.Positive, init)
+        ~f:(fun (polarity, init) type_ ->
+          match%bind.Fold_action f ~polarity init type_ with
+          | `Halt init -> Continue (`Halt (polarity, init))
+          | `Defer init ->
+            (match type_ with
+             | Function (args, effects, res) ->
+               let%bind.Fold_action init =
+                 let polarity = Polarity.flip polarity in
+                 Nonempty.fold_until args ~init ~f:(fun init arg ->
+                   Type_scheme.fold_until
+                     arg
+                     ~init
+                     ~f:(f ~polarity)
+                     ~f_effects:(f_effects ~polarity))
+               in
+               let%bind.Fold_action init =
+                 Type_scheme.fold_effects_until
+                   effects
+                   ~init
+                   ~f:(f ~polarity)
+                   ~f_effects:(f_effects ~polarity)
+               in
+               let%map.Fold_action init =
+                 Type_scheme.fold_until
+                   res
+                   ~init
+                   ~f:(f ~polarity)
+                   ~f_effects:(f_effects ~polarity)
+               in
+               `Halt (polarity, init)
+             (* TODO: Handle type variable variance in [Type_app]. *)
+             | Var _ | Type_app _ | Tuple _ | Union _ | Intersection _ ->
+               Continue (`Defer (polarity, init))))
+        ~f_effects:(fun (polarity, init) effects ->
+          let%map.Fold_action init = f_effects ~polarity init effects in
+          match init with
+          | `Halt init -> `Halt (polarity, init)
+          | `Defer init -> `Defer (polarity, init))
     in
-    let rec loop acc ~polarity (typ : _ Type_scheme.type_) =
-      match typ with
-      | Var var -> loop_var acc var ~polarity
-      | Function (args, effects, res) ->
-        let acc =
-          Nonempty.fold args ~init:acc ~f:(loop ~polarity:(Polarity.flip polarity))
-        in
-        let acc = loop_effects acc ~polarity effects in
-        loop acc ~polarity res
-      | Type_app (_, fields) ->
-        (* TODO: Handle type variable variance. *)
-        List.fold fields ~init:acc ~f:(loop ~polarity)
-      | Tuple fields -> List.fold fields ~init:acc ~f:(loop ~polarity)
-      | Union types | Intersection types ->
-        Non_single_list.fold types ~init:acc ~f:(loop ~polarity)
-    and loop_effects acc ~polarity (effects : _ Type_scheme.effects) =
-      match effects with
-      | Effect (_name, args) ->
-        (* TODO: Handle effect variable variance. *)
-        List.fold args ~init:acc ~f:(loop ~polarity)
-      | Effect_var var -> loop_var acc var ~polarity
-      | Effect_union effects | Effect_intersection effects ->
-        Non_single_list.fold effects ~init:acc ~f:(loop_effects ~polarity)
+    match result with
+    | Continue ((_ : Polarity.t), acc) -> Continue acc
+    | Stop _ as stop -> stop
+  ;;
+
+  let find_var_class var_classes var =
+    Hashtbl.find_or_add var_classes var ~default:(fun () -> Union_find.create var)
+  ;;
+
+  let simplify_var_sandwiches type_ ~var_classes ~lower_bounds ~upper_bounds =
+    (* Union variables which are sandwiched together - variables like a where a <: b and
+       a >: b. *)
+    Map.iter2 lower_bounds upper_bounds ~f:(fun ~key:var ~data ->
+      match data with
+      | `Both (subtypes, supertypes) ->
+        let var_class = find_var_class var_classes var in
+        Set.iter (Set.inter subtypes supertypes) ~f:(fun var' ->
+          Union_find.union var_class (find_var_class var_classes var'))
+      | `Left _ | `Right _ -> ());
+    Type_scheme.map_vars type_ ~f:(fun var ->
+      Union_find.get (find_var_class var_classes var))
+  ;;
+
+  let get_positive_and_negative_vars outer_type =
+    let add_var vars ~polarity var =
+      By_polarity.update vars ~polarity ~f:(Fn.flip Set.add var)
     in
-    loop (Type_param.Set.empty, Type_param.Set.empty) ~polarity:Positive outer_type
-  in
-  eprint_s
-    [%message
-      "vars"
-        (outer_type : _ Type_scheme.type_)
-        (negative_vars : Type_param.Set.t)
-        (positive_vars : Type_param.Set.t)];
-  let lower_bounds =
-    List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)
-    |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
-  in
-  let negative_lower_bounds = Map.map lower_bounds ~f:(Set.inter negative_vars) in
-  let upper_bounds =
-    List.map constraints ~f:(fun { subtype; supertype } -> subtype, supertype)
-    |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
-  in
-  let positive_upper_bounds = Map.map upper_bounds ~f:(Set.inter positive_vars) in
-  let get_relevant_var_bounds var ~(polarity : Polarity.t) =
-    let bounds_map =
-      match polarity with
-      | Positive -> negative_lower_bounds
-      | Negative -> positive_upper_bounds
-    in
-    Map.find bounds_map var |> Option.value ~default:Type_param.Set.empty
-  in
-  let all_vars = Set.union positive_vars negative_vars in
-  let var_classes = Map.of_key_set all_vars ~f:Union_find.create in
-  (* Union all variables which mutually always co-occur. *)
-  let co_occurences_by_var =
-    let co_occurences = Type_param.Map.empty in
-    let co_occurences =
-      Set.fold positive_vars ~init:co_occurences ~f:(fun co_occurences var ->
-        let vars = get_relevant_var_bounds var ~polarity:Positive in
-        Map.update co_occurences var ~f:(function
-          | None -> vars
-          | Some existing_vars -> Set.inter existing_vars vars))
-    in
-    Set.fold negative_vars ~init:co_occurences ~f:(fun co_occurences var ->
-      let vars = get_relevant_var_bounds var ~polarity:Negative in
-      Map.update co_occurences var ~f:(function
-        | None -> vars
-        | Some existing_vars -> Set.inter existing_vars vars))
-  in
-  Map.iteri co_occurences_by_var ~f:(fun ~key:var ~data:co_occuring_vars ->
-    let var_class = Map.find_exn var_classes var in
-    let mutually_co_occuring_vars =
-      Set.filter co_occuring_vars ~f:(fun var' ->
-        Map.find co_occurences_by_var var'
-        |> Option.value_map ~f:(Fn.flip Set.mem var) ~default:false)
-    in
-    Set.iter mutually_co_occuring_vars ~f:(fun var' ->
-      Union_find.union var_class (Map.find_exn var_classes var')));
-  (* Union variables which are sandwiched together - variables like a where a <: b and
-     a >: b. *)
-  Map.iteri var_classes ~f:(fun ~key:var ~data:var_class ->
-    let lower_bounds =
-      Map.find lower_bounds var |> Option.value ~default:Type_param.Set.empty
-    in
-    let upper_bounds =
-      Map.find upper_bounds var |> Option.value ~default:Type_param.Set.empty
-    in
-    Set.iter (Set.inter lower_bounds upper_bounds) ~f:(fun var' ->
-      Union_find.union var_class (Map.find_exn var_classes var')));
-  let var_replacements =
-    Map.filter_mapi var_classes ~f:(fun ~key:var ~data:var_class ->
-      let replaced_var = Union_find.get var_class in
-      if Type_param.equal var replaced_var then None else Some replaced_var)
-  in
-  let replace_var
-    var
-    ~(polarity : Polarity.t)
-    ~make_var
-    ~union
-    ~intersection
-    ~on_unconstrained
+    fold_type_with_polarity
+      outer_type
+      ~init:
+        { By_polarity.positive = Type_param.Set.empty; negative = Type_param.Set.empty }
+      ~f:(fun ~polarity vars -> function
+           | Var var -> Continue (`Halt (add_var vars ~polarity var))
+           | _ -> Continue (`Defer vars))
+      ~f_effects:(fun ~polarity vars -> function
+                   | Effect_var var -> Continue (`Halt (add_var vars ~polarity var))
+                   | _ -> Continue (`Defer vars))
+    |> Fold_action.id
+  ;;
+
+  let replace_constraints_with_unions_and_intersections
+    (outer_type : Module_path.absolute Type_scheme.type_)
+    ~lower_bounds
+    ~upper_bounds
     =
-    match Map.find var_replacements var with
-    | Some replaced_var -> make_var replaced_var
-    | None ->
-      let bounds =
-        get_relevant_var_bounds var ~polarity
-        |> Type_param.Set.map ~f:(fun var ->
-             Map.find var_replacements var |> Option.value ~default:var)
-      in
-      let combine =
+    let replace_var
+      var
+      ~(polarity : Polarity.t)
+      ~make_var
+      ~union
+      ~intersection
+      ~on_unconstrained
+      =
+      let bounds_map, combine =
         match polarity with
-        | Positive -> union
-        | Negative -> intersection
+        | Positive -> lower_bounds, union
+        | Negative -> upper_bounds, intersection
       in
-      (match Set.to_list bounds, on_unconstrained with
-       | [], `Keep_var -> make_var var
-       | vars, (`Use_union_or_intersection | `Keep_var) ->
-         List.map vars ~f:make_var
-         |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id)
-  in
-  let type_ =
+      let bounds =
+        Map.find bounds_map var |> Option.value ~default:Type_param.Set.empty
+      in
+      match Set.to_list bounds, on_unconstrained with
+      | [], `Keep_var -> make_var var
+      | [], `Use_union_or_intersection -> combine Non_single_list.[]
+      | vars, (`Use_union_or_intersection | `Keep_var) ->
+        List.map (var :: vars) ~f:make_var
+        |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id
+    in
     let type_name = Fn.id in
     let effect_name = Fn.id in
     let rec f (type_ : _ Type_scheme.type_) ~(polarity : Polarity.t)
@@ -1304,13 +1283,227 @@ let simplify_constraints ((outer_type, constraints) : Module_path.absolute Type_
       | (Effect _ | Effect_union _ | Effect_intersection _) as effects -> Defer effects
     in
     Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
-  in
-  (* TODO: Rename replaced variables in the type to give nicer types. e.g. rename (a, c)
+  ;;
+
+  let replace_co_occurring_vars type_ ~var_classes:_ =
+    (* Union all variables which mutually always co-occur in positive and/or negative
+       positions. *)
+    let co_occurences_by_var =
+      let update
+        ~(co_occurences_by_var : Type_param.Set.t Type_param.Map.t By_polarity.t)
+        ~(polarity : Polarity.t)
+        vars
+        =
+        Set.fold vars ~init:co_occurences_by_var ~f:(fun co_occurences_by_var var ->
+          let other_vars = Set.remove vars var in
+          By_polarity.update
+            co_occurences_by_var
+            ~polarity
+            ~f:(fun co_occurences_by_var ->
+            Map.update co_occurences_by_var var ~f:(function
+              | Some existing_vars -> Set.inter existing_vars other_vars
+              | None -> other_vars)))
+      in
+      fold_type_with_polarity
+        type_
+        ~init:
+          { By_polarity.positive = Type_param.Map.empty; negative = Type_param.Map.empty }
+        ~f:(fun ~polarity co_occurences_by_var type_ ->
+          match type_ with
+          | Union types | Intersection types ->
+            let vars =
+              Non_single_list.to_list types
+              |> List.map ~f:(function
+                   | Var v -> v
+                   | Type_app _ | Function _ | Tuple _ | Union _ | Intersection _ ->
+                     (* TODO: Maybe we should encode in the type that only vars are allowed. *)
+                     compiler_bug
+                       [%message
+                         "union or intersection with more than just vars "
+                           (type_ : _ Type_scheme.type_)])
+              |> Type_param.Set.of_list
+            in
+            Continue (`Halt (update ~co_occurences_by_var ~polarity vars))
+          | Var var ->
+            Continue
+              (`Halt
+                (update ~co_occurences_by_var ~polarity (Type_param.Set.singleton var)))
+          | Type_app _ | Tuple _ | Function _ -> Continue (`Defer co_occurences_by_var))
+        ~f_effects:(fun ~polarity co_occurences_by_var effects ->
+          match effects with
+          | Effect_union effects | Effect_intersection effects ->
+            let vars =
+              Non_single_list.to_list effects
+              |> List.filter_map ~f:(function
+                   | Effect_var v -> Some v
+                   | Effect _ | Effect_union _ | Effect_intersection _ -> None)
+              |> Type_param.Set.of_list
+            in
+            Continue (`Halt (update ~co_occurences_by_var ~polarity vars))
+          | Effect_var var ->
+            Continue
+              (`Halt
+                (update ~co_occurences_by_var ~polarity (Type_param.Set.singleton var)))
+          | Effect _ -> Continue (`Defer co_occurences_by_var))
+      |> Fold_action.id
+    in
+    eprint_s
+      [%message (co_occurences_by_var : Type_param.Set.t Type_param.Map.t By_polarity.t)];
+    let replacements = Type_param.Table.create () in
+    By_polarity.iter co_occurences_by_var ~f:(fun co_occurences_by_var ~polarity:_ ->
+      Map.iteri co_occurences_by_var ~f:(fun ~key:var ~data:co_occuring_vars ->
+        let merge_with_self = ref false in
+        let to_merge =
+          Set.to_list co_occuring_vars
+          |> List.map ~f:(fun var' ->
+               match Map.find co_occurences_by_var var' with
+               | Some co_occurences' when Set.mem co_occurences' var ->
+                 (* When variables mutually co-occur, union them together. *)
+                 merge_with_self := true;
+                 (match Hashtbl.find replacements var' with
+                  | None ->
+                    let other_var_class = Union_find.create var' in
+                    Hashtbl.add_exn replacements ~key:var' ~data:other_var_class;
+                    other_var_class
+                  | Some other_var_class ->
+                    Union_find.union other_var_class (Union_find.create var');
+                    other_var_class)
+               | Some _ | None -> Union_find.create var')
+        in
+        let to_merge =
+          if !merge_with_self then Union_find.create var :: to_merge else to_merge
+        in
+        match to_merge with
+        | [] -> ()
+        | var_replacement_class :: other_var_classes ->
+          List.iter other_var_classes ~f:(Union_find.union var_replacement_class);
+          (match Hashtbl.find replacements var with
+           | None -> Hashtbl.set replacements ~key:var ~data:var_replacement_class
+           | Some existing_class -> Union_find.union existing_class var_replacement_class)));
+    Type_scheme.map_vars type_ ~f:(fun var ->
+      Hashtbl.find replacements var |> Option.value_map ~f:Union_find.get ~default:var)
+  ;;
+
+  (* FIXME: Simplification ideas from simple-sub:
+   - Do co-occurence analysis: for each variable, find out which variables it always
+     co-occurs with
+   - Partition the variables into equivalence classes based on mutually always co-occuring
+     and pick one from each class to keep.
+     - Co-occurence comes from subbing in unions/intersections. We have enough information
+       from the sets of positive/negative vars and upper/lower bounds to calculate it
+   - Variables sandwiched by another variable (e.g. a <: b and b <: a) can be unified with
+     that variable too (shows up in co-occurence analysis as co-occuring in both positive
+     and negative positions with another var)
+*)
+  let simplify_constraints ((type_, constraints) : _ Type_scheme.t) =
+    eprint_s [%message "simplify_constraints" (type_, constraints : _ Type_scheme.t)];
+    let var_classes = Type_param.Table.create () in
+    let type_ =
+      let lower_bounds =
+        List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)
+        |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
+      in
+      let upper_bounds =
+        List.map constraints ~f:(fun { subtype; supertype } -> subtype, supertype)
+        |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
+      in
+      let type_ =
+        simplify_var_sandwiches type_ ~var_classes ~lower_bounds ~upper_bounds
+      in
+      eprint_s [%message "after simplifying sandwiches" (type_ : _ Type_scheme.type_)];
+      replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper_bounds
+    in
+    let { By_polarity.positive = positive_vars; negative = negative_vars } =
+      get_positive_and_negative_vars type_
+    in
+    eprint_s
+      [%message
+        "vars after simplifying var sandwiches and subbing in unions/intersections"
+          (type_ : _ Type_scheme.type_)
+          (negative_vars : Type_param.Set.t)
+          (positive_vars : Type_param.Set.t)];
+    let type_ = replace_co_occurring_vars type_ ~var_classes in
+    (* TODO: Rename replaced variables in the type to give nicer types. e.g. rename (a, c)
      -> (a, b). *)
-  (* All of the constraints are made moot by replacing vars with the union of their
+    (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
-  type_, []
-;;
+    type_, []
+  ;;
+
+  let%test_module "simplify_constraints" =
+    (module struct
+      let parse_var s = Type_param.t_of_sexp (Atom s)
+      let v = Type_scheme.var << parse_var
+      let ev i = Type_scheme.effect_var (parse_var [%string "e%{i#Int}"])
+
+      let ( <: ) s1 s2 : Type_scheme.constraint_ =
+        { subtype = parse_var s1; supertype = parse_var s2 }
+      ;;
+
+      let bool = fst Intrinsics.Bool.typ
+      let list arg = Type_scheme.Type_app (Type_name.Absolute.of_string "List", [ arg ])
+
+      let run_test original_type =
+        print_s
+          [%sexp
+            { original_type : _ Type_scheme.t
+            ; simplified_type = (simplify_constraints original_type : _ Type_scheme.t)
+            }]
+      ;;
+
+      let%expect_test "List.map" =
+        run_test
+          ( Function
+              ( [ list (v "a"); Function ([ list (v "b") ], ev 1, list (v "c")) ]
+              , ev 2
+              , v "d" )
+          , [ "a" <: "b"; "e1" <: "e2"; "c" <: "d" ] );
+        [%expect
+          {|
+        ((original_type
+          ((Function
+            ((Type_app List ((Var a)))
+             (Function ((Type_app List ((Var b)))) (Effect_var e1)
+              (Type_app List ((Var c)))))
+            (Effect_var e2) (Var d))
+           (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
+            ((subtype c) (supertype d)))))
+         (simplified_type
+          ((Function
+            ((Type_app List ((Var a)))
+             (Function ((Type_app List ((Var a)))) (Effect_var e1)
+              (Type_app List ((Var c)))))
+            (Effect_var e1) (Var c))
+           ()))) |}]
+      ;;
+
+      let%expect_test "if" =
+        run_test
+          (Function ([ bool; v "a"; v "b" ], ev 1, v "c"), [ "a" <: "c"; "b" <: "c" ]);
+        [%expect
+          {|
+        ((original_type
+          ((Function ((Type_app Bool ()) (Var a) (Var b)) (Effect_var e1) (Var c))
+           (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
+         (simplified_type
+          ((Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a))
+           ()))) |}]
+      ;;
+
+      let%expect_test "<=" =
+        run_test
+          (Function ([ v "a"; v "b" ], Effect_union [], bool), [ "a" <: "c"; "b" <: "c" ]);
+        [%expect
+          {|
+          ((original_type
+            ((Function ((Var a) (Var b)) (Effect_union ()) (Type_app Bool ()))
+             (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
+           (simplified_type
+            ((Function ((Var c) (Var c)) (Effect_union ()) (Type_app Bool ())) ()))) |}]
+      ;;
+    end)
+  ;;
+end
 
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
@@ -1374,7 +1567,7 @@ let generalize types outer_type =
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   (* FIXME: cleanup *)
   (* let result = scheme, constraints in *)
-  let result = simplify_constraints (scheme, constraints) in
+  let result = Simplification.simplify_constraints (scheme, constraints) in
   (* Constraints.print types.constraints; *)
   eprint_s
     [%message
@@ -1566,67 +1759,6 @@ let%test_module _ =
       print_s
         [%sexp (Constraints.find_vars_with_same_shape constraints (v 0) : Type_var.Set.t)];
       [%expect {| ($0 $1 $2) |}]
-    ;;
-  end)
-;;
-
-let%test_module "simplify_constraints" =
-  (module struct
-    let parse_var s = Type_param.t_of_sexp (Atom s)
-    let v = Type_scheme.var << parse_var
-    let ev i = Type_scheme.effect_var (parse_var [%string "e%{i#Int}"])
-
-    let ( <: ) s1 s2 : Type_scheme.constraint_ =
-      { subtype = parse_var s1; supertype = parse_var s2 }
-    ;;
-
-    let bool = fst Intrinsics.Bool.typ
-    let list arg = Type_scheme.Type_app (Type_name.Absolute.of_string "List", [ arg ])
-
-    let run_test original_type =
-      print_s
-        [%sexp
-          { original_type : _ Type_scheme.t
-          ; simplified_type = (simplify_constraints original_type : _ Type_scheme.t)
-          }]
-    ;;
-
-    let%expect_test "List.map" =
-      run_test
-        ( Function
-            ( [ list (v "a"); Function ([ list (v "b") ], ev 1, list (v "c")) ]
-            , ev 2
-            , v "d" )
-        , [ "a" <: "b"; "e1" <: "e2"; "c" <: "d" ] );
-      [%expect
-        {|
-        ((original_type
-          ((Function
-            ((Type_app List ((Var a)))
-             (Function ((Type_app List ((Var b)))) (Effect_var e1)
-              (Type_app List ((Var c)))))
-            (Effect_var e2) (Var d))
-           (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
-            ((subtype c) (supertype d)))))
-         (simplified_type
-          ((Function
-            ((Type_app List ((Var a)))
-             (Function ((Type_app List ((Var a)))) (Effect_var e1)
-              (Type_app List ((Var c)))))
-            (Effect_var e1) (Var c))
-           ()))) |}]
-    ;;
-
-    let%expect_test "if" =
-      run_test (Function ([ bool; v "a"; v "b" ], ev 1, v "c"), [ "a" <: "c"; "b" <: "c" ]);
-      [%expect
-        {|
-        ((original_type
-          ((Function ((Type_app Bool ()) (Var a) (Var b)) (Effect_var e1) (Var c))
-           (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
-         (simplified_type
-          ((Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a))
-           ()))) |}]
     ;;
   end)
 ;;

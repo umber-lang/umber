@@ -61,15 +61,26 @@ val map_effects
   -> effect_name:('n1 Effect_name.Qualified.t -> 'n2 Effect_name.Qualified.t)
   -> 'n2 effects
 
+val map_vars : 'n type_ -> f:(Type_param.t -> Type_param.t) -> 'n type_
+
 val fold_until
   :  'n type_
   -> init:'acc
-  -> f:('acc -> 'n type_ -> ('acc, 'final) Fold_action.t)
+  -> f:('acc -> 'n type_ -> ([< `Defer of 'acc | `Halt of 'acc ], 'final) Fold_action.t)
+  -> f_effects:
+       ('acc -> 'n effects -> ([< `Defer of 'acc | `Halt of 'acc ], 'final) Fold_action.t)
+  -> ('acc, 'final) Fold_action.t
+
+val fold_effects_until
+  :  'n effects
+  -> init:'acc
+  -> f:('acc -> 'n type_ -> ([< `Defer of 'acc | `Halt of 'acc ], 'final) Fold_action.t)
+  -> f_effects:
+       ('acc -> 'n effects -> ([< `Defer of 'acc | `Halt of 'acc ], 'final) Fold_action.t)
   -> ('acc, 'final) Fold_action.t
 
 val fold_vars : 'n type_ -> init:'acc -> f:('acc -> Type_param_name.t -> 'acc) -> 'acc
 val for_all_vars : 'n type_ -> f:(Type_param_name.t -> bool) -> bool
-val exists_var : 'n type_ -> f:(Type_param_name.t -> bool) -> bool
 
 (* TODO: Remove/rework this, since constraints are part of regular type schemes. *)
 module Bounded : sig

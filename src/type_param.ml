@@ -30,6 +30,7 @@ module Env_of_vars : sig
   val create : unit -> t
   val find_or_add : t -> Type_var.t -> Type_param_name.t
   val find : t -> Type_var.t -> Type_param_name.t option
+  val mem : t -> Type_var.t -> bool
 end = struct
   type nonrec t =
     { table : (Type_var.t, Type_param_name.t) Hashtbl.t
@@ -47,4 +48,5 @@ end = struct
   ;;
 
   let find t var = Hashtbl.find t.table var
+  let mem t var = Hashtbl.mem t.table var
 end
