@@ -2,7 +2,7 @@ open! Import
 open! Names
 
 (* FIXME: cleanup *)
-(* let eprint_s = ignore *)
+let eprint_s = ignore
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -1101,6 +1101,9 @@ module Simplification = struct
      do this iteratively as we unify normally?
    *)
 
+  (* FIXME: cleanup *)
+  (* let eprint_s = Core.eprint_s *)
+
   module By_polarity = struct
     type 'a t =
       { positive : 'a
@@ -1120,60 +1123,145 @@ module Simplification = struct
     ;;
   end
 
-  let fold_type_with_polarity type_ ~init ~f ~f_effects : _ Fold_action.t =
-    (* TODO: Do we need to consider type variable variance for effect type constructors? *)
-    let result =
+  (* TODO: Consider upstreaming these in Type_scheme *)
+
+  let map_type_with_polarity =
+    let rec loop
+      ~polarity
+      (typ : _ Type_scheme.type_)
+      ~f
+      ~f_effects
+      ~type_name
+      ~effect_name
+      =
+      match (f ~polarity typ : _ Map_action.t) with
+      | Halt typ -> typ
+      | Retry typ -> loop ~polarity typ ~f ~f_effects ~type_name ~effect_name
+      | Defer typ ->
+        (match typ with
+         | Var _ as typ -> typ
+         | Type_app (name, fields) ->
+           (* TODO: Handle type variable variance. *)
+           Type_app
+             ( type_name name
+             , List.map fields ~f:(loop ~polarity ~f ~f_effects ~type_name ~effect_name)
+             )
+         | Tuple fields ->
+           Tuple
+             (List.map fields ~f:(loop ~polarity ~f ~f_effects ~type_name ~effect_name))
+         | Function (args, effects, result) ->
+           let args =
+             Nonempty.map args ~f:(fun arg ->
+               loop
+                 arg
+                 ~polarity:(Polarity.flip polarity)
+                 ~f
+                 ~f_effects
+                 ~type_name
+                 ~effect_name)
+           in
+           let effects =
+             loop_effects ~polarity ~f ~f_effects effects ~type_name ~effect_name
+           in
+           Function
+             (args, effects, loop ~polarity ~f ~f_effects ~type_name ~effect_name result)
+         | Union types ->
+           Type_scheme.union
+             (Non_single_list.map
+                types
+                ~f:(loop ~polarity ~f ~f_effects ~type_name ~effect_name))
+         | Intersection types ->
+           Type_scheme.intersection
+             (Non_single_list.map
+                types
+                ~f:(loop ~polarity ~f ~f_effects ~type_name ~effect_name)))
+    and loop_effects
+      ~polarity
+      (effects : _ Type_scheme.effects)
+      ~f
+      ~f_effects
+      ~type_name
+      ~effect_name
+      =
+      match (f_effects ~polarity effects : _ Map_action.t) with
+      | Halt effects -> effects
+      | Retry effects ->
+        loop_effects ~polarity effects ~f ~f_effects ~type_name ~effect_name
+      | Defer effects ->
+        (match effects with
+         | Effect_var _ as effects -> effects
+         | Effect (name, args) ->
+           (* TODO: Handle type variable variance. *)
+           Effect
+             ( effect_name name
+             , List.map args ~f:(loop ~polarity ~f ~f_effects ~type_name ~effect_name) )
+         | Effect_union effects ->
+           Type_scheme.effect_union
+             (Non_single_list.map
+                effects
+                ~f:(loop_effects ~polarity ~f ~f_effects ~type_name ~effect_name))
+         | Effect_intersection effects ->
+           Type_scheme.effect_intersection
+             (Non_single_list.map
+                effects
+                ~f:(loop_effects ~polarity ~f ~f_effects ~type_name ~effect_name)))
+    in
+    loop ~polarity:Positive
+  ;;
+
+  let fold_type_with_polarity =
+    let unwrap_continue : _ Fold_action.t -> _ Fold_action.t = function
+      | Continue ((_ : Polarity.t), acc) -> Continue acc
+      | Stop _ as stop -> stop
+    in
+    let rec loop type_ ~init ~f ~f_effects ~polarity : _ Fold_action.t =
       Type_scheme.fold_until
         type_
-        ~init:(Polarity.Positive, init)
-        ~f:(fun (polarity, init) type_ ->
-          match%bind.Fold_action f ~polarity init type_ with
-          | `Halt init -> Continue (`Halt (polarity, init))
-          | `Defer init ->
-            (match type_ with
-             | Function (args, effects, res) ->
-               let%bind.Fold_action init =
-                 let polarity = Polarity.flip polarity in
-                 Nonempty.fold_until args ~init ~f:(fun init arg ->
-                   Type_scheme.fold_until
-                     arg
-                     ~init
-                     ~f:(f ~polarity)
-                     ~f_effects:(f_effects ~polarity))
-               in
-               let%bind.Fold_action init =
-                 Type_scheme.fold_effects_until
-                   effects
-                   ~init
-                   ~f:(f ~polarity)
-                   ~f_effects:(f_effects ~polarity)
-               in
-               let%map.Fold_action init =
-                 Type_scheme.fold_until
-                   res
-                   ~init
-                   ~f:(f ~polarity)
-                   ~f_effects:(f_effects ~polarity)
-               in
-               `Halt (polarity, init)
-             (* TODO: Handle type variable variance in [Type_app]. *)
-             | Var _ | Type_app _ | Tuple _ | Union _ | Intersection _ ->
-               Continue (`Defer (polarity, init))))
-        ~f_effects:(fun (polarity, init) effects ->
-          let%map.Fold_action init = f_effects ~polarity init effects in
-          match init with
-          | `Halt init -> `Halt (polarity, init)
-          | `Defer init -> `Defer (polarity, init))
+        ~init:(polarity, init)
+        ~f:(handle_type ~f ~f_effects)
+        ~f_effects:(handle_effects ~f_effects)
+      |> unwrap_continue
+    and loop_effects effects ~init ~f ~f_effects ~polarity =
+      Type_scheme.fold_effects_until
+        effects
+        ~init:(polarity, init)
+        ~f:(handle_type ~f ~f_effects)
+        ~f_effects:(handle_effects ~f_effects)
+      |> unwrap_continue
+    and handle_type (polarity, init) (type_ : _ Type_scheme.type_) ~f ~f_effects =
+      match%bind.Fold_action f ~polarity init type_ with
+      | `Halt init -> Continue (`Halt (polarity, init))
+      | `Defer init ->
+        (match type_ with
+         | Function (args, effects, res) ->
+           let%bind.Fold_action init =
+             Nonempty.fold_until args ~init ~f:(fun init arg ->
+               loop arg ~init ~f ~f_effects ~polarity:(Polarity.flip polarity))
+           in
+           let%bind.Fold_action init =
+             loop_effects effects ~init ~f ~f_effects ~polarity
+           in
+           let%map.Fold_action init = loop res ~init ~f ~f_effects ~polarity in
+           `Halt (polarity, init)
+         (* TODO: Handle type variable variance in [Type_app]. *)
+         | Var _ | Type_app _ | Tuple _ | Union _ | Intersection _ ->
+           Continue (`Defer (polarity, init)))
+    and handle_effects (polarity, init) effects ~f_effects =
+      (* TODO: Handle effect variable variance. *)
+      let%map.Fold_action init = f_effects ~polarity init effects in
+      match init with
+      | `Halt init -> `Halt (polarity, init)
+      | `Defer init -> `Defer (polarity, init)
     in
-    match result with
-    | Continue ((_ : Polarity.t), acc) -> Continue acc
-    | Stop _ as stop -> stop
+    fun type_ ~init ~f ~f_effects -> loop type_ ~init ~f ~f_effects ~polarity:Positive
   ;;
 
   let find_var_class var_classes var =
     Hashtbl.find_or_add var_classes var ~default:(fun () -> Union_find.create var)
   ;;
 
+  (* FIXME: Should also remove matched constraints, otherwise this step is probably 
+     pointless. *)
   let simplify_var_sandwiches type_ ~var_classes ~lower_bounds ~upper_bounds =
     (* Union variables which are sandwiched together - variables like a where a <: b and
        a >: b. *)
@@ -1285,9 +1373,47 @@ module Simplification = struct
     Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
   ;;
 
+  (** Remove variables which only occur in positive or negative positions respectively.
+      Replace them with empty unions or intersections (the bottom and top types). *)
+  let remove_polar_vars type_ =
+    let { By_polarity.positive = positive_vars; negative = negative_vars } =
+      get_positive_and_negative_vars type_
+    in
+    eprint_s
+      [%message
+        "vars after simplifying var sandwiches and subbing in unions/intersections"
+          (type_ : _ Type_scheme.type_)
+          (negative_vars : Type_param.Set.t)
+          (positive_vars : Type_param.Set.t)];
+    let replace_var var ~(polarity : Polarity.t) ~make_var ~bottom ~top =
+      match polarity with
+      | Positive -> if Set.mem negative_vars var then make_var var else bottom
+      | Negative -> if Set.mem positive_vars var then make_var var else top
+    in
+    map_type_with_polarity
+      type_
+      ~type_name:Fn.id
+      ~effect_name:Fn.id
+      ~f:(fun ~polarity:_ type_ ->
+        (* Don't replace regular type variables. *)
+        Defer type_)
+      ~f_effects:(fun ~polarity effects ->
+        match effects with
+        | Effect_var var ->
+          Halt
+            (replace_var
+               var
+               ~polarity
+               ~make_var:Type_scheme.effect_var
+               ~bottom:(Effect_union [])
+               ~top:(Effect_intersection []))
+        | effects -> Defer effects)
+  ;;
+
+  (** Union all variables which mutually always co-occur in positive and/or negative
+      positions. *)
   let replace_co_occurring_vars type_ ~var_classes:_ =
-    (* Union all variables which mutually always co-occur in positive and/or negative
-       positions. *)
+    (* FIXME: unused var_classes passed in *)
     let co_occurences_by_var =
       let update
         ~(co_occurences_by_var : Type_param.Set.t Type_param.Map.t By_polarity.t)
@@ -1380,8 +1506,38 @@ module Simplification = struct
           (match Hashtbl.find replacements var with
            | None -> Hashtbl.set replacements ~key:var ~data:var_replacement_class
            | Some existing_class -> Union_find.union existing_class var_replacement_class)));
-    Type_scheme.map_vars type_ ~f:(fun var ->
-      Hashtbl.find replacements var |> Option.value_map ~f:Union_find.get ~default:var)
+    (* FIXME: This step can't remove vars, which is problematic. Or maybe we needed to
+       remove [e] earlier in the [a | b | c] example.
+       
+       Maybe we could consider going back to how the code was before, it was simpler.
+       Can just backport the ideas about subbing in the var itself and taking bounds
+       regardless of polarity.
+
+       Or we could double down and use the positive-only / negative-only checks to remove
+       vars.
+       
+       We can remove vars by identifying them as only occuring positively or only
+       occuring negativvely. *)
+    map_type_with_polarity
+      type_
+      ~type_name:Fn.id
+      ~effect_name:Fn.id
+      ~f:(fun ~polarity:_ type_ ->
+        match type_ with
+        | Var var ->
+          Halt
+            (match Hashtbl.find replacements var with
+             | Some var_class -> Var (Union_find.get var_class)
+             | None -> Var var)
+        | type_ -> Defer type_)
+      ~f_effects:(fun ~polarity:_ effects ->
+        match effects with
+        | Effect_var var ->
+          Halt
+            (match Hashtbl.find replacements var with
+             | Some var_class -> Effect_var (Union_find.get var_class)
+             | None -> Effect_var var)
+        | effects -> Defer effects)
   ;;
 
   (* FIXME: Simplification ideas from simple-sub:
@@ -1394,9 +1550,9 @@ module Simplification = struct
    - Variables sandwiched by another variable (e.g. a <: b and b <: a) can be unified with
      that variable too (shows up in co-occurence analysis as co-occuring in both positive
      and negative positions with another var)
-*)
-  let simplify_constraints ((type_, constraints) : _ Type_scheme.t) =
-    eprint_s [%message "simplify_constraints" (type_, constraints : _ Type_scheme.t)];
+  *)
+  let simplify_type ((type_, constraints) : _ Type_scheme.t) =
+    eprint_s [%message "simplify_type" (type_, constraints : _ Type_scheme.t)];
     let var_classes = Type_param.Table.create () in
     let type_ =
       let lower_bounds =
@@ -1413,24 +1569,213 @@ module Simplification = struct
       eprint_s [%message "after simplifying sandwiches" (type_ : _ Type_scheme.type_)];
       replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper_bounds
     in
-    let { By_polarity.positive = positive_vars; negative = negative_vars } =
-      get_positive_and_negative_vars type_
+    let type_ = remove_polar_vars type_ in
+    eprint_s [%message "after removing polar vars" (type_ : _ Type_scheme.type_)];
+    let type_ = replace_co_occurring_vars type_ ~var_classes in
+    (* TODO: Rename replaced variables in the type to give nicer types. e.g. rename (a, c)
+       -> (a, b). *)
+    (* All of the constraints are made moot by replacing vars with the union of their
+       relevant bounds, so there will be none left. *)
+    type_, []
+  ;;
+
+  (* FIXME: cleanup *)
+  (* let simplify_type
+    ((outer_type, constraints) : Module_path.absolute Type_scheme.t)
+    =
+    let negative_vars, positive_vars =
+      let loop_var (negative_vars, positive_vars) ~(polarity : Polarity.t) var =
+        match polarity with
+        | Positive -> negative_vars, Set.add positive_vars var
+        | Negative -> Set.add negative_vars var, positive_vars
+      in
+      let rec loop acc ~polarity (typ : _ Type_scheme.type_) =
+        match typ with
+        | Var var -> loop_var acc var ~polarity
+        | Function (args, effects, res) ->
+          let acc =
+            Nonempty.fold args ~init:acc ~f:(loop ~polarity:(Polarity.flip polarity))
+          in
+          let acc = loop_effects acc ~polarity effects in
+          loop acc ~polarity res
+        | Type_app (_, fields) ->
+          (* TODO: Handle type variable variance. *)
+          List.fold fields ~init:acc ~f:(loop ~polarity)
+        | Tuple fields -> List.fold fields ~init:acc ~f:(loop ~polarity)
+        | Union types | Intersection types ->
+          Non_single_list.fold types ~init:acc ~f:(loop ~polarity)
+      and loop_effects acc ~polarity (effects : _ Type_scheme.effects) =
+        match effects with
+        | Effect (_name, args) ->
+          (* TODO: Handle effect variable variance. *)
+          List.fold args ~init:acc ~f:(loop ~polarity)
+        | Effect_var var -> loop_var acc var ~polarity
+        | Effect_union effects | Effect_intersection effects ->
+          Non_single_list.fold effects ~init:acc ~f:(loop_effects ~polarity)
+      in
+      loop (Type_param.Set.empty, Type_param.Set.empty) ~polarity:Positive outer_type
     in
     eprint_s
       [%message
-        "vars after simplifying var sandwiches and subbing in unions/intersections"
-          (type_ : _ Type_scheme.type_)
+        "vars"
+          (outer_type : _ Type_scheme.type_)
           (negative_vars : Type_param.Set.t)
           (positive_vars : Type_param.Set.t)];
-    let type_ = replace_co_occurring_vars type_ ~var_classes in
+    let lower_bounds =
+      List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)
+      |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
+    in
+    let upper_bounds =
+      List.map constraints ~f:(fun { subtype; supertype } -> subtype, supertype)
+      |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
+    in
+    let get_relevant_var_bounds var ~(polarity : Polarity.t) =
+      let bounds_map =
+        match polarity with
+        | Positive -> lower_bounds
+        | Negative -> upper_bounds
+      in
+      Map.find bounds_map var |> Option.value ~default:Type_param.Set.empty
+    in
+    let all_vars =
+      Type_param.Set.union_list
+        [ positive_vars
+        ; negative_vars
+        ; Map.key_set lower_bounds
+        ; Map.key_set upper_bounds
+        ]
+    in
+    let var_classes = Map.of_key_set all_vars ~f:Union_find.create in
+    (* FIXME: Don't we need to care about the polarity of the co-occurences? *)
+    (* Union all variables which mutually always co-occur. *)
+    let co_occurences_by_var =
+      let co_occurences = Type_param.Map.empty in
+      let co_occurences =
+        Set.fold positive_vars ~init:co_occurences ~f:(fun co_occurences var ->
+          let vars = get_relevant_var_bounds var ~polarity:Positive in
+          Map.update co_occurences var ~f:(function
+            | None -> vars
+            | Some existing_vars -> Set.inter existing_vars vars))
+      in
+      Set.fold negative_vars ~init:co_occurences ~f:(fun co_occurences var ->
+        let vars = get_relevant_var_bounds var ~polarity:Negative in
+        Map.update co_occurences var ~f:(function
+          | None -> vars
+          | Some existing_vars -> Set.inter existing_vars vars))
+    in
+    eprint_s [%message (co_occurences_by_var : Type_param.Set.t Type_param.Map.t)];
+    Map.iteri co_occurences_by_var ~f:(fun ~key:var ~data:co_occuring_vars ->
+      let var_class = Map.find_exn var_classes var in
+      let mutually_co_occuring_vars =
+        Set.filter co_occuring_vars ~f:(fun var' ->
+          Map.find co_occurences_by_var var'
+          |> Option.value_map ~f:(Fn.flip Set.mem var) ~default:false)
+      in
+      Set.iter mutually_co_occuring_vars ~f:(fun var' ->
+        Union_find.union var_class (Map.find_exn var_classes var')));
+    (* Union variables which are sandwiched together - variables like a where a <: b and
+       a >: b. *)
+    Map.iteri var_classes ~f:(fun ~key:var ~data:var_class ->
+      let lower_bounds =
+        Map.find lower_bounds var |> Option.value ~default:Type_param.Set.empty
+      in
+      let upper_bounds =
+        Map.find upper_bounds var |> Option.value ~default:Type_param.Set.empty
+      in
+      Set.iter (Set.inter lower_bounds upper_bounds) ~f:(fun var' ->
+        Union_find.union var_class (Map.find_exn var_classes var')));
+    let var_replacements =
+      Map.filter_mapi var_classes ~f:(fun ~key:var ~data:var_class ->
+        let replaced_var = Union_find.get var_class in
+        if Type_param.equal var replaced_var then None else Some replaced_var)
+    in
+    let replace_var
+      var
+      ~(polarity : Polarity.t)
+      ~make_var
+      ~union
+      ~intersection
+      ~on_unconstrained
+      =
+      match Map.find var_replacements var with
+      | Some replaced_var -> make_var replaced_var
+      | None ->
+        let bounds =
+          get_relevant_var_bounds var ~polarity
+          |> Type_param.Set.map ~f:(fun var ->
+               Map.find var_replacements var |> Option.value ~default:var)
+        in
+        let combine =
+          match polarity with
+          | Positive -> union
+          | Negative -> intersection
+        in
+        (match Set.to_list bounds, on_unconstrained with
+         | [], `Keep_var -> make_var var
+         | vars, (`Use_union_or_intersection | `Keep_var) ->
+           List.map vars ~f:make_var
+           |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id)
+    in
+    let type_ =
+      let type_name = Fn.id in
+      let effect_name = Fn.id in
+      let rec f (type_ : _ Type_scheme.type_) ~(polarity : Polarity.t)
+        : (_ Type_scheme.type_, _ Type_scheme.type_) Map_action.t
+        =
+        match type_ with
+        | Var var ->
+          Halt
+            (replace_var
+               var
+               ~polarity
+               ~make_var:Type_scheme.var
+               ~intersection:Type_scheme.intersection
+               ~union:Type_scheme.union
+               ~on_unconstrained:`Keep_var)
+        | Function (args, effects, result) ->
+          let args =
+            Nonempty.map args ~f:(fun arg ->
+              Type_scheme.map
+                arg
+                ~f:(f ~polarity:(Polarity.flip polarity))
+                ~type_name
+                ~effect_name)
+          in
+          let effects =
+            Type_scheme.map_effects
+              effects
+              ~f:(f ~polarity)
+              ~f_effects:(f_effects ~polarity)
+              ~type_name
+              ~effect_name
+          in
+          let result = Type_scheme.map ~f:(f ~polarity) ~type_name ~effect_name result in
+          Halt (Function (args, effects, result))
+        (* TODO: Handle variance in type parameters to flip polarity *)
+        | (Type_app _ | Tuple _ | Union _ | Intersection _) as type_ -> Defer type_
+      and f_effects (effects : _ Type_scheme.effects) ~polarity =
+        match effects with
+        | Effect_var var ->
+          Halt
+            (replace_var
+               var
+               ~polarity
+               ~make_var:Type_scheme.effect_var
+               ~union:Type_scheme.effect_union
+               ~intersection:Type_scheme.effect_intersection
+               ~on_unconstrained:`Use_union_or_intersection)
+        | (Effect _ | Effect_union _ | Effect_intersection _) as effects -> Defer effects
+      in
+      Type_scheme.map outer_type ~type_name ~effect_name ~f:(f ~polarity:Positive)
+    in
     (* TODO: Rename replaced variables in the type to give nicer types. e.g. rename (a, c)
      -> (a, b). *)
     (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
     type_, []
-  ;;
+  ;; *)
 
-  let%test_module "simplify_constraints" =
+  let%test_module "simplify_type" =
     (module struct
       let parse_var s = Type_param.t_of_sexp (Atom s)
       let v = Type_scheme.var << parse_var
@@ -1447,7 +1792,7 @@ module Simplification = struct
         print_s
           [%sexp
             { original_type : _ Type_scheme.t
-            ; simplified_type = (simplify_constraints original_type : _ Type_scheme.t)
+            ; simplified_type = (simplify_type original_type : _ Type_scheme.t)
             }]
       ;;
 
@@ -1460,21 +1805,21 @@ module Simplification = struct
           , [ "a" <: "b"; "e1" <: "e2"; "c" <: "d" ] );
         [%expect
           {|
-        ((original_type
-          ((Function
-            ((Type_app List ((Var a)))
-             (Function ((Type_app List ((Var b)))) (Effect_var e1)
-              (Type_app List ((Var c)))))
-            (Effect_var e2) (Var d))
-           (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
-            ((subtype c) (supertype d)))))
-         (simplified_type
-          ((Function
-            ((Type_app List ((Var a)))
-             (Function ((Type_app List ((Var a)))) (Effect_var e1)
-              (Type_app List ((Var c)))))
-            (Effect_var e1) (Var c))
-           ()))) |}]
+          ((original_type
+            ((Function
+              ((Type_app List ((Var a)))
+               (Function ((Type_app List ((Var b)))) (Effect_var e1)
+                (Type_app List ((Var c)))))
+              (Effect_var e2) (Var d))
+             (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
+              ((subtype c) (supertype d)))))
+           (simplified_type
+            ((Function
+              ((Type_app List ((Var a)))
+               (Function ((Type_app List ((Var a)))) (Effect_var e1)
+                (Type_app List ((Var c)))))
+              (Effect_var e1) (Var c))
+             ()))) |}]
       ;;
 
       let%expect_test "if" =
@@ -1482,12 +1827,12 @@ module Simplification = struct
           (Function ([ bool; v "a"; v "b" ], ev 1, v "c"), [ "a" <: "c"; "b" <: "c" ]);
         [%expect
           {|
-        ((original_type
-          ((Function ((Type_app Bool ()) (Var a) (Var b)) (Effect_var e1) (Var c))
-           (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
-         (simplified_type
-          ((Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a))
-           ()))) |}]
+          ((original_type
+            ((Function ((Type_app Bool ()) (Var a) (Var b)) (Effect_var e1) (Var c))
+             (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
+           (simplified_type
+            ((Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a))
+             ()))) |}]
       ;;
 
       let%expect_test "<=" =
@@ -1500,6 +1845,21 @@ module Simplification = struct
              (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
            (simplified_type
             ((Function ((Var c) (Var c)) (Effect_union ()) (Type_app Bool ())) ()))) |}]
+      ;;
+
+      let%expect_test "id" =
+        run_test (Function ([ v "a" ], Effect_union [], v "a"), []);
+        [%expect
+          {|
+          ((original_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))
+           (simplified_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))) |}];
+        run_test (Function ([ v "a" ], ev 1, v "b"), [ "a" <: "b" ]);
+        [%expect
+          {|
+          ((original_type
+            ((Function ((Var a)) (Effect_var e1) (Var b))
+             (((subtype a) (supertype b)))))
+           (simplified_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))) |}]
       ;;
     end)
   ;;
@@ -1567,7 +1927,7 @@ let generalize types outer_type =
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   (* FIXME: cleanup *)
   (* let result = scheme, constraints in *)
-  let result = Simplification.simplify_constraints (scheme, constraints) in
+  let result = Simplification.simplify_type (scheme, constraints) in
   (* Constraints.print types.constraints; *)
   eprint_s
     [%message
