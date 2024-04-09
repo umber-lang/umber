@@ -1755,29 +1755,27 @@ module Simplification = struct
             }]
       ;;
 
-      let%expect_test "List.map" =
+      let%expect_test "List.concat_map" =
         run_test
           ( Function
-              ( [ list (v "a"); Function ([ list (v "b") ], ev 1, list (v "c")) ]
+              ( [ list (v "a"); Function ([ v "b" ], ev 1, list (v "c")) ]
               , ev 2
-              , v "d" )
+              , list (v "d") )
           , [ "a" <: "b"; "e1" <: "e2"; "c" <: "d" ] );
         [%expect
           {|
           ((original_type
             ((Function
               ((Type_app List ((Var a)))
-               (Function ((Type_app List ((Var b)))) (Effect_var e1)
-                (Type_app List ((Var c)))))
-              (Effect_var e2) (Var d))
+               (Function ((Var b)) (Effect_var e1) (Type_app List ((Var c)))))
+              (Effect_var e2) (Type_app List ((Var d))))
              (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
               ((subtype c) (supertype d)))))
            (simplified_type
             ((Function
               ((Type_app List ((Var a)))
-               (Function ((Type_app List ((Var a)))) (Effect_var e1)
-                (Type_app List ((Var c)))))
-              (Effect_var e1) (Var c))
+               (Function ((Var a)) (Effect_var e1) (Type_app List ((Var c)))))
+              (Effect_var e1) (Type_app List ((Var c))))
              ()))) |}]
       ;;
 
