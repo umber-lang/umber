@@ -28,8 +28,8 @@
               ((Tuple ()) ()))
              ((Fun_call (Name AsPattern.iter_pairs)
                ((Function
-                 ((Function ((Var a) (Var a)) (Effect_var c) (Tuple ()))
-                  (Type_app Std.Prelude.List.List ((Var a))))
+                 ((Function ((Var b) (Var b)) (Effect_var c) (Tuple ()))
+                  (Type_app Std.Prelude.List.List ((Var b))))
                  (Effect_var c) (Tuple ()))
                 ())
                (((Name AsPattern.f)
@@ -47,8 +47,8 @@
                  ((Type_app Std.Prelude.List.List ((Var a))) ()))))
               ((Tuple ()) ()))))))))
        ((Function
-         ((Function ((Var a) (Var a)) (Effect_var c) (Tuple ()))
-          (Type_app Std.Prelude.List.List ((Var a))))
+         ((Function ((Var b) (Var b)) (Effect_var c) (Tuple ()))
+          (Type_app Std.Prelude.List.List ((Var b))))
          (Effect_var c) (Tuple ()))
         ()))))))
   (Let (rec_ false)
@@ -57,9 +57,9 @@
       ((Fun_call (Name AsPattern.iter_pairs)
         ((Function
           ((Function ((Type_app String ()) (Type_app String ()))
-            (Effect_intersection ()) (Tuple ()))
+            (Effect_var a) (Tuple ()))
            (Type_app Std.Prelude.List.List ((Type_app String ()))))
-          (Effect_union ()) (Tuple ()))
+          (Effect_var a) (Tuple ()))
          ())
         (((Lambda ((Catch_all (a)) (Catch_all (b)))
            (Fun_call (Name Std.Prelude.print)
