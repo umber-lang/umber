@@ -1256,13 +1256,13 @@ module Simplification = struct
     fun type_ ~init ~f ~f_effects -> loop type_ ~init ~f ~f_effects ~polarity:Positive
   ;;
 
-  let find_var_class var_classes var =
-    Hashtbl.find_or_add var_classes var ~default:(fun () -> Union_find.create var)
-  ;;
-
-  let simplify_var_sandwiches type_ ~var_classes ~lower_bounds ~upper_bounds =
+  let simplify_var_sandwiches type_ ~lower_bounds ~upper_bounds =
     (* Union variables which are sandwiched together - variables like a where a <: b and
        a >: b. *)
+    let var_classes = Type_param.Table.create () in
+    let find_var_class var_classes var =
+      Hashtbl.find_or_add var_classes var ~default:(fun () -> Union_find.create var)
+    in
     Map.iter2 lower_bounds upper_bounds ~f:(fun ~key:var ~data ->
       match data with
       | `Both (subtypes, supertypes) ->
@@ -1276,12 +1276,15 @@ module Simplification = struct
 
   let get_positive_and_negative_vars outer_type =
     let add_var vars ~polarity var =
-      By_polarity.update vars ~polarity ~f:(Fn.flip Set.add var)
+      By_polarity.update vars ~polarity ~f:(fun vars ->
+        Map.update vars var ~f:(function
+          | Some count -> count + 1
+          | None -> 1))
     in
     fold_type_with_polarity
       outer_type
       ~init:
-        { By_polarity.positive = Type_param.Set.empty; negative = Type_param.Set.empty }
+        { By_polarity.positive = Type_param.Map.empty; negative = Type_param.Map.empty }
       ~f:(fun ~polarity vars -> function
            | Var var -> Continue (`Halt (add_var vars ~polarity var))
            | _ -> Continue (`Defer vars))
@@ -1347,8 +1350,9 @@ module Simplification = struct
         | effects -> Defer effects)
   ;;
 
-  (** Remove variables which only occur in positive or negative positions respectively.
-      Replace them with empty unions or intersections (the bottom and top types). *)
+  (** Remove variables which only occur once in a positive or negative position
+      respectively. Replace them with empty unions or intersections (the bottom and top
+      types). *)
   let remove_polar_vars type_ =
     let { By_polarity.positive = positive_vars; negative = negative_vars } =
       get_positive_and_negative_vars type_
@@ -1357,28 +1361,33 @@ module Simplification = struct
       [%message
         "vars after simplifying var sandwiches and subbing in unions/intersections"
           (type_ : _ Type_scheme.type_)
-          (negative_vars : Type_param.Set.t)
-          (positive_vars : Type_param.Set.t)];
+          (negative_vars : int Type_param.Map.t)
+          (positive_vars : int Type_param.Map.t)];
     let replace_var var ~(polarity : Polarity.t) ~make_var ~bottom ~top =
       match polarity with
-      | Positive -> if Set.mem negative_vars var then make_var var else bottom
-      | Negative -> if Set.mem positive_vars var then make_var var else top
+      | Positive ->
+        if Map.mem negative_vars var || Map.find_exn positive_vars var > 1
+        then make_var var
+        else bottom
+      | Negative ->
+        if Map.mem positive_vars var || Map.find_exn negative_vars var > 1
+        then make_var var
+        else top
     in
     map_type_with_polarity
       type_
       ~type_name:Fn.id
       ~effect_name:Fn.id
-      ~f:(fun ~polarity:_ type_ ->
+      ~f:(fun ~polarity type_ ->
         match type_ with
-        (* FIXME: cleanup *)
-        (* | Var var ->
+        | Var var ->
           Halt
             (replace_var
                var
                ~polarity
                ~make_var:Type_scheme.var
                ~bottom:(Union [])
-               ~top:(Intersection [])) *)
+               ~top:(Intersection []))
         | type_ -> Defer type_)
       ~f_effects:(fun ~polarity effects ->
         match effects with
@@ -1394,9 +1403,9 @@ module Simplification = struct
   ;;
 
   (** Union all variables which mutually always co-occur in positive and/or negative
-      positions. *)
-  let replace_co_occurring_vars type_ ~var_classes:_ =
-    (* FIXME: unused var_classes passed in *)
+      positions. Replace variables which always co-occur in positive and/or negative
+      positions with another variable. *)
+  let replace_co_occurring_vars type_ =
     let co_occurences_by_var =
       let update
         ~(co_occurences_by_var : Type_param.Set.t Type_param.Map.t By_polarity.t)
@@ -1506,7 +1515,6 @@ module Simplification = struct
   *)
   let simplify_type ((type_, constraints) : _ Type_scheme.t) =
     eprint_s [%message "simplify_type" (type_, constraints : _ Type_scheme.t)];
-    let var_classes = Type_param.Table.create () in
     let type_ =
       let lower_bounds =
         List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)
@@ -1516,15 +1524,13 @@ module Simplification = struct
         List.map constraints ~f:(fun { subtype; supertype } -> subtype, supertype)
         |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
       in
-      let type_ =
-        simplify_var_sandwiches type_ ~var_classes ~lower_bounds ~upper_bounds
-      in
+      let type_ = simplify_var_sandwiches type_ ~lower_bounds ~upper_bounds in
       eprint_s [%message "after simplifying sandwiches" (type_ : _ Type_scheme.type_)];
       replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper_bounds
     in
     let type_ = remove_polar_vars type_ in
     eprint_s [%message "after removing polar vars" (type_ : _ Type_scheme.type_)];
-    let type_ = replace_co_occurring_vars type_ ~var_classes in
+    let type_ = replace_co_occurring_vars type_ in
     (* TODO: Rename replaced variables in the type to give nicer types. e.g. rename (a, c)
        -> (a, b). *)
     (* All of the constraints are made moot by replacing vars with the union of their
@@ -1814,6 +1820,24 @@ module Simplification = struct
              (((subtype a) (supertype b)))))
            (simplified_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))) |}]
       ;;
+
+      let%expect_test "between" =
+        run_test
+          ( Function ([ v "c"; Tuple [ v "a"; v "b" ] ], Effect_union [], bool)
+          , [ "c" <: "a"; "c" <: "b" ] );
+        [%expect
+          {|
+          ((original_type
+            ((Function ((Var c) (Tuple ((Var a) (Var b)))) (Effect_union ())
+              (Type_app Bool ()))
+             (((subtype c) (supertype a)) ((subtype c) (supertype b)))))
+           (simplified_type
+            ((Function ((Intersection ((Var a) (Var b))) (Tuple ((Var a) (Var b))))
+              (Effect_union ()) (Type_app Bool ()))
+             ()))) |}]
+      ;;
+
+      (* TODO: Quickcheck test that type simplification is idempotent. *)
     end)
   ;;
 end

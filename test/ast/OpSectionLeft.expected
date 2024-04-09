@@ -45,11 +45,11 @@
           (body
            (Lambda ((Catch_all (*arg1)))
             (Fun_call (Name OpSectionLeft.f)
-             ((Function ((Type_app String ()) (Var a)) (Effect_union ())
-               (Var c))
+             ((Function ((Type_app String ()) (Intersection ()))
+               (Effect_union ()) (Union ()))
               ())
              (((Name OpSectionLeft.*arg0) ((Type_app String ()) ()))
-              ((Name OpSectionLeft.*arg1) ((Var a) ())))))))))
+              ((Name OpSectionLeft.*arg1) ((Union ()) ())))))))))
        ((Function
          ((Function ((Type_app String ()) (Var a)) (Effect_var b) (Var c)))
          (Effect_union ()) (Function ((Var a)) (Effect_var b) (Var c)))
