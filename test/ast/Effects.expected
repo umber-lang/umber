@@ -5,6 +5,19 @@
      (operations
       ((((name ask) (args ((Tuple ())))
          (result (Type_app Std.Prelude.Int.Int ())))))))))
+  (Common_def
+   (Val read ()
+    (()
+     ((Function ((Tuple ())) (Effect Effects.Read ())
+       (Type_app Std.Prelude.Int.Int ()))
+      ()))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all (read))
+      ((Name Effects.ask)
+       ((Function ((Tuple ())) (Effect Effects.Read ())
+         (Type_app Std.Prelude.Int.Int ()))
+        ()))))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (read_and_add))

@@ -3,6 +3,8 @@ effect Read = {
   val ask : () => () -> Int
 }
 
-# TODO: Add syntax for effect type annotations
-# `read_and_add : () -> <Read> Int`
+
+val read : () => () -> <Read> Int
+let read = ask
+
 let read_and_add () = ask () + ask ()

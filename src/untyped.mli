@@ -47,6 +47,10 @@ val create_effect
   -> 'name Module.sig_ Node.t list option
   -> 'name Effect.t
 
+val parse_effects_from_type_exprs
+  :  Module_path.relative Type_scheme.type_ list
+  -> Module_path.relative Type_scheme.effects
+
 module Module : sig
   include module type of Module
 

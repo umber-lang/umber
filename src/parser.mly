@@ -43,6 +43,8 @@
 %token R_BRACKET
 %token L_BRACE
 %token R_BRACE
+%token LESS_THAN
+%token GREATER_THAN
 %token PERIOD
 
 %token <int> N_PERIODS
@@ -63,6 +65,8 @@
 
 val_operator:
   | op = OPERATOR { op }
+  | LESS_THAN { Ustring.of_uchar (Uchar.of_char '<') }
+  | GREATER_THAN { Ustring.of_uchar (Uchar.of_char '>') }
   | n = N_PERIODS { Ustring.make n (Uchar.of_char '.') }
 
 operator:
@@ -226,10 +230,14 @@ type_fun_args:
   | arg = type_non_fun { Nonempty.singleton arg }
   | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
 
+%inline type_effects:
+  | LESS_THAN; type_exprs = separated_list(COMMA, type_expr); GREATER_THAN
+    { Untyped.parse_effects_from_type_exprs type_exprs }
+
 %inline type_fun:
-  | args = type_fun_args; ARROW; body = type_non_fun
-    (* TODO: Implement effect syntax in function types. *)
-    { Type_scheme.Function (args, Effect_union [], body) }
+  | args = type_fun_args; ARROW; effects = type_effects?; body = type_non_fun
+    { Type_scheme.Function
+        (args, Option.value effects ~default:(Type_scheme.effect_union []), body) }
 
 type_expr:
   | t = type_non_fun { t }

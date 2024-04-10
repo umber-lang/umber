@@ -25,6 +25,7 @@ type token = Parser.token =
   | LOWER_NAME of Ustring.t
   | LET_NONREC
   | LET
+  | LESS_THAN
   | INT of int
   | INFIXR
   | INFIXL
@@ -33,6 +34,7 @@ type token = Parser.token =
   | IMPORT
   | IMPL
   | IF
+  | GREATER_THAN
   | FLOAT of float
   | FILE_MODULE
   | FAT_ARROW
@@ -89,6 +91,7 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_LOWER_NAME : Ustring.t terminal
   | T_LET_NONREC : unit terminal
   | T_LET : unit terminal
+  | T_LESS_THAN : unit terminal
   | T_INT : int terminal
   | T_INFIXR : unit terminal
   | T_INFIXL : unit terminal
@@ -97,6 +100,7 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_IMPORT : unit terminal
   | T_IMPL : unit terminal
   | T_IF : unit terminal
+  | T_GREATER_THAN : unit terminal
   | T_FLOAT : float terminal
   | T_FILE_MODULE : unit terminal
   | T_FAT_ARROW : unit terminal
@@ -145,6 +149,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_separated_nonempty_list_PIPE_match_branch_
       : (Umber__Untyped.Pattern.t Node.t * Untyped.Expr.t Node.t) list nonterminal
+  | N_separated_nonempty_list_COMMA_type_expr_
+      : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_separated_nonempty_list_COMMA_import_paths_ : Module.Import.Paths.t list nonterminal
   | N_separated_nonempty_list_AND_let_binding_
       : (Umber__Untyped.Pattern.t Node.t * Untyped.Expr.t Node.t) list nonterminal
@@ -169,6 +175,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         , Parser_scope.Module_path.relative )
         Pattern.t
         nonterminal
+  | N_option_type_effects_
+      : Parser_scope.Module_path.relative Type_scheme.effects option nonterminal
   | N_option_preceded_EQUALS_type_decl__
       : Parser_scope.Module_path.relative Type_decl.decl option nonterminal
   | N_option_preceded_EQUALS_pattern__
@@ -210,6 +218,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         * Parser_scope.Module_path.relative Type_scheme.type_ list)
         list
         nonterminal
+  | N_loption_separated_nonempty_list_COMMA_type_expr__
+      : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_loption_preceded_FILE_MODULE_braces_list_stmt_sig____
       : Parser_scope.Module_path.relative Module.sig_ Node.t list nonterminal
   | N_loption_equals_defs_

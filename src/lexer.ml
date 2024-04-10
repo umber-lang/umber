@@ -123,6 +123,8 @@ let rec read lexbuf =
   | '.' -> PERIOD
   | "->" -> ARROW
   | "=>" -> FAT_ARROW
+  | "<" -> LESS_THAN
+  | ">" -> GREATER_THAN
   (* Brackets *)
   | '(' -> L_PAREN
   | ')' -> R_PAREN

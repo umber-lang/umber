@@ -10,7 +10,7 @@ LET
 EQUALS
 IF
 (LOWER_NAME current)
-(OPERATOR <)
+LESS_THAN
 (LOWER_NAME end_after)
 THEN
 (LOWER_NAME loop)

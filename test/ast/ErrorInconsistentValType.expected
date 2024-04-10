@@ -10,8 +10,8 @@
       ()))
     (inferred
      ((Function
-       ((Type_app Std.Prelude.List.List ((Var n)))
-        (Function ((Var n)) (Effect_union ()) (Var n)))
-       (Effect_union ()) (Type_app Std.Prelude.List.List ((Var n))))
+       ((Type_app Std.Prelude.List.List ((Var k)))
+        (Function ((Var k)) (Effect_union ()) (Var k)))
+       (Effect_union ()) (Type_app Std.Prelude.List.List ((Var k))))
       ()))))
   (filename ErrorInconsistentValType.um) (span 6:5-6:8)))
