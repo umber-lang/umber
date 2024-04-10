@@ -377,17 +377,6 @@ let rename_vars type_ =
     Hashtbl.find_or_add vars var ~default:(fun () -> Type_param.Generator.next generator))
 ;;
 
-(* FIXME: Simplification ideas from simple-sub:
-   - Do co-occurence analysis: for each variable, find out which variables it always
-     co-occurs with
-   - Partition the variables into equivalence classes based on mutually always co-occuring
-     and pick one from each class to keep.
-     - Co-occurence comes from subbing in unions/intersections. We have enough information
-       from the sets of positive/negative vars and upper/lower bounds to calculate it
-   - Variables sandwiched by another variable (e.g. a <: b and b <: a) can be unified with
-     that variable too (shows up in co-occurence analysis as co-occuring in both positive
-     and negative positions with another var)
-  *)
 let simplify_type ((type_, constraints) : _ Type_scheme.t) =
   eprint_s [%message "simplify_type" (type_, constraints : _ Type_scheme.t)];
   let type_ =

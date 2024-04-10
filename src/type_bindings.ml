@@ -15,7 +15,7 @@ let eprint_s = ignore
 
 (** Prevent unstable [Type_var.t]s from appearing in test output sexps. *)
 let replace_vars_in_sexp env sexp =
-  (* FIXME: Need a way to show an internnal type with stable names for the variables.
+  (* FIXME: Need a way to show an internal type with stable names for the variables.
      Hmm, maybe it would be good enough if each type expression had its own variable scope,
      instead of it being global. Maybe generalize what Mir_name.Name_table does? Or make a
      wrapper for Unique_id.Int ()? Or an easier way: map over the sexp. *)
@@ -108,14 +108,10 @@ end = struct
     Hash_set.add (get_bounds lower_bounds supertype) subtype
   ;;
 
-  (* FIXME: Actually, only keep constraints of the form a- <: b+ *)
   (* If we get a constraint [a <: b], we also need to add all constraints transitively
      implied by that, so that the constraints remain closed under logical implication.
      So we need to add all constraints of the form a' <: b' for all a' <: a and b' >: b. *)
   let add t ~subtype ~supertype =
-    (* FIXME: remove *)
-    if Hashtbl.length t.lower_bounds > 10000 || Hashtbl.length t.upper_bounds > 10000
-    then failwith "Blew up";
     List.iter
       (subtype :: Hash_set.to_list (get_bounds t.lower_bounds subtype))
       ~f:(fun subtype' ->
@@ -129,24 +125,6 @@ end = struct
     Hash_set.filter_inplace (get_bounds upper_bounds var) ~f:(not << Set.mem vars)
   ;;
 
-  (* FIXME: I don't think this captures everything. 
-     An equivalence relation must be reflexive, symmetric, and transitive.
-
-     If we define a ~= b as (a <: b | a :> b), we have:
-
-     a ~= a
-     <=> (a <: a | a :> a) which is true
-
-     a ~= b
-     <=> (a <: b | a :> b)
-     => (b <: a | b :> a)
-     => b ~= a
-
-     a ~= b & b ~= c
-     => (a <: b | a :> b) & (b <: c | b :> c) 
-
-     We need to keep collecting all the reachable bounds through all variables. (I think?)
-  *)
   let find_vars_with_same_shape { lower_bounds; upper_bounds } var =
     let rec loop collected_vars var =
       let add_vars_from_bounds bounds collected_vars =
@@ -288,32 +266,6 @@ end = struct
     | Some (Type _) -> compiler_bug [%message "Expected effects, got type"]
   ;;
 
-  (* FIXME: This won't fully compose types such that doing a single application reaches a
-     fixpoint.
-     
-     Ah, actually I think the problem is that adding a mapping to a new var would
-     necessitate updating *all* previous values. Maybe we can just follow the values as
-     we go.
-
-     Problem:
-        (substitution
-        (($0
-          (Type
-          (Partial_function ((Type_app Int ()))
-            ((effects ()) (effect_var ($12))) $11)))
-        ($1
-          (Type
-          (Partial_function ((Type_app Int ()))
-            ((effects ()) (effect_var ($14))) $13)))
-        ($2 (Type (Type_app Int ()))) ($4 (Type (Type_app Float ())))
-        ($6 (Type (Type_app Float ()))) ($7 (Type (Type_app Int ())))
-        ($9 (Type (Type_app Float ()))) ($11 (Type (Type_app Float ())))
-        ($13 (Type (Type_app Float ()))))))))
-    ("generalize result" (outer_type (Var $1))
-    (substituted_type
-      (Partial_function ((Type_app Int ())) ((effects ()) (effect_var ($14)))
-      $13))
-     *)
   let compose t t' =
     Hashtbl.iteri t' ~f:(fun ~key:var ~data:new_value ->
       Hashtbl.update t var ~f:(function
@@ -360,17 +312,6 @@ and occurs_in_effects id ({ effects; effect_var } : Internal_type.effects) =
 
 let fun_arg_number_mismatch = type_error "Function argument number mismatch"
 
-(* FIXME: cleanup *)
-(* let unhandled_effects effects =
-  Compilation_error.raise
-    Type_error
-    ~msg:
-      [%message
-        "Unhandled effects"
-          (effects
-            : (Type_var.t, Type_var.t, Module_path.absolute) Internal_type.effects)]
-;; *)
-
 let iter2_types xs ys ~subtype ~supertype ~f =
   match List.iter2 ~f xs ys with
   | Ok () -> ()
@@ -382,17 +323,6 @@ let refresh_type type_ =
   let refresh_var = Hashtbl.find_or_add vars ~default:Type_var.create in
   Internal_type.map_vars type_ ~f:refresh_var
 ;;
-
-(* FIXME: cleanup *)
-(* let refresh_effects ({ effects; effect_var } : Internal_type.effects)
-  : Internal_type.effects
-  =
-  let vars = Type_var.Table.create () in
-  let refresh_var = Hashtbl.find_or_add vars ~default:Type_var.create in
-  { effects = Map.map effects ~f:(List.map ~f:(Internal_type.map_vars ~f:refresh_var))
-  ; effect_var = Option.map effect_var ~f:refresh_var
-  }
-;; *)
 
 (* FIXME: Just use this for types, not effects *)
 let check_var_vs_type
@@ -411,26 +341,6 @@ let check_var_vs_type
     | `Left -> f (to_var var) type_
     | `Right -> f type_ (to_var var)
   in
-  (* FIXME: Clean up pseudocode:
-     Let S be the current substitution, C be the current constraints.
-     
-     - Make a new substitution S' with all vars of the same shape as id1 in C each
-       mapping to different refreshed versions of type2
-     - Make a new set of constraints C' with subtyping relations between all pairs of
-       vars of the same shape as id1 in C.
-     - Recurse with:
-       - S = S' composed with S. (Map all vars with the same shape as id1 in C to
-         unique refreshed versions of type2, then map that over S)
-       - C = C - C' (Remove all subtyping constraints involving vars of the same shape
-         as id1 in C.)
-       - S' applied to all future constraints. (So apply S to constraints first.)
-         FIXME: Wait, but freshly added constraints when decomposing vars won't get
-         the substitution applied, right? Add another function for that?
-       - Also process these new constraints (without applying S' to them...):
-         - S'(id1) <= type2 (Constraint for the new version of id1)
-         - S'(C') (Constraints for all the new versions of vars with the same shape
-           as id1)
-  *)
   let vars_with_same_shape =
     Constraints.find_vars_with_same_shape types.constraints var
   in
@@ -464,7 +374,6 @@ let check_var_vs_type
       constrain ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
 ;;
 
-(* FIXME: Doesn't each type kind of have its own polarity? How do we find that out? *)
 let rec constrain ~names ~types ~subtype ~supertype =
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     (* FIXME: Isn't this code setting up [params] redundant? *)
@@ -668,28 +577,6 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       =
       supertype
     in
-    (* FIXME: Ok, what's going on in this function? 
-       We want to unify the known effects and the effect variables. Conceptually, if we have
-       <e1, a> <: <e2, b>, we want to constrain like this: (a - e1) <: (b - e2).
-       Can we do some sketchy algebra to make this (a) <: (b - e2 + e1) ?
-       or maybe (a + e2 - e1) <: (b) ?
-
-       Cases:
-       - If the variables are both missing or equal, just constrain that e1 <: e2 i.e.
-         there are no effects in e1 not in e2. Effect polymorphism makes this a bit weird,
-         but fine.
-       - If a exists but b does not, a + e1 <: e2, so subtype_only (e1 - e2) must be empty,
-         then constrain a <: e2 - e1, or just a <: e2 should also be correct I guess,
-         since (e2 - e1) <: e2. Use check_var_vs_type for this.
-       - If b exists but a does not, e1 <: b + e2, so subtype_only (e1 - e2) may be
-         non-empty (b would contain the rest). Constrain e1 - e2 <: b. Use
-         check_var_vs_type with subtype_only as a new effect type.
-       - If both a and b exist, we have the general case of a + e1 <: b + e2.
-
-       Actually, check_var_vs_type is just gonna do some recursion, yeah? Hmm, maybe
-       through some janky modifications of substitution/constraints, this can make
-       progress? We need to apply substitutions, similarly to for regular types.
-    *)
     let subtype_only, supertype_only =
       Map.fold_symmetric_diff
         subtype_effects
@@ -713,7 +600,6 @@ and constrain_effects ~names ~types ~subtype ~supertype =
              | Unequal_lengths ->
                compiler_bug [%message "Unequal number of arguments to effect types"]))
     in
-    (* FIXME: Following paper, rewriting this part *)
     let constrain_effect_vars types ~subtype_var ~supertype_var =
       match subtype_var, supertype_var with
       | Some subtype, Some supertype ->
@@ -767,7 +653,6 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           ~new_var:new_supertype_var
           ~effects_subtyping_dir:`Subtype
       in
-      (* FIXME: Not sure if this is right, or all we need. *)
       constrain_effect_vars
         types
         ~subtype_var:new_subtype_var
@@ -799,85 +684,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v ->
         Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v' ->
           constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
-      (* FIXME: Do we need an occurs check for effects? *)
-      (* FIXME: cleanup *)
-      (* let check_subtype_only_is_empty () =
-        if not (Map.is_empty subtype_only)
-        then
-          Compilation_error.raise
-            Type_error
-            ~msg:
-              [%message
-                "Found more effects than expected"
-                  ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
-      in
-      match subtype_var, supertype_var with
-      | None, None -> check_subtype_only_is_empty ()
-      | Some subtype_var, Some supertype_var when Type_var.equal subtype_var supertype_var
-        -> check_subtype_only_is_empty ()
-      | Some subtype_var, None ->
-        check_subtype_only_is_empty ();
-        (* FIXME: Robust effect occurs check *)
-        if occurs_in_effects subtype_var supertype
-        then (
-          let env = Type_param.Env_of_vars.create () in
-          Compilation_error.raise
-            Type_error
-            ~msg:
-              [%message
-                "Occurs check failed"
-                  ~type1:
-                    (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
-                      : Sexp.t)
-                  ~type2:
-                    (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
-                      : Sexp.t)]);
-        (* FIXME: Take the supertype only effects and add them to the subtype_var *)
-        check_var_vs_type
-          ~names
-          ~types
-          ~var:subtype_var
-          ~type_:supertype
-          ~var_side:`Left
-          ~constrain:constrain_effects
-          ~to_var:(fun var : Internal_type.effects ->
-            { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
-          ~set_substitution:Substitution.set_effects
-          ~refresh:refresh_effects
-      | (None | Some _), Some supertype_var ->
-        (* FIXME: When doing None <: Some var, I think we might be constraining the shape
-         of the var improperly. Stating that something is a supertype of total should be
-         a no-op. *)
-        (* FIXME: Robust effect occurs check *)
-        if occurs_in_effects supertype_var subtype
-        then (
-          let env = Type_param.Env_of_vars.create () in
-          Compilation_error.raise
-            Type_error
-            ~msg:
-              [%message
-                "Occurs check failed"
-                  ~type1:
-                    (replace_vars_in_sexp env [%sexp (subtype : Internal_type.effects)]
-                      : Sexp.t)
-                  ~type2:
-                    (replace_vars_in_sexp env [%sexp (supertype : Internal_type.effects)]
-                      : Sexp.t)]);
-        (* FIXME: If there's no suptype var, add the subtype_only effects as a subtype of
-         supertype_var. If there is a subtype_var, how do we reconcile the effects diff?
-         We need to somehow match up the subtype_only/supertype_only effects with the
-         subtype and supertype vars. *)
-        check_var_vs_type
-          ~names
-          ~types
-          ~var:supertype_var
-          ~type_:subtype
-          ~var_side:`Right
-          ~constrain:constrain_effects
-          ~to_var:(fun var : Internal_type.effects ->
-            { effect_var = Some var; effects = Effect_name.Absolute.Map.empty })
-          ~set_substitution:Substitution.set_effects
-          ~refresh:refresh_effects *)))
+      (* FIXME: Do we need an occurs check for effects? *)))
 
 and constrain_effects_to_be_total ~names ~types effects =
   constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
@@ -914,9 +721,6 @@ and instantiate_type_scheme =
         constrain ~names ~types ~subtype ~supertype:var);
       var
     | Intersection args ->
-      (* FIXME: We get the same behavior with empty intersections and unions, which
-         doesn't seem right?. (Maybe polarity restricts the type expressions we create so
-         it's fine somehow?). *)
       let var = Internal_type.fresh_var () in
       let args =
         Non_single_list.map args ~f:(instantiate_type_scheme ~names ~types ~params)
@@ -1026,44 +830,6 @@ let constrain' ~names ~types ~subtype ~supertype =
    Substituting means we should 
    ...
 *)
-
-(* FIXME: function variance goes from contra -> co.
-   You can reduce the set of possible inputs or increase the set of possible outputs
-   and get a supertype.
-   A -> B is a subtype of C -> D iff C is a subtype of A and B is a subtype of D.
-
-   When we take the "union" of two function types, we're trying to find a function
-   type which is a supertype of both of them. Maybe we can just consider the
-   effect types? Hmm, but now we've introduced subtyping in, it might be anywhere.
-
-   e.g. For
-   `Int -> <> (Int -> <Foo> Int)`
-   and
-   `Int -> <> (Int -> <Bar> Int)`
-   we can say the union is `Int -> <> (Int -> <Foo,Bar> Int)`
-
-   And for
-   `(Int -> <Foo> Int) -> <> Int`
-   and
-   `(Int -> <Bar> Int) -> <> Int`
-   we can say the union is `(Int -> <> Int) -> <> Int` by finding a type which is
-   a subtype of both of the effects in the argument functions. So this is
-   intersection instead of union.
-*)
-(* FIXME: We can't just eagerly union everything. We need to be able to union variables
-   and known types as part of bounds. We need to represent unions explicitly in the
-   intermediate types. *)
-(* let rec union_types t1 t2 =
-  Internal_type.map2 t1 t2 ~var:Fn.const ~eff:union_effects ~f_contra:(fun (t1, t2) ->
-    Halt (intersect_types t1 t2))
-
-and intersect_types t1 t2 =
-  Internal_type.map2 t1 t2 ~var:Fn.const ~eff:intersect_effects ~f_contra:(fun (t1, t2) ->
-    Halt (union_types t1 t2))
-
-(* FIXME: implement *)
-and union_effects _ _ = failwith "FIXME: union_effects"
-and intersect_effects _ _ = failwith "FIXME: intersect_effects" *)
 
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
