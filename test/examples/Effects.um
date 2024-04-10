@@ -7,3 +7,7 @@ val read : () => () -> <Read> Int
 let read = ask
 
 let read_and_add () = ask () + ask ()
+
+let run_both f g x = (f x, g x)
+
+let foo () = run_both (\x -> x + read_and_add ()) print_int 5
