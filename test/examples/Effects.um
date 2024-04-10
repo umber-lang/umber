@@ -3,7 +3,6 @@ effect Read = {
   val ask : () => () -> Int
 }
 
-
 val read : () => () -> <Read> Int
 let read = ask
 
