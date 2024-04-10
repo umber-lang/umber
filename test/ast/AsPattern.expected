@@ -30,9 +30,9 @@
               ((Tuple ()) ()))
              ((Fun_call (Name AsPattern.iter_pairs)
                ((Function
-                 ((Function ((Var b) (Var b)) (Effect_var c) (Tuple ()))
-                  (Type_app Std.Prelude.List.List ((Var b))))
-                 (Effect_var c) (Tuple ()))
+                 ((Function ((Var a) (Var a)) (Effect_var b) (Tuple ()))
+                  (Type_app Std.Prelude.List.List ((Var a))))
+                 (Effect_var b) (Tuple ()))
                 ())
                (((Name AsPattern.f)
                  ((Function ((Intersection ()) (Intersection ()))
@@ -50,9 +50,9 @@
                  ((Type_app Std.Prelude.List.List ((Union ()))) ()))))
               ((Tuple ()) ()))))))))
        ((Function
-         ((Function ((Var b) (Var b)) (Effect_var c) (Tuple ()))
-          (Type_app Std.Prelude.List.List ((Var b))))
-         (Effect_var c) (Tuple ()))
+         ((Function ((Var a) (Var a)) (Effect_var b) (Tuple ()))
+          (Type_app Std.Prelude.List.List ((Var a))))
+         (Effect_var b) (Tuple ()))
         ()))))))
   (Let (rec_ false)
    (bindings

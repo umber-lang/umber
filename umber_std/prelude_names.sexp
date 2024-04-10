@@ -605,9 +605,9 @@
                            (Scheme
                             ((Function
                               ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Function ((Var a)) (Effect_var c) (Var d)))
-                              (Effect_var c)
-                              (Type_app Std.Prelude.List.List ((Var d))))
+                               (Function ((Var a)) (Effect_var b) (Var c)))
+                              (Effect_var b)
+                              (Type_app Std.Prelude.List.List ((Var c))))
                              ())))
                           (type_source Let_inferred))))
                        (Cons
@@ -647,10 +647,10 @@
                            (Scheme
                             ((Function
                               ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Function ((Var a)) (Effect_var c)
-                                (Type_app Std.Prelude.List.List ((Var d)))))
-                              (Effect_var c)
-                              (Type_app Std.Prelude.List.List ((Var d))))
+                               (Function ((Var a)) (Effect_var b)
+                                (Type_app Std.Prelude.List.List ((Var c)))))
+                              (Effect_var b)
+                              (Type_app Std.Prelude.List.List ((Var c))))
                              ())))
                           (type_source Let_inferred))))
                        (rev_append

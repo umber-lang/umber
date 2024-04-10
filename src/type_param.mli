@@ -16,6 +16,14 @@ end
 
 include Hashable.S_plain with type t := t
 
+module Generator : sig
+  type type_param := t
+  type t
+
+  val create : unit -> t
+  val next : t -> type_param
+end
+
 module Env_to_vars : sig
   type t
 

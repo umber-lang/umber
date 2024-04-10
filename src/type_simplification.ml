@@ -369,6 +369,14 @@ let replace_co_occurring_vars type_ =
     Hashtbl.find replacements var |> Option.value_map ~f:Union_find.get ~default:var)
 ;;
 
+(* Rename variables in the type to create nicer types (starting with a, b, ...) *)
+let rename_vars type_ =
+  let generator = Type_param.Generator.create () in
+  let vars = Type_param.Table.create () in
+  Type_scheme.map_vars type_ ~f:(fun var ->
+    Hashtbl.find_or_add vars var ~default:(fun () -> Type_param.Generator.next generator))
+;;
+
 (* FIXME: Simplification ideas from simple-sub:
    - Do co-occurence analysis: for each variable, find out which variables it always
      co-occurs with
@@ -398,10 +406,9 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) =
   let type_ = remove_polar_vars type_ in
   eprint_s [%message "after removing polar vars" (type_ : _ Type_scheme.type_)];
   let type_ = replace_co_occurring_vars type_ in
-  (* TODO: Rename replaced variables in the type to give nicer types. e.g. rename (a, c)
-       -> (a, b). *)
+  let type_ = rename_vars type_ in
   (* All of the constraints are made moot by replacing vars with the union of their
-       relevant bounds, so there will be none left. *)
+     relevant bounds, so there will be none left. *)
   type_, []
 ;;
 
@@ -445,8 +452,8 @@ let%test_module "simplify_type" =
            (simplified_type
             ((Function
               ((Type_app List ((Var a)))
-               (Function ((Var a)) (Effect_var e1) (Type_app List ((Var c)))))
-              (Effect_var e1) (Type_app List ((Var c))))
+               (Function ((Var a)) (Effect_var b) (Type_app List ((Var c)))))
+              (Effect_var b) (Type_app List ((Var c))))
              ()))) |}]
     ;;
 
@@ -471,7 +478,7 @@ let%test_module "simplify_type" =
             ((Function ((Var a) (Var b)) (Effect_union ()) (Type_app Bool ()))
              (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
            (simplified_type
-            ((Function ((Var c) (Var c)) (Effect_union ()) (Type_app Bool ())) ()))) |}]
+            ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ()))) |}]
     ;;
 
     let%expect_test "id" =
@@ -500,7 +507,7 @@ let%test_module "simplify_type" =
               (Type_app Bool ()))
              (((subtype c) (supertype a)) ((subtype c) (supertype b)))))
            (simplified_type
-            ((Function ((Intersection ((Var a) (Var b))) (Tuple ((Var a) (Var b))))
+            ((Function ((Intersection ((Var a) (Var b))) (Tuple ((Var b) (Var a))))
               (Effect_union ()) (Type_app Bool ()))
              ()))) |}]
     ;;
