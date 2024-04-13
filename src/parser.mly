@@ -175,16 +175,18 @@ match_branch:
 match_branches:
   | PIPE; branches = separated_nonempty(PIPE, match_branch) { branches }
 
-effect_pattern:
-  | operation = qualified(LOWER_NAME); args = nonempty(pattern)
+effect_pattern_:
+  | LESS_THAN; operation = qualified(LOWER_NAME); args = nonempty(pattern); GREATER_THAN
     { let operation =  Value_name.Relative.of_ustrings_unchecked operation in
-      `Effect { operation; args } }
+      `Effect { Effect_pattern.operation; args } }
   | pattern = pattern { `Value pattern }
 
-handle_branch:
-  | branch = separated_pair(with_loc(effect_pattern), ARROW, expr) { branch }
+%inline effect_pattern: ep = with_loc(effect_pattern_) { ep }
 
-handle_branches:
+%inline handle_branch:
+  | branch = separated_pair(effect_pattern, ARROW, expr) { branch }
+
+%inline handle_branches:
   | PIPE; branches = separated_nonempty(PIPE, handle_branch) { branches }
 
 let_rec:

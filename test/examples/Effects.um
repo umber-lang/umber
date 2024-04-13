@@ -12,6 +12,11 @@ let run_both f g x = (f x, g x)
 
 let foo () = run_both (\x -> x + read_and_add ()) print_int 5
 
+#let _ =
+#  handle ask ()
+#  | <ask ()> -> ()
+
+# TODO: Add a test that you can't handle functions which aren't operations
 
 # FIXME: Move these to separate tests
 # let reraise f =

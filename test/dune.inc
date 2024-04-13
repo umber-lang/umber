@@ -293,6 +293,36 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorEffectsNoValueBranch.expected
+    tokens/ErrorEffectsNoValueBranch.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorEffectsNoValueBranch.expected
+    ast/ErrorEffectsNoValueBranch.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorEffectsNoValueBranch.expected
+    mir/ErrorEffectsNoValueBranch.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorEffectsNoValueBranch.expected
+    llvm/ErrorEffectsNoValueBranch.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorEffectsNoValueBranch.expected
+    output/ErrorEffectsNoValueBranch.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorHangingVal.expected tokens/ErrorHangingVal.out))))
 
 (rule (alias runtest) (deps test.dummy)

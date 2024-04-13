@@ -597,7 +597,15 @@ module Expr = struct
           in
           let value_branch =
             match value_branches with
-            | [] -> None
+            | [] ->
+              (* If there are no value branches, it's equivalent to having a branch which
+                 looks like `x -> x`. *)
+              Type_bindings.constrain
+                ~names
+                ~types
+                ~subtype:expr_type
+                ~supertype:result_type;
+              None
             | [ branch ] -> Some branch
             | _ :: _ ->
               (* TODO: Support multiple branches. Equivalent to using match. *)

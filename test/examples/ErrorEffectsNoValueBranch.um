@@ -1,0 +1,7 @@
+effect Foo = {
+  val foo : unit -> unit
+}
+
+let _ =
+  handle 5
+  | <foo ()> -> ()

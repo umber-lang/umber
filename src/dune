@@ -22,7 +22,8 @@
 (menhir
  (modules parser)
  (flags --table --inspection)
- (infer true))
+ (infer true)
+ (explain true))
 
 (generate_sites_module
  (module sources)

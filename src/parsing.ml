@@ -270,21 +270,6 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_import_stmt : Module.Import.t nonterminal
   | N_import_paths_after_module : Module.Import.Paths.t Nonempty.t nonterminal
   | N_import_paths : Module.Import.Paths.t nonterminal
-  | N_handle_branches
-      : ([ `Effect of Umber__Untyped.Effect_pattern.t
-         | `Value of Umber__Untyped.Pattern.t
-         ]
-         Node.t
-        * Untyped.Expr.t Node.t)
-        Nonempty.t
-        nonterminal
-  | N_handle_branch
-      : ([ `Effect of Umber__Untyped.Effect_pattern.t
-         | `Value of Umber__Untyped.Pattern.t
-         ]
-         Node.t
-        * Untyped.Expr.t Node.t)
-        nonterminal
   | N_flexible_nonempty_COMMA_type_non_fun_
       : Parser_scope.Module_path.relative Type_scheme.type_ Nonempty.t nonterminal
   | N_flexible_nonempty_COMMA_type_annot_non_fun_LOWER_NAME__
@@ -344,7 +329,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_either_val_name_UPPER_NAME_ : Ustring.t nonterminal
   | N_either_LOWER_NAME_UPPER_NAME_ : Ustring.t nonterminal
   | N_either_COLON_COLON_SPACED_ : unit nonterminal
-  | N_effect_pattern
+  | N_effect_pattern_
       : [ `Effect of Umber__Untyped.Effect_pattern.t
         | `Value of Umber__Untyped.Pattern.t
         ]
