@@ -8,6 +8,13 @@ module Pattern : sig
   [@@deriving equal, sexp]
 end
 
+module Effect_pattern : sig
+  include module type of Effect_pattern
+
+  type nonrec t = (Module_path.relative Type_scheme.Bounded.t, Module_path.relative) t
+  [@@deriving equal, sexp]
+end
+
 module Expr : sig
   type t =
     | Literal of Literal.t
@@ -18,6 +25,10 @@ module Expr : sig
     | Lambda of Pattern.t Node.t Nonempty.t * t Node.t
     | If of t Node.t * t Node.t * t Node.t
     | Match of t Node.t * (Pattern.t Node.t * t Node.t) Nonempty.t
+    | Handle of
+        t Node.t
+        * ([ `Effect of Effect_pattern.t | `Value of Pattern.t ] Node.t * t Node.t)
+          Nonempty.t
     | Let of (Pattern.t, t) Let_binding.t
     | Tuple of t Node.t list
     | Seq_literal of t Node.t list

@@ -13,6 +13,7 @@ type token = Parser.token =
   | R_PAREN
   | R_BRACKET
   | R_BRACE
+  | RESUME
   | PIPE
   | PERIOD
   | OPERATOR of Ustring.t
@@ -34,6 +35,7 @@ type token = Parser.token =
   | IMPORT
   | IMPL
   | IF
+  | HANDLE
   | GREATER_THAN
   | FLOAT of float
   | FILE_MODULE
@@ -79,6 +81,7 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_R_PAREN : unit terminal
   | T_R_BRACKET : unit terminal
   | T_R_BRACE : unit terminal
+  | T_RESUME : unit terminal
   | T_PIPE : unit terminal
   | T_PERIOD : unit terminal
   | T_OPERATOR : Ustring.t terminal
@@ -100,6 +103,7 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_IMPORT : unit terminal
   | T_IMPL : unit terminal
   | T_IF : unit terminal
+  | T_HANDLE : unit terminal
   | T_GREATER_THAN : unit terminal
   | T_FLOAT : float terminal
   | T_FILE_MODULE : unit terminal
@@ -149,6 +153,14 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_separated_nonempty_list_PIPE_match_branch_
       : (Umber__Untyped.Pattern.t Node.t * Untyped.Expr.t Node.t) list nonterminal
+  | N_separated_nonempty_list_PIPE_handle_branch_
+      : ([ `Effect of Umber__Untyped.Effect_pattern.t
+         | `Value of Umber__Untyped.Pattern.t
+         ]
+         Node.t
+        * Untyped.Expr.t Node.t)
+        list
+        nonterminal
   | N_separated_nonempty_list_COMMA_type_expr_
       : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_separated_nonempty_list_COMMA_import_paths_ : Module.Import.Paths.t list nonterminal
@@ -163,6 +175,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
       : (Ustring.t list * (Ustring.t list * Ustring.t)) nonterminal
   | N_qualified_either_LOWER_NAME_UPPER_NAME__ : (Ustring.t list * Ustring.t) nonterminal
   | N_qualified_UPPER_NAME_ : (Ustring.t list * Ustring.t) nonterminal
+  | N_qualified_LOWER_NAME_ : (Ustring.t list * Ustring.t) nonterminal
   | N_prog : Untyped.Module.t nonterminal
   | N_pattern_term
       : ( Parser_scope.Module_path.relative Type_scheme.Bounded.t
@@ -202,6 +215,12 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_nonempty_list_type_term_
       : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_nonempty_list_pattern_term_
+      : ( Parser_scope.Module_path.relative Type_scheme.Bounded.t
+        , Parser_scope.Module_path.relative )
+        Pattern.t
+        list
+        nonterminal
+  | N_nonempty_list_pattern_
       : ( Parser_scope.Module_path.relative Type_scheme.Bounded.t
         , Parser_scope.Module_path.relative )
         Pattern.t
@@ -251,6 +270,21 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_import_stmt : Module.Import.t nonterminal
   | N_import_paths_after_module : Module.Import.Paths.t Nonempty.t nonterminal
   | N_import_paths : Module.Import.Paths.t nonterminal
+  | N_handle_branches
+      : ([ `Effect of Umber__Untyped.Effect_pattern.t
+         | `Value of Umber__Untyped.Pattern.t
+         ]
+         Node.t
+        * Untyped.Expr.t Node.t)
+        Nonempty.t
+        nonterminal
+  | N_handle_branch
+      : ([ `Effect of Umber__Untyped.Effect_pattern.t
+         | `Value of Umber__Untyped.Pattern.t
+         ]
+         Node.t
+        * Untyped.Expr.t Node.t)
+        nonterminal
   | N_flexible_nonempty_COMMA_type_non_fun_
       : Parser_scope.Module_path.relative Type_scheme.type_ Nonempty.t nonterminal
   | N_flexible_nonempty_COMMA_type_annot_non_fun_LOWER_NAME__
@@ -310,6 +344,11 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_either_val_name_UPPER_NAME_ : Ustring.t nonterminal
   | N_either_LOWER_NAME_UPPER_NAME_ : Ustring.t nonterminal
   | N_either_COLON_COLON_SPACED_ : unit nonterminal
+  | N_effect_pattern
+      : [ `Effect of Umber__Untyped.Effect_pattern.t
+        | `Value of Umber__Untyped.Pattern.t
+        ]
+        nonterminal
 [@@deriving sexp_of]
 
 let sexp_of_production prod =

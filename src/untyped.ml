@@ -11,6 +11,13 @@ module Pattern = struct
   [@@deriving equal, sexp]
 end
 
+module Effect_pattern = struct
+  include Effect_pattern
+
+  type nonrec t = (Module_path.relative Type_scheme.Bounded.t, Module_path.relative) t
+  [@@deriving equal, sexp]
+end
+
 module Expr = struct
   type t =
     | Literal of Literal.t
@@ -21,6 +28,10 @@ module Expr = struct
     | Lambda of Pattern.t Node.t Nonempty.t * t Node.t
     | If of t Node.t * t Node.t * t Node.t
     | Match of t Node.t * (Pattern.t Node.t * t Node.t) Nonempty.t
+    | Handle of
+        t Node.t
+        * ([ `Effect of Effect_pattern.t | `Value of Pattern.t ] Node.t * t Node.t)
+          Nonempty.t
     | Let of (Pattern.t, t) Let_binding.t
     | Tuple of t Node.t list
     | Seq_literal of t Node.t list
@@ -69,6 +80,16 @@ module Expr = struct
         let used = Node.with_value expr ~f:(loop ~names used locals) in
         Nonempty.fold branches ~init:used ~f:(fun used (pat, branch) ->
           let locals = Node.with_value pat ~f:(add_locals locals) in
+          Node.with_value branch ~f:(loop ~names used locals))
+      | Handle (expr, branches) ->
+        let used = Node.with_value expr ~f:(loop ~names used locals) in
+        Nonempty.fold branches ~init:used ~f:(fun used (effect_pattern, branch) ->
+          let locals =
+            Node.with_value effect_pattern ~f:(function
+              | `Effect { operation = _; args } ->
+                Nonempty.fold args ~init:locals ~f:add_locals
+              | `Value pattern -> add_locals locals pattern)
+          in
           Node.with_value branch ~f:(loop ~names used locals))
       | Let { rec_; bindings; body } ->
         let new_locals =

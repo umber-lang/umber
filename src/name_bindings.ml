@@ -539,7 +539,7 @@ let find_cnstr_type t cnstr_name =
 let find_fixity t name = Option.value (find_entry t name).fixity ~default:Fixity.default
 
 let ( (find_type_entry_with_path, find_absolute_type_entry_with_path)
-    , (find_effect_entry_with_path, _find_absolute_effect_entry) )
+    , (find_effect_entry_with_path, find_absolute_effect_entry) )
   =
   let make (type name) ~field ~name:(module Name : Name_qualified with type t = name) =
     let rec f t ~defs_only path name bindings =
@@ -1119,19 +1119,30 @@ let merge_names t new_names ~combine =
   update_current t ~f:{ f }
 ;;
 
-let find_absolute_type_entry ?defs_only t type_name =
-  snd (find_absolute_type_entry_with_path ?defs_only t type_name)
-;;
-
 let find_absolute_type_entry ?(defs_only = false) t type_name =
   Option.value_or_thunk
-    (find_absolute_type_entry ~defs_only t type_name)
+    (snd (find_absolute_type_entry_with_path ~defs_only t type_name))
     ~default:(fun () ->
-    compiler_bug
-      [%message
-        "Placeholder decl not replaced"
-          (type_name : Type_name.Absolute.t)
-          (without_std t : t)])
+      compiler_bug
+        [%message
+          "Placeholder decl not replaced"
+            (type_name : Type_name.Absolute.t)
+            (without_std t : t)])
+;;
+
+let find_absolute_effect_entry ?(defs_only = false) t effect_name =
+  Option.value_or_thunk
+    (snd (find_absolute_effect_entry ~defs_only t effect_name))
+    ~default:(fun () ->
+      compiler_bug
+        [%message
+          "Placeholder decl not replaced"
+            (effect_name : Effect_name.Absolute.t)
+            (without_std t : t)])
+;;
+
+let find_absolute_effect_decl ?defs_only t effect_name =
+  (find_absolute_effect_entry ?defs_only t effect_name).decl
 ;;
 
 let find_absolute_type_decl ?defs_only t type_name =

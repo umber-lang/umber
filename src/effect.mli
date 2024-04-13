@@ -7,14 +7,14 @@ module Operation : sig
     ; args : 'n Type_scheme.type_ Nonempty.t
     ; result : 'n Type_scheme.type_
     }
-  [@@deriving sexp]
+  [@@deriving sexp, fields]
 end
 
 type 'n t =
   { params : Type_param_name.t list
   ; operations : 'n Operation.t list option
   }
-[@@deriving sexp]
+[@@deriving sexp, fields]
 
 val map_exprs : 'n1 t -> f:('n1 Type_scheme.type_ -> 'n2 Type_scheme.type_) -> 'n2 t
 val fold_operations : 'n t -> init:'acc -> f:('acc -> 'n Operation.t -> 'acc) -> 'acc

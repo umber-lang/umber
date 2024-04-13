@@ -424,6 +424,7 @@ module Value_name : sig
   val of_cnstr_name : Cnstr_name.t -> t
   val to_cnstr_name : t -> Cnstr_name.t Or_error.t
   val is_cnstr_name : t -> bool
+  val resume_keyword : t
 
   module Qualified : sig
     include module type of Qualified
@@ -437,6 +438,7 @@ end = struct
   let of_cnstr_name = of_ustring_unchecked << Cnstr_name.to_ustring
   let to_cnstr_name = Cnstr_name.of_ustring << to_ustring
   let is_cnstr_name = Or_error.is_ok << to_cnstr_name
+  let resume_keyword = of_string_exn "resume"
 
   module Qualified = struct
     include Qualified

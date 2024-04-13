@@ -90,6 +90,8 @@ let rec read lexbuf =
   | "and" -> AND
   | "in" -> IN
   | "match" -> MATCH
+  | "handle" -> HANDLE
+  | "resume" -> RESUME
   | "with" -> WITH
   | "as" -> AS
   | "type" -> TYPE

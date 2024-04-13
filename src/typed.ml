@@ -11,82 +11,87 @@ module Pattern = struct
 
   type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
 
-  let of_untyped_with_names ~names ~types (pat : Untyped.Pattern.t)
-    : Names.t * (t * Internal_type.t)
-    =
-    let rec of_untyped_with_names ~names ~types pat_names
-      : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
-      = function
-      | Constant lit ->
-        ( pat_names
-        , ( Constant lit
-          , Type_bindings.instantiate_type_scheme ~names ~types (Literal.typ lit) ) )
-      | Catch_all name ->
-        let pat_names, typ =
-          match name with
-          | Some name ->
-            Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder
-          | None -> pat_names, Internal_type.fresh_var ()
-        in
-        eprint_s
-          [%message
-            "pattern bound variable" (name : Value_name.t option) (typ : Internal_type.t)];
-        pat_names, (Catch_all name, typ)
-      | Cnstr_appl (cnstr, args) ->
-        (* TODO: inferring unqualified name given type information *)
-        let expected_arg_types, body_type =
-          let cnstr_type =
-            Name_bindings.find_cnstr_type names cnstr
-            |> Type_bindings.instantiate_type_or_scheme ~names ~types
+  let check_cnstr_application ~names ~types ~(cnstr_type : Internal_type.t) ~arg_types =
+    (* TODO: inferring unqualified name given type information *)
+    let expected_arg_types, effects, result_type =
+      match cnstr_type with
+      | Function (arg_types, effects, result_type) ->
+        Nonempty.to_list arg_types, Some effects, result_type
+      | result_type -> [], None, result_type
+    in
+    match
+      List.iter2 expected_arg_types arg_types ~f:(fun expected_arg_type actual_arg_type ->
+        (* The actual type of the argument must be a supertype of the expected type
+           since we are deconstructing rather than applying the constructor. *)
+        Type_bindings.constrain
+          ~names
+          ~types
+          ~subtype:expected_arg_type
+          ~supertype:actual_arg_type)
+    with
+    | Ok () -> effects, result_type
+    | Unequal_lengths -> type_error_msg "Wrong number of arguments in application"
+  ;;
+
+  let rec of_untyped_with_names ~names ~types pat_names
+    : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
+    = function
+    | Constant lit ->
+      ( pat_names
+      , ( Constant lit
+        , Type_bindings.instantiate_type_scheme ~names ~types (Literal.typ lit) ) )
+    | Catch_all name ->
+      let pat_names, typ =
+        match name with
+        | Some name ->
+          Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder
+        | None -> pat_names, Internal_type.fresh_var ()
+      in
+      eprint_s
+        [%message
+          "pattern bound variable" (name : Value_name.t option) (typ : Internal_type.t)];
+      pat_names, (Catch_all name, typ)
+    | Cnstr_appl (cnstr, args) ->
+      let cnstr_type =
+        Name_bindings.find_cnstr_type names cnstr
+        |> Type_bindings.instantiate_type_or_scheme ~names ~types
+      in
+      let cnstr =
+        Name_bindings.absolutify_value_name
+          names
+          (Value_name.Qualified.of_cnstr_name cnstr)
+        |> Value_name.Qualified.to_cnstr_name
+        |> ok_or_compiler_bug ~here:[%here]
+      in
+      let pat_names, args =
+        List.fold_map args ~init:pat_names ~f:(fun pat_names arg ->
+          of_untyped_with_names ~names ~types pat_names arg)
+      in
+      let args, arg_types = List.unzip args in
+      let effects, result_type =
+        check_cnstr_application ~names ~types ~cnstr_type ~arg_types
+      in
+      assert_or_compiler_bug
+        ~here:[%here]
+        (match effects with
+         | None -> true
+         | Some { effects; effect_var } ->
+           Map.is_empty effects && Option.is_none effect_var);
+      pat_names, (Cnstr_appl (cnstr, args), result_type)
+    | Tuple fields ->
+      let pat_names, fields, field_types =
+        List.fold_right
+          fields
+          ~init:(pat_names, [], [])
+          ~f:(fun field (pat_names, fields, field_types) ->
+          let pat_names, (field, field_type) =
+            of_untyped_with_names ~names ~types pat_names field
           in
-          match cnstr_type with
-          | Function (arg_types, _effect, body_type) ->
-            Nonempty.to_list arg_types, body_type
-          | body_type -> [], body_type
-        in
-        (match
-           List.fold2
-             expected_arg_types
-             args
-             ~init:(pat_names, [])
-             ~f:(fun (pat_names, args) expected_arg_type arg ->
-             let pat_names, (arg, actual_arg_type) =
-               of_untyped_with_names ~names ~types pat_names arg
-             in
-             (* The actual type of the argument must be a supertype of the expected type
-                since we are deconstructing rather than applying the constructor. *)
-             Type_bindings.constrain
-               ~names
-               ~types
-               ~subtype:expected_arg_type
-               ~supertype:actual_arg_type;
-             pat_names, arg :: args)
-         with
-         | Ok (pat_names, args) ->
-           let cnstr =
-             Name_bindings.absolutify_value_name
-               names
-               (Value_name.Qualified.of_cnstr_name cnstr)
-             |> Value_name.Qualified.to_cnstr_name
-             |> ok_or_compiler_bug ~here:[%here]
-           in
-           pat_names, (Cnstr_appl (cnstr, List.rev args), body_type)
-         | Unequal_lengths ->
-           type_error_msg "Wrong number of arguments in constructor application")
-      | Tuple fields ->
-        let pat_names, fields, field_types =
-          List.fold_right
-            fields
-            ~init:(pat_names, [], [])
-            ~f:(fun field (pat_names, fields, field_types) ->
-            let pat_names, (field, field_type) =
-              of_untyped_with_names ~names ~types pat_names field
-            in
-            pat_names, field :: fields, field_type :: field_types)
-        in
-        pat_names, (Tuple fields, Tuple field_types)
-      | Record _fields ->
-        (*let _names, _fields =
+          pat_names, field :: fields, field_type :: field_types)
+      in
+      pat_names, (Tuple fields, Tuple field_types)
+    | Record _fields ->
+      (*let _names, _fields =
           List.fold_right
             fields
             ~init:(names, [])
@@ -102,80 +107,70 @@ module Pattern = struct
             in
             names, (field_name, field_pat) :: fields)
         in*)
-        (*names, (Record fields, Record (List.map ~f:(fun (name, pat) ->
+      (*names, (Record fields, Record (List.map ~f:(fun (name, pat) ->
               match pat with
               | Some (_, typ) -> typ
               | None -> Type_bindings.fresh_var ())))*)
-        failwith "TODO: record types in patterns"
-      | Union (pat1, pat2) ->
-        let pat_names1, (pat1, typ1) =
-          of_untyped_with_names ~names ~types pat_names pat1
-        in
-        let pat_names2, (pat2, typ2) =
-          of_untyped_with_names ~names ~types pat_names pat2
-        in
-        let result_type = Internal_type.fresh_var () in
-        Type_bindings.constrain ~names ~types ~subtype:typ1 ~supertype:result_type;
-        Type_bindings.constrain ~names ~types ~subtype:typ2 ~supertype:result_type;
-        (* Unions must define the same names with compatible types. *)
-        if not
-             (Map.equal
-                (fun entry1 entry2 ->
-                  let entry_type = Internal_type.fresh_var () in
-                  Type_bindings.constrain'
-                    ~names
-                    ~types
-                    ~subtype:(Name_bindings.Name_entry.type_ entry1)
-                    ~supertype:(Type entry_type);
-                  Type_bindings.constrain'
-                    ~names
-                    ~types
-                    ~subtype:(Name_bindings.Name_entry.type_ entry2)
-                    ~supertype:(Type entry_type);
-                  true)
-                pat_names1
-                pat_names2)
-        then type_error_msg "Pattern unions must define the same names";
-        pat_names1, (Union (pat1, pat2), result_type)
-      | As (pat, name) ->
-        let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
-        let pat_names =
-          Pattern.Names.add_name pat_names name typ ~type_source:Placeholder
-        in
-        pat_names, (As (pat, name), typ)
-      | Type_annotation (pat, ((_ : Trait_bound.t), annotated_type)) ->
-        (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
-        (* FIXME: I think we need to propagate relevant constraints from the parent. *)
-        let annotated_type =
-          Type_bindings.instantiate_type_scheme
-            ~names
-            ~types
-            (Type_scheme.map'
-               annotated_type
-               ~type_name:(Name_bindings.absolutify_type_name names)
-               ~effect_name:(Name_bindings.absolutify_effect_name names))
-        in
-        let pat_names, (pat, inferred_type) =
-          of_untyped_with_names ~names ~types pat_names pat
-        in
-        Type_bindings.constrain
+      failwith "TODO: record types in patterns"
+    | Union (pat1, pat2) ->
+      let pat_names1, (pat1, typ1) = of_untyped_with_names ~names ~types pat_names pat1 in
+      let pat_names2, (pat2, typ2) = of_untyped_with_names ~names ~types pat_names pat2 in
+      let result_type = Internal_type.fresh_var () in
+      Type_bindings.constrain ~names ~types ~subtype:typ1 ~supertype:result_type;
+      Type_bindings.constrain ~names ~types ~subtype:typ2 ~supertype:result_type;
+      (* Unions must define the same names with compatible types. *)
+      if not
+           (Map.equal
+              (fun entry1 entry2 ->
+                let entry_type = Internal_type.fresh_var () in
+                Type_bindings.constrain'
+                  ~names
+                  ~types
+                  ~subtype:(Name_bindings.Name_entry.type_ entry1)
+                  ~supertype:(Type entry_type);
+                Type_bindings.constrain'
+                  ~names
+                  ~types
+                  ~subtype:(Name_bindings.Name_entry.type_ entry2)
+                  ~supertype:(Type entry_type);
+                true)
+              pat_names1
+              pat_names2)
+      then type_error_msg "Pattern unions must define the same names";
+      pat_names1, (Union (pat1, pat2), result_type)
+    | As (pat, name) ->
+      let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
+      let pat_names =
+        Pattern.Names.add_name pat_names name typ ~type_source:Placeholder
+      in
+      pat_names, (As (pat, name), typ)
+    | Type_annotation (pat, ((_ : Trait_bound.t), annotated_type)) ->
+      (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
+      (* FIXME: I think we need to propagate relevant constraints from the parent. *)
+      let annotated_type =
+        Type_bindings.instantiate_type_scheme
           ~names
           ~types
-          ~subtype:inferred_type
-          ~supertype:annotated_type;
-        pat_names, (pat, annotated_type)
-    in
-    let pat_names, (pat, typ) =
-      of_untyped_with_names ~names ~types Value_name.Map.empty pat
-    in
-    (* FIXME: Do we need to substitute here? What effect does it have? I'm going to get
-       rid of it for now. Previous code was:
-       `pat_names, (pat, Type_bindings.substitute types typ)` *)
-    pat_names, (pat, typ)
+          (Type_scheme.map'
+             annotated_type
+             ~type_name:(Name_bindings.absolutify_type_name names)
+             ~effect_name:(Name_bindings.absolutify_effect_name names))
+      in
+      let pat_names, (pat, inferred_type) =
+        of_untyped_with_names ~names ~types pat_names pat
+      in
+      Type_bindings.constrain
+        ~names
+        ~types
+        ~subtype:inferred_type
+        ~supertype:annotated_type;
+      pat_names, (pat, annotated_type)
   ;;
 
   let of_untyped_into ~names ~types pattern =
-    let ((pat_names, _) as pat) = of_untyped_with_names ~names ~types pattern in
+    let ((pat_names, _) as pat) =
+      of_untyped_with_names ~names ~types Pattern.Names.empty pattern
+    in
     let names =
       Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
     in
@@ -215,6 +210,83 @@ module Pattern = struct
   ;;
 end
 
+module Effect_pattern = struct
+  include Effect_pattern
+
+  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
+
+  let of_untyped_with_names
+    ~names
+    ~types
+    ~result_effects
+    ~result_type
+    pat_names
+    { operation; args }
+    =
+    let operation = Name_bindings.absolutify_value_name names operation in
+    let operation_type =
+      Name_bindings.find_absolute_entry names operation
+      |> Name_bindings.Name_entry.type_
+      |> Type_bindings.instantiate_type_or_scheme ~names ~types
+    in
+    let pat_names, args =
+      Nonempty.fold_map args ~init:pat_names ~f:(fun pat_names arg ->
+        Pattern.of_untyped_with_names ~names ~types pat_names arg)
+    in
+    let args, arg_types = Nonempty.unzip args in
+    let operation_effects, operation_result_type =
+      Pattern.check_cnstr_application
+        ~names
+        ~types
+        ~cnstr_type:operation_type
+        ~arg_types:(Nonempty.to_list arg_types)
+    in
+    let operation_effects =
+      let error () =
+        compiler_bug
+          [%message
+            "Unexpected effects for effect operation"
+              (operation_effects : Internal_type.effects option)]
+      in
+      match operation_effects with
+      | Some { effects; effect_var = None } ->
+        (match Map.to_alist effects with
+         | [ effect ] -> effect
+         | _ -> error ())
+      | Some { effects = _; effect_var = Some _ } | None -> error ()
+    in
+    let pat_names, continuation_type =
+      Pattern.Names.add_fresh_name
+        pat_names
+        Value_name.resume_keyword
+        ~type_source:Placeholder
+    in
+    (* FIXME: Check subtyping direction. *)
+    Type_bindings.constrain
+      ~names
+      ~types
+      ~subtype:continuation_type
+      ~supertype:(Function ([ operation_result_type ], result_effects, result_type));
+    pat_names, ({ operation; args }, operation_effects)
+  ;;
+
+  let of_untyped_into ~names ~types ~result_effects ~result_type effect_pattern =
+    let ((pat_names, _) as pat) =
+      of_untyped_with_names
+        ~names
+        ~types
+        ~result_effects
+        ~result_type
+        Pattern.Names.empty
+        effect_pattern
+    in
+    let names =
+      Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
+    in
+    names, pat
+  ;;
+end
+
 module Expr = struct
   type 'typ t =
     | Literal of Literal.t
@@ -222,6 +294,11 @@ module Expr = struct
     | Fun_call of 'typ t Node.t * 'typ * ('typ t Node.t * 'typ) Nonempty.t
     | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
     | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
+    | Handle of
+        { expr : 'typ t Node.t
+        ; value_branch : (Pattern.t Node.t * 'typ t Node.t) option [@sexp.option]
+        ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
+        }
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t Node.t list
     | Record_literal of (Value_name.t * 'typ t Node.t option) list
@@ -414,6 +491,181 @@ module Expr = struct
                 Node.create pat pat_span, branch)
             in
             node (Match (expr, (expr_type, Pattern.Names.empty), branches)), result_type)
+        | Handle (expr, branches) ->
+          (* FIXME: Decide on shallow vs deep handlers.
+             Shallow handlers:
+             - More primitive, can implement deep handlers easily
+
+             Deep handlers:
+             - Generally what you want, easier for users
+             
+             Let's try deep handlers. 
+
+             Effect relationships:
+
+             handle (do_thing () : <e> a)
+             | (x : a) -> (y : b)
+             | <foo x> -> ... 
+
+             We have e, eb, eh, a, b, h
+             expr_type: <e> a
+             continuation_type: b -> <eh> h (resumes the same expression, but with the
+               handler active, so it returns what the handler returns/performs, right?)
+             branch_type: <eb> b
+             handle_type: <eh> h
+             resume: _ -> <eh> h
+
+             Including a value returned branch changes this a bit. Without one, we
+             implicitly return the expr type. (i.e. `| x -> x` is a branch).
+
+             b <: h
+
+             We have eh = e + eb - er
+             so eh + er >: e + eb, this is easy to do
+          *)
+          let result_effect_var = Type_var.create () in
+          let result_effects : Internal_type.effects =
+            { effects = Effect_name.Absolute.Map.empty
+            ; effect_var = Some result_effect_var
+            }
+          in
+          let result_type = Internal_type.fresh_var () in
+          let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
+          let handled_effects = Effect_name.Absolute.Table.create () in
+          let all_branch_effects = Queue.create () in
+          let value_branches, effect_branches =
+            List.partition_map
+              (Nonempty.to_list branches)
+              ~f:(fun (pattern, branch_expr) ->
+              let pattern_span = Node.span pattern in
+              match Node.with_value pattern ~f:Fn.id with
+              | `Value pattern ->
+                let names, ((_ : Pattern.Names.t), (pattern, pattern_type)) =
+                  Pattern.of_untyped_into ~names ~types pattern
+                in
+                Type_bindings.constrain
+                  ~names
+                  ~types
+                  ~subtype:expr_type
+                  ~supertype:pattern_type;
+                let branch_expr, branch_type, branch_effects =
+                  of_untyped ~names ~types ~f_name branch_expr
+                in
+                Type_bindings.constrain
+                  ~names
+                  ~types
+                  ~subtype:branch_type
+                  ~supertype:result_type;
+                Queue.enqueue all_branch_effects branch_effects;
+                First (Node.create pattern pattern_span, branch_expr)
+              | `Effect effect_pattern ->
+                let ( names
+                    , ((_ : Pattern.Names.t), (effect_pattern, (effect_name, effect_args)))
+                    )
+                  =
+                  Effect_pattern.of_untyped_into
+                    ~names
+                    ~types
+                    ~result_effects
+                    ~result_type
+                    effect_pattern
+                in
+                let operation_name = snd effect_pattern.operation in
+                Hashtbl.update handled_effects effect_name ~f:(function
+                  | None -> [ effect_args ], Value_name.Set.singleton operation_name
+                  | Some (existing_args, existing_operations) ->
+                    if Set.mem existing_operations operation_name
+                    then
+                      Compilation_error.raise
+                        Type_error
+                        ~msg:
+                          [%message
+                            "Multiple branches handling the same effect operation"
+                              (operation_name : Value_name.t)];
+                    ( effect_args :: existing_args
+                    , Set.add existing_operations operation_name ));
+                let branch_expr, branch_type, branch_effects =
+                  of_untyped ~names ~types ~f_name branch_expr
+                in
+                Type_bindings.constrain
+                  ~names
+                  ~types
+                  ~subtype:branch_type
+                  ~supertype:result_type;
+                Queue.enqueue all_branch_effects branch_effects;
+                Second (Node.create effect_pattern pattern_span, branch_expr))
+          in
+          let value_branch =
+            match value_branches with
+            | [] -> None
+            | [ branch ] -> Some branch
+            | _ :: _ ->
+              (* TODO: Support multiple branches. Equivalent to using match. *)
+              Compilation_error.raise
+                Syntax_error
+                ~msg:
+                  [%message
+                    "Multiple value branches in handle expression are not supported"
+                      (value_branches
+                        : (Pattern.t Node.t
+                          * (Internal_type.t * Pattern.Names.t) t Node.t)
+                          list)]
+          in
+          let handled_effects =
+            List.map
+              (Hashtbl.to_alist handled_effects)
+              ~f:(fun (effect_name, (args, operations_handled)) ->
+              (* Check arguments to effect type match. *)
+              let args =
+                match args with
+                | [] -> []
+                | initial_args :: rest ->
+                  List.iter rest ~f:(fun args ->
+                    List.iter2_exn initial_args args ~f:(fun initial_arg arg ->
+                      Type_bindings.constrain
+                        ~names
+                        ~types
+                        ~subtype:arg
+                        ~supertype:initial_arg));
+                  initial_args
+              in
+              (* Check that all of the operations were handled. *)
+              let operations_from_effect_decl =
+                Name_bindings.find_absolute_effect_decl names effect_name
+                |> Effect.operations
+                |> Option.value ~default:[]
+                |> List.map ~f:Effect.Operation.name
+                |> Value_name.Set.of_list
+              in
+              if not (Set.equal operations_handled operations_from_effect_decl)
+              then
+                Compilation_error.raise
+                  Type_error
+                  ~msg:
+                    [%message
+                      "Not all operations are handled"
+                        (operations_handled : Value_name.Set.t)
+                        (operations_from_effect_decl : Value_name.Set.t)];
+              effect_name, args)
+            |> Effect_name.Absolute.Map.of_alist_exn
+          in
+          let result_plus_handled_effects : Internal_type.effects =
+            { effects = handled_effects; effect_var = Some result_effect_var }
+          in
+          Type_bindings.constrain_effects
+            ~names
+            ~types
+            ~subtype:expr_effects
+            ~supertype:result_plus_handled_effects;
+          Queue.iter all_branch_effects ~f:(fun branch_effects ->
+            Type_bindings.constrain_effects
+              ~names
+              ~types
+              ~subtype:branch_effects
+              ~supertype:result_plus_handled_effects);
+          ( node (Handle { expr; value_branch; effect_branches })
+          , result_type
+          , result_effects )
         | Let { rec_; bindings; body } ->
           collect_effects ~names ~types (fun ~add_effects ->
             let names, rec_, bindings =
@@ -560,6 +812,15 @@ module Expr = struct
            ( expr
            , f_type expr_type
            , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type)) )
+       | Handle { expr; value_branch; effect_branches } ->
+         let expr = map' expr ~f ~f_type in
+         let value_branch =
+           Option.map value_branch ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))
+         in
+         let effect_branches =
+           List.map effect_branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))
+         in
+         Handle { expr; value_branch; effect_branches }
        | Tuple fields -> Tuple (List.map fields ~f:(map' ~f ~f_type))
        | Record_literal fields ->
          Record_literal
@@ -993,7 +1254,9 @@ module Module = struct
       Nonempty.fold_map ~init:names ~f:(fun names (pat, expr) ->
         let pat_span = Node.span pat in
         let pat_names, pat =
-          Node.with_value pat ~f:(Pattern.of_untyped_with_names ~names ~types)
+          Node.with_value
+            pat
+            ~f:(Pattern.of_untyped_with_names ~names ~types Pattern.Names.empty)
         in
         let names =
           (* Unify pattern bindings with local type information (e.g. val declarations) *)

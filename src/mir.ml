@@ -758,6 +758,7 @@ module Expr = struct
     | Match (_, _, arms) ->
       Nonempty.iter arms ~f:(fun (_, expr) ->
         Node.with_value expr ~f:check_rec_binding_expr)
+    | Handle _
     | Name _
     | Tuple _
     | Record_literal _
@@ -1037,6 +1038,7 @@ module Expr = struct
             handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
           in
           Let (match_expr_name, input_expr, body))
+      | Handle _, _ -> failwith "Handle in MIR"
       | Let { rec_; bindings; body }, body_type ->
         let ctx_for_body, bindings =
           Nonempty.fold_map

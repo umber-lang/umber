@@ -5,18 +5,12 @@ module Pattern : sig
   include module type of Pattern
 
   type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
+end
 
-  val of_untyped_with_names
-    :  names:Name_bindings.t
-    -> types:Type_bindings.t
-    -> Untyped.Pattern.t
-    -> Names.t * (t * Internal_type.t)
+module Effect_pattern : sig
+  include module type of Effect_pattern
 
-  val of_untyped_into
-    :  names:Name_bindings.t
-    -> types:Type_bindings.t
-    -> Untyped.Pattern.t
-    -> Name_bindings.t * (Names.t * (t * Internal_type.t))
+  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
 end
 
 module Expr : sig
@@ -26,6 +20,11 @@ module Expr : sig
     | Fun_call of 'typ t Node.t * 'typ * ('typ t Node.t * 'typ) Nonempty.t
     | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
     | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
+    | Handle of
+        { expr : 'typ t Node.t
+        ; value_branch : (Pattern.t Node.t * 'typ t Node.t) option
+        ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
+        }
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t Node.t list
     | Record_literal of (Value_name.t * 'typ t Node.t option) list

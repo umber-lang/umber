@@ -14,6 +14,8 @@
 %token AND
 %token IN
 %token MATCH
+%token HANDLE
+%token RESUME
 %token WITH
 %token AS
 %token TYPE
@@ -127,6 +129,7 @@ expr_term:
       Expr.qualified path expr }
   | name = qualified(either(LOWER_NAME, UPPER_NAME))
     { Expr.Name (Value_name.Relative.of_ustrings_unchecked name) }
+  | RESUME { Expr.Name (Module_path.Relative.empty, Value_name.resume_keyword) }
   | l = literal { Expr.Literal l }
   | items = brackets(flexible_list(COMMA, expr)) { Expr.Seq_literal items }
   | fields = braces(record_literal_fields(expr)) { Expr.Record_literal fields }
@@ -172,6 +175,18 @@ match_branch:
 match_branches:
   | PIPE; branches = separated_nonempty(PIPE, match_branch) { branches }
 
+effect_pattern:
+  | operation = qualified(LOWER_NAME); args = nonempty(pattern)
+    { let operation =  Value_name.Relative.of_ustrings_unchecked operation in
+      `Effect { operation; args } }
+  | pattern = pattern { `Value pattern }
+
+handle_branch:
+  | branch = separated_pair(with_loc(effect_pattern), ARROW, expr) { branch }
+
+handle_branches:
+  | PIPE; branches = separated_nonempty(PIPE, handle_branch) { branches }
+
 let_rec:
   | LET { true }
   | LET_NONREC { false }
@@ -196,6 +211,7 @@ expr_:
         ~match_keyword_span:(Span.of_loc $loc(_m))
         ~branches_span:(Span.of_loc $loc(branches))
         branches }
+  | HANDLE; e = expr; branches = handle_branches { Expr.Handle (e, branches) }
   | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding); IN; body = expr
     { Expr.Let { rec_; bindings; body } }
   | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }

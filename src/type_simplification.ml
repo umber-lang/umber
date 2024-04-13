@@ -129,9 +129,14 @@ let fold_type_with_polarity =
   fun type_ ~init ~f ~f_effects -> loop type_ ~init ~f ~f_effects ~polarity:Positive
 ;;
 
+(* FIXME: The use of Union_find seems to be resulting in unstable output when simplifying
+   types, which is annoying. Could write my own simple thing maybe. I'm not sure where
+   the instability is coming from. Maybe type variable names, somehow? I'm not sure if
+   there are any sources of non-determinism. *)
+
 let simplify_var_sandwiches type_ ~lower_bounds ~upper_bounds =
   (* Union variables which are sandwiched together - variables like a where a <: b and
-       a >: b. *)
+     a >: b. *)
   let var_classes = Type_param.Table.create () in
   let find_var_class var_classes var =
     Hashtbl.find_or_add var_classes var ~default:(fun () -> Union_find.create var)
@@ -221,8 +226,8 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
 ;;
 
 (** Remove variables which only occur once in a positive or negative position
-      respectively. Replace them with empty unions or intersections (the bottom and top
-      types). *)
+    respectively. Replace them with empty unions or intersections (the bottom and top
+    types). *)
 let remove_polar_vars type_ =
   let { By_polarity.positive = positive_vars; negative = negative_vars } =
     get_positive_and_negative_vars type_
@@ -273,8 +278,8 @@ let remove_polar_vars type_ =
 ;;
 
 (** Union all variables which mutually always co-occur in positive and/or negative
-      positions. Replace variables which always co-occur in positive and/or negative
-      positions with another variable. *)
+    positions. Replace variables which always co-occur in positive and/or negative
+    positions with another variable. *)
 let replace_co_occurring_vars type_ =
   let co_occurences_by_var =
     let update
