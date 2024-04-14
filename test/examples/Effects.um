@@ -21,6 +21,13 @@ let _ =
   handle read_and_add ()
   | <ask ()> -> resume 1
 
+let _nested_handler =
+  handle
+    (handle ask ()
+     | x -> x + 1
+     | <ask ()> -> resume 5)
+  | <ask ()> -> resume 7
+
 # TODO: Add a test that you can't handle functions which aren't operations
 
 # FIXME: Move these to separate tests

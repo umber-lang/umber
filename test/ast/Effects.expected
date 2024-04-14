@@ -126,4 +126,41 @@
               (Effect Effects.Read ()) (Type_app Std.Prelude.Int.Int ()))
              ())
             (((Literal (Int 1)) ((Type_app Int ()) ()))))))))
+       ((Type_app Std.Prelude.Int.Int ()) ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all (_nested_handler))
+      ((Handle
+        (expr
+         (Handle
+          (expr
+           (Fun_call (Name Effects.ask)
+            ((Function ((Tuple ())) (Effect Effects.Read ())
+              (Type_app Std.Prelude.Int.Int ()))
+             ())
+            (((Tuple ()) ((Tuple ()) ())))))
+          (value_branch
+           ((Catch_all (x))
+            (Fun_call (Name Std.Prelude.Operators.+)
+             ((Function
+               ((Type_app Std.Prelude.Int.Int ())
+                (Type_app Std.Prelude.Int.Int ()))
+               (Effect_union ()) (Type_app Std.Prelude.Int.Int ()))
+              ())
+             (((Name Effects.x) ((Type_app Std.Prelude.Int.Int ()) ()))
+              ((Literal (Int 1)) ((Type_app Int ()) ()))))))
+          (effect_branches
+           ((((operation Effects.ask) (args ((Tuple ()))))
+             (Fun_call (Name Effects.resume)
+              ((Function ((Type_app Std.Prelude.Int.Int ()))
+                (Effect Effects.Read ()) (Type_app Std.Prelude.Int.Int ()))
+               ())
+              (((Literal (Int 5)) ((Type_app Int ()) ())))))))))
+        (effect_branches
+         ((((operation Effects.ask) (args ((Tuple ()))))
+           (Fun_call (Name Effects.resume)
+            ((Function ((Type_app Std.Prelude.Int.Int ()))
+              (Effect Effects.Read ()) (Type_app Std.Prelude.Int.Int ()))
+             ())
+            (((Literal (Int 7)) ((Type_app Int ()) ()))))))))
        ((Type_app Std.Prelude.Int.Int ()) ()))))))))
