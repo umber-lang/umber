@@ -59,7 +59,7 @@
                 ((Name ModuleSig.Range.hi) ((Union ()) ()))))
               ((Type_app Std.Prelude.Bool.Bool ()) ())))))
           ((Function
-            ((Intersection ((Var a) (Var b))) (Tuple ((Var b) (Var a))))
+            ((Intersection ((Var a) (Var b))) (Tuple ((Var a) (Var b))))
             (Effect_union ()) (Type_app Std.Prelude.Bool.Bool ()))
            ())))))))))
   (Let (rec_ false)

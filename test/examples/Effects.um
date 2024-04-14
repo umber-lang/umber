@@ -12,9 +12,14 @@ let run_both f g x = (f x, g x)
 
 let foo () = run_both (\x -> x + read_and_add ()) print_int 5
 
-#let _ =
-#  handle ask ()
-#  | <ask ()> -> ()
+# TODO: Add warning for unreachable handler branches
+let _ =
+  handle 5
+  | <ask ()> -> 6
+
+let _ =
+  handle read_and_add ()
+  | <ask ()> -> resume 1
 
 # TODO: Add a test that you can't handle functions which aren't operations
 

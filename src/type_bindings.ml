@@ -636,7 +636,22 @@ and constrain_effects ~names ~types ~subtype ~supertype =
             "Found more effects than expected"
               ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
     else (
-      (* FIXME: Not handling union of O and O', see paper. *)
+      (* FIXME: Think about the a <: (Foo, b) case. I think we might not want to assume
+         whether or not a includes Foo. Currently we effectively assume it always does,
+         by including that in the substitution. This would be clearly correct if the
+         subtyping direction was reversed. *)
+      (* FIXME: Not handling union of O and O', see paper.
+         
+         They have a concept of type params which don't contain any effects from a set O.
+         In their algorithm, type params always appear in dirts adjacent to the same set
+         of effects O. (not sure exactly what that means). We have to be careful not to
+         substitute an effect var to contain any effect it appears in a dirt with
+         anywhere.
+
+         This is already broken in [Handle] handling because we end up constraining
+         result_effect_var with effects in the expression if [resume] is used, but this
+         var apears in a dirt. Maybe we can try not re-using the variable?
+      *)
       let new_subtype_var = Option.map subtype_var ~f:(fun _ -> Type_var.create ()) in
       let new_supertype_var = Option.map supertype_var ~f:(fun _ -> Type_var.create ()) in
       let supertype_only_substitution =

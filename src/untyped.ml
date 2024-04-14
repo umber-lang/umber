@@ -87,7 +87,8 @@ module Expr = struct
           let locals =
             Node.with_value effect_pattern ~f:(function
               | `Effect { operation = _; args } ->
-                Nonempty.fold args ~init:locals ~f:add_locals
+                let locals = Nonempty.fold args ~init:locals ~f:add_locals in
+                Set.add locals Value_name.resume_keyword
               | `Value pattern -> add_locals locals pattern)
           in
           Node.with_value branch ~f:(loop ~names used locals))

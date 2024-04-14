@@ -101,4 +101,29 @@
           ((Literal (Int 5)) ((Type_app Int ()) ())))))
        ((Function ((Tuple ())) (Effect Effects.Read ())
          (Tuple ((Type_app Std.Prelude.Int.Int ()) (Tuple ()))))
-        ()))))))))
+        ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ())
+      ((Handle (expr (Literal (Int 5)))
+        (effect_branches
+         ((((operation Effects.ask) (args ((Tuple ())))) (Literal (Int 6))))))
+       ((Type_app Int ()) ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ())
+      ((Handle
+        (expr
+         (Fun_call (Name Effects.read_and_add)
+          ((Function ((Tuple ())) (Effect Effects.Read ())
+            (Type_app Std.Prelude.Int.Int ()))
+           ())
+          (((Tuple ()) ((Tuple ()) ())))))
+        (effect_branches
+         ((((operation Effects.ask) (args ((Tuple ()))))
+           (Fun_call (Name Effects.resume)
+            ((Function ((Type_app Std.Prelude.Int.Int ()))
+              (Effect Effects.Read ()) (Type_app Std.Prelude.Int.Int ()))
+             ())
+            (((Literal (Int 1)) ((Type_app Int ()) ()))))))))
+       ((Type_app Std.Prelude.Int.Int ()) ()))))))))

@@ -330,8 +330,6 @@ module Expr = struct
         * Internal_type.t
         * Internal_type.effects
       =
-      (* FIXME: cleanup *)
-      (* print_s [%message "Typed.Expr.of_untyped" (expr : Untyped.Expr.t Node.t)]; *)
       let node e = Node.create e (Node.span expr) in
       Node.with_value expr ~f:(fun expr ->
         match (expr : Untyped.Expr.t) with
@@ -523,10 +521,16 @@ module Expr = struct
              We have eh = e + eb - er
              so eh + er >: e + eb, this is easy to do
           *)
-          let result_effect_var = Type_var.create () in
-          let result_effects : Internal_type.effects =
+          (* FIXME: Using result_effect_var in multiple places seems maybe not good.
+             We should use it as a row variable and not put it with multiple rows.
+             (alternatively I guess we could track which effects it must not include, but
+             we might not know that information in type_bindings until it's too late I
+             think. 
+             
+             Let's try using another variable maybe? *)
+          let continuation_effects : Internal_type.effects =
             { effects = Effect_name.Absolute.Map.empty
-            ; effect_var = Some result_effect_var
+            ; effect_var = Some (Type_var.create ())
             }
           in
           let result_type = Internal_type.fresh_var () in
@@ -563,10 +567,11 @@ module Expr = struct
                     , ((_ : Pattern.Names.t), (effect_pattern, (effect_name, effect_args)))
                     )
                   =
+                  (* FIXME: cleanup naming *)
                   Effect_pattern.of_untyped_into
                     ~names
                     ~types
-                    ~result_effects
+                    ~result_effects:continuation_effects
                     ~result_type
                     effect_pattern
                 in
@@ -657,9 +662,12 @@ module Expr = struct
               effect_name, args)
             |> Effect_name.Absolute.Map.of_alist_exn
           in
+          (* FIXME: Did we just move the problem elsewhere? *)
+          let result_effect_var = Type_var.create () in
           let result_plus_handled_effects : Internal_type.effects =
             { effects = handled_effects; effect_var = Some result_effect_var }
           in
+          eprint_s [%message (result_plus_handled_effects : Internal_type.effects)];
           Type_bindings.constrain_effects
             ~names
             ~types
@@ -673,7 +681,9 @@ module Expr = struct
               ~supertype:result_plus_handled_effects);
           ( node (Handle { expr; value_branch; effect_branches })
           , result_type
-          , result_effects )
+          , { effects = Effect_name.Absolute.Map.empty
+            ; effect_var = Some result_effect_var
+            } )
         | Let { rec_; bindings; body } ->
           collect_effects ~names ~types (fun ~add_effects ->
             let names, rec_, bindings =
@@ -778,7 +788,8 @@ module Expr = struct
             [%message
               "typed binding"
                 (pat : (Pattern.t * (Internal_type.t * _)) Node.t)
-                (expr_type : Internal_type.t)];
+                (expr_type : Internal_type.t)
+                (expr_effects : Internal_type.effects)];
           add_effects expr_effects;
           Node.with_value pat ~f:(fun (_, (pat_type, _)) ->
             Type_bindings.constrain ~names ~types ~subtype:expr_type ~supertype:pat_type);
@@ -1363,6 +1374,7 @@ module Module = struct
               Nonempty.t)]; *)
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings ~names ~types bindings ~add_effects:(fun effects ->
+        (* TODO: Allow handlers to be installed at the toplevel. *)
         (* No effects are handled at toplevel, so get rid of any produced effects. *)
         Type_bindings.constrain_effects_to_be_total ~names ~types effects)
     in
