@@ -21,6 +21,11 @@ let _ =
   handle read_and_add ()
   | <ask ()> -> resume 1
 
+let _value_branch =
+  handle foo ()
+  | (x, ()) -> x
+  | <ask ()> -> resume 0
+
 let _nested_handler =
   handle
     (handle ask ()

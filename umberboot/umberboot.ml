@@ -172,6 +172,8 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
              Parsing.fprint_s [%sexp (ast : Ast.Untyped.Module.t)] ~out);
            ast))
       ~type_checking:
+        (* TODO: Type-checking should be able to pretty-print the typed AST. This would
+           make reading test output way easier. *)
         (run_stage ~f:(fun ast ->
            let names =
              if no_std then Name_bindings.core else force Name_bindings.prelude

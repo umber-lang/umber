@@ -662,7 +662,8 @@ module Expr = struct
               effect_name, args)
             |> Effect_name.Absolute.Map.of_alist_exn
           in
-          (* FIXME: Did we just move the problem elsewhere? *)
+          (* FIXME: Did we just move the problem elsewhere?
+             Yes, forgot to put a constraint between [resume] and the result. *)
           let result_effect_var = Type_var.create () in
           let result_plus_handled_effects : Internal_type.effects =
             { effects = handled_effects; effect_var = Some result_effect_var }
