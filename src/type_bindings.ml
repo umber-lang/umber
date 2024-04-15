@@ -617,6 +617,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
             Map.map effects ~f:(fun args ->
               List.map args ~f:(fun arg ->
                 let arg' = refresh_type arg in
+                (* FIXME: Is the subtyping direction right here? Maybe it's backwards? *)
                 (match effects_subtyping_dir with
                  | `Subtype -> constrain ~names ~types ~subtype:arg ~supertype:arg'
                  | `Supertype -> constrain ~names ~types ~subtype:arg' ~supertype:arg);
@@ -652,15 +653,37 @@ and constrain_effects ~names ~types ~subtype ~supertype =
          result_effect_var with effects in the expression if [resume] is used, but this
          var apears in a dirt. Maybe we can try not re-using the variable?
       *)
-      let new_subtype_var = Option.map subtype_var ~f:(fun _ -> Type_var.create ()) in
+      (* FIXME: Think about 13 <: Read + 2. This results in 13 := Read + _ which is bad
+         because we already have 2 <: 13 (they're the same shape), so we also get 2 :=
+         Read + _, but we want 2 to not include Read.
+         
+         In the paper they say the fresh vars here should not include any of the effects
+         listed in the subtype or supertype. Are we maintaining that? Probably not?
+         Ok that doesn't seem that important actually. We're doing the substitution here
+         which wrecks us. Maybe they're fine because they can make the regions map to
+         nothing later. But for us this messes it up badly because we don't have a way of
+         making it go away. We interpret having an effect as meaning we definitely have it
+         so this doesn't really work for subtype variables. We shouldn't blindly sub
+         them with supertype effects. Maybe just leave that direction alone. Although,
+         then we don't really know if it's less than the supertype var, do we?
+
+         Problems: this means we don't get any information when an effect variable is
+         constrained from above. We know it must be less than some effects or some other
+         var, but don't record this. Having overly large effects seems fine, but could be
+         bad in a contravariant position.
+
+         FIXME: See if we can come up with a test breaking this
+      *)
+      (* FIXME: cleanup *)
+      (* let new_subtype_var = Option.map subtype_var ~f:(fun _ -> Type_var.create ()) in *)
       let new_supertype_var = Option.map supertype_var ~f:(fun _ -> Type_var.create ()) in
-      let supertype_only_substitution =
+      (* let supertype_only_substitution =
         create_substitution
           ~effects:supertype_only
           ~var:subtype_var
           ~new_var:new_subtype_var
           ~effects_subtyping_dir:`Supertype
-      in
+      in *)
       let subtype_only_substitution =
         create_substitution
           ~effects:subtype_only
@@ -668,18 +691,27 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           ~new_var:new_supertype_var
           ~effects_subtyping_dir:`Subtype
       in
-      constrain_effect_vars
+      eprint_s
+        [%message
+          "constraining effects"
+            (subtype_var : Type_var.t option)
+            (* (new_subtype_var : Type_var.t option) *)
+            (* (supertype_only_substitution : Substitution.t) *)
+            (supertype_var : Type_var.t option)
+            (new_supertype_var : Type_var.t option)
+            (subtype_only_substitution : Substitution.t)];
+      (* constrain_effect_vars
         types
         ~subtype_var:new_subtype_var
-        ~supertype_var:new_supertype_var;
+        ~supertype_var:new_supertype_var; *)
       (* Remove all constraints between vars of the same shape as either var here. *)
-      let vars_with_same_shape_as_subtype_var =
+      (* let vars_with_same_shape_as_subtype_var =
         match subtype_var with
         | Some var -> Constraints.find_vars_with_same_shape types.constraints var
         | None -> Type_var.Set.empty
       in
       Set.iter vars_with_same_shape_as_subtype_var ~f:(fun var ->
-        Constraints.remove_vars types.constraints var vars_with_same_shape_as_subtype_var);
+        Constraints.remove_vars types.constraints var vars_with_same_shape_as_subtype_var); *)
       let vars_with_same_shape_as_supertype_var =
         match supertype_var with
         | Some var -> Constraints.find_vars_with_same_shape types.constraints var
@@ -691,11 +723,11 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           var
           vars_with_same_shape_as_supertype_var);
       Substitution.compose types.substitution subtype_only_substitution;
-      Substitution.compose types.substitution supertype_only_substitution;
+      (* Substitution.compose types.substitution supertype_only_substitution; *)
       let to_var = Internal_type.effects_of_var in
-      Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v ->
+      (* Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v ->
         Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v' ->
-          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')));
+          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v'))); *)
       Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v ->
         Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v' ->
           constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
@@ -1049,10 +1081,7 @@ let%test_module _ =
       [%expect
         {|
         (types.substitution
-         (($0 (Effects ((effects ((Bar ((Var $5))))) (effect_var ($3)))))
-          ($1 (Effects ((effects ((Foo ()))) (effect_var ($4)))))))
-        $3 <: $4
-        $5 <: $2 |}]
+         (($1 (Effects ((effects ((Foo ()))) (effect_var ($3))))))) |}]
     ;;
 
     let%expect_test "sanity check for effects subtyping semantics" =

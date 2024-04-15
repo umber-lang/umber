@@ -1,0 +1,15 @@
+effect Foo = {
+  val foo : Int -> ()
+}
+
+effect Bar = {
+  val bar : Float -> ()
+}
+
+let must_be_total (_ : () => (a -> <> b)) = ()
+
+let may_bar () =
+  handle foo 5; bar 5.0
+  | <foo _> -> 
+    # `resume` may perform `Bar` so it is not total. This should fail.
+    must_be_total resume

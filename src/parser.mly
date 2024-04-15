@@ -69,6 +69,7 @@ val_operator:
   | op = OPERATOR { op }
   | LESS_THAN { Ustring.of_uchar (Uchar.of_char '<') }
   | GREATER_THAN { Ustring.of_uchar (Uchar.of_char '>') }
+  | LESS_THAN; GREATER_THAN { Ustring.of_string_exn "<>" }
   | n = N_PERIODS { Ustring.make n (Uchar.of_char '.') }
 
 operator:

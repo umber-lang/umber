@@ -6,6 +6,8 @@ open Names
 (* FIXME: Remove type unions. We should be able to simplify the types by unifying and
    simplifying constraints. *)
 
+(* TODO: [Tuple] should use [Non_single_list] as well. *)
+
 type 'n type_ =
   | Var of Type_param_name.t
   | Type_app of 'n Type_name.Qualified.t * 'n type_ list

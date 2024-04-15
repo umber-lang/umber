@@ -1,0 +1,4 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg ("Found more effects than expected" ((ErrorResumeEffects.Bar ()))))
+  (filename ErrorResumeEffects.um) (span 12:3-15:25)))
