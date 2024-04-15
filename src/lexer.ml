@@ -113,6 +113,15 @@ let rec read lexbuf =
   | ':' -> COLON
   | ',' -> COMMA
   | '\\' -> BACKSLASH
+  | "<" -> LESS_THAN
+  | ">" -> GREATER_THAN
+  | "<>" ->
+    (*  This is a hack to stop "<>" from lexing as `OPERATOR "<>"`. *)
+    rollback lexbuf;
+    ignore (next lexbuf : Uchar.t option);
+    LESS_THAN
+  | "->" -> ARROW
+  | "=>" -> FAT_ARROW
   (* Need to support: `f . g`, `(. f)`, `(f .)`, and `(.)` as an operator. *)
   | Plus '.', (")" | white_space) ->
     let lexeme = lexeme lexbuf in
@@ -123,10 +132,6 @@ let rec read lexbuf =
   | Plus '.', Sub (operator_symbol, '.'), Star operator_symbol -> OPERATOR (lexeme lexbuf)
   | '.', Plus '.' -> N_PERIODS (Ustring.length (lexeme lexbuf))
   | '.' -> PERIOD
-  | "->" -> ARROW
-  | "=>" -> FAT_ARROW
-  | "<" -> LESS_THAN
-  | ">" -> GREATER_THAN
   (* Brackets *)
   | '(' -> L_PAREN
   | ')' -> R_PAREN

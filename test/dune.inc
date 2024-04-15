@@ -661,6 +661,31 @@
 (rule (alias runtest) (deps test.dummy)
  (action
   (no-infer
+   (diff tokens/ErrorResumeEffects.expected tokens/ErrorResumeEffects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff ast/ErrorResumeEffects.expected ast/ErrorResumeEffects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff mir/ErrorResumeEffects.expected mir/ErrorResumeEffects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff llvm/ErrorResumeEffects.expected llvm/ErrorResumeEffects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
+   (diff output/ErrorResumeEffects.expected output/ErrorResumeEffects.out))))
+
+(rule (alias runtest) (deps test.dummy)
+ (action
+  (no-infer
    (diff tokens/ErrorShadowedBool.expected tokens/ErrorShadowedBool.out))))
 
 (rule (alias runtest) (deps test.dummy)
