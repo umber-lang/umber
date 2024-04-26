@@ -67,11 +67,17 @@
          ((Function
            ((Function ((Type_app Std.Prelude.Int.Int ()))
              (Effect_union
-              ((Effect Effects.Read ()) (Effect_intersection ())))
+              ((Effect Effects.Read ())
+               (Effect_intersection
+                ((Effect_var a) (Effect_var b) (Effect_var c) (Effect_var d)
+                 (Effect_var e)))))
              (Type_app Std.Prelude.Int.Int ()))
             (Function ((Type_app Std.Prelude.Int.Int ()))
              (Effect_union
-              ((Effect Effects.Read ()) (Effect_intersection ())))
+              ((Effect Effects.Read ())
+               (Effect_intersection
+                ((Effect_var a) (Effect_var b) (Effect_var c) (Effect_var d)
+                 (Effect_var e)))))
              (Tuple ()))
             (Type_app Std.Prelude.Int.Int ()))
            (Effect Effects.Read ())
@@ -183,4 +189,21 @@
               (Type_app Std.Prelude.Int.Int ()))
              ())
             (((Literal (Int 7)) ((Type_app Int ()) ()))))))))
-       ((Type_app Std.Prelude.Int.Int ()) ()))))))))
+       ((Type_app Std.Prelude.Int.Int ()) ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all (higher_order_handler))
+      ((Lambda ((Catch_all (f)))
+        (Handle
+         (expr
+          (Fun_call (Name Effects.f)
+           ((Function ((Tuple ())) (Effect Effects.Read ()) (Tuple ())) ())
+           (((Tuple ()) ((Tuple ()) ())))))
+         (effect_branches
+          ((((operation Effects.ask) (args ((Tuple ())))) (Tuple ()))))))
+       ((Function
+         ((Function ((Tuple ()))
+           (Effect_union ((Effect Effects.Read ()) (Effect_var a)))
+           (Tuple ())))
+         (Effect_var a) (Tuple ()))
+        ()))))))))

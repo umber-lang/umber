@@ -313,10 +313,11 @@ module Expr = struct
         }
       in
       let (expr : _ t Node.t), (typ : Internal_type.t) =
-        f ~add_effects:(fun subtype ->
+        f ~add_effects:(fun subtype span ->
           (* FIXME: cleanup *)
           (* eprint_s [%message "add_effects" ~effects:(subtype : Internal_type.effects)]; *)
-          Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects)
+          Node.with_value (Node.create subtype span) ~f:(fun subtype ->
+            Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects))
       in
       expr, typ, effects
     in
@@ -325,7 +326,8 @@ module Expr = struct
         * Internal_type.t
         * Internal_type.effects
       =
-      let node e = Node.create e (Node.span expr) in
+      let expr_span = Node.span expr in
+      let node e = Node.create e expr_span in
       let result =
         Node.with_value expr ~f:(fun expr ->
           match (expr : Untyped.Expr.t) with
@@ -357,11 +359,11 @@ module Expr = struct
           *)
             collect_effects ~names ~types (fun ~add_effects ->
               let fun_, fun_type, fun_effects = of_untyped ~names ~types ~f_name fun_ in
-              add_effects fun_effects;
+              add_effects fun_effects (Node.span fun_);
               let args =
                 Nonempty.map args ~f:(fun arg ->
                   let arg, arg_type, arg_effects = of_untyped ~names ~types ~f_name arg in
-                  add_effects arg_effects;
+                  add_effects arg_effects (Node.span arg);
                   arg, (arg_type, Pattern.Names.empty))
               in
               let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
@@ -371,7 +373,7 @@ module Expr = struct
                 ; effect_var = Some (Type_var.create ())
                 }
               in
-              add_effects call_effects;
+              add_effects call_effects expr_span;
               (* FIXME: Is this subtyping doing the correct thing? Seems very sus, e.g.:
                
                val foo : a, a -> Bool
@@ -424,7 +426,7 @@ module Expr = struct
           | If (cond, then_, else_) ->
             collect_effects ~names ~types (fun ~add_effects ->
               let cond, cond_type, cond_effects = of_untyped ~names ~types ~f_name cond in
-              add_effects cond_effects;
+              add_effects cond_effects (Node.span cond);
               let bool_type =
                 Type_bindings.instantiate_type_scheme ~names ~types Intrinsics.Bool.typ
               in
@@ -437,8 +439,8 @@ module Expr = struct
                 ( of_untyped ~names ~types ~f_name then_
                 , of_untyped ~names ~types ~f_name else_ )
               in
-              add_effects then_effects;
-              add_effects else_effects;
+              add_effects then_effects (Node.span then_);
+              add_effects else_effects (Node.span else_);
               let result_type = Internal_type.fresh_var () in
               Type_bindings.constrain
                 ~names
@@ -464,7 +466,7 @@ module Expr = struct
           | Match (expr, branches) ->
             collect_effects ~names ~types (fun ~add_effects ->
               let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
-              add_effects expr_effects;
+              add_effects expr_effects (Node.span expr);
               let result_type = Internal_type.fresh_var () in
               eprint_s [%message "typing match" (result_type : Internal_type.t)];
               let branches =
@@ -481,7 +483,7 @@ module Expr = struct
                   let branch, branch_type, branch_effects =
                     of_untyped ~names ~types ~f_name branch
                   in
-                  add_effects branch_effects;
+                  add_effects branch_effects (Node.span branch);
                   Type_bindings.constrain
                     ~names
                     ~types
@@ -604,8 +606,8 @@ module Expr = struct
             let value_branch =
               match value_branches with
               | [] ->
-                (* If there are no value branches, it's equivalent to having a branch which
-                 looks like `x -> x`. *)
+                (* If there are no value branches, it's equivalent to having a branch
+                   which looks like `x -> x`. *)
                 Type_bindings.constrain
                   ~names
                   ~types
@@ -700,6 +702,14 @@ module Expr = struct
                 ~types
                 ~subtype:branch_effects
                 ~supertype:result_plus_handled_effects);
+            eprint_s
+              [%message
+                "Finished typing handle expr"
+                  ~expr:
+                    (Handle { expr; value_branch; effect_branches }
+                      : (Internal_type.t * _) t)
+                  (result_type : Internal_type.t)
+                  (result_effects : Internal_type.effects)];
             ( node (Handle { expr; value_branch; effect_branches })
             , result_type
             , result_effects )
@@ -728,7 +738,7 @@ module Expr = struct
                       let expr, expr_type, expr_effects =
                         of_untyped ~names ~types ~f_name expr
                       in
-                      add_effects expr_effects;
+                      add_effects expr_effects (Node.span expr);
                       Type_bindings.constrain
                         ~names
                         ~types
@@ -740,14 +750,14 @@ module Expr = struct
               in
               let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
               (* eprint_s [%message (body_effects : Internal_type.effects)]; *)
-              add_effects body_effects;
+              add_effects body_effects (Node.span body);
               node (Let { rec_; bindings; body }), body_type)
           | Tuple items ->
             collect_effects ~names ~types (fun ~add_effects ->
               let items, types =
                 List.map items ~f:(fun item ->
                   let item, type_, effects = of_untyped item ~names ~types ~f_name in
-                  add_effects effects;
+                  add_effects effects (Node.span item);
                   item, type_)
                 |> List.unzip
               in
@@ -820,7 +830,7 @@ module Expr = struct
                 (pat : (Pattern.t * (Internal_type.t * _)) Node.t)
                 (expr_type : Internal_type.t)
                 (expr_effects : Internal_type.effects)];
-          add_effects expr_effects;
+          add_effects expr_effects (Node.span expr);
           Node.with_value pat ~f:(fun (_, (pat_type, _)) ->
             Type_bindings.constrain ~names ~types ~subtype:expr_type ~supertype:pat_type);
           pat, expr)
@@ -1403,10 +1413,15 @@ module Module = struct
               * Untyped.Expr.t Node.t)
               Nonempty.t)]; *)
     let (_ : Name_bindings.t), rec_, bindings =
-      Expr.type_recursive_let_bindings ~names ~types bindings ~add_effects:(fun effects ->
+      Expr.type_recursive_let_bindings
+        ~names
+        ~types
+        bindings
+        ~add_effects:(fun effects span ->
         (* TODO: Allow handlers to be installed at the toplevel. *)
         (* No effects are handled at toplevel, so get rid of any produced effects. *)
-        Type_bindings.constrain_effects_to_be_total ~names ~types effects)
+        Node.with_value (Node.create effects span) ~f:(fun effects ->
+          Type_bindings.constrain_effects_to_be_total ~names ~types effects))
     in
     Nonempty.fold_map bindings ~init:names ~f:(fun names (pattern_etc, expr) ->
       let pat_span = Node.span pattern_etc in

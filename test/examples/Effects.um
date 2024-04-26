@@ -33,6 +33,30 @@ let _nested_handler =
      | <ask ()> -> resume 5)
   | <ask ()> -> resume 7
 
+# FIXME: Wrong type inferred
+# Expected:
+# `(() -> <Read,e> ()) -> <e> ()` (importantly, e does not include Read)
+# Also sound, though not a precise enough type:
+# `(() -> <e> ()) -> <e> ()` (doesn't show that Read is handled, bad, but is still sound)
+# Or what about this:
+# `(() -> <e> ()) -> <e - Read> ()` (if we could represent effect differences)
+# (we could equivalently use the same "effect var does not include effect" idea
+# and mint an anonymous var e2 to be basically e - Read)
+# Actual:
+# `(() -> <&> ()) -> <> ()`
+# which is clearly wrong. It eliminates all effects from the argument.
+#
+# Importantly, we might need to somehow propagate the implicit constraint that e does not
+# include Read when instantiating the type. (Or maybe it's fine if we don't)
+# 
+# To get this:
+# Set f : (() -> <e1> ())
+# Constrain e1 <: Read + e2
+# Get e1 := Read + e3
+let higher_order_handler f =
+  handle f ()
+  | <ask ()> -> ()
+
 # TODO: Add a test that you can't handle functions which aren't operations
 
 # FIXME: Move these to separate tests

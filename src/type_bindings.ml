@@ -78,6 +78,8 @@ module Constraints : sig
   (* FIXME: Make this interface less confusing*)
   val remove_vars : t -> Type_var.t -> Type_var.Set.t -> unit
   val find_vars_with_same_shape : t -> Type_var.t -> Type_var.Set.t
+  val mark_effects_as_not_included : t -> Type_var.t -> Effect_name.Absolute.Set.t -> unit
+  val find_effects_not_included : t -> Type_var.t -> Effect_name.Absolute.Set.t
 
   val to_constraint_list
     :  t
@@ -89,11 +91,15 @@ end = struct
   type t =
     { lower_bounds : Type_var.Hash_set.t Type_var.Table.t
     ; upper_bounds : Type_var.Hash_set.t Type_var.Table.t
+    ; effects_not_included : Effect_name.Absolute.Set.t Type_var.Table.t
     }
   [@@deriving sexp_of]
 
   let create () =
-    { lower_bounds = Type_var.Table.create (); upper_bounds = Type_var.Table.create () }
+    { lower_bounds = Type_var.Table.create ()
+    ; upper_bounds = Type_var.Table.create ()
+    ; effects_not_included = Type_var.Table.create ()
+    }
   ;;
 
   let get_bounds bounds var =
@@ -103,7 +109,7 @@ end = struct
       vars)
   ;;
 
-  let add_bounds { lower_bounds; upper_bounds } ~subtype ~supertype =
+  let add_bounds { lower_bounds; upper_bounds; _ } ~subtype ~supertype =
     Hash_set.add (get_bounds upper_bounds subtype) supertype;
     Hash_set.add (get_bounds lower_bounds supertype) subtype
   ;;
@@ -120,12 +126,12 @@ end = struct
           ~f:(fun supertype' -> add_bounds t ~subtype:subtype' ~supertype:supertype'))
   ;;
 
-  let remove_vars { lower_bounds; upper_bounds } var vars =
+  let remove_vars { lower_bounds; upper_bounds; _ } var vars =
     Hash_set.filter_inplace (get_bounds lower_bounds var) ~f:(not << Set.mem vars);
     Hash_set.filter_inplace (get_bounds upper_bounds var) ~f:(not << Set.mem vars)
   ;;
 
-  let find_vars_with_same_shape { lower_bounds; upper_bounds } var =
+  let find_vars_with_same_shape { lower_bounds; upper_bounds; _ } var =
     let rec loop collected_vars var =
       let add_vars_from_bounds bounds collected_vars =
         Hash_set.fold
@@ -139,6 +145,22 @@ end = struct
       |> add_vars_from_bounds upper_bounds
     in
     loop Type_var.Set.empty var
+  ;;
+
+  let mark_effects_as_not_included t var effects =
+    Hashtbl.update t.effects_not_included var ~f:(function
+      | None -> effects
+      | Some existing_effects -> Set.union existing_effects effects)
+  ;;
+
+  let find_effects_not_included t var =
+    Hash_set.fold
+      (get_bounds t.lower_bounds var)
+      ~init:Effect_name.Absolute.Set.empty
+      ~f:(fun effects var ->
+      match Hashtbl.find t.effects_not_included var with
+      | None -> effects
+      | Some effects' -> Set.union effects effects')
   ;;
 
   let to_constraint_list t ~params =
@@ -577,6 +599,37 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       =
       supertype
     in
+    Option.iter subtype_var ~f:(fun subtype_var ->
+      Constraints.mark_effects_as_not_included
+        types.constraints
+        subtype_var
+        (Map.key_set subtype_effects));
+    Option.iter supertype_var ~f:(fun supertype_var ->
+      Constraints.mark_effects_as_not_included
+        types.constraints
+        supertype_var
+        (Map.key_set supertype_effects));
+    (* FIXME: Should it be a type error if we have e not including Foo, then try to
+       constrain a :> Foo? Or is that a compiler bug? *)
+    let supertype_effects' =
+      match subtype_var with
+      | None -> supertype_effects
+      | Some subtype_var ->
+        let effects_not_included =
+          Constraints.find_effects_not_included types.constraints subtype_var
+        in
+        Map.filter_keys supertype_effects ~f:(fun supertype_effect ->
+          (not (Set.mem effects_not_included supertype_effect))
+          || Map.mem subtype_effects supertype_effect)
+    in
+    if not ([%equal: _ Effect_name.Absolute.Map.t] supertype_effects supertype_effects')
+    then
+      eprint_s
+        [%message
+          "Removed some effects"
+            (supertype_effects : _ Effect_name.Absolute.Map.t)
+            (supertype_effects' : _ Effect_name.Absolute.Map.t)];
+    let supertype_effects = supertype_effects' in
     let subtype_only, supertype_only =
       Map.fold_symmetric_diff
         subtype_effects
@@ -608,23 +661,35 @@ and constrain_effects ~names ~types ~subtype ~supertype =
       | Some subtype_var, None ->
         Substitution.set_effects types.substitution subtype_var Internal_type.no_effects
     in
-    let create_substitution ~effects ~var ~new_var ~effects_subtyping_dir =
+    let create_substitution ~effects ~var ~effects_subtyping_dir ~all_mentioned_effects =
       let substitution = Substitution.create () in
-      if not (Map.is_empty effects)
-      then
-        Option.iter var ~f:(fun var ->
-          let effects =
-            Map.map effects ~f:(fun args ->
-              List.map args ~f:(fun arg ->
-                let arg' = refresh_type arg in
-                (* FIXME: Is the subtyping direction right here? Maybe it's backwards? *)
-                (match effects_subtyping_dir with
-                 | `Subtype -> constrain ~names ~types ~subtype:arg ~supertype:arg'
-                 | `Supertype -> constrain ~names ~types ~subtype:arg' ~supertype:arg);
-                arg'))
-          in
-          Substitution.set_effects substitution var { effects; effect_var = new_var });
-      substitution
+      let new_var =
+        if Map.is_empty effects
+        then None
+        else
+          Option.map var ~f:(fun var ->
+            let new_var = Type_var.create () in
+            let effects =
+              Map.map effects ~f:(fun args ->
+                List.map args ~f:(fun arg ->
+                  let arg' = refresh_type arg in
+                  (* FIXME: Is the subtyping direction right here? Maybe it's backwards? *)
+                  (match effects_subtyping_dir with
+                   | `Subtype -> constrain ~names ~types ~subtype:arg ~supertype:arg'
+                   | `Supertype -> constrain ~names ~types ~subtype:arg' ~supertype:arg);
+                  arg'))
+            in
+            Substitution.set_effects
+              substitution
+              var
+              { effects; effect_var = Some new_var };
+            Constraints.mark_effects_as_not_included
+              types.constraints
+              new_var
+              all_mentioned_effects;
+            new_var)
+      in
+      substitution, new_var
     in
     if Map.is_empty subtype_only && Map.is_empty supertype_only
     then constrain_effect_vars types ~subtype_var ~supertype_var
@@ -674,44 +739,50 @@ and constrain_effects ~names ~types ~subtype ~supertype =
 
          FIXME: See if we can come up with a test breaking this
       *)
-      (* FIXME: cleanup *)
-      (* let new_subtype_var = Option.map subtype_var ~f:(fun _ -> Type_var.create ()) in *)
-      let new_supertype_var = Option.map supertype_var ~f:(fun _ -> Type_var.create ()) in
-      (* let supertype_only_substitution =
+      (* FIXME: The problem is we shouldn't be assuming concrete effects are in the lower
+         bound when putting concrete effects as part of an upper bound. The paper can do
+         this because it has region parameters which it can later determine to be
+         uninhabited.
+         
+         The problem then becomes: how do we represent a constraint like a <: (Foo | b) ?
+         We know a <: b.
+         a may or may not include Foo. (don't know)
+      *)
+      let all_mentioned_effects =
+        Set.union (Map.key_set subtype_effects) (Map.key_set supertype_effects)
+      in
+      let supertype_only_substitution, new_subtype_var =
         create_substitution
           ~effects:supertype_only
           ~var:subtype_var
-          ~new_var:new_subtype_var
           ~effects_subtyping_dir:`Supertype
-      in *)
-      let subtype_only_substitution =
+          ~all_mentioned_effects
+      in
+      let subtype_only_substitution, new_supertype_var =
         create_substitution
           ~effects:subtype_only
           ~var:supertype_var
-          ~new_var:new_supertype_var
           ~effects_subtyping_dir:`Subtype
+          ~all_mentioned_effects
       in
       eprint_s
         [%message
           "constraining effects"
             (subtype_var : Type_var.t option)
-            (* (new_subtype_var : Type_var.t option) *)
-            (* (supertype_only_substitution : Substitution.t) *)
+            (new_subtype_var : Type_var.t option)
+            (supertype_only_substitution : Substitution.t)
             (supertype_var : Type_var.t option)
             (new_supertype_var : Type_var.t option)
             (subtype_only_substitution : Substitution.t)];
-      (* constrain_effect_vars
-        types
-        ~subtype_var:new_subtype_var
-        ~supertype_var:new_supertype_var; *)
-      (* Remove all constraints between vars of the same shape as either var here. *)
-      (* let vars_with_same_shape_as_subtype_var =
+      (* Remove all constraints between vars of the same shape as either var here, then
+         re-add them with the new substitution applied. *)
+      let vars_with_same_shape_as_subtype_var =
         match subtype_var with
         | Some var -> Constraints.find_vars_with_same_shape types.constraints var
         | None -> Type_var.Set.empty
       in
       Set.iter vars_with_same_shape_as_subtype_var ~f:(fun var ->
-        Constraints.remove_vars types.constraints var vars_with_same_shape_as_subtype_var); *)
+        Constraints.remove_vars types.constraints var vars_with_same_shape_as_subtype_var);
       let vars_with_same_shape_as_supertype_var =
         match supertype_var with
         | Some var -> Constraints.find_vars_with_same_shape types.constraints var
@@ -722,16 +793,21 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           types.constraints
           var
           vars_with_same_shape_as_supertype_var);
+      (* Apply the new substitution and re-add the constraints. *)
       Substitution.compose types.substitution subtype_only_substitution;
-      (* Substitution.compose types.substitution supertype_only_substitution; *)
+      Substitution.compose types.substitution supertype_only_substitution;
       let to_var = Internal_type.effects_of_var in
-      (* Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v ->
+      Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v ->
         Set.iter vars_with_same_shape_as_subtype_var ~f:(fun v' ->
-          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v'))); *)
+          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')));
       Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v ->
         Set.iter vars_with_same_shape_as_supertype_var ~f:(fun v' ->
-          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
-      (* FIXME: Do we need an occurs check for effects? *)))
+          constrain_effects ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')));
+      (* Add constraints between the residual effect variables. *)
+      constrain_effect_vars
+        types
+        ~subtype_var:(Option.first_some new_subtype_var subtype_var)
+        ~supertype_var:(Option.first_some new_supertype_var supertype_var)))
 
 and constrain_effects_to_be_total ~names ~types effects =
   constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
@@ -790,6 +866,8 @@ and instantiate_type_scheme =
     | Effect_union [] | Effect_intersection [] ->
       { effects = Effect_name.Absolute.Map.empty; effect_var = None }
     | Effect_union args ->
+      (* FIXME: Need to express that in e.g. `<Foo,a>`, `a` does not include `Foo`.
+         Applies for both union and intersection, I think. *)
       let var : Internal_type.effects =
         { effects = Effect_name.Absolute.Map.empty
         ; effect_var = Some (Type_var.create ())
@@ -1081,7 +1159,35 @@ let%test_module _ =
       [%expect
         {|
         (types.substitution
-         (($1 (Effects ((effects ((Foo ()))) (effect_var ($3))))))) |}]
+         (($0 (Effects ((effects ((Bar ((Var $4))))) (effect_var ($3)))))
+          ($1 (Effects ((effects ((Foo ()))) (effect_var ($5)))))))
+        $3 <: $5
+        $4 <: $2 |}]
+    ;;
+
+    let%expect_test "[constrain_effects]: var <: effect, var" =
+      let types = create () in
+      let names = Name_bindings.core in
+      let v = unstage (make_vars 2) in
+      (* <v0> <: <Foo, v1> *)
+      constrain_effects
+        ~names
+        ~types
+        ~subtype:{ effects = Effect_name.Absolute.Map.empty; effect_var = Some (v 0) }
+        ~supertype:
+          { effects =
+              Effect_name.Absolute.Map.singleton
+                (Module_path.Absolute.empty, foo_effect_name)
+                []
+          ; effect_var = Some (v 1)
+          };
+      print_s [%message (types.substitution : Substitution.t)];
+      Constraints.print types.constraints;
+      [%expect
+        {|
+        (types.substitution
+         (($0 (Effects ((effects ((Foo ()))) (effect_var ($2)))))))
+        $2 <: $1 |}]
     ;;
 
     let%expect_test "sanity check for effects subtyping semantics" =
