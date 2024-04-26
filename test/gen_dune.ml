@@ -4,28 +4,34 @@ open! Core
    This would hopefully mean we don't see red diffs for later phases when earlier phases
    fail. *)
 
-let make_rule dir name : Sexp.t =
-  [%sexp
-    "rule"
-    , ("alias", "runtest")
-    , ("deps", "test.dummy")
-    , ( "action"
-      , ( "no-infer"
-        , ("diff", (dir ^/ name ^ ".expected" : string), (dir ^/ name ^ ".out" : string))
-        ) )]
+let test_dirs = [ "tokens"; "ast"; "mir"; "llvm"; "output" ]
+
+let gen_rule () =
+  let test_names =
+    Util.sorted_files_in_local_dir "examples"
+    |> Array.map ~f:Filename.chop_extension
+    |> Array.to_list
+  in
+  let action : Sexp.t =
+    List
+      (Atom "progn"
+       :: [%sexp "run", "%{dep:test.exe}"]
+       :: List.concat_map test_dirs ~f:(fun dir ->
+            List.map test_names ~f:(fun test_name ->
+              [%sexp
+                "diff?"
+                , (dir ^/ test_name ^ ".expected" : string)
+                , (dir ^/ test_name ^ ".out" : string)])))
+  in
+  let deps : Sexp.t =
+    List
+      (Atom "deps"
+       :: [%sexp "package", "umber"]
+       :: [%sexp "glob_files", "examples/*"]
+       :: List.map test_dirs ~f:(fun dir ->
+            [%sexp "glob_files", (dir ^/ "*.expected" : string)]))
+  in
+  [%sexp "rule", ("alias", "runtest"), (deps : Sexp.t), ("action", (action : Sexp.t))]
 ;;
 
-let handle_dir dir bare_filename =
-  make_rule dir bare_filename |> print_s;
-  Out_channel.newline stdout
-;;
-
-let () =
-  Array.iter (Util.sorted_files_in_local_dir "examples") ~f:(fun filename ->
-    let bare_filename = Filename.chop_extension filename in
-    handle_dir "tokens" bare_filename;
-    handle_dir "ast" bare_filename;
-    handle_dir "mir" bare_filename;
-    handle_dir "llvm" bare_filename;
-    handle_dir "output" bare_filename)
-;;
+let () = print_s (gen_rule ())
