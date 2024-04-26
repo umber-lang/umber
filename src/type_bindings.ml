@@ -15,10 +15,6 @@ let eprint_s = ignore
 
 (** Prevent unstable [Type_var.t]s from appearing in test output sexps. *)
 let replace_vars_in_sexp env sexp =
-  (* FIXME: Need a way to show an internal type with stable names for the variables.
-     Hmm, maybe it would be good enough if each type expression had its own variable scope,
-     instead of it being global. Maybe generalize what Mir_name.Name_table does? Or make a
-     wrapper for Unique_id.Int ()? Or an easier way: map over the sexp. *)
   (* TODO: This is a hack to remove unstable type variables from the output in tests. 
      We should probably have type variables be scopied properly to let binding groups for
      one [Type_bindings.t]. We also need to think of a smarter way to display an
@@ -74,8 +70,6 @@ module Constraints : sig
 
   val create : unit -> t
   val add : t -> subtype:Type_var.t -> supertype:Type_var.t -> unit
-
-  (* FIXME: Make this interface less confusing*)
   val remove_vars : t -> Type_var.t -> Type_var.Set.t -> unit
   val find_vars_with_same_shape : t -> Type_var.t -> Type_var.Set.t
   val mark_effects_as_not_included : t -> Type_var.t -> Effect_name.Absolute.Set.t -> unit
@@ -374,7 +368,6 @@ let rec constrain ~names ~types ~subtype ~supertype =
   let supertype = Substitution.apply_to_type types.substitution supertype in
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
-    (* FIXME: cleanup *)
     eprint_s
       [%message
         "Type_bindings.constrain (post-substitution)"
@@ -410,10 +403,10 @@ let rec constrain ~names ~types ~subtype ~supertype =
           | (_ : _ Type_decl.t) ->
             if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
             then type_error "Type application mismatch" subtype supertype;
-            (* FIXME: Improve this *)
-            (* TODO: We don't know what the variance of the type parameters to the type are,
-             so we conservatively assume they are invariant. Implement inference and
-             manual specification of type parameter variance, similar to what OCaml does. *)
+            (* TODO: We don't know what the variance of the type parameters to the type
+               are, so we conservatively assume they are invariant. Implement inference
+               and manual specification of type parameter variance, similar to what OCaml
+               does. *)
             iter2_types args1 args2 ~subtype ~supertype ~f:(fun arg1 arg2 ->
               constrain ~names ~types ~subtype:arg1 ~supertype:arg2
               (* constrain ~names ~types ~subtype:arg2 ~supertype:arg1 *))))
@@ -518,7 +511,6 @@ and check_var_vs_type ~names ~types ~var ~type_ ~var_side =
       Substitution.set_type substitution var (refresh_type type_));
     substitution
   in
-  (* FIXME: cleanup *)
   eprint_s
     [%message
       "check_var_vs_type"
@@ -668,52 +660,6 @@ and constrain_effects ~names ~types ~subtype ~supertype =
             "Found more effects than expected"
               ~_:(subtype_only : Internal_type.t list Effect_name.Absolute.Map.t)]
     else (
-      (* FIXME: Think about the a <: (Foo, b) case. I think we might not want to assume
-         whether or not a includes Foo. Currently we effectively assume it always does,
-         by including that in the substitution. This would be clearly correct if the
-         subtyping direction was reversed. *)
-      (* FIXME: Not handling union of O and O', see paper.
-         
-         They have a concept of type params which don't contain any effects from a set O.
-         In their algorithm, type params always appear in dirts adjacent to the same set
-         of effects O. (not sure exactly what that means). We have to be careful not to
-         substitute an effect var to contain any effect it appears in a dirt with
-         anywhere.
-
-         This is already broken in [Handle] handling because we end up constraining
-         result_effect_var with effects in the expression if [resume] is used, but this
-         var apears in a dirt. Maybe we can try not re-using the variable?
-      *)
-      (* FIXME: Think about 13 <: Read + 2. This results in 13 := Read + _ which is bad
-         because we already have 2 <: 13 (they're the same shape), so we also get 2 :=
-         Read + _, but we want 2 to not include Read.
-         
-         In the paper they say the fresh vars here should not include any of the effects
-         listed in the subtype or supertype. Are we maintaining that? Probably not?
-         Ok that doesn't seem that important actually. We're doing the substitution here
-         which wrecks us. Maybe they're fine because they can make the regions map to
-         nothing later. But for us this messes it up badly because we don't have a way of
-         making it go away. We interpret having an effect as meaning we definitely have it
-         so this doesn't really work for subtype variables. We shouldn't blindly sub
-         them with supertype effects. Maybe just leave that direction alone. Although,
-         then we don't really know if it's less than the supertype var, do we?
-
-         Problems: this means we don't get any information when an effect variable is
-         constrained from above. We know it must be less than some effects or some other
-         var, but don't record this. Having overly large effects seems fine, but could be
-         bad in a contravariant position.
-
-         FIXME: See if we can come up with a test breaking this
-      *)
-      (* FIXME: The problem is we shouldn't be assuming concrete effects are in the lower
-         bound when putting concrete effects as part of an upper bound. The paper can do
-         this because it has region parameters which it can later determine to be
-         uninhabited.
-         
-         The problem then becomes: how do we represent a constraint like a <: (Foo | b) ?
-         We know a <: b.
-         a may or may not include Foo. (don't know)
-      *)
       let all_mentioned_effects =
         Set.union (Map.key_set subtype_effects) (Map.key_set supertype_effects)
       in
@@ -889,38 +835,6 @@ let constrain' ~names ~types ~subtype ~supertype =
     ~subtype:(instantiate_type_or_scheme ~names ~types subtype)
     ~supertype:(instantiate_type_or_scheme ~names ~types supertype)
 ;;
-
-(* FIXME: write effect type inference:
-   Example:
-
-   ```
-   val run_both : (a -> <e1> b), (a -> <e2> c), a -> <e1, e2> (b, c)
-   let run_both f g x = (f x, g x)
-   ```
-   This becomes Lambda ([f; g; x], Tuple [Fun_call (f, [x]); Fun_call (g, [x])])
-   Constraints we check for:
-   Var f :> Partial_function ([Var a], [Var e1], b)
-   | => f gets an upper bound of this type
-   Var g :> Partial_function ([Var a], [Var e2], c)
-   | => g gets an upper bound of this type
-   Doing substitution:
-   ...
-
-   Another example:
-
-   ```
-   val run_twice : (a -> <e1> b), a, a -> <e1> (b, b)
-   let run_twice f x y = (f x, f y)
-   ```
-   This becomes Lambda ([f; x; y], Tuple [Fun_call (f, [x]); Fun_call (f, [y])])
-   Constraints we check for:
-   Var f :> Partial_function ([Var a], [Var e1], b)
-   | => f gets an upper bound of this type
-   Var f :> Partial_function ([Var a], [Var e2], c)
-   | => f gets an upper bound of this type
-   Substituting means we should 
-   ...
-*)
 
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
