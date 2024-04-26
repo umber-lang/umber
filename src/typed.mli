@@ -32,9 +32,6 @@ module Expr : sig
     | Record_field_access of 'typ t Node.t * Value_name.t Node.t
   [@@deriving sexp]
 
-  (* FIXME: Type constraints should be scoped to the expression-level, right? So this
-     probably shouldn't have constraints at every type in the expression, just list them
-     once at the toplevel. Having them spread around might cause problems. *)
   type generalized =
     Module_path.absolute Type_scheme.t t * Module_path.absolute Type_scheme.t
   [@@deriving sexp_of]

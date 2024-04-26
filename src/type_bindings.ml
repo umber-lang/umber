@@ -530,8 +530,6 @@ and check_var_vs_type ~names ~types ~var ~type_ ~var_side =
     match var_side with
     | `Left -> constrain ~names ~types ~subtype:(Var var) ~supertype:type_
     | `Right -> constrain ~names ~types ~subtype:type_ ~supertype:(Var var));
-  (* FIXME: Should we be skipping this constrain check if v = v'?
-     (Maybe we should put an extra check in [constrain] for that case actually.) *)
   Set.iter vars_with_same_shape ~f:(fun v ->
     Set.iter vars_with_same_shape ~f:(fun v' ->
       constrain ~names ~types ~subtype:(Var v) ~supertype:(Var v')))
@@ -881,7 +879,6 @@ let generalize types outer_type =
     in
     Type_scheme.effect_union_list (Option.to_list effects_from_effect_var @ effects)
   in
-  (* FIXME: cleanup *)
   eprint_s
     [%message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
   (* FIXME: We give different names to the params in different places in the same
@@ -890,11 +887,6 @@ let generalize types outer_type =
   let env = Type_param.Env_of_vars.create () in
   let substituted_type = Substitution.apply_to_type types.substitution outer_type in
   let scheme = generalize_internal types substituted_type ~env ~polarity:Positive in
-  (* FIXME: Constraints are not propagating correctly.
-     Want to replace positive instances of vars with the union of their negative lower
-     bounds. (might do this for negative instances of vars too, not sure).
-     Then we need to think about what to to do with the constraints. (Only include ones
-     between vars which end up in the final type.) - should just work. *)
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   let result = Type_simplification.simplify_type (scheme, constraints) in
   (* Constraints.print types.constraints; *)

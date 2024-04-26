@@ -146,7 +146,6 @@ module Pattern = struct
       pat_names, (As (pat, name), typ)
     | Type_annotation (pat, ((_ : Trait_bound.t), annotated_type)) ->
       (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
-      (* FIXME: I think we need to propagate relevant constraints from the parent. *)
       let annotated_type =
         Type_bindings.instantiate_type_scheme
           ~names
@@ -178,7 +177,6 @@ module Pattern = struct
   ;;
 
   let generalize ~names ~types pat_names typ ~shadowing_allowed =
-    (* FIXME: cleanup *)
     eprint_s
       [%message
         "Pattern.generalize"
@@ -314,8 +312,6 @@ module Expr = struct
       in
       let (expr : _ t Node.t), (typ : Internal_type.t) =
         f ~add_effects:(fun subtype span ->
-          (* FIXME: cleanup *)
-          (* eprint_s [%message "add_effects" ~effects:(subtype : Internal_type.effects)]; *)
           Node.with_value (Node.create subtype span) ~f:(fun subtype ->
             Type_bindings.constrain_effects ~names ~types ~subtype ~supertype:effects))
       in
@@ -347,16 +343,6 @@ module Expr = struct
             let names = Name_bindings.import_all names path in
             of_untyped ~names ~types ~f_name expr
           | Fun_call (fun_, args) ->
-            (* FIXME: Is supertype right here? I think so?
-
-             E.g. if we have <Fun>, <Arg>, <Call> we need to get e = <Fun,Arg,Call>
-             so e :> <Fun>, <Arg>, <Call>
-
-             Upcasting is always safe. It's always safe to add effects to a function type
-             => that's the subtyping direction.
-
-             We need to have (() -> <Foo> ()) <: (() -> <Foo,Bar> ())
-          *)
             collect_effects ~names ~types (fun ~add_effects ->
               let fun_, fun_type, fun_effects = of_untyped ~names ~types ~f_name fun_ in
               add_effects fun_effects (Node.span fun_);
@@ -374,31 +360,6 @@ module Expr = struct
                 }
               in
               add_effects call_effects expr_span;
-              (* FIXME: Is this subtyping doing the correct thing? Seems very sus, e.g.:
-               
-               val foo : a, a -> Bool
-
-               foo 1 3.14 => try (a, a -> Bool) <: (Int, Float -> a)
-
-               ~> (($1, $1) -> Bool) <: (Int, Float -> $2)
-                  ~> Int <: $1
-                  ~> Float <: $1 (shouldn't it error here? maybe it's fine then?)
-                  ~> Bool <: $2
-
-               OR, for x <= y, try (a, a -> Bool) <: (b, c -> d)
-
-               ~> (($5, $5) -> Bool) <: ($2, $3 -> <$7> $6)
-                  ~> $2 <: $5
-                  ~> $3 <: $5
-                  ~> Bool <: $6
-
-                Ah, the constraints against $5 end up getting thrown away at the end since
-                $5 isn't mentioned in the final type.
-                
-                - Maybe we need to do something special when instantiating types?
-                - Shouldn't $2 and $3 have the same shape since they both have the same
-                  shape as $5? That's not how the implementation works atm
-            *)
               Type_bindings.constrain
                 ~names
                 ~types
@@ -493,44 +454,6 @@ module Expr = struct
               in
               node (Match (expr, (expr_type, Pattern.Names.empty), branches)), result_type)
           | Handle (expr, branches) ->
-            (* FIXME: Decide on shallow vs deep handlers.
-             Shallow handlers:
-             - More primitive, can implement deep handlers easily
-
-             Deep handlers:
-             - Generally what you want, easier for users
-             
-             Let's try deep handlers. 
-
-             Effect relationships:
-
-             handle (do_thing () : <e> a)
-             | (x : a) -> (y : b)
-             | <foo x> -> ... 
-
-             We have e, eb, eh, a, b, h
-             expr_type: <e> a
-             continuation_type: b -> <eh> h (resumes the same expression, but with the
-               handler active, so it returns what the handler returns/performs, right?)
-             branch_type: <eb> b
-             handle_type: <eh> h
-             resume: _ -> <eh> h
-
-             Including a value returned branch changes this a bit. Without one, we
-             implicitly return the expr type. (i.e. `| x -> x` is a branch).
-
-             b <: h
-
-             We have eh = e + eb - er
-             so eh + er >: e + eb, this is easy to do
-          *)
-            (* FIXME: Using result_effect_var in multiple places seems maybe not good.
-             We should use it as a row variable and not put it with multiple rows.
-             (alternatively I guess we could track which effects it must not include, but
-             we might not know that information in type_bindings until it's too late I
-             think. 
-             
-             Let's try using another variable maybe? *)
             let result_effect_var = Type_var.create () in
             let result_effects : Internal_type.effects =
               { effects = Effect_name.Absolute.Map.empty
@@ -665,28 +588,6 @@ module Expr = struct
                 effect_name, args)
               |> Effect_name.Absolute.Map.of_alist_exn
             in
-            (* FIXME: Did we just move the problem elsewhere?
-             Yes, forgot to put a constraint between [resume] and the result. 
-             
-             Here's another idea: rather than using a constraint, just remove the 
-             effects from the result type at the end. Except we need to put it in `resume`
-             before we know what it is, I think. We can see what effects will be handled
-             but not which new ones may be performed by other branches. So we need a var.
-
-             Maybe we can try substituting it and then remove the effects?
-
-             Ok in the paper they seem to be doing a very similar thing:
-             for each operation in the input, the p_in <: p_out | handled_ops
-
-             We could either change the semantics of constraint_effects to make it work
-             or:
-
-             Do some kind of weird manual re-implementation?
-             Track which effects a variable cannot include?
-
-             What's the problem exactly? We do e_res <: e_res + e_handled ?
-             Some other vars get in there and mess it up maybe.
-          *)
             let result_plus_handled_effects : Internal_type.effects =
               { effects = handled_effects; effect_var = Some result_effect_var }
             in
@@ -1402,16 +1303,6 @@ module Module = struct
     let representative_span =
       get_spans (Nonempty.hd bindings) |> Tuple2.uncurry Span.combine
     in
-    (* FIXME: cleanup *)
-    (* print_s
-      [%message
-        "typing bindings"
-          (bindings
-            : ((Pattern.t
-               * (Internal_type.t * Name_bindings.Name_entry.t Value_name.Map.t))
-               Node.t
-              * Untyped.Expr.t Node.t)
-              Nonempty.t)]; *)
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings
         ~names

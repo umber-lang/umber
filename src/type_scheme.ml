@@ -3,9 +3,6 @@ open Names
 
 (* TODO: Type declarations/expressions should have spans like other parts of the AST do. *)
 
-(* FIXME: Remove type unions. We should be able to simplify the types by unifying and
-   simplifying constraints. *)
-
 (* TODO: [Tuple] should use [Non_single_list] as well. *)
 
 type 'n type_ =
@@ -34,7 +31,7 @@ type 'n t = 'n type_ * constraint_ list [@@deriving hash, compare, equal, sexp]
 let var v = Var v
 let tuple ts = Tuple ts
 
-(* FIXME: Union and intersection functions should expand nested unions/intersections.
+(* TODO: Union and intersection functions should expand nested unions/intersections.
    Except maybe we just replace Union/Intersection with Merged or something because
    it doesn't make sense to e.g. have an intersection in a positive position
    (can't happen based on how we generate them). *)

@@ -4,7 +4,6 @@ open Names
 type 'n type_ =
   | Var of Type_param_name.t
   | Type_app of 'n Type_name.Qualified.t * 'n type_ list
-  (* FIXME: Have tuple use Non_single_list.t *)
   | Tuple of 'n type_ list
   | Function of 'n type_ Nonempty.t * 'n effects * 'n type_
   | Union of 'n type_ Non_single_list.t
