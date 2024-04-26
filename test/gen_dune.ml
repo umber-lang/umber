@@ -6,6 +6,9 @@ open! Core
 
 let test_dirs = [ "tokens"; "ast"; "mir"; "llvm"; "output" ]
 
+(* FIXME: Will stop at the first error instead of propagating them, bad. Maybe try
+   "concurrent" or generate separate rules. *)
+
 let gen_rule () =
   let test_names =
     Util.sorted_files_in_local_dir "examples"
@@ -14,14 +17,17 @@ let gen_rule () =
   in
   let action : Sexp.t =
     List
-      (Atom "progn"
-       :: [%sexp "run", "%{dep:test.exe}"]
-       :: List.concat_map test_dirs ~f:(fun dir ->
-            List.map test_names ~f:(fun test_name ->
-              [%sexp
-                "diff?"
-                , (dir ^/ test_name ^ ".expected" : string)
-                , (dir ^/ test_name ^ ".out" : string)])))
+      [ Atom "progn"
+      ; [%sexp "run", "%{dep:test.exe}"]
+      ; List
+          (Atom "concurrent"
+           :: List.concat_map test_dirs ~f:(fun dir ->
+                List.map test_names ~f:(fun test_name ->
+                  [%sexp
+                    "diff?"
+                    , (dir ^/ test_name ^ ".expected" : string)
+                    , (dir ^/ test_name ^ ".out" : string)])))
+      ]
   in
   let deps : Sexp.t =
     List

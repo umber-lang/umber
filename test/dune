@@ -6,26 +6,6 @@
  (preprocess
   (pps ppx_jane)))
 
-(rule
- (alias runtest)
- (target test.dummy)
- (deps
-  (package umber)
-  (glob_files examples/*)
-  (glob_files tokens/*.expected)
-  (glob_files ast/*.expected)
-  (glob_files mir/*.expected)
-  (glob_files llvm/*.expected)
-  (glob_files output/*.expected))
- (action
-  (progn
-   (ignore-stderr
-    (with-accepted-exit-codes
-     (or 0 1)
-     (system "mkdir ast tokens mir llvm")))
-   (run %{dep:test.exe})
-   (system "echo \"Tests run at $(date)\" > %{target}"))))
-
 (include dune.inc)
 
 (rule
