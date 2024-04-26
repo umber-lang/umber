@@ -1,0 +1,9 @@
+module : {
+  effect Abstract
+
+  val more_effects_in_sig : Int -> <Abstract> Int
+}
+
+let more_effects_in_sig x = x
+
+# FIXME: Check for equivalent vars

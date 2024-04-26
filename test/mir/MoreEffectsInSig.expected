@@ -1,0 +1,3 @@
+((Fun_def
+  ((fun_name MoreEffectsInSig.more_effects_in_sig)
+   (args (MoreEffectsInSig.x.1)) (body (Name MoreEffectsInSig.x.1)))))
