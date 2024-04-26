@@ -341,14 +341,6 @@ let refresh_type type_ =
 ;;
 
 let rec constrain ~names ~types ~subtype ~supertype =
-  let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
-    (* FIXME: Isn't this code setting up [params] redundant? *)
-    let params = Type_param.Env_to_vars.create () in
-    List.iter
-      (param_list :> Type_param_name.t list)
-      ~f:(fun p -> ignore (Type_param.Env_to_vars.find_or_add params p : Type_var.t));
-    instantiate_type_scheme ~names ~types expr ~params
-  in
   let lookup_type names name args =
     let type_entry = Name_bindings.find_absolute_type_entry names name in
     if List.length args = Type_decl.arity (Name_bindings.Type_entry.decl type_entry)
@@ -389,17 +381,21 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Type_app (name1, args1), Type_app (name2, args2) ->
       let type_entry1 = lookup_type names name1 args1 in
       (match Name_bindings.Type_entry.decl type_entry1 with
-       | params, Alias expr ->
-         constrain ~names ~types ~subtype:(instantiate_alias params (expr, [])) ~supertype
+       | _params, Alias expr ->
+         constrain
+           ~names
+           ~types
+           ~subtype:(instantiate_type_scheme ~names ~types (expr, []))
+           ~supertype
        | (_ : _ Type_decl.t) ->
          let type_entry2 = lookup_type names name2 args2 in
          (match Name_bindings.Type_entry.decl type_entry2 with
-          | params, Alias expr ->
+          | _params, Alias expr ->
             constrain
               ~names
               ~types
               ~subtype
-              ~supertype:(instantiate_alias params (expr, []))
+              ~supertype:(instantiate_type_scheme ~names ~types (expr, []))
           | (_ : _ Type_decl.t) ->
             if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
             then type_error "Type application mismatch" subtype supertype;
@@ -412,13 +408,21 @@ let rec constrain ~names ~types ~subtype ~supertype =
               (* constrain ~names ~types ~subtype:arg2 ~supertype:arg1 *))))
     | Type_app (name, args), (Tuple _ | Function _ | Partial_function _) ->
       (match Name_bindings.Type_entry.decl (lookup_type names name args) with
-       | params, Alias expr ->
-         constrain ~names ~types ~subtype:(instantiate_alias params (expr, [])) ~supertype
+       | _params, Alias expr ->
+         constrain
+           ~names
+           ~types
+           ~subtype:(instantiate_type_scheme ~names ~types (expr, []))
+           ~supertype
        | _ -> type_error "Type application mismatch" subtype supertype)
     | (Tuple _ | Function _ | Partial_function _), Type_app (name, args) ->
       (match Name_bindings.Type_entry.decl (lookup_type names name args) with
-       | params, Alias expr ->
-         constrain ~names ~types ~subtype ~supertype:(instantiate_alias params (expr, []))
+       | _params, Alias expr ->
+         constrain
+           ~names
+           ~types
+           ~subtype
+           ~supertype:(instantiate_type_scheme ~names ~types (expr, []))
        | _ -> type_error "Type application mismatch" subtype supertype)
     | Function (args1, effects1, res1), Function (args2, effects2, res2) ->
       (match
@@ -743,10 +747,6 @@ and instantiate_type_scheme =
       let args = Nonempty.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
       let effects = instantiate_effect_type_scheme ~names ~types ~params effects in
       Function (args, effects, instantiate_type_scheme ~names ~types ~params result)
-    | Union [] ->
-      (* The empty union is the bottom type, the type which is a subtype of all other
-         types. We can get equivalent behavior by using an unconstrained type variable. *)
-      Var (Type_var.create ())
     | Union args ->
       let var = Internal_type.fresh_var () in
       let args =
