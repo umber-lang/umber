@@ -346,56 +346,6 @@ let refresh_type type_ =
   Internal_type.map_vars type_ ~f:refresh_var
 ;;
 
-(* FIXME: Just use this for types, not effects *)
-let check_var_vs_type
-  ~names
-  ~types
-  ~var
-  ~type_
-  ~var_side
-  ~constrain
-  ~to_var
-  ~set_substitution
-  ~refresh
-  =
-  let orient f ~var ~type_ =
-    match var_side with
-    | `Left -> f (to_var var) type_
-    | `Right -> f type_ (to_var var)
-  in
-  let vars_with_same_shape =
-    Constraints.find_vars_with_same_shape types.constraints var
-  in
-  Set.iter vars_with_same_shape ~f:(fun var ->
-    Constraints.remove_vars types.constraints var vars_with_same_shape);
-  let new_var_substitution =
-    let substitution = Substitution.create () in
-    Set.iter vars_with_same_shape ~f:(fun var ->
-      set_substitution substitution var (refresh type_));
-    substitution
-  in
-  (* FIXME: cleanup *)
-  eprint_s
-    [%message
-      "check_var_vs_type"
-        (var : Type_var.t)
-        (var_side : [ `Left | `Right ])
-        (vars_with_same_shape : Type_var.Set.t)
-        (new_var_substitution : Substitution.t)];
-  Substitution.compose types.substitution new_var_substitution;
-  (* After applying the substitution, add constraints between the refreshed types and
-     their original. The refreshed type will be substituted in using the substitution to
-     take the place of the var. *)
-  Set.iter vars_with_same_shape ~f:(fun var ->
-    orient ~var ~type_ (fun subtype supertype ->
-      constrain ~names ~types ~subtype ~supertype));
-  (* FIXME: Should we be skipping this constrain check if v = v'?
-     (Maybe we should put an extra check in [constrain] for that case actually.) *)
-  Set.iter vars_with_same_shape ~f:(fun v ->
-    Set.iter vars_with_same_shape ~f:(fun v' ->
-      constrain ~names ~types ~subtype:(to_var v) ~supertype:(to_var v')))
-;;
-
 let rec constrain ~names ~types ~subtype ~supertype =
   let instantiate_alias (param_list : Type_param_name.t Unique_list.t) expr =
     (* FIXME: Isn't this code setting up [params] redundant? *)
@@ -438,29 +388,11 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Var var, type_ ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      check_var_vs_type
-        ~names
-        ~types
-        ~var
-        ~type_
-        ~var_side:`Left
-        ~constrain
-        ~to_var:Internal_type.var
-        ~set_substitution:Substitution.set_type
-        ~refresh:refresh_type
+      check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Left
     | type_, Var var ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      check_var_vs_type
-        ~names
-        ~types
-        ~var
-        ~type_
-        ~var_side:`Right
-        ~constrain
-        ~to_var:Internal_type.var
-        ~set_substitution:Substitution.set_type
-        ~refresh:refresh_type
+      check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Right
     | Type_app (name1, args1), Type_app (name2, args2) ->
       let type_entry1 = lookup_type names name1 args1 in
       (match Name_bindings.Type_entry.decl type_entry1 with
@@ -573,6 +505,40 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Tuple _, (Function _ | Partial_function _)
     | Function _, Tuple _
     | Partial_function _, Tuple _ -> type_error "Types do not match" subtype supertype)
+
+and check_var_vs_type ~names ~types ~var ~type_ ~var_side =
+  let vars_with_same_shape =
+    Constraints.find_vars_with_same_shape types.constraints var
+  in
+  Set.iter vars_with_same_shape ~f:(fun var ->
+    Constraints.remove_vars types.constraints var vars_with_same_shape);
+  let new_var_substitution =
+    let substitution = Substitution.create () in
+    Set.iter vars_with_same_shape ~f:(fun var ->
+      Substitution.set_type substitution var (refresh_type type_));
+    substitution
+  in
+  (* FIXME: cleanup *)
+  eprint_s
+    [%message
+      "check_var_vs_type"
+        (var : Type_var.t)
+        (var_side : [ `Left | `Right ])
+        (vars_with_same_shape : Type_var.Set.t)
+        (new_var_substitution : Substitution.t)];
+  Substitution.compose types.substitution new_var_substitution;
+  (* After applying the substitution, add constraints between the refreshed types and
+     their original. The refreshed type will be substituted in using the substitution to
+     take the place of the var. *)
+  Set.iter vars_with_same_shape ~f:(fun var ->
+    match var_side with
+    | `Left -> constrain ~names ~types ~subtype:(Var var) ~supertype:type_
+    | `Right -> constrain ~names ~types ~subtype:type_ ~supertype:(Var var));
+  (* FIXME: Should we be skipping this constrain check if v = v'?
+     (Maybe we should put an extra check in [constrain] for that case actually.) *)
+  Set.iter vars_with_same_shape ~f:(fun v ->
+    Set.iter vars_with_same_shape ~f:(fun v' ->
+      constrain ~names ~types ~subtype:(Var v) ~supertype:(Var v')))
 
 and constrain_effects ~names ~types ~subtype ~supertype =
   eprint_s
