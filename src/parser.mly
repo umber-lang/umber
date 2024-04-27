@@ -249,9 +249,15 @@ type_fun_args:
   | arg = type_non_fun { Nonempty.singleton arg }
   | arg = type_non_fun; COMMA; args = type_fun_args { Nonempty.cons arg args }
 
+type_effect:
+  | param = LOWER_NAME
+    { Type_scheme.Effect_var (Type_param_name.of_ustring_unchecked param) }
+  | cnstr = qualified(UPPER_NAME); args = list(type_term)
+    { Type_scheme.Effect (Effect_name.Relative.of_ustrings_unchecked cnstr, args) }
+
 %inline type_effects:
-  | LESS_THAN; type_exprs = separated_list(COMMA, type_expr); GREATER_THAN
-    { Untyped.parse_effects_from_type_exprs type_exprs }
+  | LESS_THAN; effects = separated_list(COMMA, type_effect); GREATER_THAN
+    { Type_scheme.effect_union_list effects }
 
 %inline type_fun:
   | args = type_fun_args; ARROW; effects = type_effects?; body = type_non_fun

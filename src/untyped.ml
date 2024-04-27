@@ -221,21 +221,6 @@ let create_effect params sigs : _ Effect.t =
   { params; operations }
 ;;
 
-let parse_effects_from_type_exprs =
-  let parse_effect_from_type_expr : _ Type_scheme.type_ -> _ Type_scheme.effects
-    = function
-    | Var var -> Effect_var var
-    | Type_app ((path, name), args) ->
-      let name = Effect_name.of_ustring_unchecked (Type_name.to_ustring name) in
-      Effect ((path, name), args)
-    | (Tuple _ | Function _ | Union _ | Intersection _) as type_ ->
-      Compilation_error.raise
-        Syntax_error
-        ~msg:[%message "Expected an effect" (type_ : _ Type_scheme.type_)]
-  in
-  Type_scheme.effect_union_list << List.map ~f:parse_effect_from_type_expr
-;;
-
 module Module = struct
   include Module
 

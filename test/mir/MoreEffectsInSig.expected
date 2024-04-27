@@ -1,3 +1,11 @@
 ((Fun_def
   ((fun_name MoreEffectsInSig.more_effects_in_sig)
-   (args (MoreEffectsInSig.x.1)) (body (Name MoreEffectsInSig.x.1)))))
+   (args (MoreEffectsInSig.x.1)) (body (Name MoreEffectsInSig.x.1))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_def
+  ((fun_name MoreEffectsInSig.equivalent_with_different_vars)
+   (args (MoreEffectsInSig.f.1 MoreEffectsInSig.g.1))
+   (body
+    (Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call MoreEffectsInSig.f.1 ((Make_block (tag 0))))
+      (Fun_call MoreEffectsInSig.g.1 ((Make_block (tag 0))))))))))

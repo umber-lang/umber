@@ -133,6 +133,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_type_fun_args
       : Parser_scope.Module_path.relative Type_scheme.type_ Nonempty.t nonterminal
   | N_type_expr : Parser_scope.Module_path.relative Type_scheme.type_ nonterminal
+  | N_type_effect : Parser_scope.Module_path.relative Type_scheme.effects nonterminal
   | N_type_decl : Parser_scope.Module_path.relative Type_decl.decl nonterminal
   | N_type_cnstr_decl
       : (Parser_scope.Cnstr_name.t
@@ -161,8 +162,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         * Untyped.Expr.t Node.t)
         list
         nonterminal
-  | N_separated_nonempty_list_COMMA_type_expr_
-      : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
+  | N_separated_nonempty_list_COMMA_type_effect_
+      : Parser_scope.Module_path.relative Type_scheme.effects list nonterminal
   | N_separated_nonempty_list_COMMA_import_paths_ : Module.Import.Paths.t list nonterminal
   | N_separated_nonempty_list_AND_let_binding_
       : (Umber__Untyped.Pattern.t Node.t * Untyped.Expr.t Node.t) list nonterminal
@@ -237,8 +238,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         * Parser_scope.Module_path.relative Type_scheme.type_ list)
         list
         nonterminal
-  | N_loption_separated_nonempty_list_COMMA_type_expr__
-      : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
+  | N_loption_separated_nonempty_list_COMMA_type_effect__
+      : Parser_scope.Module_path.relative Type_scheme.effects list nonterminal
   | N_loption_preceded_FILE_MODULE_braces_list_stmt_sig____
       : Parser_scope.Module_path.relative Module.sig_ Node.t list nonterminal
   | N_loption_equals_defs_
