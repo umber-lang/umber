@@ -1,0 +1,8 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("Free parameters in effect declaration"
+    (effect
+     ((params ())
+      (operations ((((name cast) (args ((Var a))) (result (Var b))))))))))
+  (filename ErrorEffectOpUnboundParams.um) (span 2:1-4:2)))

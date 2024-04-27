@@ -900,15 +900,14 @@ let add_to_effects effects name decl ~err_msg =
 ;;
 
 let add_type_decl t type_name decl =
+  if not (Type_decl.no_free_params decl)
+  then
+    Compilation_error.raise
+      Type_error
+      ~msg:
+        [%message
+          "Free parameters in type declaration" (decl : Module_path.absolute Type_decl.t)];
   let f bindings =
-    if not (Type_decl.no_free_params decl)
-    then
-      Compilation_error.raise
-        Type_error
-        ~msg:
-          [%message
-            "Free parameters in type declaration"
-              (decl : Module_path.absolute Type_decl.t)];
     { bindings with
       types =
         add_to_types
@@ -973,7 +972,14 @@ let add_name_entry names name scheme new_entry ~constrain =
           ^ Value_name.Absolute.to_ustring imported_name))
 ;;
 
-let add_effect t effect_name (effect : _ Effect.t) ~constrain =
+let add_effect t effect_name effect ~constrain =
+  if not (Effect.no_free_params effect)
+  then
+    Compilation_error.raise
+      Type_error
+      ~msg:
+        [%message
+          "Free parameters in effect declaration" (effect : Module_path.absolute Effect.t)];
   let f bindings =
     let effects : _ Type_scheme.effects =
       Effect

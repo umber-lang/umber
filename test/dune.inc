@@ -24,6 +24,8 @@
     (diff? tokens/ErrorDuplicateTypeParameter.expected
      tokens/ErrorDuplicateTypeParameter.out)
     (diff? tokens/ErrorDuplicateVal.expected tokens/ErrorDuplicateVal.out)
+    (diff? tokens/ErrorEffectOpUnboundParams.expected
+     tokens/ErrorEffectOpUnboundParams.out)
     (diff? tokens/ErrorEffectSigDefDiff.expected
      tokens/ErrorEffectSigDefDiff.out)
     (diff? tokens/ErrorEffectsNoValueBranch.expected
@@ -59,6 +61,8 @@
      tokens/ErrorSubmoduleSignatures.out)
     (diff? tokens/ErrorToplevelImport.expected
      tokens/ErrorToplevelImport.out)
+    (diff? tokens/ErrorTypeDeclFreeParams.expected
+     tokens/ErrorTypeDeclFreeParams.out)
     (diff? tokens/ErrorUnqualifiedUniversalImport.expected
      tokens/ErrorUnqualifiedUniversalImport.out)
     (diff? tokens/ExternInt.expected tokens/ExternInt.out)
@@ -106,6 +110,8 @@
     (diff? ast/ErrorDuplicateTypeParameter.expected
      ast/ErrorDuplicateTypeParameter.out)
     (diff? ast/ErrorDuplicateVal.expected ast/ErrorDuplicateVal.out)
+    (diff? ast/ErrorEffectOpUnboundParams.expected
+     ast/ErrorEffectOpUnboundParams.out)
     (diff? ast/ErrorEffectSigDefDiff.expected ast/ErrorEffectSigDefDiff.out)
     (diff? ast/ErrorEffectsNoValueBranch.expected
      ast/ErrorEffectsNoValueBranch.out)
@@ -135,6 +141,8 @@
     (diff? ast/ErrorSubmoduleSignatures.expected
      ast/ErrorSubmoduleSignatures.out)
     (diff? ast/ErrorToplevelImport.expected ast/ErrorToplevelImport.out)
+    (diff? ast/ErrorTypeDeclFreeParams.expected
+     ast/ErrorTypeDeclFreeParams.out)
     (diff? ast/ErrorUnqualifiedUniversalImport.expected
      ast/ErrorUnqualifiedUniversalImport.out)
     (diff? ast/ExternInt.expected ast/ExternInt.out)
@@ -180,6 +188,8 @@
     (diff? mir/ErrorDuplicateTypeParameter.expected
      mir/ErrorDuplicateTypeParameter.out)
     (diff? mir/ErrorDuplicateVal.expected mir/ErrorDuplicateVal.out)
+    (diff? mir/ErrorEffectOpUnboundParams.expected
+     mir/ErrorEffectOpUnboundParams.out)
     (diff? mir/ErrorEffectSigDefDiff.expected mir/ErrorEffectSigDefDiff.out)
     (diff? mir/ErrorEffectsNoValueBranch.expected
      mir/ErrorEffectsNoValueBranch.out)
@@ -209,6 +219,8 @@
     (diff? mir/ErrorSubmoduleSignatures.expected
      mir/ErrorSubmoduleSignatures.out)
     (diff? mir/ErrorToplevelImport.expected mir/ErrorToplevelImport.out)
+    (diff? mir/ErrorTypeDeclFreeParams.expected
+     mir/ErrorTypeDeclFreeParams.out)
     (diff? mir/ErrorUnqualifiedUniversalImport.expected
      mir/ErrorUnqualifiedUniversalImport.out)
     (diff? mir/ExternInt.expected mir/ExternInt.out)
@@ -254,6 +266,8 @@
     (diff? llvm/ErrorDuplicateTypeParameter.expected
      llvm/ErrorDuplicateTypeParameter.out)
     (diff? llvm/ErrorDuplicateVal.expected llvm/ErrorDuplicateVal.out)
+    (diff? llvm/ErrorEffectOpUnboundParams.expected
+     llvm/ErrorEffectOpUnboundParams.out)
     (diff? llvm/ErrorEffectSigDefDiff.expected
      llvm/ErrorEffectSigDefDiff.out)
     (diff? llvm/ErrorEffectsNoValueBranch.expected
@@ -285,6 +299,8 @@
     (diff? llvm/ErrorSubmoduleSignatures.expected
      llvm/ErrorSubmoduleSignatures.out)
     (diff? llvm/ErrorToplevelImport.expected llvm/ErrorToplevelImport.out)
+    (diff? llvm/ErrorTypeDeclFreeParams.expected
+     llvm/ErrorTypeDeclFreeParams.out)
     (diff? llvm/ErrorUnqualifiedUniversalImport.expected
      llvm/ErrorUnqualifiedUniversalImport.out)
     (diff? llvm/ExternInt.expected llvm/ExternInt.out)
@@ -333,6 +349,8 @@
     (diff? output/ErrorDuplicateTypeParameter.expected
      output/ErrorDuplicateTypeParameter.out)
     (diff? output/ErrorDuplicateVal.expected output/ErrorDuplicateVal.out)
+    (diff? output/ErrorEffectOpUnboundParams.expected
+     output/ErrorEffectOpUnboundParams.out)
     (diff? output/ErrorEffectSigDefDiff.expected
      output/ErrorEffectSigDefDiff.out)
     (diff? output/ErrorEffectsNoValueBranch.expected
@@ -368,6 +386,8 @@
      output/ErrorSubmoduleSignatures.out)
     (diff? output/ErrorToplevelImport.expected
      output/ErrorToplevelImport.out)
+    (diff? output/ErrorTypeDeclFreeParams.expected
+     output/ErrorTypeDeclFreeParams.out)
     (diff? output/ErrorUnqualifiedUniversalImport.expected
      output/ErrorUnqualifiedUniversalImport.out)
     (diff? output/ExternInt.expected output/ExternInt.out)

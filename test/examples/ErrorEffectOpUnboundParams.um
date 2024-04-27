@@ -1,0 +1,4 @@
+# If allowed naively, this would break a lot of things
+effect Magic = {
+  val cast : a -> b
+}
