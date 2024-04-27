@@ -21,8 +21,8 @@ let gen_rule () =
       ; [%sexp "run", "%{dep:test.exe}"]
       ; List
           (Atom "concurrent"
-           :: List.concat_map test_dirs ~f:(fun dir ->
-                List.map test_names ~f:(fun test_name ->
+           :: List.concat_map test_names ~f:(fun test_name ->
+                List.map test_dirs ~f:(fun dir ->
                   [%sexp
                     "diff?"
                     , (dir ^/ test_name ^ ".expected" : string)
