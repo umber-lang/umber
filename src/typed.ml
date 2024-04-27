@@ -867,7 +867,15 @@ module Module = struct
 
     val empty : t
     val add_type_decl : t -> type_name:Type_name.t -> def:Untyped.Module.def Node.t -> t
+
+    val add_effect_decl
+      :  t
+      -> effect_name:Effect_name.t
+      -> def:Untyped.Module.def Node.t
+      -> t
+
     val remove_type_decl : t -> Type_name.t -> t
+    val remove_effect_decl : t -> Effect_name.t -> t
 
     val fold_defs
       :  t
@@ -875,27 +883,42 @@ module Module = struct
       -> f:('acc -> Untyped.Module.def Node.t -> 'acc)
       -> 'acc
   end = struct
-    type t = { type_decls : Untyped.Module.def Node.t Type_name.Map.t }
+    type t =
+      { type_decls : Untyped.Module.def Node.t Type_name.Map.t
+      ; effect_decls : Untyped.Module.def Node.t Effect_name.Map.t
+      }
     [@@deriving fields]
 
-    let empty = { type_decls = Type_name.Map.empty }
+    let empty = { type_decls = Type_name.Map.empty; effect_decls = Effect_name.Map.empty }
 
-    let add_internal map ~key ~data =
-      match Map.add map ~key ~data with
-      | `Ok map -> map
-      | `Duplicate -> compiler_bug [%message "Sig_data.add: duplicate value"]
+    let add_internal (t : t) field ~key ~data =
+      Field.map field t ~f:(fun map ->
+        match Map.add map ~key ~data with
+        | `Ok map -> map
+        | `Duplicate -> compiler_bug [%message "Sig_data.add: duplicate value"])
     ;;
 
-    let add_type_decl { type_decls } ~type_name ~def =
-      { type_decls = add_internal type_decls ~key:type_name ~data:def }
+    let remove_internal (t : t) field key =
+      Field.map field t ~f:(fun map -> Map.remove map key)
     ;;
 
-    let remove_type_decl { type_decls } type_name =
-      { type_decls = Map.remove type_decls type_name }
+    let add_type_decl t ~type_name ~def =
+      add_internal t Fields.type_decls ~key:type_name ~data:def
     ;;
 
-    let fold_defs { type_decls } ~init ~f =
-      Map.fold type_decls ~init ~f:(fun ~key:_ ~data:def acc -> f acc def)
+    let add_effect_decl t ~effect_name ~def =
+      add_internal t Fields.effect_decls ~key:effect_name ~data:def
+    ;;
+
+    let remove_type_decl t type_name = remove_internal t Fields.type_decls type_name
+
+    let remove_effect_decl t effect_name =
+      remove_internal t Fields.effect_decls effect_name
+    ;;
+
+    let fold_defs { type_decls; effect_decls } ~init ~f =
+      let init = Map.fold type_decls ~init ~f:(fun ~key:_ ~data:def acc -> f acc def) in
+      Map.fold effect_decls ~init ~f:(fun ~key:_ ~data:def acc -> f acc def)
     ;;
   end
 
@@ -907,7 +930,7 @@ module Module = struct
      resolving imports and absolutifying everything? Actually, that would mess with our
      ability to know what names exist where before resolving imports, so it wouldn't
      quite work. Maybe we could include the values as placeholders in the def, and then
-      fill their actual values in after resolving imports? Pretty complicated. *)
+     fill their actual values in after resolving imports? Pretty complicated. *)
   let rec copy_some_sigs_to_defs sigs defs =
     let rec gather_decls ~sig_map sigs =
       List.fold sigs ~init:sig_map ~f:(fun sig_map sig_ ->
@@ -917,9 +940,10 @@ module Module = struct
              | Type_decl (type_name, _) ->
                let def = Node.set sig_ (Common_def common) in
                Nested_map.map sig_map ~f:(Sig_data.add_type_decl ~type_name ~def)
+             | Effect (effect_name, _) ->
+               let def = Node.set sig_ (Common_def common) in
+               Nested_map.map sig_map ~f:(Sig_data.add_effect_decl ~effect_name ~def)
              | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-             (* TODO: Implement effect copying from sigs to defs *)
-             | Effect _
              | Val _
              | Extern _
              (* We could consider handling imports bringing in type declarations to copy
@@ -945,9 +969,11 @@ module Module = struct
                | Type_decl (type_name, _) ->
                  ( Nested_map.map sig_map ~f:(Fn.flip Sig_data.remove_type_decl type_name)
                  , def )
-               | Effect _ ->
-                 (* TODO: Copy effect declarations to defs *)
-                 sig_map, def
+               | Effect (effect_name, _) ->
+                 ( Nested_map.map
+                     sig_map
+                     ~f:(Fn.flip Sig_data.remove_effect_decl effect_name)
+                 , def )
                | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
                | Val _ | Extern _ | Import _ -> sig_map, def)
             | Module (module_name, sigs, defs) ->

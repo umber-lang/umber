@@ -15,7 +15,8 @@
         (Function ((Tuple ())) (Effect_var e2) (Tuple ())))
        (Effect_union ((Effect_var e1) (Effect_var e2))) (Tuple ()))
       ())))))
- ((Let (rec_ false)
+ ((Common_def (Effect Abstract ((params ()) (operations ()))))
+  (Let (rec_ false)
    (bindings
     (((Catch_all (more_effects_in_sig))
       ((Lambda ((Catch_all (x))) (Name MoreEffectsInSig.x))
