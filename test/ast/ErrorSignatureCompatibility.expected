@@ -4,7 +4,23 @@
    ("The signature of this module does not match its definition"
     (module_name ErrorSignatureCompatibility)
     ((name_diff
-      ((double'
+      ((yield
+        (Incompatible
+         ((type_
+           (Scheme
+            ((Function ((Var a))
+              (Effect ErrorSignatureCompatibility.InconsistentVarUse
+               ((Var a) (Var b)))
+              (Var b))
+             ()))))
+         ((type_
+           (Scheme
+            ((Function ((Var b))
+              (Effect ErrorSignatureCompatibility.InconsistentVarUse
+               ((Var a) (Var b)))
+              (Var a))
+             ()))))))
+       (double'
         (Incompatible
          ((type_
            (Scheme
@@ -52,6 +68,13 @@
           (Variants ((Foo ((Function ((Var a)) (Effect_union ()) (Var b)))))))
          ((a b)
           (Variants ((Foo ((Function ((Var b)) (Effect_union ()) (Var a)))))))))))
+     (effect_diff
+      ((InconsistentVarUse
+        (Incompatible
+         ((params (a b))
+          (operations ((((name yield) (args ((Var a))) (result (Var b)))))))
+         ((params (a b))
+          (operations ((((name yield) (args ((Var b))) (result (Var a)))))))))))
      (module_diff
       ((A
         (Module_diff

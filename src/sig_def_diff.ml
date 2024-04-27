@@ -60,8 +60,6 @@ let fold2 xs ys ~init ~f =
   | Unequal_lengths -> raise Compatibility_error
 ;;
 
-(* FIXME: We need to skolemize effects too, right? Write some tests for this. *)
-
 let iter2 xs ys ~f = fold2 xs ys ~init:() ~f:(fun () x -> f x)
 
 let create_skolemized_type ~names =

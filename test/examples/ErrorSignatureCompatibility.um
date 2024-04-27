@@ -17,6 +17,10 @@ module : {
 
   type InconsistentVarUse a b =
     | Foo (a -> b)
+
+  effect InconsistentVarUse a b = {
+    val yield : a -> b
+  }
 }
 
 val id : a -> a
@@ -53,3 +57,7 @@ let double' = A.double_int
 
 type InconsistentVarUse a b =
   | Foo (b -> a)
+
+effect InconsistentVarUse a b = {
+  val yield : b -> a
+}
