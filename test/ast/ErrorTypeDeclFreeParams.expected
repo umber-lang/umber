@@ -1,0 +1,6 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("Free parameters in type declaration"
+    (decl (() (Variants ((Unbound ((Var a)))))))))
+  (filename ErrorTypeDeclFreeParams.um) (span 1:1-2:14)))
