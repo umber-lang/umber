@@ -1,0 +1,3 @@
+effect Cyclic = {
+  val go : () => (() -> <Cyclic> ()) -> ()
+}

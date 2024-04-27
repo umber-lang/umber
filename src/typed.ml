@@ -1220,7 +1220,7 @@ module Module = struct
         check_cyclic_type_alias ~names alias;
         names
       | Effect _ ->
-        (* FIXME: Check for cyclic effect types. *)
+        (* TODO: Check for recursive effect type aliases when those are implemented. *)
         names
       | Type_decl _ | Trait_sig _ | Import _ -> names
     in

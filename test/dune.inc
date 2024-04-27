@@ -82,6 +82,8 @@
     (diff? tokens/Option.expected tokens/Option.out)
     (diff? tokens/OverlappingImports.expected tokens/OverlappingImports.out)
     (diff? tokens/Paths.expected tokens/Paths.out)
+    (diff? tokens/RecursiveEffectDecl.expected
+     tokens/RecursiveEffectDecl.out)
     (diff? tokens/SelfReferentialImport.expected
      tokens/SelfReferentialImport.out)
     (diff? tokens/Text.expected tokens/Text.out)
@@ -162,6 +164,7 @@
     (diff? ast/Option.expected ast/Option.out)
     (diff? ast/OverlappingImports.expected ast/OverlappingImports.out)
     (diff? ast/Paths.expected ast/Paths.out)
+    (diff? ast/RecursiveEffectDecl.expected ast/RecursiveEffectDecl.out)
     (diff? ast/SelfReferentialImport.expected ast/SelfReferentialImport.out)
     (diff? ast/Text.expected ast/Text.out)
     (diff? ast/Traits.expected ast/Traits.out)
@@ -240,6 +243,7 @@
     (diff? mir/Option.expected mir/Option.out)
     (diff? mir/OverlappingImports.expected mir/OverlappingImports.out)
     (diff? mir/Paths.expected mir/Paths.out)
+    (diff? mir/RecursiveEffectDecl.expected mir/RecursiveEffectDecl.out)
     (diff? mir/SelfReferentialImport.expected mir/SelfReferentialImport.out)
     (diff? mir/Text.expected mir/Text.out)
     (diff? mir/Traits.expected mir/Traits.out)
@@ -320,6 +324,7 @@
     (diff? llvm/Option.expected llvm/Option.out)
     (diff? llvm/OverlappingImports.expected llvm/OverlappingImports.out)
     (diff? llvm/Paths.expected llvm/Paths.out)
+    (diff? llvm/RecursiveEffectDecl.expected llvm/RecursiveEffectDecl.out)
     (diff? llvm/SelfReferentialImport.expected
      llvm/SelfReferentialImport.out)
     (diff? llvm/Text.expected llvm/Text.out)
@@ -407,6 +412,8 @@
     (diff? output/Option.expected output/Option.out)
     (diff? output/OverlappingImports.expected output/OverlappingImports.out)
     (diff? output/Paths.expected output/Paths.out)
+    (diff? output/RecursiveEffectDecl.expected
+     output/RecursiveEffectDecl.out)
     (diff? output/SelfReferentialImport.expected
      output/SelfReferentialImport.out)
     (diff? output/Text.expected output/Text.out)
