@@ -16,6 +16,8 @@
      tokens/ErrorCrossModuleMutualRecursion.out)
     (diff? tokens/ErrorCyclicTypeAlias.expected
      tokens/ErrorCyclicTypeAlias.out)
+    (diff? tokens/ErrorDuplicateEffectTypeParameter.expected
+     tokens/ErrorDuplicateEffectTypeParameter.out)
     (diff? tokens/ErrorDuplicateLet.expected tokens/ErrorDuplicateLet.out)
     (diff? tokens/ErrorDuplicateNameAsPattern.expected
      tokens/ErrorDuplicateNameAsPattern.out)
@@ -96,6 +98,8 @@
     (diff? ast/ErrorCrossModuleMutualRecursion.expected
      ast/ErrorCrossModuleMutualRecursion.out)
     (diff? ast/ErrorCyclicTypeAlias.expected ast/ErrorCyclicTypeAlias.out)
+    (diff? ast/ErrorDuplicateEffectTypeParameter.expected
+     ast/ErrorDuplicateEffectTypeParameter.out)
     (diff? ast/ErrorDuplicateLet.expected ast/ErrorDuplicateLet.out)
     (diff? ast/ErrorDuplicateNameAsPattern.expected
      ast/ErrorDuplicateNameAsPattern.out)
@@ -168,6 +172,8 @@
     (diff? mir/ErrorCrossModuleMutualRecursion.expected
      mir/ErrorCrossModuleMutualRecursion.out)
     (diff? mir/ErrorCyclicTypeAlias.expected mir/ErrorCyclicTypeAlias.out)
+    (diff? mir/ErrorDuplicateEffectTypeParameter.expected
+     mir/ErrorDuplicateEffectTypeParameter.out)
     (diff? mir/ErrorDuplicateLet.expected mir/ErrorDuplicateLet.out)
     (diff? mir/ErrorDuplicateNameAsPattern.expected
      mir/ErrorDuplicateNameAsPattern.out)
@@ -240,6 +246,8 @@
     (diff? llvm/ErrorCrossModuleMutualRecursion.expected
      llvm/ErrorCrossModuleMutualRecursion.out)
     (diff? llvm/ErrorCyclicTypeAlias.expected llvm/ErrorCyclicTypeAlias.out)
+    (diff? llvm/ErrorDuplicateEffectTypeParameter.expected
+     llvm/ErrorDuplicateEffectTypeParameter.out)
     (diff? llvm/ErrorDuplicateLet.expected llvm/ErrorDuplicateLet.out)
     (diff? llvm/ErrorDuplicateNameAsPattern.expected
      llvm/ErrorDuplicateNameAsPattern.out)
@@ -317,6 +325,8 @@
      output/ErrorCrossModuleMutualRecursion.out)
     (diff? output/ErrorCyclicTypeAlias.expected
      output/ErrorCyclicTypeAlias.out)
+    (diff? output/ErrorDuplicateEffectTypeParameter.expected
+     output/ErrorDuplicateEffectTypeParameter.out)
     (diff? output/ErrorDuplicateLet.expected output/ErrorDuplicateLet.out)
     (diff? output/ErrorDuplicateNameAsPattern.expected
      output/ErrorDuplicateNameAsPattern.out)

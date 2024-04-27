@@ -54,7 +54,7 @@ module Expr : sig
 end
 
 val create_effect
-  :  Type_param_name.t list
+  :  Type_param_name.t Unique_list.t
   -> 'name Module.sig_ Node.t list option
   -> 'name Effect.t
 

@@ -169,10 +169,27 @@ let compatible_name_entries ~names ~sig_:sig_entry ~def:def_entry =
     then raise Compatibility_error)
 ;;
 
-(* TODO: test/look at this for correctness, there are probably bugs here. Could we maybe
-   run quickcheck on the AST types? It might be hard to express all the constraints
-   guaranteed by previous modules. Maybe we could just check that compilation never
-   crashes. *)
+let process_type_param_lists
+  ~names
+  ({ sig_ = sig_param_list; def = def_param_list } :
+    Type_param_name.t Unique_list.t By_kind.t)
+  : Name_bindings.t * _ By_kind.t
+  =
+  let sig_params = Type_param.Table.create () in
+  let def_params = Type_param.Table.create () in
+  let names =
+    fold2
+      (sig_param_list :> Type_param_name.t list)
+      (def_param_list :> Type_param_name.t list)
+      ~init:names
+      ~f:(fun names sig_param def_param ->
+        let names, type_ = create_skolemized_type ~names in
+        Hashtbl.add_exn sig_params ~key:sig_param ~data:type_;
+        Hashtbl.add_exn def_params ~key:def_param ~data:type_;
+        names)
+  in
+  names, { sig_ = sig_params; def = def_params }
+;;
 
 let compatible_type_decls
   ~names
@@ -180,20 +197,8 @@ let compatible_type_decls
   ~def:((def_param_list, def_type) : _ Type_decl.t)
   =
   no_errors (fun () ->
-    let sig_params = Type_param.Table.create () in
-    let def_params = Type_param.Table.create () in
-    let names =
-      fold2
-        (sig_param_list :> Type_param_name.t list)
-        (def_param_list :> Type_param_name.t list)
-        ~init:names
-        ~f:(fun names sig_param def_param ->
-          let names, type_ = create_skolemized_type ~names in
-          (* FIXME: Duplicate type param names would crash this rather than producing an
-             error, write a test for this *)
-          Hashtbl.add_exn sig_params ~key:sig_param ~data:type_;
-          Hashtbl.add_exn def_params ~key:def_param ~data:type_;
-          names)
+    let names, ({ sig_ = sig_params; def = def_params } : _ By_kind.t) =
+      process_type_param_lists ~names { sig_ = sig_param_list; def = def_param_list }
     in
     match sig_type, def_type with
     | Abstract, _ -> ()
@@ -226,19 +231,8 @@ let compatible_effect_decls
   ~def:({ params = def_param_list; operations = def_operations } : _ Effect.t)
   =
   no_errors (fun () ->
-    (* FIXME: Share code *)
-    let sig_params = Type_param.Table.create () in
-    let def_params = Type_param.Table.create () in
-    let names =
-      fold2
-        (sig_param_list :> Type_param_name.t list)
-        (def_param_list :> Type_param_name.t list)
-        ~init:names
-        ~f:(fun names sig_param def_param ->
-          let names, type_ = create_skolemized_type ~names in
-          Hashtbl.add_exn sig_params ~key:sig_param ~data:type_;
-          Hashtbl.add_exn def_params ~key:def_param ~data:type_;
-          names)
+    let names, ({ sig_ = sig_params; def = def_params } : _ By_kind.t) =
+      process_type_param_lists ~names { sig_ = sig_param_list; def = def_param_list }
     in
     match sig_operations, def_operations with
     | None, _ -> ()

@@ -976,7 +976,9 @@ let add_name_entry names name scheme new_entry ~constrain =
 let add_effect t effect_name (effect : _ Effect.t) ~constrain =
   let f bindings =
     let effects : _ Type_scheme.effects =
-      Effect ((current_path t, effect_name), List.map effect.params ~f:Type_scheme.var)
+      Effect
+        ( (current_path t, effect_name)
+        , List.map (effect.params :> Type_param_name.t list) ~f:Type_scheme.var )
     in
     { bindings with
       effects =

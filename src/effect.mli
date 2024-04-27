@@ -11,7 +11,7 @@ module Operation : sig
 end
 
 type 'n t =
-  { params : Type_param_name.t list
+  { params : Type_param_name.t Unique_list.t
   ; operations : 'n Operation.t list option
   }
 [@@deriving sexp, fields]

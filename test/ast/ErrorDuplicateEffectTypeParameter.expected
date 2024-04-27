@@ -1,0 +1,3 @@
+("Compilation error"
+ ((kind Name_error) (msg ("Duplicate type parameter name" (duplicate a)))
+  (filename ErrorDuplicateEffectTypeParameter.um)))

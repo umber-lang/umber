@@ -345,7 +345,8 @@ stmt_common:
   | EFFECT; name = UPPER_NAME; params = type_params;
     sigs = option(preceded(EQUALS, braces(list(stmt_sig))))
     { Module.Effect (
-        Effect_name.of_ustring_unchecked name, Untyped.create_effect params sigs) }
+        Effect_name.of_ustring_unchecked name,
+        Untyped.create_effect (Type_decl.params_of_list params) sigs) }
   | import = import_stmt { Module.Import import }
 
 stmt_sig_:
