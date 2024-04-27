@@ -1,0 +1,13 @@
+("Compilation error"
+ ((kind Type_error)
+  (msg
+   ("The signature of this module does not match its definition"
+    (module_name ErrorEffectSigDefDiff)
+    ((effect_diff
+      ((BadVars
+        (Incompatible ((params (a)) (operations ()))
+         ((params (a b))
+          (operations
+           ((((name foo) (args ((Type_app Std.Prelude.Bool.Bool ())))
+              (result (Tuple ((Var b) (Var a))))))))))))))))
+  (filename ErrorEffectSigDefDiff.um)))

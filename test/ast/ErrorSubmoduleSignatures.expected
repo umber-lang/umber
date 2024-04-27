@@ -17,6 +17,5 @@
             ((Function ((Type_app String ())) (Effect_union ())
               (Type_app String ()))
              ())))
-          (type_source Let_inferred))))))
-     (type_diff ()) (module_diff ()))))
+          (type_source Let_inferred)))))))))
   (filename ErrorSubmoduleSignatures.um) (span 1:1-13:2)))

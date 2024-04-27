@@ -7,11 +7,14 @@ type 'a diff =
   | Incompatible of 'a * 'a
 [@@deriving sexp_of]
 
-(* FIXME: Add effect diffs. *)
 type t =
   { name_diff : (Value_name.t * Name_bindings.Name_entry.t diff) Sequence.t
+       [@sexp.omit_nil]
   ; type_diff : (Type_name.t * Module_path.absolute Type_decl.t diff) Sequence.t
-  ; module_diff : (Module_name.t * module_diff) Sequence.t
+       [@sexp.omit_nil]
+  ; effect_diff : (Effect_name.t * Module_path.absolute Effect.t diff) Sequence.t
+       [@sexp.omit_nil]
+  ; module_diff : (Module_name.t * module_diff) Sequence.t [@sexp.omit_nil]
   }
 [@@deriving sexp_of]
 
@@ -20,12 +23,17 @@ and module_diff =
   | Module_diff of t
 
 let empty =
-  { name_diff = Sequence.empty; type_diff = Sequence.empty; module_diff = Sequence.empty }
+  { name_diff = Sequence.empty
+  ; type_diff = Sequence.empty
+  ; effect_diff = Sequence.empty
+  ; module_diff = Sequence.empty
+  }
 ;;
 
-let is_empty { name_diff; type_diff; module_diff } =
+let is_empty { name_diff; type_diff; effect_diff; module_diff } =
   Sequence.is_empty name_diff
   && Sequence.is_empty type_diff
+  && Sequence.is_empty effect_diff
   && Sequence.is_empty module_diff
 ;;
 
@@ -52,29 +60,7 @@ let fold2 xs ys ~init ~f =
   | Unequal_lengths -> raise Compatibility_error
 ;;
 
-(* FIXME: This should be able to use unification. I think I'll need a check for effect
-   declarations though.  *)
-(* let check_effects
-  ({ sig_ = sig_effects; def = def_effects } : _ By_kind.t)
-  ~param_matching
-  =
-  (* FIXME: Using scheme equality on effects won't work with type variable renaming. Need
-     to check the param table for `Lenient and `Strict. *)
-  match param_matching with
-  | `Lenient ->
-    (* Effects in the signature are the same or more than effects in the defintion. *)
-    (* FIXME: Need to handle subtyping properly. Should properly consider that first-class
-       here, since that's what we're basically doing. Need variance handling. It's
-       sufficient to keep tracking of how many function arrows we are to the left of. *)
-    List.for_all def_effects ~f:(List.mem sig_effects ~equal:[%equal: Type_scheme.effect])
-  | `Strict | `None ->
-    (* Effects in the signature are exactly the same as effects in the definition. *)
-    Comparable.lift
-      ~f:(List.sort ~compare:[%compare: Type_scheme.effect])
-      [%equal: Type_scheme.effect_row]
-      sig_effects
-      def_effects
-;; *)
+(* FIXME: We need to skolemize effects too, right? Write some tests for this. *)
 
 let iter2 xs ys ~f = fold2 xs ys ~init:() ~f:(fun () x -> f x)
 
@@ -123,7 +109,7 @@ let skolemize ~names ~types ~types_by_param scheme =
    [Type_bindings.generalize] never produces a type with any constraints. *)
 (** A `val` item in a signature is compatible with a `let` in a defintion if the
     signature is a "more specific" version of the defintion. We can check this by
-    skolemizing the signature, instatiating the defintion, and then unifying the two. *)
+    skolemizing the signature, instantiating the defintion, and then unifying the two. *)
 let check_val_type_schemes ~names ({ sig_ = sig_scheme; def = def_scheme } : _ By_kind.t) =
   let types = Type_bindings.create () in
   let names, sig_type = skolemize ~names ~types sig_scheme ~types_by_param:None in
@@ -203,11 +189,13 @@ let compatible_type_decls
         ~init:names
         ~f:(fun names sig_param def_param ->
           let names, type_ = create_skolemized_type ~names in
+          (* FIXME: Duplicate type param names would crash this rather than producing an
+             error, write a test for this *)
           Hashtbl.add_exn sig_params ~key:sig_param ~data:type_;
           Hashtbl.add_exn def_params ~key:def_param ~data:type_;
           names)
     in
-    match (sig_type : _ Type_decl.decl), (def_type : _ Type_decl.decl) with
+    match sig_type, def_type with
     | Abstract, _ -> ()
     | Alias sig_scheme, Alias def_scheme ->
       check_type_decl_schemes
@@ -230,6 +218,47 @@ let compatible_type_decls
     | Record _, (Abstract | Alias _ | Variants _)
     | Variants _, (Abstract | Alias _ | Record _)
     | Alias _, (Abstract | Variants _ | Record _) -> raise Compatibility_error)
+;;
+
+let compatible_effect_decls
+  ~names
+  ~sig_:({ params = sig_param_list; operations = sig_operations } : _ Effect.t)
+  ~def:({ params = def_param_list; operations = def_operations } : _ Effect.t)
+  =
+  no_errors (fun () ->
+    (* FIXME: Share code *)
+    let sig_params = Type_param.Table.create () in
+    let def_params = Type_param.Table.create () in
+    let names =
+      fold2
+        (sig_param_list :> Type_param_name.t list)
+        (def_param_list :> Type_param_name.t list)
+        ~init:names
+        ~f:(fun names sig_param def_param ->
+          let names, type_ = create_skolemized_type ~names in
+          Hashtbl.add_exn sig_params ~key:sig_param ~data:type_;
+          Hashtbl.add_exn def_params ~key:def_param ~data:type_;
+          names)
+    in
+    match sig_operations, def_operations with
+    | None, _ -> ()
+    | Some _, None -> raise Compatibility_error
+    | Some sig_operations, Some def_operations ->
+      iter2
+        sig_operations
+        def_operations
+        ~f:(fun
+             { name = sig_name; args = sig_args; result = sig_result }
+             { name = def_name; args = def_args; result = def_result }
+           ->
+        if not (Value_name.equal sig_name def_name) then raise Compatibility_error;
+        check_type_decl_schemes
+          ~names
+          ~sig_params
+          ~def_params
+          { sig_ = Function (sig_args, Effect_union [], sig_result), []
+          ; def = Function (def_args, Effect_union [], def_result), []
+          }))
 ;;
 
 (* TODO: Maybe we should get rid of [filter] and just have constructor names show up in
@@ -268,13 +297,19 @@ let create ~names module_name =
           ~compatible:compatible_name_entries
           ~find:Sigs_or_defs.find_entry
     ; type_diff =
-        (* FIXME: This needs to handle effects to do diffing *)
         do_simple_diff
           inner_names
           (Sigs_or_defs.type_names bindings1, bindings1)
           (Sigs_or_defs.type_names bindings2, bindings2)
           ~compatible:compatible_type_decls
           ~find:Sigs_or_defs.find_type_decl
+    ; effect_diff =
+        do_simple_diff
+          inner_names
+          (Sigs_or_defs.effect_names bindings1, bindings1)
+          (Sigs_or_defs.effect_names bindings2, bindings2)
+          ~compatible:compatible_effect_decls
+          ~find:Sigs_or_defs.find_effect_decl
     ; module_diff = do_module_diff ~names ~inner_names bindings1 bindings2
     }
   and do_module_diff ~names ~inner_names bindings1 bindings2 =

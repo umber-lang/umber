@@ -1,9 +1,7 @@
 module : {
-  effect BadVars a b = {
-    val foo : a -> b
-  }
+  effect BadVars a
 }
 
 effect BadVars a b = {
-  val foo : b -> a
+  val foo : Bool -> (b, a)
 }

@@ -1161,6 +1161,18 @@ let resolve_type_or_import t (decl_or_import : _ Or_imported.t option) =
           (without_std t : t)]
 ;;
 
+let resolve_effect_or_import t (decl_or_import : _ Or_imported.t option) =
+  match decl_or_import with
+  | Some (Local entry) -> entry
+  | Some (Imported path) -> find_absolute_effect_entry t path
+  | None ->
+    compiler_bug
+      [%message
+        "Placeholder decl not replaced"
+          (decl_or_import : (Effect_entry.t, Effect_name.Absolute.t) Or_imported.t option)
+          (without_std t : t)]
+;;
+
 let find_sigs_and_defs t path module_name =
   let rec loop t path module_name =
     find
@@ -1207,6 +1219,12 @@ module Sigs_or_defs = struct
 
   let type_names = Map.key_set << types
 
+  let effects = function
+    | Sigs { effects; _ } | Defs { effects; _ } -> effects
+  ;;
+
+  let effect_names = Map.key_set << effects
+
   let module_names = function
     | Sigs sigs -> Map.key_set sigs.modules
     | Defs defs -> Map.key_set defs.modules
@@ -1224,6 +1242,16 @@ module Sigs_or_defs = struct
 
   let find_type_decl names t type_name =
     (make_find names t type_name ~into_bindings:types ~resolve:resolve_type_or_import)
+      .decl
+  ;;
+
+  let find_effect_decl names t effect_name =
+    (make_find
+       names
+       t
+       effect_name
+       ~into_bindings:effects
+       ~resolve:resolve_effect_or_import)
       .decl
   ;;
 

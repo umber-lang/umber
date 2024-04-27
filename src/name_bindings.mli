@@ -190,6 +190,7 @@ module Sigs_or_defs : sig
   (* TODO: instead of having sets of keys + lookup functions, could we not just return maps? *)
   val value_names : t -> Value_name.Set.t
   val type_names : t -> Type_name.Set.t
+  val effect_names : t -> Effect_name.Set.t
   val module_names : t -> Module_name.Set.t
   val find_entry : name_bindings -> t -> Value_name.t -> Name_entry.t
 
@@ -198,6 +199,12 @@ module Sigs_or_defs : sig
     -> t
     -> Type_name.t
     -> Module_path.absolute Type_decl.t
+
+  val find_effect_decl
+    :  name_bindings
+    -> t
+    -> Effect_name.t
+    -> Module_path.absolute Effect.t
 
   val find_module : name_bindings -> t -> Module_name.t -> t option
 end

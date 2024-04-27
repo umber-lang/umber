@@ -39,7 +39,6 @@
              (Incompatible
               ((type_ (Scheme ((Type_app ErrorIncompatibleSig.A.A ()) ()))))
               ((type_ (Scheme ((Type_app String ()) ())))
-               (type_source Let_inferred))))))
-          (type_diff ()) (module_diff ()))))
+               (type_source Let_inferred)))))))))
        (MissingModule Missing_module))))))
   (filename ErrorIncompatibleSig.um)))
