@@ -762,6 +762,50 @@ and instantiate_type_scheme =
         constrain ~names ~types ~subtype:var ~supertype);
       var
   and instantiate_effect_type_scheme ~names ~types ~params effects =
+    let collect_effects
+      (effects : _ Type_scheme.effects Non_single_list.t)
+      ~union_or_intersection
+      : Internal_type.effects
+      =
+      let concrete_effects, effect_vars =
+        Non_single_list.fold
+          effects
+          ~init:(Effect_name.Absolute.Map.empty, [])
+          ~f:(fun (concrete_effects, effect_vars) new_effects ->
+          match new_effects with
+          | Effect (effect_name, args) ->
+            let args = List.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
+            (match Map.add concrete_effects ~key:effect_name ~data:args with
+             | `Ok concrete_effects -> concrete_effects, effect_vars
+             | `Duplicate ->
+               Compilation_error.raise
+                 Type_error
+                 ~msg:
+                   [%message "Duplicate effects" (effect_name : Effect_name.Absolute.t)])
+          | Effect_var param ->
+            let var = Type_param.Env_to_vars.find_or_add params param in
+            concrete_effects, var :: effect_vars
+          | Effect_union _ | Effect_intersection _ ->
+            (* TODO: Decide if this should be allowed, or statically prevent it from
+             happening by changing the type. *)
+            compiler_bug
+              [%message "Nested complex effects" (new_effects : _ Type_scheme.effects)])
+      in
+      let effect_var =
+        if List.is_empty effect_vars
+        then None
+        else (
+          let effect_var = Type_var.create () in
+          List.iter effect_vars ~f:(fun other_var ->
+            match union_or_intersection with
+            | `Union ->
+              Constraints.add types.constraints ~subtype:other_var ~supertype:effect_var
+            | `Intersection ->
+              Constraints.add types.constraints ~subtype:effect_var ~supertype:other_var);
+          Some effect_var)
+      in
+      { effects = concrete_effects; effect_var }
+    in
     match effects with
     | Effect (effect_name, args) ->
       { effects =
@@ -773,34 +817,9 @@ and instantiate_type_scheme =
     | Effect_var param ->
       let var = Type_param.Env_to_vars.find_or_add params param in
       { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
-    | Effect_union [] | Effect_intersection [] ->
-      { effects = Effect_name.Absolute.Map.empty; effect_var = None }
-    | Effect_union args ->
-      (* FIXME: Need to express that in e.g. `<Foo,a>`, `a` does not include `Foo`.
-         Applies for both union and intersection, I think. *)
-      let var : Internal_type.effects =
-        { effects = Effect_name.Absolute.Map.empty
-        ; effect_var = Some (Type_var.create ())
-        }
-      in
-      let args =
-        Non_single_list.map args ~f:(instantiate_effect_type_scheme ~names ~types ~params)
-      in
-      Non_single_list.iter args ~f:(fun subtype ->
-        constrain_effects ~names ~types ~subtype ~supertype:var);
-      var
+    | Effect_union args -> collect_effects args ~union_or_intersection:`Union
     | Effect_intersection args ->
-      let var : Internal_type.effects =
-        { effects = Effect_name.Absolute.Map.empty
-        ; effect_var = Some (Type_var.create ())
-        }
-      in
-      let args =
-        Non_single_list.map args ~f:(instantiate_effect_type_scheme ~names ~types ~params)
-      in
-      Non_single_list.iter args ~f:(fun supertype ->
-        constrain_effects ~names ~types ~subtype:var ~supertype);
-      var
+      collect_effects args ~union_or_intersection:`Intersection
   in
   fun ?(params = Type_param.Env_to_vars.create ())
       ~names
