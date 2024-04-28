@@ -189,9 +189,7 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
     if not (List.is_empty constraints)
     then failwith "TODO: constraints on effect operations";
     (match scheme with
-     | Function (args, Effect_union [], result) ->
-       (* FIXME: Check for free params. Should be done elsewhere. *)
-       { name; args; result }
+     | Function (args, Effect_union [], result) -> { name; args; result }
      | Function (_, _, _) ->
        Compilation_error.raise
          Other
