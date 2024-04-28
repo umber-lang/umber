@@ -620,6 +620,14 @@
      output/RecursiveEffectDecl.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/ReraiseExn.um})
+   (concurrent (diff? tokens/ReraiseExn.expected tokens/ReraiseExn.out)
+    (diff? ast/ReraiseExn.expected ast/ReraiseExn.out)
+    (diff? mir/ReraiseExn.expected mir/ReraiseExn.out)
+    (diff? llvm/ReraiseExn.expected llvm/ReraiseExn.out)
+    (diff? output/ReraiseExn.expected output/ReraiseExn.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/SelfReferentialImport.um})
    (concurrent
     (diff? tokens/SelfReferentialImport.expected

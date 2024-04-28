@@ -1,0 +1,37 @@
+type Result a e =
+  | Ok a
+  | Error e
+
+type Exn = String
+
+effect Exn = {
+  val raise : Exn -> Never
+}
+
+let _ =
+  handle
+    if True then 1 else raise "exn"  
+  | <raise _> -> 2
+
+let reraise msg f =
+  let result =
+    handle f ()
+    | value -> Ok value
+    | <raise exn> -> Error exn
+  in
+  match result
+  | Ok value -> value
+  | Error exn -> raise (msg ++ ": " ++ exn)
+
+let _ =
+  handle
+    reraise "Reraised" (\() ->
+      if True then
+        raise "My exception"
+      else 42)
+  | value -> print_int value
+  | <raise exn> -> print ("Unhandled exception: " ++ exn) 
+
+# FIXME: Write a test to see what happens if you mix one var between types and effects
+# - might need some notion of variable kind which is tracked properly
+# (Also, what happens if you try to use a type param in a decl as an effect var?)
