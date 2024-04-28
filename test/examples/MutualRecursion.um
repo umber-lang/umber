@@ -14,7 +14,7 @@ let sum_forest =
 
 let sum_tree = match
   | Leaf -> 0
-  | Node x forest -> x + sum_forest forest  # FIXME: `forest` has a generic type here
+  | Node x forest -> x + sum_forest forest
 
 type Forest a = List (Tree a)
 type Tree a =

@@ -3,9 +3,8 @@
   (msg
    ("Function argument number mismatch"
     (type1
-     (Function
-      ((Type_app Std.Prelude.Int.Int ()) (Type_app Std.Prelude.Int.Int ()))
-      ((effects ()) (effect_var ())) (Type_app Std.Prelude.Int.Int ())))
+     (Function ((Type_app Int ()) (Type_app Int ()))
+      ((effects ()) (effect_var ())) (Type_app Int ())))
     (type2
      (Function ((Type_app Int ())) ((effects ()) (effect_var (a))) (Var b)))))
   (filename ErrorPartialApplication.um) (span 17:9-17:24)))

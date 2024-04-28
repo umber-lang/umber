@@ -349,6 +349,17 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
+  let expand_type_if_alias (type_ : Internal_type.t) =
+    match type_ with
+    | Type_app (name, args) ->
+      let type_entry = lookup_type names name args in
+      (* FIXME: Substitute alias arguments as params. Also reduce code duplication with
+         below. *)
+      (match Name_bindings.Type_entry.decl type_entry with
+       | _params, Alias alias -> instantiate_type_scheme ~names ~types (alias, [])
+       | _ -> type_)
+    | type_ -> type_
+  in
   eprint_s
     [%message
       "Type_bindings.constrain_internal (pre-substitution)"
@@ -380,13 +391,21 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Var var, type_ ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Left
+      let type_ = expand_type_if_alias type_ in
+      (match type_ with
+       | Any -> ()
+       | _ -> check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Left)
     | type_, Var var ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Right
+      let type_ = expand_type_if_alias type_ in
+      (match type_ with
+       | Never -> ()
+       | _ -> check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Right)
     | Type_app (name1, args1), Type_app (name2, args2) ->
       let type_entry1 = lookup_type names name1 args1 in
+      (* FIXME: Need to substitute the arguments into the alias expansion.
+         Otherwise for e.g. `type Pair a = (a, a)`, `Pair Int` is treated as `(a, a)`. *)
       (match Name_bindings.Type_entry.decl type_entry1 with
        | _params, Alias expr ->
          constrain

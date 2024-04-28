@@ -42,8 +42,8 @@
            (Scheme ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))
          ((type_
            (Scheme
-            ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
-              (Type_app Std.Prelude.Int.Int ()))
+            ((Function ((Type_app Int ())) (Effect_union ())
+              (Type_app Int ()))
              ())))
           (type_source Let_inferred))))
        (plus_one'

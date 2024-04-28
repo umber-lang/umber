@@ -26,10 +26,9 @@
             (Type_app Std.Prelude.Int.Int ()))
            (Effect_union ()) (Type_app Std.Prelude.Int.Int ()))
           ())
-         (((Name Functions.x) ((Type_app Std.Prelude.Int.Int ()) ()))
-          ((Name Functions.x) ((Type_app Std.Prelude.Int.Int ()) ())))))
-       ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
-         (Type_app Std.Prelude.Int.Int ()))
+         (((Name Functions.x) ((Type_app Int ()) ()))
+          ((Name Functions.x) ((Type_app Int ()) ())))))
+       ((Function ((Type_app Int ())) (Effect_union ()) (Type_app Int ()))
         ()))))))
   (Let (rec_ false)
    (bindings
