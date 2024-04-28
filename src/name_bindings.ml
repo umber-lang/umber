@@ -10,6 +10,7 @@ module Name_entry = struct
         | Val_declared
         | Val_and_let
         | Extern_declared
+        | Effect_operation
       [@@deriving compare, enumerate, equal, sexp, variants]
     end
 
@@ -20,7 +21,13 @@ module Name_entry = struct
       List.equal
         equal
         (List.sort ~compare all)
-        [ Placeholder; Let_inferred; Val_declared; Val_and_let; Extern_declared ]
+        [ Placeholder
+        ; Let_inferred
+        ; Val_declared
+        ; Val_and_let
+        ; Extern_declared
+        ; Effect_operation
+        ]
     ;;
   end
 
@@ -838,7 +845,7 @@ let add_val_or_extern ?extern_name t name fixity scheme ~constrain ~type_source 
           | Some (Local existing_entry) ->
             (match existing_entry.type_source with
              | Placeholder | Let_inferred -> ()
-             | Val_declared | Val_and_let | Extern_declared ->
+             | Val_declared | Val_and_let | Extern_declared | Effect_operation ->
                Compilation_error.raise
                  Name_error
                  ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
@@ -990,7 +997,14 @@ let add_effect t effect_name effect ~constrain =
           ~init:bindings.names
           ~f:(fun names { name; args; result } ->
           let scheme : _ Type_scheme.t = Function (args, effects, result), [] in
-          let new_entry = Name_entry.val_declared scheme in
+          let new_entry : Name_entry.t =
+            { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
+            ; type_source = Effect_operation
+            ; type_ = Scheme scheme
+            ; fixity = None
+            ; extern_name = None
+            }
+          in
           add_name_entry names name scheme new_entry ~constrain)
     }
   in
@@ -1019,7 +1033,7 @@ let set_inferred_scheme t name scheme ~shadowing_allowed ~check_existing =
             in
             (match existing_entry.type_source with
              | Placeholder | Val_declared -> ()
-             | Extern_declared -> multiple_definitions ()
+             | Extern_declared | Effect_operation -> multiple_definitions ()
              | Let_inferred | Val_and_let ->
                if not shadowing_allowed then multiple_definitions ());
             check_existing existing_entry;

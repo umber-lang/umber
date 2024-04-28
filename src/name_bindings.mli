@@ -11,6 +11,7 @@ module Name_entry : sig
       | Val_declared
       | Val_and_let
       | Extern_declared
+      | Effect_operation
     [@@deriving compare, enumerate, equal, sexp, variants]
   end
 

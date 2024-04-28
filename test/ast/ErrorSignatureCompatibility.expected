@@ -12,14 +12,16 @@
               (Effect ErrorSignatureCompatibility.InconsistentVarUse
                ((Var a) (Var b)))
               (Var b))
-             ()))))
+             ())))
+          (type_source Effect_operation))
          ((type_
            (Scheme
             ((Function ((Var b))
               (Effect ErrorSignatureCompatibility.InconsistentVarUse
                ((Var a) (Var b)))
               (Var a))
-             ()))))))
+             ())))
+          (type_source Effect_operation))))
        (double'
         (Incompatible
          ((type_

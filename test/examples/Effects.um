@@ -39,8 +39,6 @@ let higher_order_handler f =
 let _ =
   higher_order_handler (\() -> ignore (ask ()))
 
-# FIXME: Add a test that you can't handle functions which aren't operations
-
 # FIXME: Move these to separate tests
 # let reraise f =
 #   let result =

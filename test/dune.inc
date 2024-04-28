@@ -192,6 +192,20 @@
      output/ErrorEffectsNoValueBranch.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/ErrorHandleNonOperation.um})
+   (concurrent
+    (diff? tokens/ErrorHandleNonOperation.expected
+     tokens/ErrorHandleNonOperation.out)
+    (diff? ast/ErrorHandleNonOperation.expected
+     ast/ErrorHandleNonOperation.out)
+    (diff? mir/ErrorHandleNonOperation.expected
+     mir/ErrorHandleNonOperation.out)
+    (diff? llvm/ErrorHandleNonOperation.expected
+     llvm/ErrorHandleNonOperation.out)
+    (diff? output/ErrorHandleNonOperation.expected
+     output/ErrorHandleNonOperation.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/ErrorHangingVal.um})
    (concurrent
     (diff? tokens/ErrorHangingVal.expected tokens/ErrorHangingVal.out)

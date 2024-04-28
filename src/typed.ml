@@ -222,9 +222,16 @@ module Effect_pattern = struct
     { operation; args }
     =
     let operation = Name_bindings.absolutify_value_name names operation in
+    let operation_name_entry = Name_bindings.find_absolute_entry names operation in
+    (match Name_bindings.Name_entry.type_source operation_name_entry with
+     | Effect_operation -> ()
+     | _ ->
+       Compilation_error.raise
+         Other
+         ~msg:
+           [%message "Expected an effect operation" (operation : Value_name.Absolute.t)]);
     let operation_type =
-      Name_bindings.find_absolute_entry names operation
-      |> Name_bindings.Name_entry.type_
+      Name_bindings.Name_entry.type_ operation_name_entry
       |> Type_bindings.instantiate_type_or_scheme ~names ~types
     in
     let pat_names, args =
@@ -1425,13 +1432,15 @@ module Module = struct
               names
               (Name_bindings.current_path names, name)
           in
+          (* FIXME: Test what happens when you have an effect operation and a val
+             declaration with the same name. *)
           (match Name_bindings.Name_entry.type_source entry with
            | Val_and_let -> ()
            | Val_declared ->
              Compilation_error.raise
                Name_error
                ~msg:[%message "No definition for val declaration"]
-           | Placeholder | Let_inferred | Extern_declared ->
+           | Placeholder | Let_inferred | Extern_declared | Effect_operation ->
              compiler_bug
                [%message
                  "Unexpected type source for val entry"

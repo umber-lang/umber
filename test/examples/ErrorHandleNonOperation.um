@@ -1,0 +1,11 @@
+effect Foo = {
+  val foo : () -> ()
+}
+
+let bar () = ()
+
+let _ =
+  handle foo ()
+  | () -> 1
+  | <foo ()> -> 2
+  | <bar ()> -> 3
