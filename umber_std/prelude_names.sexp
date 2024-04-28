@@ -6,9 +6,11 @@
      (False
       (Local ((type_ (Scheme ((Type_app Bool ()) ()))) (extern_name %false))))))
    (types
-    ((Int ((Local (() Abstract))))
+    ((Any ((Local (() (Alias (Intersection ()))))))
+     (Int ((Local (() Abstract))))
      (Bool ((Local (() (Variants ((False ()) (True ())))))))
      (Char ((Local (() Abstract)))) (Float ((Local (() Abstract))))
+     (Never ((Local (() (Alias (Union ()))))))
      (String ((Local (() Abstract))))))
    (effects ())
    (modules

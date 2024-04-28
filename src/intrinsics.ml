@@ -86,8 +86,27 @@ module String = Make_abstract (struct
   let name = "String"
 end)
 
+(* TODO: Provide better support for defining custom uninhabited types as variant types
+   with no constructors. *)
+module Never = Make_type (struct
+  let name = "Never"
+  let decl : _ Type_decl.t = Unique_list.empty, Alias (Union [])
+end)
+
+module Any = Make_type (struct
+  let name = "Any"
+  let decl : _ Type_decl.t = Unique_list.empty, Alias (Intersection [])
+end)
+
 (* TODO: Add intrinsics for Never and Any (Bottom and Top) *)
 
 let all : (module Type) list =
-  [ (module Bool); (module Int); (module Float); (module Char); (module String) ]
+  [ (module Bool)
+  ; (module Int)
+  ; (module Float)
+  ; (module Char)
+  ; (module String)
+  ; (module Never)
+  ; (module Any)
+  ]
 ;;
