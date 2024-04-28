@@ -1,5 +1,5 @@
-; ModuleID = './examples/SelfReferentialImport.um'
-source_filename = "./examples/SelfReferentialImport.um"
+; ModuleID = 'examples/SelfReferentialImport.um'
+source_filename = "examples/SelfReferentialImport.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -9,7 +9,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @"SelfReferentialImport.*binding.1" = global %umber_block* null
 @string.123660923 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"Honk!\00\00\02" }
 
-define i32 @"umber_main:./examples/SelfReferentialImport.um"() {
+define i32 @"umber_main:examples/SelfReferentialImport.um"() {
 entry:
   %fun_call = tail call tailcc %umber_block* @SelfReferentialImport.goose(%umber_block* inttoptr (i64 1 to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @"SelfReferentialImport.*binding.1", align 8

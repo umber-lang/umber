@@ -21,6 +21,7 @@ module : {
   import .Option.(None, Some)
 
   module Bool : {
+    # TODO: Avoid this hack and just re-export the type rather than defining an alias
     import Bool as PrimitiveBool
     type Bool = PrimitiveBool
 

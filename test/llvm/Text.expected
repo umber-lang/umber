@@ -1,5 +1,5 @@
-; ModuleID = './examples/Text.um'
-source_filename = "./examples/Text.um"
+; ModuleID = 'examples/Text.um'
+source_filename = "examples/Text.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -28,7 +28,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @char.b = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 98 }
 @string.986077178 = constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA\00" }
 
-define i32 @"umber_main:./examples/Text.um"() {
+define i32 @"umber_main:examples/Text.um"() {
 entry:
   %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* bitcast (%umber_block8b* @string.125514899 to %umber_block*), %umber_block* bitcast (%umber_block8b* @string.593386469 to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @Text._.1, align 8

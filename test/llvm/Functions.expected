@@ -1,5 +1,5 @@
-; ModuleID = './examples/Functions.um'
-source_filename = "./examples/Functions.um"
+; ModuleID = 'examples/Functions.um'
+source_filename = "examples/Functions.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -17,7 +17,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @string.1948248 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"huh\00\00\00\00\04" }
 @char.c = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 99 }
 
-define i32 @"umber_main:./examples/Functions.um"() {
+define i32 @"umber_main:examples/Functions.um"() {
 entry:
   %Functions.zero = load %umber_block*, %umber_block** @Functions.zero, align 8
   %fun_call = tail call tailcc %umber_block* @Functions.id(%umber_block* %Functions.zero)

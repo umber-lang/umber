@@ -1,5 +1,5 @@
-; ModuleID = './examples/LetBindingGroups.um'
-source_filename = "./examples/LetBindingGroups.um"
+; ModuleID = 'examples/LetBindingGroups.um'
+source_filename = "examples/LetBindingGroups.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -25,7 +25,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.4 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 4 }
 @int.17 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 17 }
 
-define i32 @"umber_main:./examples/LetBindingGroups.um"() {
+define i32 @"umber_main:examples/LetBindingGroups.um"() {
 entry:
   %LetBindingGroups.a = load %umber_block*, %umber_block** @LetBindingGroups.a, align 8
   %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block* %LetBindingGroups.a, %umber_block* bitcast (%umber_block1* @int.6 to %umber_block*))

@@ -1,5 +1,5 @@
-; ModuleID = './examples/Basics.um'
-source_filename = "./examples/Basics.um"
+; ModuleID = 'examples/Basics.um'
+source_filename = "examples/Basics.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -21,7 +21,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
 @int.3 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
 
-define i32 @"umber_main:./examples/Basics.um"() {
+define i32 @"umber_main:examples/Basics.um"() {
 entry:
   br label %cond
 

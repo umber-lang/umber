@@ -1,5 +1,5 @@
-; ModuleID = './examples/Option.um'
-source_filename = "./examples/Option.um"
+; ModuleID = 'examples/Option.um'
+source_filename = "examples/Option.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -7,7 +7,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 @Option.None = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 
-define i32 @"umber_main:./examples/Option.um"() {
+define i32 @"umber_main:examples/Option.um"() {
 entry:
   ret i32 0
 }

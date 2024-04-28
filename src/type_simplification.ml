@@ -6,6 +6,8 @@ open! Names
 (* FIXME: cleanup *)
 let eprint_s = ignore
 
+(* FIXME: This stability isn't working. Figure out why. Union_find may not be to blame. *)
+
 (** Provides similar functionality to [Union_find], but returns stable output, picking the
     least representative for each class. *)
 module Stable_union_find = struct
@@ -547,6 +549,9 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) =
   let type_ = rename_vars type_ in
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
+  eprint_s
+    [%message
+      "after replacing co-occuring vars and renaming" (type_ : _ Type_scheme.type_)];
   type_, []
 ;;
 

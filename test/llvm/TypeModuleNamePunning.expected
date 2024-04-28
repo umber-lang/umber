@@ -1,5 +1,5 @@
-; ModuleID = './examples/TypeModuleNamePunning.um'
-source_filename = "./examples/TypeModuleNamePunning.um"
+; ModuleID = 'examples/TypeModuleNamePunning.um'
+source_filename = "examples/TypeModuleNamePunning.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -15,7 +15,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @float.5. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 5.000000e+00 }
 @string.563089956 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"5\00\00\00\00\00\00\06" }
 
-define i32 @"umber_main:./examples/TypeModuleNamePunning.um"() {
+define i32 @"umber_main:examples/TypeModuleNamePunning.um"() {
 entry:
   ret i32 0
 }

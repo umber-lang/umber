@@ -1,5 +1,5 @@
-; ModuleID = './examples/MutualRecursion.um'
-source_filename = "./examples/MutualRecursion.um"
+; ModuleID = 'examples/MutualRecursion.um'
+source_filename = "examples/MutualRecursion.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -16,7 +16,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.17 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 17 }
 @int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
 
-define i32 @"umber_main:./examples/MutualRecursion.um"() {
+define i32 @"umber_main:examples/MutualRecursion.um"() {
 entry:
   %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
   store %umber_block* %Std.Prelude.List.Nil, %umber_block** @MutualRecursion.f, align 8

@@ -1,5 +1,5 @@
-; ModuleID = './examples/Closures.um'
-source_filename = "./examples/Closures.um"
+; ModuleID = 'examples/Closures.um'
+source_filename = "examples/Closures.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -11,7 +11,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
 @int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
 
-define i32 @"umber_main:./examples/Closures.um"() {
+define i32 @"umber_main:examples/Closures.um"() {
 entry:
   %fun_call = tail call tailcc %umber_block* @Closures.count_up(%umber_block* bitcast (%umber_block1* @int.0 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*))
   %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print_int(%umber_block* %fun_call)
