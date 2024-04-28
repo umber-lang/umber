@@ -1432,8 +1432,6 @@ module Module = struct
               names
               (Name_bindings.current_path names, name)
           in
-          (* FIXME: Test what happens when you have an effect operation and a val
-             declaration with the same name. *)
           (match Name_bindings.Name_entry.type_source entry with
            | Val_and_let -> ()
            | Val_declared ->

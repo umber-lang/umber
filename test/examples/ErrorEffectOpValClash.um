@@ -1,0 +1,5 @@
+effect Foo = {
+  val foo : () -> ()
+}
+
+val foo : () -> ()

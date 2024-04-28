@@ -166,6 +166,18 @@
      output/ErrorEffectOpUnboundParams.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/ErrorEffectOpValClash.um})
+   (concurrent
+    (diff? tokens/ErrorEffectOpValClash.expected
+     tokens/ErrorEffectOpValClash.out)
+    (diff? ast/ErrorEffectOpValClash.expected ast/ErrorEffectOpValClash.out)
+    (diff? mir/ErrorEffectOpValClash.expected mir/ErrorEffectOpValClash.out)
+    (diff? llvm/ErrorEffectOpValClash.expected
+     llvm/ErrorEffectOpValClash.out)
+    (diff? output/ErrorEffectOpValClash.expected
+     output/ErrorEffectOpValClash.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/ErrorEffectSigDefDiff.um})
    (concurrent
     (diff? tokens/ErrorEffectSigDefDiff.expected
