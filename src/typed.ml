@@ -144,7 +144,7 @@ module Pattern = struct
         Pattern.Names.add_name pat_names name typ ~type_source:Placeholder
       in
       pat_names, (As (pat, name), typ)
-    | Type_annotation (pat, ((_ : Trait_bound.t), annotated_type)) ->
+    | Type_annotation (pat, annotated_type) ->
       (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
       let annotated_type =
         Type_bindings.instantiate_type_scheme
@@ -668,11 +668,8 @@ module Expr = struct
           | Record_update (_expr, _fields) -> failwith "TODO: record2"
           | Record_field_access (_record, _name) -> failwith "TODO: record3"
           | Type_annotation (expr, annotated_type) ->
-            (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
             let annotated_type =
-              Node.with_value
-                annotated_type
-                ~f:(fun ((_ : Trait_bound.t), annotated_type) ->
+              Node.with_value annotated_type ~f:(fun annotated_type ->
                 Type_bindings.instantiate_type_scheme
                   ~names
                   ~types
@@ -1086,10 +1083,7 @@ module Module = struct
     let absolutify_common ~names common =
       match (common : _ Module.common) with
       | Val (name, fixity, type_) ->
-        Val
-          ( name
-          , fixity
-          , Tuple2.map_snd type_ ~f:(Name_bindings.absolutify_type_scheme names) )
+        Val (name, fixity, Name_bindings.absolutify_type_scheme names type_)
       | Extern (name, fixity, type_, extern_name) ->
         Extern
           (name, fixity, Name_bindings.absolutify_type_scheme names type_, extern_name)
@@ -1215,7 +1209,7 @@ module Module = struct
         Name_bindings.add_val names name fixity typ ~constrain
       | Extern (name, fixity, typ, extern_name) ->
         let constrain = Type_bindings.constrain' ~names ~types in
-        Name_bindings.add_extern names name fixity ([], typ) extern_name ~constrain
+        Name_bindings.add_extern names name fixity typ extern_name ~constrain
       | Type_decl (_, (_, Alias alias)) ->
         check_cyclic_type_alias ~names alias;
         names

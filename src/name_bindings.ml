@@ -828,17 +828,8 @@ let absolutify_type_scheme' t type_ =
 
 let prelude = lazy (into_parent (t_of_sexp (force Sites.prelude_names)))
 
-let add_val_or_extern
-  ?extern_name
-  t
-  name
-  fixity
-  (trait_bounds, scheme)
-  ~constrain
-  ~type_source
-  =
+let add_val_or_extern ?extern_name t name fixity scheme ~constrain ~type_source =
   let f bindings =
-    if not (List.is_empty trait_bounds) then failwith "TODO: trait bounds in val";
     { bindings with
       names =
         Map.update bindings.names name ~f:(function

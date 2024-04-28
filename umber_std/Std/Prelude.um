@@ -47,10 +47,7 @@ module : {
   }
 
   module Operators : {
-    val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
-    # `() =>` is a hack for the parser as it confuses the `(` in `(b -> c)` as the start
-    # of a trait bound (it would need arbitrary lookahead or some other trickery to
-    # avoid doing so)
+    val (.) (infixr 9) : (b -> c), (a -> b), a -> c
 
     val (^) (infixr 8) : Int, Int -> Int
     #val (^^) (infixr 8) : Float, Int -> Float
@@ -92,7 +89,7 @@ module : {
 
     val (|>) (infixl 0) : a, (a -> b) -> b
 
-    val (;) (infixl 0) : () => (), a -> a
+    val (;) (infixl 0) : (), a -> a
 
     val (++) (infixl 5) : String, String -> String
   }
@@ -194,7 +191,7 @@ module Operators = {
   # TODO: Consider removing these fixity declarations and copying them from the sig
   # This requires a way to specify fixity in a let binding. (Also consider that there's 
   # currently there's no way to put fixity declarations inside nested expressions).
-  val (.) (infixr 9) : () => (b -> c), (a -> b), a -> c
+  val (.) (infixr 9) : (b -> c), (a -> b), a -> c
   let (.) f g x = f (g x)
 
   extern (+) (infixl 6) : Int, Int -> Int = "umber_int_add"
@@ -229,7 +226,7 @@ module Operators = {
   val (|>) (infixl 0) : a, (a -> b) -> b
   let (|>) x f = f x
 
-  val (;) (infixl 0) : () => (), a -> a
+  val (;) (infixl 0) : (), a -> a
   let (;) () x = x
 
   extern (++) (infixl 5) : String, String -> String = "umber_string_append"

@@ -110,5 +110,5 @@
    (bindings
     (((Catch_all (a))
       ((Name LetPattern.ANewThing) ((Type_app LetPattern.NewThing ()) ()))))))
-  (Common_def (Val a () (() ((Type_app LetPattern.NewThing ()) ()))))
+  (Common_def (Val a () ((Type_app LetPattern.NewThing ()) ())))
   (Common_def (Type_decl NewThing (() (Variants ((ANewThing ()))))))))

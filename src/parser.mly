@@ -38,7 +38,6 @@
 %token COMMA
 %token BACKSLASH
 %token ARROW
-%token FAT_ARROW
 %token L_PAREN
 %token R_PAREN
 %token L_BRACKET
@@ -108,7 +107,7 @@ pattern:
   | left = pattern; PIPE; right = pattern { Pattern.Union (left, right) }
   | pat = pattern; AS; name = val_name
     { Pattern.As (pat, Value_name.of_ustring_unchecked name) }
-  | annot = type_annot_bounded(pattern)
+  | annot = type_annot_constrained(pattern)
     { Pattern.Type_annotation (fst annot, Node.with_value (snd annot) ~f:Fn.id) }
 
 op_section:
@@ -217,7 +216,7 @@ expr_:
   | HANDLE; e = expr; branches = handle_branches { Expr.Handle (e, branches) }
   | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding); IN; body = expr
     { Expr.Let { rec_; bindings; body } }
-  | annot = type_annot_bounded(expr) { Expr.Type_annotation (fst annot, snd annot) }
+  | annot = type_annot_constrained(expr) { Expr.Type_annotation (fst annot, snd annot) }
 
 %inline expr: e = with_loc(expr_) { e }
 
@@ -268,19 +267,9 @@ type_expr:
   | t = type_non_fun { t }
   | t = type_fun { t }
 
-(* TODO: Parse constraints using "where" *)
+(* TODO: Parse constraints using "where". Use these for trait bounds too. *)
 %inline type_expr_constrained:
   | type_ = type_expr { type_, [] }
-
-(* TODO: Consider having trait bounds use brackets [] instead of parens (). I think it
-   looks a little clearer and would also be easier to parse. *)
-%inline trait_bound:
-  | bounds = parens(flexible_list(COMMA, pair(UPPER_NAME, type_params_nonempty)));
-    FAT_ARROW
-    { List.map bounds ~f:(Tuple2.map_fst ~f:Trait_name.of_ustring_unchecked) }
-
-%inline type_expr_bounded:
-  | bound = loption(trait_bound); t = type_expr_constrained { (bound, t) }
 
 type_cnstr_decl:
   | cnstr = UPPER_NAME; args = list(type_term)
@@ -332,7 +321,7 @@ import_stmt:
     { { Module.Import.kind = Module.Import.Kind.of_n_periods n_periods ; paths } }
 
 stmt_common:
-  | VAL; name = val_name; fix = parens(fixity)?; colon; t = type_expr_bounded
+  | VAL; name = val_name; fix = parens(fixity)?; colon; t = type_expr_constrained
     { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
   | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = type_expr_constrained;
     EQUALS; s = STRING
@@ -371,9 +360,9 @@ stmt_:
     { Module.Let { rec_ = true ; bindings } }
   | MODULE; name = UPPER_NAME; sigs = loption(colon_sigs); defs = equals_defs 
     { Module.Module (Module_name.of_ustring_unchecked name, sigs, defs) }
-  | IMPL; bound = loption(trait_bound); trait = UPPER_NAME; args = nonempty(type_term);
+  | IMPL; trait = UPPER_NAME; args = nonempty(type_term);
     defs = equals_defs
-    { Module.Impl (bound, Trait_name.of_ustring_unchecked trait, args, defs) }
+    { Module.Impl ([], Trait_name.of_ustring_unchecked trait, args, defs) }
 
 %inline stmt: s = with_loc(stmt_) { s }
 
@@ -388,8 +377,8 @@ prog:
 
 %inline type_annot(X): a = separated_pair(X, colon, type_expr) { a }
 %inline type_annot_non_fun(X): a = separated_pair(X, colon, type_non_fun) { a }
-%inline type_annot_bounded(X):
-  | a = separated_pair(X, colon, with_loc(type_expr_bounded)) { a }
+%inline type_annot_constrained(X):
+  | a = separated_pair(X, colon, with_loc(type_expr_constrained)) { a }
 
 %inline record_field_EQUALS(X):
   | field = LOWER_NAME; x = preceded(EQUALS, X)?

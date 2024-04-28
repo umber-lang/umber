@@ -4,14 +4,14 @@ open Names
 module Pattern : sig
   include module type of Pattern
 
-  type nonrec t = (Module_path.relative Type_scheme.Bounded.t, Module_path.relative) t
+  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
   [@@deriving equal, sexp]
 end
 
 module Effect_pattern : sig
   include module type of Effect_pattern
 
-  type nonrec t = (Module_path.relative Type_scheme.Bounded.t, Module_path.relative) t
+  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
   [@@deriving equal, sexp]
 end
 
@@ -35,7 +35,7 @@ module Expr : sig
     | Record_literal of (Value_name.t * t Node.t option) Nonempty.t
     | Record_update of t Node.t * (Value_name.t * t Node.t option) Nonempty.t
     | Record_field_access of t Node.t * Value_name.t Node.t
-    | Type_annotation of t Node.t * Module_path.relative Type_scheme.Bounded.t Node.t
+    | Type_annotation of t Node.t * Module_path.relative Type_scheme.t Node.t
   [@@deriving equal, sexp, variants]
 
   (** Get all the external names referenced by an expression. Names local to the

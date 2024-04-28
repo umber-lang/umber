@@ -80,8 +80,3 @@ val fold_effects_until
 
 val fold_vars : 'n type_ -> init:'acc -> f:('acc -> Type_param_name.t -> 'acc) -> 'acc
 val for_all_vars : 'n type_ -> f:(Type_param_name.t -> bool) -> bool
-
-(* TODO: Remove/rework this, since constraints are part of regular type schemes. *)
-module Bounded : sig
-  type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
-end

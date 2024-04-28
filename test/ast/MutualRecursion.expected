@@ -1,6 +1,5 @@
 (MutualRecursion ()
- ((Common_def
-   (Val f () (() ((Type_app MutualRecursion.Forest ((Var a))) ()))))
+ ((Common_def (Val f () ((Type_app MutualRecursion.Forest ((Var a))) ())))
   (Let (rec_ false)
    (bindings
     (((Catch_all (f))

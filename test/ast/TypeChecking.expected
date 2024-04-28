@@ -18,10 +18,9 @@
         ()))))))
   (Common_def
    (Val id_for_floats ()
-    (()
-     ((Function ((Type_app Std.Prelude.Float.Float ())) (Effect_union ())
-       (Type_app Std.Prelude.Float.Float ()))
-      ()))))
+    ((Function ((Type_app Std.Prelude.Float.Float ())) (Effect_union ())
+      (Type_app Std.Prelude.Float.Float ()))
+     ())))
   (Let (rec_ false)
    (bindings
     (((Catch_all (id_for_floats))
@@ -37,9 +36,7 @@
         ()))))))
   (Common_def
    (Val id_for_chars ()
-    (()
-     ((Function ((Type_app Char ())) (Effect_union ()) (Type_app Char ()))
-      ()))))
+    ((Function ((Type_app Char ())) (Effect_union ()) (Type_app Char ())) ())))
   (Let (rec_ false)
    (bindings
     (((Catch_all (id_for_bools))

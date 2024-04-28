@@ -32,7 +32,7 @@ type ('pat, 'expr, 'name) t =
   Module_name.t * 'name sig_ Node.t list * ('pat, 'expr, 'name) def Node.t list
 
 and 'name common =
-  | Val of Value_name.t * Fixity.t option * 'name Type_scheme.Bounded.t
+  | Val of Value_name.t * Fixity.t option * 'name Type_scheme.t
   | Extern of Value_name.t * Fixity.t option * 'name Type_scheme.t * Extern_name.t
   | Type_decl of Type_name.t * 'name Type_decl.t
   | Effect of Effect_name.t * 'name Effect.t

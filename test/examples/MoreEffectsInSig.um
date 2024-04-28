@@ -2,10 +2,10 @@ module : {
   effect Abstract
 
   val more_effects_in_sig : Int -> <Abstract> Int
-  val equivalent_with_different_vars : () => (() -> <e1> ()), (() -> <e2> ()) -> <e1, e2> ()
+  val equivalent_with_different_vars : (() -> <e1> ()), (() -> <e2> ()) -> <e1, e2> ()
 }
 
 let more_effects_in_sig x = x
 
-val equivalent_with_different_vars : () => (() -> <e> ()), (() -> <e> ()) -> <e> ()
+val equivalent_with_different_vars : (() -> <e> ()), (() -> <e> ()) -> <e> ()
 let equivalent_with_different_vars f g = f (); g ()

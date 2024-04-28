@@ -3,15 +3,14 @@
   (Trait Eq (a)
    ((Common_sig
      (Val == ()
-      (()
-       ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ())))))
+      ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ()))))
    ())
   (Common_def
    (Type_decl Person
     (() (Record ((name (Type_app String ())) (dob (Type_app Date ())))))))
   (Let (rec_ true)
    (bindings
-    (((Type_annotation (Catch_all (p)) (() ((Type_app Person ()) ())))
+    (((Type_annotation (Catch_all (p)) ((Type_app Person ()) ()))
       (Record_literal
        ((name ((Literal (String Bob))))
         (dob
@@ -29,15 +28,6 @@
                 ((Record_field_access (Name p2) name))))
               ((Record_field_access (Name p1) dob))))
             ((Record_field_access (Name p2) dob))))))))))))
-  (Impl ((Eq (a)) (Eq (b))) Eq ((Tuple ((Var a) (Var b))))
-   ((Let (rec_ true)
-     (bindings
-      (((Catch_all (==))
-        (Lambda
-         ((Tuple ((Catch_all (a)) (Catch_all (b))))
-          (Tuple ((Catch_all (c)) (Catch_all (d)))))
-         (Op_tree
-          (== ((&& ((== (((Name a)) ((Name c)))) ((Name b)))) ((Name d))))))))))))
   (Let (rec_ true)
    (bindings
     (((Catch_all (_x)) (Tuple ((Literal (Int 1)) (Literal (Int 2))))))))

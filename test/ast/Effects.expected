@@ -7,10 +7,9 @@
          (result (Type_app Std.Prelude.Int.Int ())))))))))
   (Common_def
    (Val read ()
-    (()
-     ((Function ((Tuple ())) (Effect Effects.Read ())
-       (Type_app Std.Prelude.Int.Int ()))
-      ()))))
+    ((Function ((Tuple ())) (Effect Effects.Read ())
+      (Type_app Std.Prelude.Int.Int ()))
+     ())))
   (Let (rec_ false)
    (bindings
     (((Catch_all (read))

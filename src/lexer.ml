@@ -121,7 +121,6 @@ let rec read lexbuf =
     ignore (next lexbuf : Uchar.t option);
     LESS_THAN
   | "->" -> ARROW
-  | "=>" -> FAT_ARROW
   (* Need to support: `f . g`, `(. f)`, `(f .)`, and `(.)` as an operator. *)
   | Plus '.', (")" | white_space) ->
     let lexeme = lexeme lexbuf in

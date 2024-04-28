@@ -215,7 +215,3 @@ let for_all_vars typ ~f =
   | Continue () -> true
   | Stop () -> false
 ;;
-
-module Bounded = struct
-  type nonrec 'n t = Trait_bound.t * 'n t [@@deriving compare, equal, hash, sexp]
-end

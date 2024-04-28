@@ -7,14 +7,14 @@ open Names
 module Pattern = struct
   include Pattern
 
-  type nonrec t = (Module_path.relative Type_scheme.Bounded.t, Module_path.relative) t
+  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
   [@@deriving equal, sexp]
 end
 
 module Effect_pattern = struct
   include Effect_pattern
 
-  type nonrec t = (Module_path.relative Type_scheme.Bounded.t, Module_path.relative) t
+  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
   [@@deriving equal, sexp]
 end
 
@@ -38,7 +38,7 @@ module Expr = struct
     | Record_literal of (Value_name.t * t Node.t option) Nonempty.t
     | Record_update of t Node.t * (Value_name.t * t Node.t option) Nonempty.t
     | Record_field_access of t Node.t * Value_name.t Node.t
-    | Type_annotation of t Node.t * Module_path.relative Type_scheme.Bounded.t Node.t
+    | Type_annotation of t Node.t * Module_path.relative Type_scheme.t Node.t
   [@@deriving equal, sexp, variants]
 
   let names_used ~names =
@@ -183,9 +183,7 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
     Compilation_error.raise
       Other
       ~msg:[%message "Fixity declarations are not supported on effect operations"]
-  | Common_sig (Val (name, None, ((trait_bounds, (scheme, constraints)) as type_))) ->
-    if not (List.is_empty trait_bounds)
-    then failwith "TODO: trait bounds on effect operations";
+  | Common_sig (Val (name, None, ((scheme, constraints) as type_))) ->
     if not (List.is_empty constraints)
     then failwith "TODO: constraints on effect operations";
     (match scheme with
@@ -194,14 +192,11 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
        Compilation_error.raise
          Other
          ~msg:
-           [%message
-             "Effect operations can't perform effects" (type_ : _ Type_scheme.Bounded.t)]
+           [%message "Effect operations can't perform effects" (type_ : _ Type_scheme.t)]
      | Var _ | Type_app _ | Tuple _ | Union _ | Intersection _ ->
        Compilation_error.raise
          Other
-         ~msg:
-           [%message
-             "Effect operations must be functions" (type_ : _ Type_scheme.Bounded.t)])
+         ~msg:[%message "Effect operations must be functions" (type_ : _ Type_scheme.t)])
   | Module_sig _ | Common_sig (Extern _ | Type_decl _ | Effect _ | Trait_sig _ | Import _)
     ->
     Compilation_error.raise
