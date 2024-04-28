@@ -13,7 +13,8 @@ let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests 
 (* TODO: enable these for mir. *)
 let type_only_tests =
   [ "LetPattern" (* unions in toplevel let bindings *)
-  ; "Effects" (* FIXME: Fix effect operations not being added to context *)
+  ; "Effects" (* effects *)
+  ; "ReraiseExn" (* effects *)
   ]
 ;;
 

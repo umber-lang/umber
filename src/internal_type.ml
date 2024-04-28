@@ -4,6 +4,8 @@ open Names
 module T = struct
   type t =
     | Var of Type_var.t
+    | Never
+    | Any
     | Type_app of Type_name.Absolute.t * t list
     | Tuple of t list
     | Function of t Nonempty.t * effects * t
@@ -33,7 +35,7 @@ let rec map typ ~f =
   | Retry typ -> map typ ~f
   | Defer typ ->
     (match typ with
-     | Var v -> Var v
+     | Var _ | Never | Any -> typ
      | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f))
      | Tuple fields -> Tuple (List.map fields ~f:(map ~f))
      | Function (args, effects, body) ->
@@ -56,6 +58,7 @@ let map_vars typ ~f =
   in
   map typ ~f:(function
     | Var v -> Halt (Var (f v))
+    | (Never | Any) as typ -> Halt typ
     | Function (args, effects, result) ->
       Defer (Function (args, map_effects effects, result))
     | Partial_function (args, effects, v) ->
@@ -69,6 +72,8 @@ let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~eff =
   | Retry (type1, type2) -> map2 type1 type2 ~f ~f_contra ~var ~eff
   | Defer (type1, type2) ->
     (match type1, type2 with
+     | Never, Never -> Never
+     | Any, Any -> Any
      | Var v1, Var v2 -> Var (var v1 v2)
      | Type_app (name1, args1), Type_app (name2, args2) ->
        assert_or_compiler_bug
@@ -90,11 +95,13 @@ let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~eff =
        Partial_function (args, effect_row, v)
      | Partial_function _, Function _
      | Function _, Partial_function _
-     | Var _, (Type_app _ | Tuple _ | Function _ | Partial_function _)
-     | Type_app _, (Var _ | Tuple _ | Function _ | Partial_function _)
-     | Tuple _, (Var _ | Type_app _ | Function _ | Partial_function _)
-     | Function _, (Var _ | Type_app _ | Tuple _)
-     | Partial_function _, (Var _ | Type_app _ | Tuple _) ->
+     | Never, (Var _ | Type_app _ | Tuple _ | Function _ | Partial_function _ | Any)
+     | Any, (Var _ | Type_app _ | Tuple _ | Function _ | Partial_function _ | Never)
+     | Var _, (Type_app _ | Tuple _ | Function _ | Partial_function _ | Never | Any)
+     | Type_app _, (Var _ | Tuple _ | Function _ | Partial_function _ | Never | Any)
+     | Tuple _, (Var _ | Type_app _ | Function _ | Partial_function _ | Never | Any)
+     | Function _, (Var _ | Type_app _ | Tuple _ | Never | Any)
+     | Partial_function _, (Var _ | Type_app _ | Tuple _ | Never | Any) ->
        compiler_bug [%message "Incompatible types for map2" (type1 : t) (type2 : t)])
 ;;
 
@@ -103,7 +110,7 @@ let rec fold_until typ ~init ~f =
   | Stop _ as stop -> stop
   | Continue init as continue ->
     (match typ with
-     | Var _ -> continue
+     | Var _ | Never | Any -> continue
      | Type_app (_, fields) | Tuple fields ->
        List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
      | Function (args, effects, body) ->

@@ -217,6 +217,7 @@ end = struct
 
   let rec apply_to_type t type_ =
     Internal_type.map type_ ~f:(function
+      | (Never | Any) as typ -> Halt typ
       | Var var -> Halt (apply_to_type_var t var)
       | Function (args, effects, result) ->
         Halt
@@ -236,7 +237,7 @@ end = struct
            if Internal_type.equal_effects effects Internal_type.no_effects
            then Halt (Partial_function (Nonempty.append args args', effects', result_var))
            else Halt (Function (args, effects, result_type))
-         | (Function _ | Type_app _ | Tuple _) as result_type ->
+         | (Function _ | Type_app _ | Tuple _ | Never | Any) as result_type ->
            Halt (Function (args, effects, result_type)))
       | (Type_app _ | Tuple _) as type_ -> Defer type_)
 
@@ -311,6 +312,7 @@ let create () =
 
 let rec occurs_in id : Internal_type.t -> bool = function
   | Var id' -> Type_var.(id = id')
+  | Never | Any -> false
   | Type_app (_, fields) | Tuple fields -> List.exists fields ~f:(occurs_in id)
   | Function (args, effects, body) ->
     Nonempty.exists args ~f:(occurs_in id)
@@ -367,6 +369,11 @@ let rec constrain ~names ~types ~subtype ~supertype =
           (supertype : Internal_type.t)];
     Hash_set.add types.constrained_types (subtype, supertype);
     match subtype, supertype with
+    | _, Any | Never, _ -> ()
+    | Any, Never
+    | Any, (Type_app _ | Tuple _ | Function _ | Partial_function _)
+    | (Type_app _ | Tuple _ | Function _ | Partial_function _), Never ->
+      type_error "Type mismatch" subtype supertype
     | Var var1, Var var2 ->
       if not (Type_var.equal var1 var2)
       then Constraints.add types.constraints ~subtype:var1 ~supertype:var2
@@ -745,6 +752,8 @@ and instantiate_type_scheme =
       let args = Nonempty.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
       let effects = instantiate_effect_type_scheme ~names ~types ~params effects in
       Function (args, effects, instantiate_type_scheme ~names ~types ~params result)
+    | Union [] -> Never
+    | Intersection [] -> Any
     | Union args ->
       let var = Internal_type.fresh_var () in
       let args =
@@ -819,6 +828,9 @@ and instantiate_type_scheme =
       { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
     | Effect_union args -> collect_effects args ~union_or_intersection:`Union
     | Effect_intersection args ->
+      (* FIXME: This doesn't quite make sense for effects. We model them as a row,
+         which is like a union. e.g. what does it mean to be `<Foo & Bar>`? Isn't that
+         uninhabited? *)
       collect_effects args ~union_or_intersection:`Intersection
   in
   fun ?(params = Type_param.Env_to_vars.create ())
@@ -861,6 +873,8 @@ let generalize types outer_type =
     : Module_path.absolute Type_scheme.type_
     =
     match (typ : Internal_type.t) with
+    | Never -> Union []
+    | Any -> Intersection []
     | Var var -> Var (Type_param.Env_of_vars.find_or_add env var)
     | Function (args, effects, res) ->
       let args =

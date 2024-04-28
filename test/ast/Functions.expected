@@ -48,8 +48,8 @@
     (((Tuple ())
       ((Fun_call (Name Functions.lots_of_args)
         ((Function
-          ((Type_app Int ()) (Type_app Float ()) (Type_app Int ())
-           (Type_app String ()) (Type_app Char ()))
+          ((Intersection ()) (Intersection ()) (Intersection ())
+           (Intersection ()) (Intersection ()))
           (Effect_union ()) (Tuple ()))
          ())
         (((Literal (Int 5)) ((Type_app Int ()) ()))

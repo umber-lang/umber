@@ -3,6 +3,8 @@ open Names
 
 type t =
   | Var of Type_var.t
+  | Never
+  | Any
   | Type_app of Type_name.Absolute.t * t list
   | Tuple of t list
   | Function of t Nonempty.t * effects * t

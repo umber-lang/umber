@@ -98,8 +98,6 @@ module Any = Make_type (struct
   let decl : _ Type_decl.t = Unique_list.empty, Alias (Intersection [])
 end)
 
-(* TODO: Add intrinsics for Never and Any (Bottom and Top) *)
-
 let all : (module Type) list =
   [ (module Bool)
   ; (module Int)

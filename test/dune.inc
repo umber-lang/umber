@@ -328,6 +328,17 @@
      output/ErrorNameClashWithImport.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/ErrorNeverSubtyping.um})
+   (concurrent
+    (diff? tokens/ErrorNeverSubtyping.expected
+     tokens/ErrorNeverSubtyping.out)
+    (diff? ast/ErrorNeverSubtyping.expected ast/ErrorNeverSubtyping.out)
+    (diff? mir/ErrorNeverSubtyping.expected mir/ErrorNeverSubtyping.out)
+    (diff? llvm/ErrorNeverSubtyping.expected llvm/ErrorNeverSubtyping.out)
+    (diff? output/ErrorNeverSubtyping.expected
+     output/ErrorNeverSubtyping.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/ErrorPartialApplication.um})
    (concurrent
     (diff? tokens/ErrorPartialApplication.expected

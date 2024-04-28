@@ -1463,6 +1463,7 @@ module Module = struct
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
       check_every_val_is_defined ~names module_name defs;
+      eprint_s [%message "Finished type-checking. Checking sig-def compatbility."];
       Sig_def_diff.check ~names module_name;
       Ok (names, (module_name, sigs, defs))
     with

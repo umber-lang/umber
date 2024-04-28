@@ -1,0 +1,3 @@
+let cannot_be_called (_ : Never) = ()
+
+let () = cannot_be_called 5
