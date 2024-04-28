@@ -98,6 +98,8 @@ module : {
 
   val sqrt : Float -> Float
 
+  val ignore : a -> ()
+
   extern print : String -> () = "umber_print_endline"  # TODO: effects
   extern print_int : Int -> () = "umber_print_int"
   extern print_bool : Bool -> () = "umber_print_bool"
@@ -233,6 +235,8 @@ module Operators = {
 }
 
 import .Operators._
+
+let ignore _ = ()
 
 extern sqrt : Float -> Float = "umber_float_sqrt"
 extern print : String -> () = "umber_print_endline"

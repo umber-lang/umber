@@ -64,6 +64,11 @@
                         ())))
                      (type_source Extern_declared)
                      (extern_name umber_print_endline))))
+                  (ignore
+                   (Local
+                    ((type_
+                      (Scheme
+                       ((Function ((Var a)) (Effect_union ()) (Tuple ())) ()))))))
                   (print_int
                    (Local
                     ((type_
@@ -537,6 +542,14 @@
                        ())))
                     (type_source Extern_declared)
                     (extern_name umber_print_endline))))
+                 (ignore
+                  (Local
+                   ((type_
+                     (Scheme
+                      ((Function ((Intersection ())) (Effect_union ())
+                        (Tuple ()))
+                       ())))
+                    (type_source Let_inferred))))
                  (print_int
                   (Local
                    ((type_
