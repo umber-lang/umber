@@ -18,6 +18,15 @@ module Document = struct
     | t :: ts -> Concat (t, concat_all ts)
   ;;
 
+  let ( ^^ ) t t' = Concat (t, t')
+
+  let ( ^| ) t t' =
+    match t, t' with
+    | Empty, t' -> t'
+    | t, Empty -> t
+    | _ -> t ^^ Break ^^ t'
+  ;;
+
   let separated ts = concat_all (List.intersperse ts ~sep:Break)
 end
 
@@ -100,16 +109,30 @@ let print doc ~max_line_length =
 ;;
 
 let%expect_test _ =
-  let example : Document.t =
+  let open Document in
+  let example =
     Group
-      (Document.separated
-         [ Text "begin"
-         ; Indent
-             ( 3
-             , Group (Document.separated (List.init 3 ~f:(const (Document.Text "stmt;"))))
-             )
-         ; Text "end"
-         ])
+      (Text "begin"
+       ^^ Indent
+            ( 2
+            , Break
+              ^^ Group
+                   (Document.separated (List.init 3 ~f:(const (Document.Text "stmt;"))))
+            )
+       ^| Text "end")
   in
-  print example ~max_line_length:50
+  print example ~max_line_length:50;
+  [%expect {| begin stmt; stmt; stmt; end |}];
+  print example ~max_line_length:25;
+  [%expect {|
+    begin
+      stmt; stmt; stmt;
+    end |}];
+  print example ~max_line_length:10;
+  [%expect {|
+    begin
+      stmt;
+      stmt;
+      stmt;
+    end |}]
 ;;

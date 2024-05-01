@@ -9,4 +9,4 @@ module Document : sig
 end
 
 val format : Document.t -> max_line_length:int -> string Base.Sequence.t
-val format_and_print : Document.t -> max_line_length:int -> unit
+val print : Document.t -> max_line_length:int -> unit
