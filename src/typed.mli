@@ -22,6 +22,7 @@ module Expr : sig
     | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Handle of
         { expr : 'typ t Node.t
+        ; expr_type : 'typ
         ; value_branch : (Pattern.t Node.t * 'typ t Node.t) option
         ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
         }

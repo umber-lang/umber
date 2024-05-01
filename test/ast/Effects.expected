@@ -108,7 +108,7 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all ())
-      ((Handle (expr (Literal (Int 5)))
+      ((Handle (expr (Literal (Int 5))) (expr_type ((Type_app Int ()) ()))
         (effect_branches
          ((((operation Effects.ask) (args ((Tuple ())))) (Literal (Int 6))))))
        ((Type_app Int ()) ()))))))
@@ -121,6 +121,7 @@
           ((Function ((Tuple ())) (Effect Effects.Read ()) (Type_app Int ()))
            ())
           (((Tuple ()) ((Tuple ()) ())))))
+        (expr_type ((Type_app Int ()) ()))
         (effect_branches
          ((((operation Effects.ask) (args ((Tuple ()))))
            (Fun_call (Name Effects.resume)
@@ -139,6 +140,7 @@
             (Tuple ((Type_app Int ()) (Tuple ()))))
            ())
           (((Tuple ()) ((Tuple ()) ())))))
+        (expr_type ((Tuple ((Type_app Int ()) (Tuple ()))) ()))
         (value_branch
          ((Tuple ((Catch_all (x)) (Tuple ()))) (Name Effects.x)))
         (effect_branches
@@ -161,6 +163,7 @@
               (Type_app Std.Prelude.Int.Int ()))
              ())
             (((Tuple ()) ((Tuple ()) ())))))
+          (expr_type ((Type_app Int ()) ()))
           (value_branch
            ((Catch_all (x))
             (Fun_call (Name Std.Prelude.Operators.+)
@@ -178,6 +181,7 @@
                 (Effect_union ()) (Type_app Int ()))
                ())
               (((Literal (Int 5)) ((Type_app Int ()) ())))))))))
+        (expr_type ((Type_app Int ()) ()))
         (effect_branches
          ((((operation Effects.ask) (args ((Tuple ()))))
            (Fun_call (Name Effects.resume)
@@ -195,6 +199,7 @@
           (Fun_call (Name Effects.f)
            ((Function ((Tuple ())) (Effect Effects.Read ()) (Tuple ())) ())
            (((Tuple ()) ((Tuple ()) ())))))
+         (expr_type ((Tuple ()) ()))
          (effect_branches
           ((((operation Effects.ask) (args ((Tuple ())))) (Tuple ()))))))
        ((Function

@@ -21,6 +21,7 @@
                (Effect ReraiseExn.Exn ()) (Type_app Never ()))
               ())
              (((Literal (String exn)) ((Type_app String ()) ()))))))))
+        (expr_type ((Type_app Int ()) ()))
         (effect_branches
          ((((operation ReraiseExn.raise) (args ((Catch_all ()))))
            (Literal (Int 2))))))
@@ -42,6 +43,7 @@
                   (Union ()))
                  ())
                 (((Tuple ()) ((Tuple ()) ())))))
+              (expr_type ((Union ()) ()))
               (value_branch
                ((Catch_all (value))
                 (Fun_call (Name ReraiseExn.Ok)
@@ -117,6 +119,7 @@
             ((Function ((Tuple ())) (Effect ReraiseExn.Exn ())
               (Type_app Int ()))
              ())))))
+        (expr_type ((Type_app Int ()) ()))
         (value_branch
          ((Catch_all (value))
           (Fun_call (Name Std.Prelude.print_int)

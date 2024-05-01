@@ -296,6 +296,7 @@ module Expr = struct
     | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Handle of
         { expr : 'typ t Node.t
+        ; expr_type : 'typ
         ; value_branch : (Pattern.t Node.t * 'typ t Node.t) option [@sexp.option]
         ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
         }
@@ -610,15 +611,8 @@ module Expr = struct
                 ~types
                 ~subtype:branch_effects
                 ~supertype:result_plus_handled_effects);
-            eprint_s
-              [%message
-                "Finished typing handle expr"
-                  ~expr:
-                    (Handle { expr; value_branch; effect_branches }
-                      : (Internal_type.t * _) t)
-                  (result_type : Internal_type.t)
-                  (result_effects : Internal_type.effects)];
-            ( node (Handle { expr; value_branch; effect_branches })
+            let expr_type = expr_type, Pattern.Names.empty in
+            ( node (Handle { expr; expr_type; value_branch; effect_branches })
             , result_type
             , result_effects )
           | Let { rec_; bindings; body } ->
@@ -776,15 +770,16 @@ module Expr = struct
            ( expr
            , f_type expr_type
            , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type)) )
-       | Handle { expr; value_branch; effect_branches } ->
+       | Handle { expr; expr_type; value_branch; effect_branches } ->
          let expr = map' expr ~f ~f_type in
+         let expr_type = f_type expr_type in
          let value_branch =
            Option.map value_branch ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))
          in
          let effect_branches =
            List.map effect_branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))
          in
-         Handle { expr; value_branch; effect_branches }
+         Handle { expr; expr_type; value_branch; effect_branches }
        | Tuple fields -> Tuple (List.map fields ~f:(map' ~f ~f_type))
        | Record_literal fields ->
          Record_literal
