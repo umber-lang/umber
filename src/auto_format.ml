@@ -6,11 +6,16 @@ module Document = struct
   type t =
     | Empty
     | Text of string
-    | Break
+    | Break of string
     | Concat of t * t
     | Indent of int * t
     | Group of t
   [@@deriving variants]
+
+  let space = Break " "
+
+  (* FIXME: This won't work due to indentation. Maybe add [Force_break]? *)
+  let line_break = Break "\n"
 
   let rec concat_all = function
     | [] -> Empty
@@ -24,10 +29,10 @@ module Document = struct
     match t, t' with
     | Empty, t' -> t'
     | t, Empty -> t
-    | _ -> t ^^ Break ^^ t'
+    | _ -> t ^^ space ^^ t'
   ;;
 
-  let separated ts = concat_all (List.intersperse ts ~sep:Break)
+  let separated ?(sep = space) ts = concat_all (List.intersperse ts ~sep)
 end
 
 type fragment =
@@ -45,8 +50,7 @@ let rec fits fragments ~length =
     | { indent; mode; doc } :: fragments ->
       (match doc with
        | Empty -> fits ~length fragments
-       | Text str -> fits ~length:(length - String.length str) fragments
-       | Break -> fits ~length:(length - 1) fragments
+       | Text str | Break str -> fits ~length:(length - String.length str) fragments
        | Concat (left, right) ->
          fits
            ~length
@@ -56,40 +60,33 @@ let rec fits fragments ~length =
        | Group doc -> fits ~length ({ indent; mode; doc } :: fragments)))
 ;;
 
-let format =
-  let rec format fragments ~max_line_length ~used_length =
+let format doc ~max_line_length =
+  let rec format fragments ~used_length =
     match fragments with
     | [] -> Sequence.empty
     | { indent; mode; doc } :: fragments ->
       (match doc with
-       | Empty -> format fragments ~max_line_length ~used_length
+       | Empty -> format fragments ~used_length
        | Text text ->
          Sequence.append
            (Sequence.singleton text)
-           (format
-              fragments
-              ~max_line_length
-              ~used_length:(used_length + String.length text))
-       | Break ->
+           (format fragments ~used_length:(used_length + String.length text))
+       | Break sep ->
          (match mode with
           | `Flat ->
             Sequence.append
-              (Sequence.singleton " ")
-              (format fragments ~max_line_length ~used_length:(used_length + 1))
+              (Sequence.singleton sep)
+              (format fragments ~used_length:(used_length + String.length sep))
           | `Break ->
             Sequence.append
               (Sequence.singleton ("\n" ^ String.make indent ' '))
-              (format fragments ~max_line_length ~used_length:indent))
+              (format fragments ~used_length:indent))
        | Concat (left, right) ->
          format
-           ~max_line_length
            ~used_length
            ({ indent; mode; doc = left } :: { indent; mode; doc = right } :: fragments)
        | Indent (indent_to_add, doc) ->
-         format
-           ~max_line_length
-           ~used_length
-           ({ indent = indent + indent_to_add; mode; doc } :: fragments)
+         format ~used_length ({ indent = indent + indent_to_add; mode; doc } :: fragments)
        | Group doc ->
          let mode =
            if fits
@@ -98,10 +95,9 @@ let format =
            then `Flat
            else `Break
          in
-         format ~max_line_length ~used_length ({ indent; mode; doc } :: fragments))
+         format ~used_length ({ indent; mode; doc } :: fragments))
   in
-  fun doc ~max_line_length ->
-    format [ { indent = 0; mode = `Flat; doc } ] ~max_line_length ~used_length:0
+  format [ { indent = 0; mode = `Flat; doc } ] ~used_length:0
 ;;
 
 let print doc ~max_line_length =
@@ -113,12 +109,7 @@ let%expect_test _ =
   let example =
     Group
       (Text "begin"
-       ^^ Indent
-            ( 2
-            , Break
-              ^^ Group
-                   (Document.separated (List.init 3 ~f:(const (Document.Text "stmt;"))))
-            )
+       ^^ Indent (2, space ^^ Group (separated (List.init 3 ~f:(const (Text "stmt;")))))
        ^| Text "end")
   in
   print example ~max_line_length:50;

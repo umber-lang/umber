@@ -12,6 +12,11 @@ module Import = struct
       | 0 -> Absolute
       | n -> Relative { nth_parent = n - 1 }
     ;;
+
+    let to_n_periods = function
+      | Absolute -> 0
+      | Relative { nth_parent } -> nth_parent + 1
+    ;;
   end
 
   module Paths = struct

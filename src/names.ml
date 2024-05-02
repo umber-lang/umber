@@ -8,6 +8,7 @@ module type General_name = sig
 
   val empty : t
   val to_ustring : t -> Ustring.t
+  val to_string : t -> string
 end
 
 (* TODO: add string/ustring interning. Should be super easy to just add it to a core

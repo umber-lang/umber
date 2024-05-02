@@ -9,6 +9,7 @@ module Import : sig
     [@@deriving sexp_of]
 
     val of_n_periods : int -> t
+    val to_n_periods : t -> int
   end
 
   module Paths : sig
