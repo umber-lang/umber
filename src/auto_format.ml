@@ -6,16 +6,12 @@ module Document = struct
   type t =
     | Empty
     | Text of string
-    | Break of string
+    | Break
+    | Force_break
     | Concat of t * t
     | Indent of int * t
     | Group of t
-  [@@deriving variants]
-
-  let space = Break " "
-
-  (* FIXME: This won't work due to indentation. Maybe add [Force_break]? *)
-  let line_break = Break "\n"
+  [@@deriving sexp, variants]
 
   let rec concat_all = function
     | [] -> Empty
@@ -23,16 +19,21 @@ module Document = struct
     | t :: ts -> Concat (t, concat_all ts)
   ;;
 
-  let ( ^^ ) t t' = Concat (t, t')
+  let ( ^^ ) t t' =
+    match t, t' with
+    | Empty, t' -> t'
+    | t, Empty -> t
+    | _ -> Concat (t, t')
+  ;;
 
   let ( ^| ) t t' =
     match t, t' with
     | Empty, t' -> t'
     | t, Empty -> t
-    | _ -> t ^^ space ^^ t'
+    | _ -> t ^^ Break ^^ t'
   ;;
 
-  let separated ?(sep = space) ts = concat_all (List.intersperse ts ~sep)
+  let separated ?(sep = Break) ts = concat_all (List.intersperse ts ~sep)
 end
 
 type fragment =
@@ -49,8 +50,10 @@ let rec fits fragments ~length =
     | [] -> true
     | { indent; mode; doc } :: fragments ->
       (match doc with
+       | Force_break -> false
        | Empty -> fits ~length fragments
-       | Text str | Break str -> fits ~length:(length - String.length str) fragments
+       | Text str -> fits ~length:(length - String.length str) fragments
+       | Break -> fits ~length:(length - 1) fragments
        | Concat (left, right) ->
          fits
            ~length
@@ -71,16 +74,14 @@ let format doc ~max_line_length =
          Sequence.append
            (Sequence.singleton text)
            (format fragments ~used_length:(used_length + String.length text))
-       | Break sep ->
+       | Break ->
          (match mode with
           | `Flat ->
             Sequence.append
-              (Sequence.singleton sep)
-              (format fragments ~used_length:(used_length + String.length sep))
-          | `Break ->
-            Sequence.append
-              (Sequence.singleton ("\n" ^ String.make indent ' '))
-              (format fragments ~used_length:indent))
+              (Sequence.singleton " ")
+              (format fragments ~used_length:(used_length + 1))
+          | `Break -> format_break indent fragments)
+       | Force_break -> format_break indent fragments
        | Concat (left, right) ->
          format
            ~used_length
@@ -89,41 +90,93 @@ let format doc ~max_line_length =
          format ~used_length ({ indent = indent + indent_to_add; mode; doc } :: fragments)
        | Group doc ->
          let mode =
+           (* FIXME: Is fits checking if the whole rest of the document fits in one line??
+              Is this just nonsense? Am I missing something? Why would it need to look
+               beyond the current group? *)
            if fits
-                ({ indent; mode = `Flat; doc } :: fragments)
+                [ { indent; mode = `Flat; doc } ]
                 ~length:(max_line_length - used_length)
            then `Flat
            else `Break
          in
+         (* FIXME: cleanup *)
+         (* print_s
+           [%message "formatting group" (mode : [ `Break | `Flat ]) (doc : Document.t)]; *)
          format ~used_length ({ indent; mode; doc } :: fragments))
+  and format_break indent fragments =
+    Sequence.append
+      (Sequence.singleton ("\n" ^ String.make indent ' '))
+      (format fragments ~used_length:indent)
   in
-  format [ { indent = 0; mode = `Flat; doc } ] ~used_length:0
+  format [ { indent = 0; mode = `Flat; doc = Group doc } ] ~used_length:0
 ;;
 
 let print doc ~max_line_length =
-  format doc ~max_line_length |> Sequence.iter ~f:print_string
+  format doc ~max_line_length |> Sequence.iter ~f:print_string;
+  Out_channel.newline stdout
 ;;
 
-let%expect_test _ =
-  let open Document in
-  let example =
-    Group
-      (Text "begin"
-       ^^ Indent (2, space ^^ Group (separated (List.init 3 ~f:(const (Text "stmt;")))))
-       ^| Text "end")
-  in
-  print example ~max_line_length:50;
-  [%expect {| begin stmt; stmt; stmt; end |}];
-  print example ~max_line_length:25;
-  [%expect {|
-    begin
-      stmt; stmt; stmt;
-    end |}];
-  print example ~max_line_length:10;
-  [%expect {|
-    begin
-      stmt;
-      stmt;
-      stmt;
-    end |}]
+let%test_module _ =
+  (module struct
+    open Document
+
+    let%expect_test "basic example with different line lengths" =
+      let example =
+        Group
+          (Text "begin"
+           ^^ Indent
+                (2, Break ^^ Group (separated (List.init 3 ~f:(const (Text "stmt;")))))
+           ^| Text "end")
+      in
+      print example ~max_line_length:50;
+      [%expect {| begin stmt; stmt; stmt; end |}];
+      print example ~max_line_length:25;
+      [%expect {|
+        begin
+          stmt; stmt; stmt;
+        end |}];
+      print example ~max_line_length:10;
+      [%expect
+        {|
+        begin
+          stmt;
+          stmt;
+          stmt;
+        end |}]
+    ;;
+
+    let%expect_test "let binding with if statement" =
+      let example =
+        (t_of_sexp << Sexp.of_string)
+          {|
+          (Concat (Text let)
+           (Concat Break
+            (Concat (Text _)
+             (Concat Break
+              (Concat (Text =)
+               (Indent 2
+                (Concat Break
+                 (Group
+                  (Group
+                   (Concat (Text if)
+                    (Concat (Indent 2 (Concat Break (Group (Text false))))
+                     (Concat Break
+                      (Concat (Text then)
+                       (Concat (Indent 2 (Concat Break (Group (Text 1.))))
+                        (Concat Break
+                         (Concat (Text else)
+                          (Indent 2 (Concat Break (Group (Text 2.5))))))))))))))))))))
+      |}
+      in
+      print example ~max_line_length:33;
+      [%expect {| let _ = if false then 1. else 2.5 |}];
+      (* FIXME: This seems weird. Ah, I didn't make the let + pattern a group. *)
+      print example ~max_line_length:32;
+      [%expect {|
+        let
+        _
+        =
+          if false then 1. else 2.5 |}]
+    ;;
+  end)
 ;;

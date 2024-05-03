@@ -205,16 +205,33 @@ let format_to_document
     | Some value -> f value
     | None -> Empty
   in
-  let indent doc = Indent (indent_size, space ^^ Group doc) in
+  let indent ?(prefix = Break) doc =
+    match doc with
+    | Empty -> Empty
+    | _ -> Indent (indent_size, prefix ^^ Group doc)
+  in
   let parens doc = Text "(" ^^ doc ^^ Text ")" in
-  let comma_separated = separated ~sep:(Text "," ^^ space) in
-  let format_block ?(on_empty = Empty) sigs_or_defs ~f =
-    (* FIXME: How to force line breaks? *)
+  let comma_separated = separated ~sep:(Text "," ^^ Break) in
+  let format_block sigs_or_defs ~on_empty ~f =
+    (* FIXME: How to express "two line breaks between multi-line elements, and only one
+       between single-line elements"? We'd need to support that explicitly in the document
+       language, I think, since only it knows whether something ends up being broken.
+       Conditional syntax based on mode of adjacent groups or something?
+       
+       Or, we give each group an id, and you can branch based on the mode of an id.
+       
+       Like [Group of { id; doc }] and [Branch of { group_id; if_flat; if_break; }] *)
     if List.is_empty sigs_or_defs
     then on_empty
-    else Text "{" ^| indent (separated (List.map sigs_or_defs ~f)) ^| Text "}"
+    else
+      Text "{"
+      ^^ indent
+           ~prefix:Force_break
+           (separated ~sep:Force_break (List.map sigs_or_defs ~f))
+      ^^ Force_break
+      ^^ Text "}"
   in
-  let format_application fun_ args = fun_ ^^ indent (Group (separated args)) in
+  let format_application fun_ args = fun_ ^^ indent (separated args) in
   let format_params_application type_name (params : Type_param_name.t Unique_list.t) =
     format_application
       (Text type_name)
@@ -249,16 +266,17 @@ let format_to_document
     | Union types ->
       (* FIXME: Make this | and & syntaxes real (parseable) *)
       separated
-        ~sep:(space ^^ Text "|" ^^ space)
+        ~sep:(Break ^^ Text "|" ^^ Break)
         (Non_single_list.to_list (Non_single_list.map types ~f:format_type_term))
     | Intersection types ->
       separated
-        ~sep:(space ^^ Text "&" ^^ space)
+        ~sep:(Break ^^ Text "&" ^^ Break)
         (Non_single_list.to_list (Non_single_list.map types ~f:format_type_term))
   and format_type_term (type_ : _ Type_scheme.type_) =
     match type_ with
-    | Var _ | Tuple _ -> format_type type_
-    | Type_app _ | Function _ | Union _ | Intersection _ -> parens (format_type type_)
+    | Var _ | Tuple _ | Type_app (_, []) -> format_type type_
+    | Type_app (_, _ :: _) | Function _ | Union _ | Intersection _ ->
+      parens (format_type type_)
   and format_effects effects =
     let effects =
       match effects with
@@ -281,11 +299,11 @@ let format_to_document
     | Empty -> Empty
     | _ -> Text "<" ^^ effects ^^ Text ">"
   in
-  let format_annotated doc type_ = doc ^| Text ":" ^| indent (Group type_) in
-  let format_equals doc body =
+  let format_annotated doc type_ = doc ^| Text ":" ^^ indent type_ in
+  let format_equals ?body_prefix doc body =
     match body with
     | Empty -> doc
-    | _ -> doc ^| Text "=" ^| indent (Group body)
+    | _ -> Group (doc ^| Text "=") ^^ indent ?prefix:body_prefix body
   in
   let format_fixity =
     format_option ~f:(fun ((assoc, level) : Fixity.t) ->
@@ -412,16 +430,16 @@ let format_to_document
     ~rec_
     ~bindings:((first_pat, first_expr) :: bindings : _ Nonempty.t)
     =
-    Text (if rec_ then "let" else "let'")
-    ^| format_equals
-         (Node.with_value first_pat ~f:format_pattern)
+    Group
+      (format_equals
+         (Text (if rec_ then "let" else "let'")
+          ^| Node.with_value first_pat ~f:format_pattern)
          (Node.with_value first_expr ~f:format_expr)
-    ^| separated
-         (List.map bindings ~f:(fun (pat, expr) ->
-            Text "and"
-            ^| format_equals
-                 (Node.with_value pat ~f:format_pattern)
-                 (Node.with_value expr ~f:format_expr)))
+       ^| separated
+            (List.map bindings ~f:(fun (pat, expr) ->
+               format_equals
+                 (Text "and" ^| Node.with_value pat ~f:format_pattern)
+                 (Node.with_value expr ~f:format_expr))))
   in
   let rec format_common : _ Module.common -> t = function
     | Val (name, fixity, type_) ->
@@ -435,19 +453,33 @@ let format_to_document
            (format_type' type_))
         (format_string_literal (Extern_name.to_ustring extern_name))
     | Type_decl (type_name, (params, decl)) ->
+      let body, body_prefix =
+        match decl with
+        | Abstract -> Empty, None
+        | Alias type_ -> format_type type_, None
+        | Variants cnstrs ->
+          let body =
+            if List.is_empty cnstrs
+            then Text "|"
+            else
+              concat_all
+                (List.map cnstrs ~f:(fun (cnstr, args) ->
+                   Force_break
+                   ^^ Group
+                        (Text "|"
+                         ^| format_application
+                              (Text (Cnstr_name.to_string cnstr))
+                              (List.map args ~f:format_type_term))))
+          in
+          (* Variants starting with [Force_break] means breaks double-up if another is
+             inserted.*)
+          body, Some Empty
+        | Record _ -> failwith "TODO: Format record type decl"
+      in
       format_equals
         (Text "type" ^| format_params_application (Type_name.to_string type_name) params)
-        (match decl with
-         | Abstract -> Empty
-         | Alias type_ -> format_type type_
-         | Variants cnstrs ->
-           separated
-             (List.map cnstrs ~f:(fun (cnstr, args) ->
-                Text "|"
-                ^| format_application
-                     (Text (Cnstr_name.to_string cnstr))
-                     (List.map args ~f:format_type_term)))
-         | Record _ -> failwith "TODO: Format record type decl")
+        body
+        ?body_prefix
     | Effect (effect_name, { params; operations }) ->
       format_equals
         (Text "effect"
@@ -504,7 +536,7 @@ let format_to_document
         format_equals
           (format_annotated
              module_name
-             (format_block sigs ~f:(Node.with_value ~f:format_sig)))
+             (format_block ~on_empty:Empty sigs ~f:(Node.with_value ~f:format_sig)))
           defs
     | Trait _ | Impl _ -> failwith "TODO: formatting traits and impls"
   in
@@ -513,8 +545,8 @@ let format_to_document
    else
      format_annotated
        (Text "module")
-       (format_block sigs ~f:(Node.with_value ~f:format_sig)))
-  ^| separated (List.map defs ~f:(Node.with_value ~f:format_def))
+       (format_block ~on_empty:Empty sigs ~f:(Node.with_value ~f:format_sig)))
+  ^| separated ~sep:Force_break (List.map defs ~f:(Node.with_value ~f:format_def))
 ;;
 
 let format ?(config = Config.default) module_ =
