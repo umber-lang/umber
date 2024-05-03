@@ -12,6 +12,7 @@
    %{target}
    (run
     %{dep:../umberboot.exe}
+    compile
     %{dep:Std/Prelude.um}
     -no-std
     -parent
@@ -25,6 +26,7 @@
    %{target}
    (run
     %{dep:../umberboot.exe}
+    compile
     %{dep:Std/Prelude.um}
     -no-std
     -parent
