@@ -1,12 +1,6 @@
 open! Import
 open Names
 
-(* FIXME: Define functions to:
-   1) convert from typed ast to untyped ast with annotations
-   2) pretty-print the untyped ast back into code (like a formatter would). 
-   
-   This is basically just implementing a code formatter, but shouldn't be too hard. *)
-
 let typed_ast_to_untyped_annotated_module ((module_name, sigs, defs) : Typed.Module.t)
   : Untyped.Module.t
   =
@@ -194,7 +188,6 @@ end
 
 (* TODO: Add more groups so we can handle breaking more kinds of nodes, test with low max
    line length. *)
-(* FIXME: Think about how to insert parentheses where necessary. *)
 let format_to_document
   ?config:({ Config.max_line_length = _; indent_size } = Config.default)
   (((_ : Module_name.t), sigs, defs) : Untyped.Module.t)
@@ -219,7 +212,9 @@ let format_to_document
      
      Or, we give each group an id, and you can branch based on the mode of an id.
      
-     Like [Group of { id; doc }] and [Branch of { group_id; if_flat; if_break; }] *)
+     Like [Group of { id; doc }] and [Branch of { group_id; if_flat; if_break; }]
+      
+     Or, like Pprint, we can have [Check_mode { if_flat; if_break }]. *)
   let format_inside_block sigs_or_defs ~f =
     indent ~prefix:Force_break (separated ~sep:Force_break (List.map sigs_or_defs ~f))
     ^^ Force_break
@@ -310,6 +305,15 @@ let format_to_document
     | Empty -> Empty
     | _ -> Text "<" ^^ effects ^^ Text ">"
   in
+  let format_value_name name =
+    let text = Text (Value_name.to_string name) in
+    if Parsing.Utils.value_name_is_infix_operator name then parens text else text
+  in
+  let format_qualified (path, name) ~f =
+    if Module_path.is_empty path
+    then f name
+    else Text (Module_path.to_string path ^ ".") ^^ f name
+  in
   let format_annotated doc type_ = Group (doc ^| Text ":") ^^ indent type_ in
   let format_equals ?body_prefix doc body =
     match body with
@@ -341,13 +345,11 @@ let format_to_document
     | Char c -> format_char_literal c
     | String ustr -> format_string_literal ustr
   in
-  (* FIXME: Think about using groups more *)
   let rec format_pattern : Untyped.Pattern.t -> t = function
     | Constant literal -> format_literal literal
     | Catch_all None -> Text "_"
-    | Catch_all (Some name) -> Text (Value_name.to_string name)
-    | As (pat, name) ->
-      format_pattern pat ^| Text "as" ^| Text (Value_name.to_string name)
+    | Catch_all (Some name) -> format_value_name name
+    | As (pat, name) -> format_pattern pat ^| Text "as" ^| format_value_name name
     | Cnstr_appl (cnstr, args) ->
       format_application
         (Text (Cnstr_name.Relative.to_string cnstr))
@@ -365,9 +367,9 @@ let format_to_document
   in
   let rec format_expr : Untyped.Expr.t -> t = function
     | Literal literal -> format_literal literal
-    | Name name -> Text (Value_name.Relative.to_string name)
+    | Name name -> format_qualified name ~f:format_value_name
     | Qualified (path, expr) ->
-      Text (Module_path.to_string path ^ ".") ^^ Node.with_value expr ~f:format_expr_term
+      format_qualified (path, expr) ~f:(Node.with_value ~f:format_expr_term)
     | Fun_call (fun_, args) ->
       let format_fun_call fun_ =
         format_application
@@ -385,25 +387,28 @@ let format_to_document
                | Fun_call _ -> format_expr expr
                | expr -> format_expr_term expr
              in
-             let name_text = Text (Value_name.to_string name) in
+             let name = Value_name.to_string name in
              let left = Node.with_value left ~f:format_expr_term_or_fun_call in
              let right = Node.with_value right ~f:format_expr_term_or_fun_call in
              Group
-               (match Value_name.to_string name with
+               (match name with
                 | ";" ->
                   (* Format as `a; b` instead of `a ; b`. *)
-                  Group (left ^^ name_text) ^| right
-                | _ -> left ^| Group (name_text ^| right))
+                  Group (left ^^ Text name) ^| right
+                | _ -> left ^| Group (Text name ^| right))
            | _ ->
              format_fun_call
-               (Text (Module_path.to_string path ^ ".")
-                ^^ parens (Text (Value_name.to_string name))))
+               (format_qualified (path, ()) ~f:(fun () ->
+                  parens (Text (Value_name.to_string name)))))
         | _ -> format_fun_call (Node.with_value fun_ ~f:format_expr_term))
     | Lambda (args, body) ->
-      Text "\\"
-      ^^ separated
-           (List.map (Nonempty.to_list args) ~f:(Node.with_value ~f:format_pattern_term))
-      ^| Text "->"
+      Group
+        (Text "\\"
+         ^^ separated
+              (List.map
+                 (Nonempty.to_list args)
+                 ~f:(Node.with_value ~f:format_pattern_term))
+         ^| Text "->")
       ^^ indent_expr body
     | If (cond, then_, else_) ->
       Text "if"
@@ -413,14 +418,14 @@ let format_to_document
       ^| Text "else"
       ^^ indent_expr else_
     | Match (expr, branches) ->
-      Text "match"
-      ^^ indent_expr expr
-      ^| separated
+      Group (Text "match" ^^ indent_expr expr)
+      ^^ concat_all
            (List.map (Nonempty.to_list branches) ~f:(fun (pattern, expr) ->
-              Text "|"
-              ^| Node.with_value pattern ~f:format_pattern
-              ^| Text "->"
-              ^^ indent_expr expr))
+              Force_break
+              ^^ Group
+                   (Group
+                      (Text "|" ^| Node.with_value pattern ~f:format_pattern ^| Text "->")
+                    ^^ indent_expr expr)))
     | Handle (expr, branches) ->
       Text "handle"
       ^^ indent_expr expr
@@ -431,13 +436,14 @@ let format_to_document
                    | `Value pattern -> format_pattern pattern
                    | `Effect { operation; args } ->
                      format_application
-                       (Text (Value_name.Relative.to_string operation))
+                       (format_qualified operation ~f:format_value_name)
                        (List.map (Nonempty.to_list args) ~f:format_pattern))
               ^| Text "->"
               ^^ indent_expr expr))
     | Let { rec_; bindings; body } ->
       Group (format_let_binding ~rec_ ~bindings ^| Text "in")
-      ^| Node.with_value body ~f:format_expr
+      ^^ Force_break
+      ^^ Group (Node.with_value body ~f:format_expr)
     | Tuple args -> format_tuple (List.map args ~f:(Node.with_value ~f:format_expr))
     | Type_annotation (expr, type_) ->
       format_annotated
@@ -467,28 +473,37 @@ let format_to_document
     ~rec_
     ~bindings:((first_pat, first_expr) :: bindings : _ Nonempty.t)
     =
+    let format_binding keyword pattern expr =
+      Node.with_value pattern ~f:(fun (pattern : Untyped.Pattern.t) ->
+        Node.with_value expr ~f:(fun (expr : Untyped.Expr.t) ->
+          match pattern, expr with
+          | Catch_all (Some _fun_name), Lambda (args, body) ->
+            format_equals
+              (Text keyword
+               ^| format_pattern pattern
+               ^| separated
+                    (List.map
+                       (Nonempty.to_list args)
+                       ~f:(Node.with_value ~f:format_pattern_term)))
+              (Node.with_value body ~f:format_expr)
+          | _ -> format_equals (Text keyword ^| format_pattern pattern) (format_expr expr)))
+    in
     Group
-      (format_equals
-         (Text (if rec_ then "let" else "let'")
-          ^| Node.with_value first_pat ~f:format_pattern)
-         (Node.with_value first_expr ~f:format_expr)
+      (format_binding (if rec_ then "let" else "let'") first_pat first_expr
        ^| separated
-            (List.map bindings ~f:(fun (pat, expr) ->
-               format_equals
-                 (Text "and" ^| Node.with_value pat ~f:format_pattern)
-                 (Node.with_value expr ~f:format_expr))))
+            (List.map bindings ~f:(fun (pat, expr) -> format_binding "and" pat expr)))
   in
   let rec format_common : _ Module.common -> t = function
     | Val (name, fixity, type_) ->
       Group
         (format_annotated
-           (Text "val" ^| Text (Value_name.to_string name) ^| format_fixity fixity)
+           (Text "val" ^| format_value_name name ^| format_fixity fixity)
            (format_type' type_))
     | Extern (name, fixity, type_, extern_name) ->
       Group
         (format_equals
            (format_annotated
-              (Text "extern" ^| Text (Value_name.to_string name) ^| format_fixity fixity)
+              (Text "extern" ^| format_value_name name ^| format_fixity fixity)
               (format_type' type_))
            (format_string_literal (Extern_name.to_ustring extern_name)))
     | Type_decl (type_name, (params, decl)) ->
@@ -535,13 +550,12 @@ let format_to_document
         ~on_empty:(Text "{}")
     | Trait_sig _ -> failwith "TODO: format trait sig"
     | Import { kind; paths } ->
-      (* FIXME: Put toplevel imports at the top (and they should probably apply to sigs
+      (* TODO: Put toplevel imports at the top (and they should probably apply to sigs
          too)*)
       let rec format_import_paths : Module.Import.Paths.t -> t = function
         | All -> Text "_"
         | Module (module_name, paths) ->
-          Text (Module_name.to_string module_name)
-          ^^ Text "."
+          Text (Module_name.to_string module_name ^ ".")
           ^^ format_multiple_import_paths paths
         | Name name -> Text (Unidentified_name.to_string name)
         | Name_as (name, as_name) ->
