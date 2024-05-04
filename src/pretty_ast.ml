@@ -657,19 +657,20 @@ let format_to_document
     | Trait_sig _ -> failwith "TODO: format trait sig"
     | Import { kind; paths } ->
       (* TODO: Put toplevel imports at the top (and they should probably apply to sigs
-         too)*)
+         too) *)
+      let format_unidentified_name name =
+        format_value_name
+          (Value_name.of_ustring_unchecked (Unidentified_name.to_ustring name))
+      in
       let rec format_import_paths : Module.Import.Paths.t -> t = function
         | All -> Text "_"
         | Module (module_name, paths) ->
           Text (Module_name.to_string module_name ^ ".")
           ^^ format_multiple_import_paths paths
-        | Name name -> Text (Unidentified_name.to_string name)
+        | Name name -> format_unidentified_name name
         | Name_as (name, as_name) ->
-          Text (Unidentified_name.to_string name)
-          ^| Text "as"
-          ^| Text (Unidentified_name.to_string as_name)
-        | Name_excluded name ->
-          Text (Unidentified_name.to_string name) ^| Text "as" ^| Text "_"
+          format_unidentified_name name ^| Text "as" ^| format_unidentified_name as_name
+        | Name_excluded name -> format_unidentified_name name ^| Text "as" ^| Text "_"
       and format_multiple_import_paths : _ Nonempty.t -> t = function
         | [ paths ] -> format_import_paths paths
         | multiple_paths ->

@@ -1,4 +1,5 @@
 open Import
+open Names
 open Sedlexing
 
 type token = Parser.token =
@@ -407,7 +408,7 @@ let parse_file ?print_tokens_to = with_file ~f:(try_parse ?print_tokens_to)
 
 module Utils = struct
   let value_name_is_infix_operator value_name =
-    let lexbuf = Sedlexing.Utf8.from_string (Names.Value_name.to_string value_name) in
+    let lexbuf = Sedlexing.Utf8.from_string (Value_name.to_string value_name) in
     let parser = MenhirLib.Convert.Simplified.traditional2revised Parser.val_operator in
     match
       parser (fun () ->
@@ -419,5 +420,8 @@ module Utils = struct
     | exception _ -> false
   ;;
 
-  let%test _ = value_name_is_infix_operator (Names.Value_name.of_string_unchecked "==")
+  let%test _ = value_name_is_infix_operator (Value_name.of_string_unchecked "==")
+  let%test _ = value_name_is_infix_operator (Value_name.of_string_unchecked "*")
+  let%test _ = value_name_is_infix_operator (Value_name.of_string_unchecked "..")
+  let%test _ = not (value_name_is_infix_operator (Value_name.of_string_unchecked "foo"))
 end
