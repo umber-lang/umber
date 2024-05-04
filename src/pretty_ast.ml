@@ -212,23 +212,34 @@ let format_to_document
   in
   let parens doc = Text "(" ^^ doc ^^ Text ")" in
   let comma_separated = separated ~sep:(Text "," ^^ Break) in
-  let format_block sigs_or_defs ~on_empty ~f =
-    (* FIXME: How to express "two line breaks between multi-line elements, and only one
-       between single-line elements"? We'd need to support that explicitly in the document
-       language, I think, since only it knows whether something ends up being broken.
-       Conditional syntax based on mode of adjacent groups or something?
-       
-       Or, we give each group an id, and you can branch based on the mode of an id.
-       
-       Like [Group of { id; doc }] and [Branch of { group_id; if_flat; if_break; }] *)
-    if List.is_empty sigs_or_defs
-    then on_empty
+  (* FIXME: How to express "two line breaks between multi-line elements, and only one
+     between single-line elements"? We'd need to support that explicitly in the document
+     language, I think, since only it knows whether something ends up being broken.
+     Conditional syntax based on mode of adjacent groups or something?
+     
+     Or, we give each group an id, and you can branch based on the mode of an id.
+     
+     Like [Group of { id; doc }] and [Branch of { group_id; if_flat; if_break; }] *)
+  let format_inside_block sigs_or_defs ~f =
+    indent ~prefix:Force_break (separated ~sep:Force_break (List.map sigs_or_defs ~f))
+    ^^ Force_break
+  in
+  let format_block prefix eq_or_colon sigs_or_defs ~on_empty ~f =
+    match sigs_or_defs with
+    | [] -> Group (prefix ^| Text (Char.to_string eq_or_colon) ^| on_empty)
+    | _ :: _ ->
+      Group (prefix ^| Text (Char.to_string eq_or_colon) ^| Text "{")
+      ^^ format_inside_block sigs_or_defs ~f
+      ^^ Text "}"
+  in
+  let format_sigs_and_defs prefix ~sigs ~defs ~f_sigs ~f_defs =
+    if List.is_empty sigs
+    then format_block prefix '=' defs ~f:f_defs ~on_empty:(Text "{}")
     else
-      Text "{"
-      ^^ indent
-           ~prefix:Force_break
-           (separated ~sep:Force_break (List.map sigs_or_defs ~f))
-      ^^ Force_break
+      Group (prefix ^| Text ":" ^| Text "{")
+      ^^ format_inside_block sigs ~f:f_sigs
+      ^^ Group (Text "}" ^| Text "=" ^| Text "{")
+      ^^ format_inside_block defs ~f:f_defs
       ^^ Text "}"
   in
   let format_application fun_ args = fun_ ^^ indent (separated args) in
@@ -299,7 +310,7 @@ let format_to_document
     | Empty -> Empty
     | _ -> Text "<" ^^ effects ^^ Text ">"
   in
-  let format_annotated doc type_ = doc ^| Text ":" ^^ indent type_ in
+  let format_annotated doc type_ = Group (doc ^| Text ":") ^^ indent type_ in
   let format_equals ?body_prefix doc body =
     match body with
     | Empty -> doc
@@ -356,13 +367,31 @@ let format_to_document
     | Literal literal -> format_literal literal
     | Name name -> Text (Value_name.Relative.to_string name)
     | Qualified (path, expr) ->
-      Text (Module_path.to_string path)
-      ^^ Text "."
-      ^^ Node.with_value expr ~f:format_expr_term
+      Text (Module_path.to_string path ^ ".") ^^ Node.with_value expr ~f:format_expr_term
     | Fun_call (fun_, args) ->
-      format_application
-        (Node.with_value fun_ ~f:format_expr_term)
-        (List.map (Nonempty.to_list args) ~f:(Node.with_value ~f:format_expr_term))
+      let format_fun_call fun_ =
+        format_application
+          fun_
+          (List.map (Nonempty.to_list args) ~f:(Node.with_value ~f:format_expr_term))
+      in
+      Node.with_value fun_ ~f:(function
+        | Name (path, name) when Parsing.Utils.value_name_is_infix_operator name ->
+          (match (path :> Module_name.t list), args with
+           | [], [ left; right ] ->
+             (* TODO: Remove unnecessary parentheses. Requires understanding precedence
+                and associativity again. *)
+             (* TODO: Support custom formatting for `;` (leave out the left break).
+                Could also do something custom mfor `|>` potentially. *)
+             Group
+               (Node.with_value left ~f:format_expr_term
+                ^| Group
+                     (Text (Value_name.to_string name)
+                      ^| Node.with_value right ~f:format_expr_term))
+           | _ ->
+             format_fun_call
+               (Text (Module_path.to_string path ^ ".")
+                ^^ parens (Text (Value_name.to_string name))))
+        | _ -> format_fun_call (Node.with_value fun_ ~f:format_expr_term))
     | Lambda (args, body) ->
       Text "\\"
       ^^ separated
@@ -407,7 +436,8 @@ let format_to_document
       format_annotated
         (Node.with_value expr ~f:format_expr)
         (Node.with_value type_ ~f:format_type')
-    | Op_tree _ -> failwith "TODO: format op tree"
+    | Op_tree op_tree ->
+      Node.with_value (Op_tree.to_untyped_expr_as_is op_tree) ~f:format_expr
     | Seq_literal _ -> failwith "TODO: format seq literal"
     | Record_literal _ | Record_update (_, _) | Record_field_access (_, _) ->
       failwith "TODO: format record expressions"
@@ -485,17 +515,17 @@ let format_to_document
            body
            ?body_prefix)
     | Effect (effect_name, { params; operations }) ->
-      format_equals
+      format_block
         (Text "effect"
          ^| format_params_application (Effect_name.to_string effect_name) params)
+        '='
         (match operations with
-         | None -> Empty
+         | None -> []
          | Some operations ->
-           format_block
-             ~on_empty:(Text "{}")
-             ~f:format_common
-             (List.map operations ~f:(fun { name; args; result } ->
-                Module.Val (name, None, (Function (args, Effect_union [], result), [])))))
+           List.map operations ~f:(fun { name; args; result } ->
+             Module.Val (name, None, (Function (args, Effect_union [], result), []))))
+        ~f:format_common
+        ~on_empty:(Text "{}")
     | Trait_sig _ -> failwith "TODO: format trait sig"
     | Import { kind; paths } ->
       (* FIXME: Put toplevel imports at the top (and they should probably apply to sigs
@@ -524,33 +554,33 @@ let format_to_document
   and format_sig : _ Module.sig_ -> t = function
     | Common_sig common -> format_common common
     | Module_sig (module_name, sigs) ->
-      format_annotated
+      format_block
         (Text "module" ^| Text (Module_name.to_string module_name))
-        (format_block sigs ~on_empty:(Text "{}") ~f:(Node.with_value ~f:format_sig))
+        ':'
+        sigs
+        ~f:(Node.with_value ~f:format_sig)
+        ~on_empty:(Text "{}")
   and format_def : _ Module.def -> t = function
     | Common_def common -> format_common common
     | Let { rec_ = _; bindings } -> format_let_binding ~rec_:true ~bindings
     | Module (module_name, sigs, defs) ->
-      let module_name = Text (Module_name.to_string module_name) in
-      let defs =
-        format_block ~on_empty:(Text "{}") defs ~f:(Node.with_value ~f:format_def)
-      in
-      if List.is_empty sigs
-      then format_equals module_name defs
-      else
-        format_equals
-          (format_annotated
-             module_name
-             (format_block ~on_empty:Empty sigs ~f:(Node.with_value ~f:format_sig)))
-          defs
+      format_sigs_and_defs
+        (Text (Module_name.to_string module_name))
+        ~sigs
+        ~defs
+        ~f_sigs:(Node.with_value ~f:format_sig)
+        ~f_defs:(Node.with_value ~f:format_def)
     | Trait _ | Impl _ -> failwith "TODO: formatting traits and impls"
   in
   (if List.is_empty sigs
    then Empty
    else
-     format_annotated
+     format_block
        (Text "module")
-       (format_block ~on_empty:Empty sigs ~f:(Node.with_value ~f:format_sig)))
+       ':'
+       sigs
+       ~f:(Node.with_value ~f:format_sig)
+       ~on_empty:Empty)
   ^| separated ~sep:Force_break (List.map defs ~f:(Node.with_value ~f:format_def))
 ;;
 

@@ -124,10 +124,12 @@ and turn_clockwise ~names op_name op_assoc op_level left_child right_child =
       (op_name, fix_associativity ~names left_child, fix_associativity ~names right_child)
 ;;
 
-let rec to_untyped_expr : t -> Untyped.Expr.t Node.t = function
+let rec to_untyped_expr_as_is : t -> Untyped.Expr.t Node.t = function
   | Leaf expr -> expr
   | Node (op_name, left_child, right_child) ->
-    let left_arg, right_arg = to_untyped_expr left_child, to_untyped_expr right_child in
+    let left_arg, right_arg =
+      to_untyped_expr_as_is left_child, to_untyped_expr_as_is right_child
+    in
     let span =
       Span.combine
         (Node.span op_name)
@@ -204,7 +206,9 @@ let fix_precedence_and_associativity t ~names =
   t'
 ;;
 
-let to_untyped_expr ~names t = to_untyped_expr (fix_precedence_and_associativity t ~names)
+let to_untyped_expr ~names t =
+  to_untyped_expr_as_is (fix_precedence_and_associativity t ~names)
+;;
 
 let%test_module _ =
   (module struct

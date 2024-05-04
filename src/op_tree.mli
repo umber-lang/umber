@@ -10,3 +10,6 @@ type t = (Value_name.Relative.t Node.t, Untyped.Expr.t Node.t) Btree.t
        precedence.
     3. Same as (2) but with "left" and "right" swapped. *)
 val to_untyped_expr : names:Name_bindings.t -> t -> Untyped.Expr.t Node.t
+
+(** Convert the operator tree to an expression without fixing precedence first. *)
+val to_untyped_expr_as_is : t -> Untyped.Expr.t Node.t

@@ -404,3 +404,18 @@ let lex_file ~print_tokens_to =
 ;;
 
 let parse_file ?print_tokens_to = with_file ~f:(try_parse ?print_tokens_to)
+
+module Utils = struct
+  let value_name_is_infix_operator value_name =
+    let lexbuf = Sedlexing.Utf8.from_string (Names.Value_name.to_string value_name) in
+    let parser = MenhirLib.Convert.Simplified.traditional2revised Parser.val_operator in
+    match
+      parser (fun () ->
+        let token = Lexer.read lexbuf in
+        let start_pos, end_pos = Sedlexing.lexing_positions lexbuf in
+        token, start_pos, end_pos)
+    with
+    | (_ : Ustring.t) -> true
+    | exception _ -> false
+  ;;
+end

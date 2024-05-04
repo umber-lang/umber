@@ -62,6 +62,7 @@
 %token EOF
 
 %start <Untyped.Module.t> prog
+%start <Ustring.t> val_operator
 %%
 
 val_operator:
