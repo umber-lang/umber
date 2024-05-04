@@ -512,19 +512,7 @@ let format_to_document
       Group (Text "match" ^^ indent_expr expr) ^^ format_match_branches branches
     | Match_function branches -> Text "match" ^^ format_match_branches branches
     | Handle (expr, branches) ->
-      Text "handle"
-      ^^ indent_expr expr
-      ^| separated
-           (List.map (Nonempty.to_list branches) ~f:(fun (effect_pattern, expr) ->
-              Text "|"
-              ^| Node.with_value effect_pattern ~f:(function
-                   | `Value pattern -> format_pattern pattern
-                   | `Effect { operation; args } ->
-                     format_application
-                       (format_qualified operation ~f:format_value_name)
-                       (List.map (Nonempty.to_list args) ~f:format_pattern))
-              ^| Text "->"
-              ^^ indent_expr expr))
+      Group (Text "handle" ^^ indent_expr expr) ^^ format_handle_branches branches
     | Let { rec_; bindings; body } ->
       Group (format_let_binding ~rec_ ~bindings ^| Text "in")
       ^^ Force_break
@@ -563,13 +551,24 @@ let format_to_document
     | Fun_call _ -> format_expr expr
     | expr -> format_expr_term expr
   and indent_expr expr = indent (Node.with_value expr ~f:format_expr)
-  and format_match_branches branches =
+  and format_branches_aux
+        : 'a. ('a Node.t * Untyped.Expr.t Node.t) Nonempty.t -> f:('a -> t) -> t
+    =
+   fun branches ~f ->
     concat_all
       (List.map (Nonempty.to_list branches) ~f:(fun (pattern, expr) ->
          Force_break
          ^^ Group
-              (Group (Text "|" ^| Node.with_value pattern ~f:format_pattern ^| Text "->")
+              (Group (Text "|" ^| Node.with_value pattern ~f ^| Text "->")
                ^^ indent_expr expr)))
+  and format_match_branches branches = format_branches_aux branches ~f:format_pattern
+  and format_handle_branches branches =
+    format_branches_aux branches ~f:(function
+      | `Value pattern -> format_pattern pattern
+      | `Effect ({ operation; args } : _ Effect_pattern.t) ->
+        format_application
+          (format_qualified operation ~f:format_value_name)
+          (List.map (Nonempty.to_list args) ~f:format_pattern))
   and format_let_binding
     ~rec_
     ~bindings:((first_pat, first_expr) :: bindings : _ Nonempty.t)
