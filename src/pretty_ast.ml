@@ -410,7 +410,7 @@ let format_to_document
     then f name
     else Text (Module_path.to_string path ^ ".") ^^ f name
   in
-  let format_annotated doc type_ = Group (doc ^| Text ":") ^^ indent type_ in
+  let format_annotated doc type_ = doc ^^ indent (Text ":" ^| type_) in
   let format_equals ?body_prefix doc body =
     match body with
     | Empty -> doc
