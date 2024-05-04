@@ -126,22 +126,6 @@ module Expr = struct
     loop ~names Value_name.Absolute.Set.empty Value_name.Set.empty
   ;;
 
-  let match_function
-    ~match_keyword_span
-    ~branches_span
-    (branches : (Pattern.t Node.t * t Node.t) Nonempty.t)
-    : t
-    =
-    let name = Constant_names.match_ in
-    Lambda
-      ( [ Node.create (Catch_all (Some name) : Pattern.t) match_keyword_span ]
-      , Node.create
-          (Match
-             ( Node.create (Name (Module_path.Relative.empty, name)) match_keyword_span
-             , branches ))
-          branches_span )
-  ;;
-
   let qualified path expr =
     match path with
     | [] -> Node.with_value expr ~f:Fn.id

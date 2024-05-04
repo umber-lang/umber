@@ -19,12 +19,11 @@
   (Let (rec_ true)
    (bindings
     (((Catch_all (first_letter))
-      (Lambda ((Catch_all (match)))
-       (Match (Name match)
-        (((Cnstr_appl North ()) (Literal (Char N)))
-         ((Cnstr_appl South ()) (Literal (Char S)))
-         ((Cnstr_appl East ()) (Literal (Char E)))
-         ((Cnstr_appl West ()) (Literal (Char W))))))))))
+      (Match_function
+       (((Cnstr_appl North ()) (Literal (Char N)))
+        ((Cnstr_appl South ()) (Literal (Char S)))
+        ((Cnstr_appl East ()) (Literal (Char E)))
+        ((Cnstr_appl West ()) (Literal (Char W)))))))))
   (Let (rec_ true)
    (bindings
     (((Catch_all (magnitude))

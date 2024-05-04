@@ -303,9 +303,9 @@ module Ustring_qualified (N : Name) : Name_qualified = struct
         then
           if Int.equal i j
           then
-            (* Multiple '.'s in a row. This is ok, seen in e.g.
-                   `Std.Prelude.Operators..` This is only allowed in the name itself, so
-                   we can just take the rest of the string *)
+            (* Multiple '.'s in a row. This is ok, seen in e.g. `Std.Prelude.Operators..`
+               This is only allowed in the name itself, so we can just take the rest of
+               the string. *)
             List.rev acc, String.subo s ~pos:i
           else (
             let substring = String.sub s ~pos:i ~len:(j - i) in
@@ -470,6 +470,7 @@ module Type_param_name : sig
 end = struct
   include Lower_name_qualified
 
+  (* FIXME: cleanup *)
   (* let default = of_string_unchecked "a"
 
   (* Generates names like: "a", .., "z", "aa", "ab", .. *)

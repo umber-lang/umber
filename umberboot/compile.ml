@@ -201,7 +201,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
            maybe_output Type_annotated_code ~f:(fun out ->
              let formatted_code =
                let buffer = Buffer.create 100 in
-               Pretty_ast.typed_ast_to_untyped_annotated_module typed_ast
+               Pretty_ast.Typed_to_untyped.convert_module typed_ast
                |> Pretty_ast.format
                |> Sequence.iter ~f:(Buffer.add_string buffer);
                Buffer.add_char buffer '\n';

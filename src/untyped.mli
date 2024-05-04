@@ -43,12 +43,6 @@ module Expr : sig
       expression (e.g. those bound by match expressions or lambdas) are not included. *)
   val names_used : names:Name_bindings.t -> t -> Value_name.Absolute.Set.t
 
-  val match_function
-    :  match_keyword_span:Span.t
-    -> branches_span:Span.t
-    -> (Pattern.t Node.t * t Node.t) Nonempty.t
-    -> t
-
   val qualified : Ustring.t list -> t Node.t -> t
   val op_section_right : (Ustring.t list * Ustring.t) Node.t -> t Node.t -> t
   val op_section_left : t Node.t -> (Ustring.t list * Ustring.t) Node.t -> t

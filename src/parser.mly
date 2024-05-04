@@ -209,11 +209,7 @@ expr_:
   | IF; cond = expr; THEN; e1 = expr; ELSE; e2 = expr { Expr.If (cond, e1, e2) }
   (* TODO: Allow the OCaml-like `match ... with` syntax to reduce surprise. *)
   | MATCH; e = expr; branches = match_branches { Expr.Match (e, branches) }
-  | _m = MATCH; branches = match_branches
-    { Expr.match_function
-        ~match_keyword_span:(Span.of_loc $loc(_m))
-        ~branches_span:(Span.of_loc $loc(branches))
-        branches }
+  | MATCH; branches = match_branches { Expr.Match_function branches }
   | HANDLE; e = expr; branches = handle_branches { Expr.Handle (e, branches) }
   | rec_ = let_rec; bindings = separated_nonempty(AND, let_binding); IN; body = expr
     { Expr.Let { rec_; bindings; body } }
