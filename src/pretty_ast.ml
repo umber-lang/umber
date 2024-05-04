@@ -65,8 +65,23 @@ module Typed_to_untyped = struct
           annotated
             (Lambda
                ( Nonempty.map2 args arg_types ~f:(fun arg arg_type ->
-                   Node.map arg ~f:(fun arg ->
-                     Pattern.Type_annotation (relativize_pattern arg, (arg_type, []))))
+                   Node.map arg ~f:(fun arg : Untyped.Pattern.t ->
+                     match arg with
+                     | Tuple fields ->
+                       let field_types =
+                         match arg_type with
+                         | Tuple field_types -> field_types
+                         | _ ->
+                           compiler_bug
+                             [%message
+                               "Unexpected type for tuple"
+                                 (arg_type : _ Type_scheme.type_)]
+                       in
+                       Tuple
+                         (List.map2_exn fields field_types ~f:(fun field field_type ->
+                            Pattern.Type_annotation
+                              (relativize_pattern field, (field_type, []))))
+                     | arg -> Type_annotation (relativize_pattern arg, (arg_type, []))))
                , Node.map body ~f:(convert_expr ~type_:(body_type, [])) ))
         in
         (* Handle `match` functions with their anonymous argument. *)
@@ -448,11 +463,6 @@ let format_to_document
            | [], [ left; right ] ->
              (* TODO: Remove unnecessary parentheses. Requires understanding precedence
                 and associativity again. *)
-             let format_expr_term_or_fun_call (expr : Untyped.Expr.t) =
-               match expr with
-               | Fun_call _ -> format_expr expr
-               | expr -> format_expr_term expr
-             in
              let name = Value_name.to_string name in
              let left = Node.with_value left ~f:format_expr_term_or_fun_call in
              let right = Node.with_value right ~f:format_expr_term_or_fun_call in
@@ -507,7 +517,7 @@ let format_to_document
     | Tuple args -> format_tuple (List.map args ~f:(Node.with_value ~f:format_expr))
     | Type_annotation (expr, type_) ->
       format_annotated
-        (Node.with_value expr ~f:format_expr)
+        (Node.with_value expr ~f:format_expr_term_or_fun_call)
         (Node.with_value type_ ~f:format_type')
     | Op_tree op_tree ->
       Node.with_value (Op_tree.to_untyped_expr_as_is op_tree) ~f:format_expr
@@ -533,6 +543,10 @@ let format_to_document
     | Handle _
     | Let _
     | Type_annotation _ -> parens (format_expr expr)
+  and format_expr_term_or_fun_call (expr : Untyped.Expr.t) =
+    match expr with
+    | Fun_call _ -> format_expr expr
+    | expr -> format_expr_term expr
   and indent_expr expr = indent (Node.with_value expr ~f:format_expr)
   and format_match_branches branches =
     concat_all
@@ -665,7 +679,7 @@ let format_to_document
     | Let { rec_ = _; bindings } -> format_let_binding ~rec_:true ~bindings
     | Module (module_name, sigs, defs) ->
       format_sigs_and_defs
-        (Text (Module_name.to_string module_name))
+        (Text "module" ^| Text (Module_name.to_string module_name))
         ~sigs
         ~defs
         ~f_sigs:(Node.with_value ~f:format_sig)
