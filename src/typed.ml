@@ -461,6 +461,19 @@ module Expr = struct
                   Node.create pat pat_span, branch)
               in
               node (Match (expr, (expr_type, Pattern.Names.empty), branches)), result_type)
+          | Match_function branches ->
+            let name = Constant_names.match_ in
+            of_untyped
+              ~names
+              ~types
+              ~f_name
+              (node
+                 (Untyped.Expr.Lambda
+                    ( [ node (Untyped.Pattern.catch_all (Some name)) ]
+                    , node
+                        (Untyped.Expr.Match
+                           ( node (Untyped.Expr.Name (Module_path.Relative.empty, name))
+                           , branches )) )))
           | Handle (expr, branches) ->
             let result_effect_var = Type_var.create () in
             let result_effects : Internal_type.effects =

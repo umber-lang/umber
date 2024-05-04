@@ -28,6 +28,7 @@ module Expr = struct
     | Lambda of Pattern.t Node.t Nonempty.t * t Node.t
     | If of t Node.t * t Node.t * t Node.t
     | Match of t Node.t * (Pattern.t Node.t * t Node.t) Nonempty.t
+    | Match_function of (Pattern.t Node.t * t Node.t) Nonempty.t
     | Handle of
         t Node.t
         * ([ `Effect of Effect_pattern.t | `Value of Pattern.t ] Node.t * t Node.t)
@@ -78,6 +79,10 @@ module Expr = struct
         Node.with_value else_ ~f:(loop ~names used locals)
       | Match (expr, branches) ->
         let used = Node.with_value expr ~f:(loop ~names used locals) in
+        Nonempty.fold branches ~init:used ~f:(fun used (pat, branch) ->
+          let locals = Node.with_value pat ~f:(add_locals locals) in
+          Node.with_value branch ~f:(loop ~names used locals))
+      | Match_function branches ->
         Nonempty.fold branches ~init:used ~f:(fun used (pat, branch) ->
           let locals = Node.with_value pat ~f:(add_locals locals) in
           Node.with_value branch ~f:(loop ~names used locals))

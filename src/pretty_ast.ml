@@ -55,19 +55,36 @@ let typed_ast_to_untyped_annotated_module
                Node.map arg ~f:(fun arg ->
                  handle_expr arg ~type_:(relativize_type' arg_type))) ))
     | Lambda (args, body) ->
-      (* FIXME: Handle `match` functions *)
-      let arg_types, body_type =
-        match fst type_ with
-        | Function (arg_types, _, body_type) -> arg_types, body_type
-        | _ ->
-          compiler_bug [%message "Unexpected type for function" (type_ : _ Type_scheme.t)]
+      let handle_lambda args body =
+        let arg_types, body_type =
+          match fst type_ with
+          | Function (arg_types, _, body_type) -> arg_types, body_type
+          | _ ->
+            compiler_bug
+              [%message "Unexpected type for function" (type_ : _ Type_scheme.t)]
+        in
+        annotated
+          (Lambda
+             ( Nonempty.map2 args arg_types ~f:(fun arg arg_type ->
+                 Node.map arg ~f:(fun arg ->
+                   Pattern.Type_annotation (relativize_pattern arg, (arg_type, []))))
+             , Node.map body ~f:(handle_expr ~type_:(body_type, [])) ))
       in
-      annotated
-        (Lambda
-           ( Nonempty.map2 args arg_types ~f:(fun arg arg_type ->
-               Node.map arg ~f:(fun arg ->
-                 Pattern.Type_annotation (relativize_pattern arg, (arg_type, []))))
-           , Node.map body ~f:(handle_expr ~type_:(body_type, [])) ))
+      (match args, Node.with_value body ~f:Fn.id with
+       | [ arg ], Match (expr, _expr_type, branches) ->
+         Node.with_value2 arg expr ~f:(fun arg expr ->
+           (* Handle `match` functions with their anonymous argument *)
+           match arg, expr with
+           | Catch_all (Some name), Name (_, name')
+             when Value_name.equal name Constant_names.match_
+                  && Value_name.equal name name' ->
+             annotated
+               (Match_function
+                  (Nonempty.map branches ~f:(fun (pattern, branch) ->
+                     ( Node.map pattern ~f:relativize_pattern
+                     , Node.map branch ~f:(handle_expr ~type_ ~should_annotate:false) ))))
+           | _ -> handle_lambda args body)
+       | _ -> handle_lambda args body)
     | Match (expr, expr_type, branches) ->
       annotated
         (Match
@@ -424,6 +441,7 @@ let format_to_document
       ^^ indent_expr else_
     | Match (expr, branches) ->
       Group (Text "match" ^^ indent_expr expr) ^^ format_match_branches branches
+    | Match_function branches -> Text "match" ^^ format_match_branches branches
     | Handle (expr, branches) ->
       Text "handle"
       ^^ indent_expr expr
@@ -454,18 +472,23 @@ let format_to_document
       failwith "TODO: format record expressions"
   and format_expr_term (expr : Untyped.Expr.t) =
     match expr with
-    | Literal _ | Name _
-    | Qualified (_, _)
-    | Tuple _ | Seq_literal _ | Record_literal _ | Record_update _ | Record_field_access _
-      -> format_expr expr
-    | Fun_call (_, _)
+    | Literal _
+    | Name _
+    | Qualified _
+    | Tuple _
+    | Seq_literal _
+    | Record_literal _
+    | Record_update _
+    | Record_field_access _ -> format_expr expr
+    | Fun_call _
     | Op_tree _
-    | Lambda (_, _)
-    | If (_, _, _)
-    | Match (_, _)
-    | Handle (_, _)
+    | Lambda _
+    | If _
+    | Match _
+    | Match_function _
+    | Handle _
     | Let _
-    | Type_annotation (_, _) -> parens (format_expr expr)
+    | Type_annotation _ -> parens (format_expr expr)
   and indent_expr expr = indent (Node.with_value expr ~f:format_expr)
   and format_match_branches branches =
     concat_all
@@ -486,31 +509,17 @@ let format_to_document
         match pattern, expr with
         | Catch_all (Some _fun_name), Lambda (args, body) ->
           Node.with_value body ~f:(fun body ->
-            let format_let_lambda () =
-              format_equals
-                (Text keyword
-                 ^| format_pattern pattern
-                 ^| separated
-                      (List.map
-                         (Nonempty.to_list args)
-                         ~f:(Node.with_value ~f:format_pattern_term)))
-                (format_expr body)
-            in
-            match args, body with
-            | [ arg ], Match (expr, branches) ->
-              Node.with_value2 arg expr ~f:(fun arg expr ->
-                (* Handle `match` functions with their anonymous argument *)
-                match arg, expr with
-                | Catch_all (Some name), Name (_, name')
-                  when Value_name.equal name Constant_names.match_
-                       && Value_name.equal name name' ->
-                  Group
-                    (format_equals
-                       (Text keyword ^| format_pattern pattern)
-                       (Text "match"))
-                  ^^ indent ~prefix:Empty (format_match_branches branches)
-                | _ -> format_let_lambda ())
-            | _ -> format_let_lambda ())
+            format_equals
+              (Text keyword
+               ^| format_pattern pattern
+               ^| separated
+                    (List.map
+                       (Nonempty.to_list args)
+                       ~f:(Node.with_value ~f:format_pattern_term)))
+              (format_expr body))
+        | Catch_all (Some _fun_name), Match_function branches ->
+          Group (format_equals (Text keyword ^| format_pattern pattern) (Text "match"))
+          ^^ indent ~prefix:Empty (format_match_branches branches)
         | _ -> format_equals (Text keyword ^| format_pattern pattern) (format_expr expr))
     in
     Group

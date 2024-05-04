@@ -25,6 +25,7 @@ module Expr : sig
     | Lambda of Pattern.t Node.t Nonempty.t * t Node.t
     | If of t Node.t * t Node.t * t Node.t
     | Match of t Node.t * (Pattern.t Node.t * t Node.t) Nonempty.t
+    | Match_function of (Pattern.t Node.t * t Node.t) Nonempty.t
     | Handle of
         t Node.t
         * ([ `Effect of Effect_pattern.t | `Value of Pattern.t ] Node.t * t Node.t)
