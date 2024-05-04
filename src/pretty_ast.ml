@@ -55,6 +55,7 @@ let typed_ast_to_untyped_annotated_module
                Node.map arg ~f:(fun arg ->
                  handle_expr arg ~type_:(relativize_type' arg_type))) ))
     | Lambda (args, body) ->
+      (* FIXME: Handle `match` functions *)
       let arg_types, body_type =
         match fst type_ with
         | Function (arg_types, _, body_type) -> arg_types, body_type
@@ -594,7 +595,8 @@ let format_to_document
           format_tuple (List.map (Nonempty.to_list multiple_paths) ~f:format_import_paths)
       in
       Group
-        (Text (String.init (Module.Import.Kind.to_n_periods kind) ~f:(const '.'))
+        (Text "import"
+         ^| Text (String.init (Module.Import.Kind.to_n_periods kind) ~f:(const '.'))
          ^^ format_import_paths paths)
   and format_sig : _ Module.sig_ -> t = function
     | Common_sig common -> format_common common
