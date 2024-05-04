@@ -21,6 +21,7 @@ module Target : sig
     | Tokens
     | Untyped_ast
     | Typed_ast
+    | Type_annotated_code
     | Names
     | Mir
     | Llvm

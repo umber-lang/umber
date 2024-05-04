@@ -23,6 +23,7 @@ module Target = struct
       | Tokens
       | Untyped_ast
       | Typed_ast
+      | Type_annotated_code
       | Names
       | Mir
       | Llvm
@@ -36,7 +37,7 @@ module Target = struct
   let stage : t -> Stage.t = function
     | Tokens -> Lexing
     | Untyped_ast -> Parsing
-    | Typed_ast | Names -> Type_checking
+    | Typed_ast | Type_annotated_code | Names -> Type_checking
     | Mir -> Generating_mir
     | Llvm -> Generating_llvm
     | Exe -> Linking
@@ -103,6 +104,8 @@ end = struct
     let%map_open.Command tokens = flag "tokens" no_arg ~doc:"Print lexer output (tokens)"
     and untyped_ast = flag "untyped-ast" no_arg ~doc:"Print parser output (untyped AST)"
     and typed_ast = flag "typed-ast" no_arg ~doc:"Print type-checker output (typed AST)"
+    and type_annotated_code =
+      flag "type-annotated-code" no_arg ~doc:"Pretty-print type-annotated code"
     and names = flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
     and mir = flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
     and llvm = flag "llvm" no_arg ~doc:"Print LLVM IR"
@@ -117,6 +120,7 @@ end = struct
       ~tokens:(add tokens)
       ~untyped_ast:(add untyped_ast)
       ~typed_ast:(add typed_ast)
+      ~type_annotated_code:(add type_annotated_code)
       ~names:(add names)
       ~mir:(add mir)
       ~llvm:(add llvm)
@@ -192,6 +196,11 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
            in
            maybe_output Typed_ast ~f:(fun out ->
              Parsing.fprint_s [%sexp (ast : Ast.Typed.Module.t)] ~out);
+           maybe_output Type_annotated_code ~f:(fun out ->
+             Pretty_ast.typed_ast_to_untyped_annotated_module ast
+             |> Pretty_ast.format
+             |> Sequence.iter ~f:(Out_channel.output_string out);
+             Out_channel.newline out);
            maybe_output Names ~f:(fun out ->
              Parsing.fprint_s [%sexp (names : Name_bindings.t)] ~out);
            ast, names))
