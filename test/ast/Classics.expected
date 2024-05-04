@@ -2,8 +2,8 @@
  ((Let (rec_ true)
    (bindings
     (((Catch_all (fact))
-      ((Lambda ((Catch_all ("")))
-        (Match (Name Classics.) ((Type_app Int ()) ())
+      ((Lambda ((Catch_all (match)))
+        (Match (Name Classics.match) ((Type_app Int ()) ())
          (((Union (Constant (Int 0)) (Constant (Int 1))) (Literal (Int 1)))
           ((Catch_all (n))
            (Fun_call (Name Std.Prelude.Operators.*)

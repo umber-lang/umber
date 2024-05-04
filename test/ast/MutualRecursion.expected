@@ -77,8 +77,8 @@
          (Effect_union ()) (Type_app Int ()))
         ())))
      ((Catch_all (sum_tree))
-      ((Lambda ((Catch_all ("")))
-        (Match (Name MutualRecursion.)
+      ((Lambda ((Catch_all (match)))
+        (Match (Name MutualRecursion.match)
          ((Type_app MutualRecursion.Tree ((Type_app Int ()))) ())
          (((Cnstr_appl MutualRecursion.Leaf ()) (Literal (Int 0)))
           ((Cnstr_appl MutualRecursion.Node

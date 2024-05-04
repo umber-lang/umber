@@ -13,7 +13,7 @@ entry:
   ret i32 0
 }
 
-define tailcc %umber_block* @Constructors.B.of_a(%umber_block* %Constructors.B..1) {
+define tailcc %umber_block* @Constructors.B.of_a(%umber_block* %Constructors.B.match.1) {
 entry:
   %Constructors.B.Foo = load %umber_block*, %umber_block** @Constructors.B.Foo, align 8
   ret %umber_block* %Constructors.B.Foo

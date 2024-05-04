@@ -31,7 +31,7 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block*, %umber_bl
 
 declare tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @Classics.fact(%umber_block* %Classics..1) {
+define tailcc %umber_block* @Classics.fact(%umber_block* %Classics.match.1) {
 entry:
   br label %cond
 
@@ -40,7 +40,7 @@ cond_binding_merge:                               ; preds = %cond_binding6, %con
 
 cond:                                             ; preds = %entry
   %equals_literal = load i64, i64* getelementptr inbounds (%umber_block1, %umber_block1* @int.0, i32 0, i32 1, i32 0), align 8
-  %equals_expr_gep = getelementptr %umber_block, %umber_block* %Classics..1, i32 0, i32 1, i32 0
+  %equals_expr_gep = getelementptr %umber_block, %umber_block* %Classics.match.1, i32 0, i32 1, i32 0
   %equals_expr = load i64, i64* %equals_expr_gep, align 8
   %equals = icmp eq i64 %equals_expr, %equals_literal
   br i1 %equals, label %cond_binding, label %cond1
@@ -50,7 +50,7 @@ cond_binding:                                     ; preds = %cond
 
 cond1:                                            ; preds = %cond
   %equals_literal2 = load i64, i64* getelementptr inbounds (%umber_block1, %umber_block1* @int.1, i32 0, i32 1, i32 0), align 8
-  %equals_expr_gep3 = getelementptr %umber_block, %umber_block* %Classics..1, i32 0, i32 1, i32 0
+  %equals_expr_gep3 = getelementptr %umber_block, %umber_block* %Classics.match.1, i32 0, i32 1, i32 0
   %equals_expr4 = load i64, i64* %equals_expr_gep3, align 8
   %equals5 = icmp eq i64 %equals_expr4, %equals_literal2
   br i1 %equals5, label %cond_binding6, label %cond_otherwise
@@ -59,9 +59,9 @@ cond_binding6:                                    ; preds = %cond1
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond1
-  %fun_call = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %Classics..1, %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*))
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %Classics.match.1, %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*))
   %fun_call7 = tail call tailcc %umber_block* @Classics.fact(%umber_block* %fun_call)
-  %fun_call8 = tail call tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %Classics..1, %umber_block* %fun_call7)
+  %fun_call8 = tail call tailcc %umber_block* @"Std.Prelude.Operators.*"(%umber_block* %Classics.match.1, %umber_block* %fun_call7)
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge

@@ -115,7 +115,7 @@ entry:
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @MutualRecursion.sum_tree(%umber_block* %MutualRecursion..1) {
+define tailcc %umber_block* @MutualRecursion.sum_tree(%umber_block* %MutualRecursion.match.1) {
 entry:
   br label %cond
 
@@ -123,18 +123,18 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %MutualRecursion..11 = ptrtoint %umber_block* %MutualRecursion..1 to i64
-  %equals = icmp eq i64 %MutualRecursion..11, 1
+  %MutualRecursion.match.11 = ptrtoint %umber_block* %MutualRecursion.match.1 to i64
+  %equals = icmp eq i64 %MutualRecursion.match.11, 1
   br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond
-  %block_field_gep = getelementptr %umber_block, %umber_block* %MutualRecursion..1, i32 0, i32 1, i32 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %MutualRecursion.match.1, i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep2 = getelementptr %umber_block, %umber_block* %MutualRecursion..1, i32 0, i32 1, i32 0
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %MutualRecursion.match.1, i32 0, i32 1, i32 0
   %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
   %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
   %fun_call = tail call tailcc %umber_block* @MutualRecursion.sum_forest(%umber_block* %block_field)

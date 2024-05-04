@@ -19,8 +19,8 @@
   (Let (rec_ true)
    (bindings
     (((Catch_all (first_letter))
-      (Lambda ((Catch_all ("")))
-       (Match (Name "")
+      (Lambda ((Catch_all (match)))
+       (Match (Name match)
         (((Cnstr_appl North ()) (Literal (Char N)))
          ((Cnstr_appl South ()) (Literal (Char S)))
          ((Cnstr_appl East ()) (Literal (Char E)))

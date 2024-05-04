@@ -73,7 +73,7 @@ entry:
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @"TypeChecking.*fun.1"(%umber_block* %"TypeChecking.*closure_env.1", %umber_block* %TypeChecking..1) {
+define tailcc %umber_block* @"TypeChecking.*fun.1"(%umber_block* %"TypeChecking.*closure_env.1", %umber_block* %TypeChecking.match.1) {
 entry:
   %block_field_gep = getelementptr %umber_block, %umber_block* %"TypeChecking.*closure_env.1", i32 0, i32 1, i32 2
   %block_field_raw = load i64, i64* %block_field_gep, align 8
@@ -88,8 +88,8 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %TypeChecking..14 = ptrtoint %umber_block* %TypeChecking..1 to i64
-  %equals = icmp eq i64 %TypeChecking..14, 3
+  %TypeChecking.match.14 = ptrtoint %umber_block* %TypeChecking.match.1 to i64
+  %equals = icmp eq i64 %TypeChecking.match.14, 3
   br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond

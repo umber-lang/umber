@@ -1,5 +1,5 @@
 ((Value_def Constructors.A.Foo (Make_block (tag 0)))
  (Value_def Constructors.B.Foo (Make_block (tag 0)))
  (Fun_def
-  ((fun_name Constructors.B.of_a) (args (Constructors.B..1))
+  ((fun_name Constructors.B.of_a) (args (Constructors.B.match.1))
    (body (Name Constructors.B.Foo)))))

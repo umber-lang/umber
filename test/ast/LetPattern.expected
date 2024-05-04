@@ -21,8 +21,8 @@
   (Let (rec_ false)
    (bindings
     (((Catch_all (make_thing))
-      ((Lambda ((Catch_all ("")))
-        (Match (Name LetPattern.) ((Type_app Int ()) ())
+      ((Lambda ((Catch_all (match)))
+        (Match (Name LetPattern.match) ((Type_app Int ()) ())
          (((Constant (Int 1))
            (Fun_call (Name LetPattern.Thing1)
             ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())

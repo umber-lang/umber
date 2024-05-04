@@ -127,7 +127,7 @@ module Expr = struct
     (branches : (Pattern.t Node.t * t Node.t) Nonempty.t)
     : t
     =
-    let name = Value_name.empty in
+    let name = Constant_names.match_ in
     Lambda
       ( [ Node.create (Catch_all (Some name) : Pattern.t) match_keyword_span ]
       , Node.create

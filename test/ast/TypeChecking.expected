@@ -70,8 +70,8 @@
    (bindings
     (((Catch_all (if_))
       ((Lambda ((Catch_all (then_)) (Catch_all (else_)))
-        (Lambda ((Catch_all ("")))
-         (Match (Name TypeChecking.) ((Type_app Bool ()) ())
+        (Lambda ((Catch_all (match)))
+         (Match (Name TypeChecking.match) ((Type_app Bool ()) ())
           (((Cnstr_appl True ())
             (Fun_call (Name TypeChecking.then_)
              ((Function ((Tuple ())) (Effect_union ()) (Union ())) ())

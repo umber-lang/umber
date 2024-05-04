@@ -1,16 +1,16 @@
 ((Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_def
-  ((fun_name Classics.fact) (args (Classics..1))
+  ((fun_name Classics.fact) (args (Classics.match.1))
    (body
     (Cond_assign
      (conds
-      (((Equals (Name Classics..1) (Int 0)) ())
-       ((Equals (Name Classics..1) (Int 1)) ())))
+      (((Equals (Name Classics.match.1) (Int 0)) ())
+       ((Equals (Name Classics.match.1) (Int 1)) ())))
      (body (Primitive (Int 1)))
      (if_none_matched
       (Otherwise
-       (Let Classics.n.1 (Name Classics..1)
+       (Let Classics.n.1 (Name Classics.match.1)
         (Fun_call Std.Prelude.Operators.*
          ((Name Classics.n.1)
           (Fun_call Classics.fact

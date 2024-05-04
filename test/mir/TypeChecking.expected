@@ -26,14 +26,14 @@
    (body (Fun_call TypeChecking.f.1 ((Name TypeChecking.x.5))))))
  (Fun_def
   ((fun_name TypeChecking.*fun.1)
-   (args (TypeChecking.*closure_env.1 TypeChecking..1))
+   (args (TypeChecking.*closure_env.1 TypeChecking.match.1))
    (body
     (Let TypeChecking.then_.2
      (Get_block_field 2 (Name TypeChecking.*closure_env.1))
      (Let TypeChecking.else_.2
       (Get_block_field 1 (Name TypeChecking.*closure_env.1))
       (Cond_assign
-       (conds (((Constant_tag_equals (Name TypeChecking..1) 1) ())))
+       (conds (((Constant_tag_equals (Name TypeChecking.match.1) 1) ())))
        (body (Fun_call TypeChecking.then_.2 ((Make_block (tag 0)))))
        (if_none_matched
         (Otherwise (Fun_call TypeChecking.else_.2 ((Make_block (tag 0))))))))))))
