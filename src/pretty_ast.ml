@@ -32,6 +32,23 @@ module Typed_to_untyped = struct
       | Union (left, right) -> Union (relativize_pattern left, relativize_pattern right)
       | Type_annotation _ -> .
     in
+    let annotated_pattern (pattern : Typed.Pattern.t) (type_ : _ Type_scheme.type_)
+      : Untyped.Pattern.t
+      =
+      match pattern with
+      | Tuple fields ->
+        let field_types =
+          match type_ with
+          | Tuple field_types -> field_types
+          | _ ->
+            compiler_bug
+              [%message "Unexpected type for tuple" (type_ : _ Type_scheme.type_)]
+        in
+        Tuple
+          (List.map2_exn fields field_types ~f:(fun field field_type ->
+             Pattern.Type_annotation (relativize_pattern field, (field_type, []))))
+      | _ -> Type_annotation (relativize_pattern pattern, (type_, []))
+    in
     let rec convert_expr
       ?(should_annotate = true)
       (expr : Module_path.absolute Type_scheme.t Typed.Expr.t)
@@ -65,23 +82,10 @@ module Typed_to_untyped = struct
           annotated
             (Lambda
                ( Nonempty.map2 args arg_types ~f:(fun arg arg_type ->
-                   Node.map arg ~f:(fun arg : Untyped.Pattern.t ->
-                     match arg with
-                     | Tuple fields ->
-                       let field_types =
-                         match arg_type with
-                         | Tuple field_types -> field_types
-                         | _ ->
-                           compiler_bug
-                             [%message
-                               "Unexpected type for tuple"
-                                 (arg_type : _ Type_scheme.type_)]
-                       in
-                       Tuple
-                         (List.map2_exn fields field_types ~f:(fun field field_type ->
-                            Pattern.Type_annotation
-                              (relativize_pattern field, (field_type, []))))
-                     | arg -> Type_annotation (relativize_pattern arg, (arg_type, []))))
+                   Node.map arg ~f:(fun arg ->
+                     if should_annotate
+                     then annotated_pattern arg arg_type
+                     else relativize_pattern arg))
                , Node.map body ~f:(convert_expr ~type_:(body_type, [])) ))
         in
         (* Handle `match` functions with their anonymous argument. *)
@@ -141,13 +145,12 @@ module Typed_to_untyped = struct
           { rec_
           ; bindings =
               Nonempty.map bindings ~f:(fun (pat_and_type, expr) ->
-                let pat_span = Node.span pat_and_type in
-                let pat, type_ =
-                  Node.with_value pat_and_type ~f:(fun (pat, type_) ->
-                    relativize_pattern pat, relativize_type' type_)
-                in
-                let pat : Untyped.Pattern.t = Type_annotation (pat, type_) in
-                Node.create pat pat_span, Node.map expr ~f:(convert_expr ~type_))
+                let pattern, type_ = Node.with_value pat_and_type ~f:Fn.id in
+                let type_ = relativize_type' type_ in
+                ( Node.create
+                    (annotated_pattern pattern (fst type_))
+                    (Node.span pat_and_type)
+                , Node.map expr ~f:(convert_expr ~type_) ))
           ; body = Node.map body ~f:(convert_expr ~type_)
           }
       | Tuple fields ->
@@ -188,13 +191,14 @@ module Typed_to_untyped = struct
         Let
           { rec_
           ; bindings =
-              Nonempty.map bindings ~f:(fun (pat, expr_and_type) ->
-                ( Node.map pat ~f:relativize_pattern
-                , Node.map expr_and_type ~f:(fun (expr, type_) ->
-                    convert_expr
-                      expr
-                      ~type_:(relativize_type' type_)
-                      ~should_annotate:false) ))
+              Nonempty.map bindings ~f:(fun (pattern, expr_and_type) ->
+                let expr, type_ = Node.with_value expr_and_type ~f:Fn.id in
+                let type_ = relativize_type' type_ in
+                ( Node.map pattern ~f:(fun pattern ->
+                    annotated_pattern pattern (fst type_))
+                , Node.create
+                    (convert_expr expr ~type_ ~should_annotate:false)
+                    (Node.span expr_and_type) ))
           }
       | Module (module_name, sigs, defs) ->
         Module
@@ -254,7 +258,9 @@ module Typed_to_untyped = struct
       (MatchFunction ()
        ((Let (rec_ false)
          (bindings
-          (((Catch_all (foo)) (Match_function (((Catch_all ()) (Tuple ())))))))))) |}]
+          (((Type_annotation (Catch_all (foo))
+             ((Function ((Intersection ())) (Effect_union ()) (Tuple ())) ()))
+            (Match_function (((Catch_all ()) (Tuple ())))))))))) |}]
   ;;
 end
 
@@ -343,8 +349,9 @@ let format_to_document
         (* [Type_app] binds tighter than "->", but "->" is non-associative so higher-order
            function types must be parenthesized. *)
         match type_ with
-        | Var _ | Tuple _ | Type_app _ -> format_type type_
-        | Function _ | Union _ | Intersection _ -> parens (format_type type_)
+        | Type_app _ -> format_type type_
+        | Var _ | Tuple _ | Function _ | Union _ | Intersection _ ->
+          format_type_term type_
       in
       comma_separated (Nonempty.to_list (Nonempty.map arg_types ~f:format_fun_part))
       ^| Text "->"
@@ -352,18 +359,26 @@ let format_to_document
       ^| format_fun_part result_type
     | Union types ->
       (* FIXME: Make this | and & syntaxes real (parseable) *)
-      separated
-        ~sep:(Break ^^ Text "|" ^^ Break)
-        (Non_single_list.to_list (Non_single_list.map types ~f:format_type_term))
+      (* FIXME: Don't just write "Never" or "Any", it could be shadowed. Maybe turn into a
+         new type varable or something. *)
+      let types =
+        Non_single_list.to_list (Non_single_list.map types ~f:format_type_term)
+      in
+      if List.is_empty types
+      then Text "Never"
+      else separated ~sep:(Break ^^ Text "|" ^^ Break) types
     | Intersection types ->
-      separated
-        ~sep:(Break ^^ Text "&" ^^ Break)
-        (Non_single_list.to_list (Non_single_list.map types ~f:format_type_term))
+      let types =
+        Non_single_list.to_list (Non_single_list.map types ~f:format_type_term)
+      in
+      if List.is_empty types
+      then Text "Any"
+      else separated ~sep:(Break ^^ Text "&" ^^ Break) types
   and format_type_term (type_ : _ Type_scheme.type_) =
     match type_ with
-    | Var _ | Tuple _ | Type_app (_, []) -> format_type type_
-    | Type_app (_, _ :: _) | Function _ | Union _ | Intersection _ ->
-      parens (format_type type_)
+    | Var _ | Tuple _ | Type_app (_, []) | Union [] | Intersection [] -> format_type type_
+    | Type_app (_, _ :: _) | Function _ | Union (_ :: _ :: _) | Intersection (_ :: _ :: _)
+      -> parens (format_type type_)
   and format_effects effects =
     let effects =
       match effects with

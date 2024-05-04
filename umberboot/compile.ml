@@ -209,6 +209,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
              in
              Out_channel.output_string out formatted_code;
              let lexbuf = Sedlexing.Utf8.from_string formatted_code in
+             Sedlexing.set_filename lexbuf filename;
              let roundtrip_result =
                match Parsing.try_parse lexbuf with
                | Error error ->
