@@ -443,25 +443,27 @@ let format_to_document
   in
   let rec format_common : _ Module.common -> t = function
     | Val (name, fixity, type_) ->
-      format_annotated
-        (Text "val" ^| Text (Value_name.to_string name) ^| format_fixity fixity)
-        (format_type' type_)
-    | Extern (name, fixity, type_, extern_name) ->
-      format_equals
+      Group
         (format_annotated
-           (Text "extern" ^| Text (Value_name.to_string name) ^| format_fixity fixity)
+           (Text "val" ^| Text (Value_name.to_string name) ^| format_fixity fixity)
            (format_type' type_))
-        (format_string_literal (Extern_name.to_ustring extern_name))
+    | Extern (name, fixity, type_, extern_name) ->
+      Group
+        (format_equals
+           (format_annotated
+              (Text "extern" ^| Text (Value_name.to_string name) ^| format_fixity fixity)
+              (format_type' type_))
+           (format_string_literal (Extern_name.to_ustring extern_name)))
     | Type_decl (type_name, (params, decl)) ->
       let body, body_prefix =
         match decl with
         | Abstract -> Empty, None
         | Alias type_ -> format_type type_, None
         | Variants cnstrs ->
-          let body =
-            if List.is_empty cnstrs
-            then Text "|"
-            else
+          if List.is_empty cnstrs
+          then Text "|", None
+          else (
+            let body =
               concat_all
                 (List.map cnstrs ~f:(fun (cnstr, args) ->
                    Force_break
@@ -470,16 +472,18 @@ let format_to_document
                          ^| format_application
                               (Text (Cnstr_name.to_string cnstr))
                               (List.map args ~f:format_type_term))))
-          in
-          (* Variants starting with [Force_break] means breaks double-up if another is
-             inserted.*)
-          body, Some Empty
+            in
+            (* Variants starting with [Force_break] means breaks double-up if another is
+               inserted.*)
+            body, Some Empty)
         | Record _ -> failwith "TODO: Format record type decl"
       in
-      format_equals
-        (Text "type" ^| format_params_application (Type_name.to_string type_name) params)
-        body
-        ?body_prefix
+      Group
+        (format_equals
+           (Text "type"
+            ^| format_params_application (Type_name.to_string type_name) params)
+           body
+           ?body_prefix)
     | Effect (effect_name, { params; operations }) ->
       format_equals
         (Text "effect"
@@ -514,8 +518,9 @@ let format_to_document
         | multiple_paths ->
           format_tuple (List.map (Nonempty.to_list multiple_paths) ~f:format_import_paths)
       in
-      Text (String.init (Module.Import.Kind.to_n_periods kind) ~f:(const '.'))
-      ^^ format_import_paths paths
+      Group
+        (Text (String.init (Module.Import.Kind.to_n_periods kind) ~f:(const '.'))
+         ^^ format_import_paths paths)
   and format_sig : _ Module.sig_ -> t = function
     | Common_sig common -> format_common common
     | Module_sig (module_name, sigs) ->
