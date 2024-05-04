@@ -178,32 +178,57 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
       ~type_checking:
         (* TODO: Type-checking should be able to pretty-print the typed AST. This would
            make reading test output way easier. *)
-        (run_stage ~f:(fun ast ->
-           let names =
-             if no_std then Name_bindings.core else force Name_bindings.prelude
-           in
-           let names =
-             match parent with
-             | Some module_name -> Name_bindings.into_module names module_name ~place:`Def
-             | None -> names
-           in
-           let%map.Result names, ast =
+        (run_stage ~f:(fun untyped_ast ->
+           let type_check untyped_ast =
+             let names =
+               if no_std then Name_bindings.core else force Name_bindings.prelude
+             in
+             let names =
+               match parent with
+               | Some module_name ->
+                 Name_bindings.into_module names module_name ~place:`Def
+               | None -> names
+             in
              Ast.Typed.Module.of_untyped
                ~names
                ~types:(Type_bindings.create ())
                ~include_std:(not no_std)
-               ast
+               untyped_ast
            in
+           let%map.Result names, typed_ast = type_check untyped_ast in
            maybe_output Typed_ast ~f:(fun out ->
-             Parsing.fprint_s [%sexp (ast : Ast.Typed.Module.t)] ~out);
+             Parsing.fprint_s [%sexp (typed_ast : Ast.Typed.Module.t)] ~out);
            maybe_output Type_annotated_code ~f:(fun out ->
-             Pretty_ast.typed_ast_to_untyped_annotated_module ast
-             |> Pretty_ast.format
-             |> Sequence.iter ~f:(Out_channel.output_string out);
-             Out_channel.newline out);
+             let formatted_code =
+               let buffer = Buffer.create 100 in
+               Pretty_ast.typed_ast_to_untyped_annotated_module typed_ast
+               |> Pretty_ast.format
+               |> Sequence.iter ~f:(Buffer.add_string buffer);
+               Buffer.add_char buffer '\n';
+               Buffer.contents buffer
+             in
+             Out_channel.output_string out formatted_code;
+             let lexbuf = Sedlexing.Utf8.from_string formatted_code in
+             let roundtrip_result =
+               match Parsing.try_parse lexbuf with
+               | Error error ->
+                 Error
+                   [%message
+                     "BUG: Failed to parse pretty-printed code"
+                       (error : Compilation_error.t)]
+               | Ok untyped_ast' ->
+                 (match type_check untyped_ast' with
+                  | Ok _ -> Ok ()
+                  | Error error ->
+                    Error
+                      [%message
+                        "BUG: Failed to type-check annotated code on roundtrip"
+                          (error : Compilation_error.t)])
+             in
+             Result.iter_error roundtrip_result ~f:(Parsing.fprint_s ~out));
            maybe_output Names ~f:(fun out ->
              Parsing.fprint_s [%sexp (names : Name_bindings.t)] ~out);
-           ast, names))
+           typed_ast, names))
       ~generating_mir:
         (run_stage ~f:(fun (ast, names) ->
            let%map.Result mir = Mir.of_typed_module ~names ast in
