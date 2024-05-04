@@ -66,8 +66,7 @@ let test ~in_file =
     Out_channel.write_all file ~data:"");
   let base_targets : target list =
     [ Tokens, File tokens_file
-    ; ( (if should_type_check bare_filename then Type_annotated_code else Untyped_ast)
-      , File ast_file )
+    ; (if should_type_check bare_filename then Typed_ast else Untyped_ast), File ast_file
     ]
   in
   let targets =

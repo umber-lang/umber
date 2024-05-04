@@ -1,0 +1,14 @@
+; ModuleID = 'examples/NeverAndAny.um'
+source_filename = "examples/NeverAndAny.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@Std.Prelude.List.Nil = external global %umber_block*
+
+define i32 @"umber_main:examples/NeverAndAny.um"() {
+entry:
+  ret i32 0
+}
+

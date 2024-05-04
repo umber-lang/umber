@@ -349,14 +349,15 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" subtype supertype
   in
-  let expand_type_if_alias (type_ : Internal_type.t) =
+  let rec expand_aliases (type_ : Internal_type.t) =
     match type_ with
     | Type_app (name, args) ->
       let type_entry = lookup_type names name args in
-      (* FIXME: Substitute alias arguments as params. Also reduce code duplication with
-         below. *)
+      (* FIXME: Need to substitute the arguments into the alias expansion.
+         Otherwise for e.g. `type Pair a = (a, a)`, `Pair Int` is treated as `(a, a)`. *)
       (match Name_bindings.Type_entry.decl type_entry with
-       | _params, Alias alias -> instantiate_type_scheme ~names ~types (alias, [])
+       | _params, Alias alias ->
+         expand_aliases (instantiate_type_scheme ~names ~types (alias, []))
        | _ -> type_)
     | type_ -> type_
   in
@@ -379,6 +380,8 @@ let rec constrain ~names ~types ~subtype ~supertype =
           (subtype : Internal_type.t)
           (supertype : Internal_type.t)];
     Hash_set.add types.constrained_types (subtype, supertype);
+    let subtype = expand_aliases subtype in
+    let supertype = expand_aliases supertype in
     match subtype, supertype with
     | _, Any | Never, _ -> ()
     | Any, Never
@@ -391,47 +394,27 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Var var, type_ ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      let type_ = expand_type_if_alias type_ in
       (match type_ with
        | Any -> ()
        | _ -> check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Left)
     | type_, Var var ->
       (* FIXME: Need a more robust occurs check *)
       if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
-      let type_ = expand_type_if_alias type_ in
       (match type_ with
        | Never -> ()
        | _ -> check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Right)
     | Type_app (name1, args1), Type_app (name2, args2) ->
       let type_entry1 = lookup_type names name1 args1 in
-      (* FIXME: Need to substitute the arguments into the alias expansion.
-         Otherwise for e.g. `type Pair a = (a, a)`, `Pair Int` is treated as `(a, a)`. *)
-      (match Name_bindings.Type_entry.decl type_entry1 with
-       | _params, Alias expr ->
-         constrain
-           ~names
-           ~types
-           ~subtype:(instantiate_type_scheme ~names ~types (expr, []))
-           ~supertype
-       | (_ : _ Type_decl.t) ->
-         let type_entry2 = lookup_type names name2 args2 in
-         (match Name_bindings.Type_entry.decl type_entry2 with
-          | _params, Alias expr ->
-            constrain
-              ~names
-              ~types
-              ~subtype
-              ~supertype:(instantiate_type_scheme ~names ~types (expr, []))
-          | (_ : _ Type_decl.t) ->
-            if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
-            then type_error "Type application mismatch" subtype supertype;
-            (* TODO: We don't know what the variance of the type parameters to the type
-               are, so we conservatively assume they are invariant. Implement inference
-               and manual specification of type parameter variance, similar to what OCaml
-               does. *)
-            iter2_types args1 args2 ~subtype ~supertype ~f:(fun arg1 arg2 ->
-              constrain ~names ~types ~subtype:arg1 ~supertype:arg2
-              (* constrain ~names ~types ~subtype:arg2 ~supertype:arg1 *))))
+      let type_entry2 = lookup_type names name2 args2 in
+      if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
+      then type_error "Type application mismatch" subtype supertype;
+      (* TODO: We don't know what the variance of the type parameters to the type
+         are, so we conservatively assume they are invariant. Implement inference
+         and manual specification of type parameter variance, similar to what OCaml
+         does. *)
+      (* FIXME: Actually, I'm assuming they're covariant, which isn't sound. *)
+      iter2_types args1 args2 ~subtype ~supertype ~f:(fun arg1 arg2 ->
+        constrain ~names ~types ~subtype:arg1 ~supertype:arg2)
     | Type_app (name, args), (Tuple _ | Function _ | Partial_function _) ->
       (match Name_bindings.Type_entry.decl (lookup_type names name args) with
        | _params, Alias expr ->

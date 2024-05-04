@@ -559,6 +559,14 @@
     (diff? output/MutualRecursion.expected output/MutualRecursion.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/NeverAndAny.um})
+   (concurrent (diff? tokens/NeverAndAny.expected tokens/NeverAndAny.out)
+    (diff? ast/NeverAndAny.expected ast/NeverAndAny.out)
+    (diff? mir/NeverAndAny.expected mir/NeverAndAny.out)
+    (diff? llvm/NeverAndAny.expected llvm/NeverAndAny.out)
+    (diff? output/NeverAndAny.expected output/NeverAndAny.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/OpSectionLeft.um})
    (concurrent (diff? tokens/OpSectionLeft.expected tokens/OpSectionLeft.out)
     (diff? ast/OpSectionLeft.expected ast/OpSectionLeft.out)
