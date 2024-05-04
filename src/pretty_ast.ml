@@ -1,15 +1,19 @@
 open! Import
 open Names
 
-let typed_ast_to_untyped_annotated_module ((module_name, sigs, defs) : Typed.Module.t)
+let typed_ast_to_untyped_annotated_module
+  ((outer_module_name, sigs, defs) : Typed.Module.t)
   : Untyped.Module.t
   =
   (* NOTE: It isn't semantics-preserving to interpret an absolute path as a relative path
      due to shadowing. This is kinda fine for the purposes of pretty-printing the AST
      for test output or error messages. *)
+  let outer_module_path = Module_path.Relative.of_module_names [ outer_module_name ] in
   let relativize_name =
     Tuple2.map_fst ~f:(fun (path : Module_path.Absolute.t) ->
-      Module_path.Relative.of_module_names (path :> Module_name.t list))
+      Module_path.Relative.of_module_names (path :> Module_name.t list)
+      (* Chopping the current module name is necessary for basic correctness. *)
+      |> Module_path.chop_prefix_if_exists ~prefix:outer_module_path)
   in
   let relativize_type type_ =
     Type_scheme.map type_ ~type_name:relativize_name ~effect_name:relativize_name
@@ -172,7 +176,7 @@ let typed_ast_to_untyped_annotated_module ((module_name, sigs, defs) : Typed.Mod
         , Nonempty.map args ~f:relativize_type
         , List.map defs ~f:(Node.map ~f:handle_def) )
   in
-  ( module_name
+  ( outer_module_name
   , List.map sigs ~f:(Node.map ~f:handle_sig)
   , List.map defs ~f:(Node.map ~f:handle_def) )
 ;;

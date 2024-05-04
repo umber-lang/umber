@@ -100,13 +100,14 @@ module Module_path : sig
   type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
   val is_empty : _ t -> bool
-  val is_prefix : prefix:'a t -> 'a t -> bool
+  val is_prefix : 'a t -> prefix:'a t -> bool
   val append : 'a t -> Module_name.t list -> 'a t
   val append' : 'a t -> relative t -> 'a t
   val last : _ t -> Module_name.t option
   val drop_last : 'a t -> 'a t option
   val drop_last_n_exn : 'a t -> int -> 'a t
   val split_last : 'a t -> ('a t * Module_name.t) option
+  val chop_prefix_if_exists : 'a t -> prefix:'a t -> 'a t
   val to_ustring : _ t -> Ustring.t
   val to_string : _ t -> string
   val to_module_names : _ t -> Module_name.t list
@@ -145,7 +146,8 @@ end = struct
 
   let is_empty = List.is_empty
 
-  let rec is_prefix ~prefix:t t' =
+  (* FIXME: Use List.is_prefix *)
+  let rec is_prefix t' ~prefix:t =
     match t, t' with
     | [], ([] | _ :: _) -> true
     | _ :: _, [] -> false
@@ -160,6 +162,10 @@ end = struct
   let last = List.last
   let drop_last = List.drop_last
   let split_last = List.split_last
+
+  let chop_prefix_if_exists t ~prefix =
+    if is_prefix t ~prefix then List.drop t (List.length prefix) else t
+  ;;
 
   let drop_last_n_exn t n =
     let remaining = List.length t - n in

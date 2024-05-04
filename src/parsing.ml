@@ -418,4 +418,6 @@ module Utils = struct
     | (_ : Ustring.t) -> true
     | exception _ -> false
   ;;
+
+  let%test _ = value_name_is_infix_operator (Names.Value_name.of_string_unchecked "==")
 end
