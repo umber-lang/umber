@@ -9,18 +9,27 @@ type 'a t =
 let create value span = { value; span }
 let span t = t.span
 
+let raise_error (error : Compilation_error.t) span =
+  raise_notrace
+    (Compilation_error.Compilation_error
+       { error with
+         span =
+           (match error.span with
+            | Some _ -> error.span
+            | None -> Some span)
+       ; backtrace = Some (Backtrace.Exn.most_recent ())
+       })
+;;
+
 let with_value { value; span } ~f =
   try f value with
+  | Compilation_error.Compilation_error error -> raise_error error span
+;;
+
+let with_value2 t t' ~f =
+  try f t.value t'.value with
   | Compilation_error.Compilation_error error ->
-    raise_notrace
-      (Compilation_error.Compilation_error
-         { error with
-           span =
-             (match error.span with
-              | Some _ -> error.span
-              | None -> Some span)
-         ; backtrace = Some (Backtrace.Exn.most_recent ())
-         })
+    raise_error error (Span.combine t.span t'.span)
 ;;
 
 let map t ~f = with_value t ~f:(fun value -> { t with value = f value })

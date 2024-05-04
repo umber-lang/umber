@@ -418,14 +418,7 @@ let format_to_document
       ^| Text "else"
       ^^ indent_expr else_
     | Match (expr, branches) ->
-      Group (Text "match" ^^ indent_expr expr)
-      ^^ concat_all
-           (List.map (Nonempty.to_list branches) ~f:(fun (pattern, expr) ->
-              Force_break
-              ^^ Group
-                   (Group
-                      (Text "|" ^| Node.with_value pattern ~f:format_pattern ^| Text "->")
-                    ^^ indent_expr expr)))
+      Group (Text "match" ^^ indent_expr expr) ^^ format_match_branches branches
     | Handle (expr, branches) ->
       Text "handle"
       ^^ indent_expr expr
@@ -469,24 +462,51 @@ let format_to_document
     | Let _
     | Type_annotation (_, _) -> parens (format_expr expr)
   and indent_expr expr = indent (Node.with_value expr ~f:format_expr)
+  and format_match_branches branches =
+    concat_all
+      (List.map (Nonempty.to_list branches) ~f:(fun (pattern, expr) ->
+         Force_break
+         ^^ Group
+              (Group (Text "|" ^| Node.with_value pattern ~f:format_pattern ^| Text "->")
+               ^^ indent_expr expr)))
   and format_let_binding
     ~rec_
     ~bindings:((first_pat, first_expr) :: bindings : _ Nonempty.t)
     =
     let format_binding keyword pattern expr =
-      Node.with_value pattern ~f:(fun (pattern : Untyped.Pattern.t) ->
-        Node.with_value expr ~f:(fun (expr : Untyped.Expr.t) ->
-          match pattern, expr with
-          | Catch_all (Some _fun_name), Lambda (args, body) ->
-            format_equals
-              (Text keyword
-               ^| format_pattern pattern
-               ^| separated
-                    (List.map
-                       (Nonempty.to_list args)
-                       ~f:(Node.with_value ~f:format_pattern_term)))
-              (Node.with_value body ~f:format_expr)
-          | _ -> format_equals (Text keyword ^| format_pattern pattern) (format_expr expr)))
+      Node.with_value2
+        pattern
+        expr
+        ~f:(fun (pattern : Untyped.Pattern.t) (expr : Untyped.Expr.t) ->
+        match pattern, expr with
+        | Catch_all (Some _fun_name), Lambda (args, body) ->
+          Node.with_value body ~f:(fun body ->
+            let format_let_lambda () =
+              format_equals
+                (Text keyword
+                 ^| format_pattern pattern
+                 ^| separated
+                      (List.map
+                         (Nonempty.to_list args)
+                         ~f:(Node.with_value ~f:format_pattern_term)))
+                (format_expr body)
+            in
+            match args, body with
+            | [ arg ], Match (expr, branches) ->
+              Node.with_value2 arg expr ~f:(fun arg expr ->
+                (* Handle `match` functions with their anonymous argument *)
+                match arg, expr with
+                | Catch_all (Some name), Name (_, name')
+                  when Value_name.equal name Constant_names.match_
+                       && Value_name.equal name name' ->
+                  Group
+                    (format_equals
+                       (Text keyword ^| format_pattern pattern)
+                       (Text "match"))
+                  ^^ indent ~prefix:Empty (format_match_branches branches)
+                | _ -> format_let_lambda ())
+            | _ -> format_let_lambda ())
+        | _ -> format_equals (Text keyword ^| format_pattern pattern) (format_expr expr))
     in
     Group
       (format_binding (if rec_ then "let" else "let'") first_pat first_expr
