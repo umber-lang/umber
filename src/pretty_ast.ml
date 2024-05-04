@@ -380,13 +380,20 @@ let format_to_document
            | [], [ left; right ] ->
              (* TODO: Remove unnecessary parentheses. Requires understanding precedence
                 and associativity again. *)
-             (* TODO: Support custom formatting for `;` (leave out the left break).
-                Could also do something custom mfor `|>` potentially. *)
+             let format_expr_term_or_fun_call (expr : Untyped.Expr.t) =
+               match expr with
+               | Fun_call _ -> format_expr expr
+               | expr -> format_expr_term expr
+             in
+             let name_text = Text (Value_name.to_string name) in
+             let left = Node.with_value left ~f:format_expr_term_or_fun_call in
+             let right = Node.with_value right ~f:format_expr_term_or_fun_call in
              Group
-               (Node.with_value left ~f:format_expr_term
-                ^| Group
-                     (Text (Value_name.to_string name)
-                      ^| Node.with_value right ~f:format_expr_term))
+               (match Value_name.to_string name with
+                | ";" ->
+                  (* Format as `a; b` instead of `a ; b`. *)
+                  Group (left ^^ name_text) ^| right
+                | _ -> left ^| Group (name_text ^| right))
            | _ ->
              format_fun_call
                (Text (Module_path.to_string path ^ ".")
