@@ -378,8 +378,7 @@ let format_to_document
     | Var _ | Tuple _ | Type_app (_, []) | Union _ | Intersection _ -> format_type type_
     | Type_app (_, _ :: _) | Function _ -> parens (format_type type_)
   and format_effects effects =
-    let effects =
-      match effects with
+    let rec format_effects_internal : _ Type_scheme.effects -> t = function
       | Effect_var param -> Text (Type_param_name.to_string param)
       | Effect (effect_name, args) ->
         format_application
@@ -388,16 +387,16 @@ let format_to_document
       | Effect_union effects | Effect_intersection effects ->
         let format_part (effects : _ Type_scheme.effects) =
           match effects with
-          | Effect_var _ | Effect _ -> format_effects effects
+          | Effect_var _ | Effect _ -> format_effects_internal effects
           | Effect_union _ | Effect_intersection _ ->
             (* TODO: Decide what to do with this *)
             failwith "TODO: Nested effect union/intersection"
         in
         comma_separated (List.map (Non_single_list.to_list effects) ~f:format_part)
     in
-    match effects with
+    match format_effects_internal effects with
     | Empty -> Empty
-    | _ -> Text "<" ^^ effects ^^ Text ">"
+    | effects -> Text "<" ^^ effects ^^ Text ">"
   in
   let format_value_name name =
     let text = Text (Value_name.to_string name) in
@@ -580,9 +579,11 @@ let format_to_document
     format_branches_aux branches ~f:(function
       | `Value pattern -> format_pattern pattern
       | `Effect ({ operation; args } : _ Effect_pattern.t) ->
-        format_application
-          (format_qualified operation ~f:format_value_name)
-          (List.map (Nonempty.to_list args) ~f:format_pattern))
+        Text "<"
+        ^^ format_application
+             (format_qualified operation ~f:format_value_name)
+             (List.map (Nonempty.to_list args) ~f:format_pattern)
+        ^^ Text ">")
   and format_let_binding
     ~rec_
     ~bindings:((first_pat, first_expr) :: bindings : _ Nonempty.t)
