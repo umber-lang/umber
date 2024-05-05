@@ -377,6 +377,48 @@ module Expr = struct
               , Var result_var ))
           | Op_tree tree ->
             of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
+          | Op_section { op_side; op; expr } ->
+            let op_span = Node.span op in
+            let expr_span = Node.span expr in
+            let left_var = Constant_names.synthetic_arg 0 in
+            let right_var = Constant_names.synthetic_arg 1 in
+            let applied_arg_var, unapplied_arg_var, left_var_span, right_var_span =
+              match op_side with
+              | `Left -> right_var, left_var, op_span, expr_span
+              | `Right -> left_var, right_var, expr_span, op_span
+            in
+            let qualified = Value_name.Relative.with_path Module_path.Relative.empty in
+            let rewritten_expr : Untyped.Expr.t =
+              Let
+                { rec_ = false
+                ; bindings =
+                    [ ( Node.create
+                          (Untyped.Pattern.catch_all (Some applied_arg_var))
+                          expr_span
+                      , expr )
+                    ]
+                ; body =
+                    Node.create
+                      (Untyped.Expr.Lambda
+                         ( [ Node.create
+                               (Untyped.Pattern.catch_all (Some unapplied_arg_var))
+                               op_span
+                           ]
+                         , Node.create
+                             (Untyped.Expr.Fun_call
+                                ( Node.map op ~f:Untyped.Expr.name
+                                , [ Node.create
+                                      (Untyped.Expr.Name (qualified left_var))
+                                      left_var_span
+                                  ; Node.create
+                                      (Untyped.Expr.Name (qualified right_var))
+                                      right_var_span
+                                  ] ))
+                             expr_span ))
+                      (Span.combine left_var_span right_var_span)
+                }
+            in
+            of_untyped ~names ~types ~f_name (node rewritten_expr)
           | Lambda (args, body) ->
             let names, args_and_types =
               Nonempty.fold_map args ~init:names ~f:(fun names arg ->

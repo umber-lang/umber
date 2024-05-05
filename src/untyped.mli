@@ -22,6 +22,11 @@ module Expr : sig
     | Qualified of Module_path.Relative.t * t Node.t
     | Fun_call of t Node.t * t Node.t Nonempty.t
     | Op_tree of (Value_name.Relative.t Node.t, t Node.t) Btree.t
+    | Op_section of
+        { op_side : [ `Left | `Right ]
+        ; op : Value_name.Relative.t Node.t
+        ; expr : t Node.t
+        }
     | Lambda of Pattern.t Node.t Nonempty.t * t Node.t
     | If of t Node.t * t Node.t * t Node.t
     | Match of t Node.t * (Pattern.t Node.t * t Node.t) Nonempty.t
@@ -44,8 +49,6 @@ module Expr : sig
   val names_used : names:Name_bindings.t -> t -> Value_name.Absolute.Set.t
 
   val qualified : Ustring.t list -> t Node.t -> t
-  val op_section_right : (Ustring.t list * Ustring.t) Node.t -> t Node.t -> t
-  val op_section_left : t Node.t -> (Ustring.t list * Ustring.t) Node.t -> t
 end
 
 val create_effect

@@ -407,6 +407,11 @@ let format_to_document
     then f name
     else Text (Module_path.to_string path ^ ".") ^^ f name
   in
+  let format_operator_name (path, name) =
+    if Module_path.is_empty path && Parsing.Utils.value_name_is_infix_operator name
+    then Text (Value_name.to_string name)
+    else Text ":" ^^ format_qualified (path, name) ~f:format_value_name ^^ Text ":"
+  in
   let format_annotated doc type_ = doc ^^ indent (Text ":" ^| type_) in
   let format_equals ?body_prefix doc body =
     match body with
@@ -537,6 +542,12 @@ let format_to_document
         (Node.with_value type_ ~f:format_type')
     | Op_tree op_tree ->
       Node.with_value (Op_tree.to_untyped_expr_as_is op_tree) ~f:format_expr
+    | Op_section { op_side = `Left; op; expr } ->
+      parens
+        (Node.with_value op ~f:format_operator_name ^| Node.with_value expr ~f:format_expr)
+    | Op_section { op_side = `Right; op; expr } ->
+      parens
+        (Node.with_value expr ~f:format_expr ^| Node.with_value op ~f:format_operator_name)
     | Seq_literal _ -> failwith "TODO: format seq literal"
     | Record_literal _ | Record_update (_, _) | Record_field_access (_, _) ->
       failwith "TODO: format record expressions"
@@ -546,6 +557,7 @@ let format_to_document
     | Name _
     | Qualified _
     | Tuple _
+    | Op_section _
     | Seq_literal _
     | Record_literal _
     | Record_update _

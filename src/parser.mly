@@ -116,8 +116,12 @@ pattern:
     { Pattern.Type_annotation (fst annot, Node.with_value (snd annot) ~f:Fn.id) }
 
 op_section:
-  | op = with_loc(operator); e = with_loc(expr_op_term) { Expr.op_section_right op e }
-  | e = with_loc(expr_op_term); op = with_loc(operator) { Expr.op_section_left e op }
+  | op = with_loc(operator); expr = with_loc(expr_op_term)
+    { let op = Node.map op ~f:Value_name.Relative.of_ustrings_unchecked in
+      Expr.Op_section { op_side = `Left; op; expr } }
+  | expr = with_loc(expr_op_term); op = with_loc(operator)
+    { let op = Node.map op ~f:Value_name.Relative.of_ustrings_unchecked in
+      Expr.Op_section { op_side = `Right; op; expr } }
 
 expr_term:
   | e = qualified(with_loc(tuple(expr)))

@@ -25,6 +25,11 @@ module Expr = struct
     | Qualified of Module_path.Relative.t * t Node.t
     | Fun_call of t Node.t * t Node.t Nonempty.t
     | Op_tree of (Value_name.Relative.t Node.t, t Node.t) Btree.t
+    | Op_section of
+        { op_side : [ `Left | `Right ]
+        ; op : Value_name.Relative.t Node.t
+        ; expr : t Node.t
+        }
     | Lambda of Pattern.t Node.t Nonempty.t * t Node.t
     | If of t Node.t * t Node.t * t Node.t
     | Match of t Node.t * (Pattern.t Node.t * t Node.t) Nonempty.t
@@ -67,6 +72,9 @@ module Expr = struct
           | Leaf expr -> Node.with_value expr ~f:(loop ~names acc locals)
         in
         tree_loop used tree
+      | Op_section { op_side = _; op; expr } ->
+        let used = Node.with_value op ~f:(fun op -> loop ~names used locals (Name op)) in
+        Node.with_value expr ~f:(loop ~names used locals)
       | Lambda (args, body) ->
         let locals =
           Nonempty.fold args ~init:locals ~f:(fun locals ->
@@ -131,39 +139,6 @@ module Expr = struct
     | [] -> Node.with_value expr ~f:Fn.id
     | _ :: _ -> Qualified (Module_path.Relative.of_ustrings_unchecked path, expr)
   ;;
-
-  let op_section_internal ~op ~expr ~side =
-    let op_span = Node.span op in
-    let expr_span = Node.span expr in
-    let left_var = Constant_names.synthetic_arg 0 in
-    let right_var = Constant_names.synthetic_arg 1 in
-    let applied_arg_var, unapplied_arg_var, left_var_span, right_var_span =
-      match side with
-      | `Left -> left_var, right_var, expr_span, op_span
-      | `Right -> right_var, left_var, op_span, expr_span
-    in
-    let qualified = Value_name.Relative.with_path Module_path.Relative.empty in
-    Let
-      { rec_ = false
-      ; bindings =
-          [ Node.create (Pattern.catch_all (Some applied_arg_var)) expr_span, expr ]
-      ; body =
-          Node.create
-            (Lambda
-               ( [ Node.create (Pattern.catch_all (Some unapplied_arg_var)) op_span ]
-               , Node.create
-                   (Fun_call
-                      ( Node.map op ~f:(name << Value_name.Relative.of_ustrings_unchecked)
-                      , [ Node.create (Name (qualified left_var)) left_var_span
-                        ; Node.create (Name (qualified right_var)) right_var_span
-                        ] ))
-                   expr_span ))
-            (Span.combine left_var_span right_var_span)
-      }
-  ;;
-
-  let op_section_right op expr = op_section_internal ~op ~expr ~side:`Right
-  let op_section_left expr op = op_section_internal ~op ~expr ~side:`Left
 end
 
 let create_effect_operation sig_ : _ Effect.Operation.t =
