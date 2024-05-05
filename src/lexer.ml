@@ -109,6 +109,7 @@ let rec read lexbuf =
   (* Special symbols *)
   | '=' -> EQUALS
   | '|' -> PIPE
+  | '&' -> AMPERSAND
   | ':', Plus white_space -> COLON_SPACED
   | ':' -> COLON
   | ',' -> COMMA

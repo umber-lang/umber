@@ -53,6 +53,7 @@ type token = Parser.token =
   | AS
   | ARROW
   | AND
+  | AMPERSAND
 [@@deriving sexp]
 
 let fprint_s sexp ~out =
@@ -120,6 +121,7 @@ type 'a terminal = 'a Parser.MenhirInterpreter.terminal =
   | T_AS : unit terminal
   | T_ARROW : unit terminal
   | T_AND : unit terminal
+  | T_AMPERSAND : unit terminal
 [@@deriving sexp_of]
 
 type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
@@ -146,6 +148,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         , Parser_scope.Module_path.relative )
         Module.def
         nonterminal
+  | N_separated_nonempty_list_PIPE_type_non_fun_
+      : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_separated_nonempty_list_PIPE_type_cnstr_decl_
       : (Parser_scope.Cnstr_name.t
         * Parser_scope.Module_path.relative Type_scheme.type_ list)
@@ -166,6 +170,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_separated_nonempty_list_COMMA_import_paths_ : Module.Import.Paths.t list nonterminal
   | N_separated_nonempty_list_AND_let_binding_
       : (Umber__Untyped.Pattern.t Node.t * Untyped.Expr.t Node.t) list nonterminal
+  | N_separated_nonempty_list_AMPERSAND_type_non_fun_
+      : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_qualified_with_loc_tuple_expr___
       : (Ustring.t list * Untyped.Expr.t Node.t list Node.t) nonterminal
   | N_qualified_val_name_ : (Ustring.t list * Ustring.t) nonterminal

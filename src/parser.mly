@@ -33,6 +33,7 @@
 
 %token EQUALS
 %token PIPE
+%token AMPERSAND
 %token COLON
 %token COLON_SPACED
 %token COMMA
@@ -232,6 +233,13 @@ type_term:
   | cnstr = qualified(UPPER_NAME)
     { Type_scheme.Type_app (Type_name.Relative.of_ustrings_unchecked cnstr, []) }
   | param = LOWER_NAME { Type_scheme.Var (Type_param_name.of_ustring_unchecked param) }
+  (* Require parentheses around unions/intersections besides otherwise, variant type
+     arguments or type annotations on match expressions would always require parenthese
+     to avoid confusion between union types and the pipe separator. *)
+  | types = parens(separated_at_least_two(PIPE, type_non_fun))
+    { Type_scheme.Union types }
+  | types = parens(separated_at_least_two(AMPERSAND, type_non_fun))
+    { Type_scheme.Intersection types }
 
 type_non_fun:
   | t = type_term { t }
@@ -394,6 +402,9 @@ qualified(X):
 %inline parens(X): x = delimited(L_PAREN, X, R_PAREN) { x }
 %inline brackets(X): x = delimited(L_BRACKET, X, R_BRACKET) { x }
 %inline braces(X): x = delimited(L_BRACE, X, R_BRACE) { x }
+
+%inline separated_at_least_two(separator, X):
+  | x = X; separator; xs = separated_nonempty(separator, X) { Non_single_list.(x :: xs) }
 
 flexible_list(separator, X):
   | { [] }

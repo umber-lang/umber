@@ -358,7 +358,6 @@ let format_to_document
       ^| format_effects effects
       ^| format_fun_part result_type
     | Union types ->
-      (* FIXME: Make this | and & syntaxes real (parseable) *)
       (* FIXME: Don't just write "Never" or "Any", it could be shadowed. Maybe turn into a
          new type varable or something. *)
       let types =
@@ -366,19 +365,18 @@ let format_to_document
       in
       if List.is_empty types
       then Text "Never"
-      else separated ~sep:(Break ^^ Text "|" ^^ Break) types
+      else parens (separated ~sep:(Break ^^ Text "|" ^^ Break) types)
     | Intersection types ->
       let types =
         Non_single_list.to_list (Non_single_list.map types ~f:format_type_term)
       in
       if List.is_empty types
       then Text "Any"
-      else separated ~sep:(Break ^^ Text "&" ^^ Break) types
+      else parens (separated ~sep:(Break ^^ Text "&" ^^ Break) types)
   and format_type_term (type_ : _ Type_scheme.type_) =
     match type_ with
-    | Var _ | Tuple _ | Type_app (_, []) | Union [] | Intersection [] -> format_type type_
-    | Type_app (_, _ :: _) | Function _ | Union (_ :: _ :: _) | Intersection (_ :: _ :: _)
-      -> parens (format_type type_)
+    | Var _ | Tuple _ | Type_app (_, []) | Union _ | Intersection _ -> format_type type_
+    | Type_app (_, _ :: _) | Function _ -> parens (format_type type_)
   and format_effects effects =
     let effects =
       match effects with
@@ -450,7 +448,15 @@ let format_to_document
       format_application
         (Text (Cnstr_name.Relative.to_string cnstr))
         (List.map args ~f:format_pattern_term)
-    | Tuple args -> format_tuple (List.map args ~f:format_pattern)
+    | Tuple args ->
+      let format_tuple_part (pattern : Untyped.Pattern.t) =
+        (* Type annotations can contain function types, and the commas in these can get
+           mixed up with the commas in a tuple, so parenthesize them. *)
+        match pattern with
+        | Type_annotation _ -> parens (format_pattern pattern)
+        | _ -> format_pattern pattern
+      in
+      format_tuple (List.map args ~f:format_tuple_part)
     | Union (left, right) -> format_pattern left ^| Text "|" ^| format_pattern right
     | Type_annotation (pattern, type_) ->
       format_annotated (format_pattern pattern) (format_type' type_)
@@ -517,7 +523,15 @@ let format_to_document
       Group (format_let_binding ~rec_ ~bindings ^| Text "in")
       ^^ Force_break
       ^^ Group (Node.with_value body ~f:format_expr)
-    | Tuple args -> format_tuple (List.map args ~f:(Node.with_value ~f:format_expr))
+    | Tuple args ->
+      let format_tuple_part (expr : Untyped.Expr.t) =
+        (* Type annotations can contain function types, and the commas in these can get
+           mixed up with the commas in a tuple, so parenthesize them. *)
+        match expr with
+        | Type_annotation _ -> parens (format_expr expr)
+        | _ -> format_expr expr
+      in
+      format_tuple (List.map args ~f:(Node.with_value ~f:format_tuple_part))
     | Type_annotation (expr, type_) ->
       format_annotated
         (Node.with_value expr ~f:format_expr_term_or_fun_call)
