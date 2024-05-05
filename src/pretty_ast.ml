@@ -580,13 +580,16 @@ let format_to_document
         (Node.with_value type_ ~f:format_type')
     | Op_tree op_tree ->
       Node.with_value (Op_tree.to_untyped_expr_as_is op_tree) ~f:format_expr
-    | Op_section { op_side = `Left; op; expr } ->
-      (* FIXME: This can only handle function calls and expr terms, not any expr *)
-      parens
-        (Node.with_value op ~f:format_operator_name ^| Node.with_value expr ~f:format_expr)
-    | Op_section { op_side = `Right; op; expr } ->
-      parens
-        (Node.with_value expr ~f:format_expr ^| Node.with_value op ~f:format_operator_name)
+    | Op_section { op_side; op; expr } ->
+      (match op_side with
+       | `Left ->
+         parens
+           (Node.with_value op ~f:format_operator_name
+            ^| Node.with_value expr ~f:format_expr_op_term)
+       | `Right ->
+         parens
+           (Node.with_value expr ~f:format_expr_op_term
+            ^| Node.with_value op ~f:format_operator_name))
     | Seq_literal _ -> failwith "TODO: format seq literal"
     | Record_literal _ | Record_update (_, _) | Record_field_access (_, _) ->
       failwith "TODO: format record expressions"
@@ -614,6 +617,10 @@ let format_to_document
     match expr with
     | Fun_call _ -> format_expr expr
     | expr -> format_expr_term expr
+  and format_expr_op_term (expr : Untyped.Expr.t) =
+    match expr with
+    | Fun_call _ -> format_expr expr
+    | _ -> format_expr_term expr
   and indent_expr expr = indent (Node.with_value expr ~f:format_expr)
   and format_branches_aux
         : 'a. ('a Node.t * Untyped.Expr.t Node.t) Nonempty.t -> f:('a -> t) -> t
