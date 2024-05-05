@@ -333,6 +333,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         | `Value of Umber__Untyped.Pattern.t
         ]
         nonterminal
+  | N_check_operator : unit nonterminal
 [@@deriving sexp_of]
 
 let sexp_of_production prod =
@@ -415,19 +416,20 @@ let parse_file ?print_tokens_to = with_file ~f:(try_parse ?print_tokens_to)
 module Utils = struct
   let value_name_is_infix_operator value_name =
     let lexbuf = Sedlexing.Utf8.from_string (Value_name.to_string value_name) in
-    let parser = MenhirLib.Convert.Simplified.traditional2revised Parser.val_operator in
+    let parser = MenhirLib.Convert.Simplified.traditional2revised Parser.check_operator in
     match
       parser (fun () ->
         let token = Lexer.read lexbuf in
         let start_pos, end_pos = Sedlexing.lexing_positions lexbuf in
         token, start_pos, end_pos)
     with
-    | (_ : Ustring.t) -> true
+    | () -> true
     | exception _ -> false
   ;;
 
   let%test _ = value_name_is_infix_operator (Value_name.of_string_unchecked "==")
   let%test _ = value_name_is_infix_operator (Value_name.of_string_unchecked "*")
   let%test _ = value_name_is_infix_operator (Value_name.of_string_unchecked "..")
+  let%test _ = value_name_is_infix_operator (Value_name.of_string_unchecked "<")
   let%test _ = not (value_name_is_infix_operator (Value_name.of_string_unchecked "foo"))
 end

@@ -63,7 +63,7 @@
 %token EOF
 
 %start <Untyped.Module.t> prog
-%start <Ustring.t> val_operator
+%start <unit> check_operator
 %%
 
 val_operator:
@@ -72,6 +72,9 @@ val_operator:
   | GREATER_THAN { Ustring.of_uchar (Uchar.of_char '>') }
   | LESS_THAN; GREATER_THAN { Ustring.of_string_exn "<>" }
   | n = N_PERIODS { Ustring.make n (Uchar.of_char '.') }
+
+check_operator:
+  | _op = val_operator; EOF { () }
 
 operator:
   | COLON; name = qualified(val_name); colon { name }
