@@ -141,18 +141,56 @@ module Typed_to_untyped = struct
              ( Node.map expr ~f:(convert_expr ~type_:(relativize_type' expr_type))
              , branches ))
       | Let { rec_; bindings; body } ->
-        Let
-          { rec_
-          ; bindings =
-              Nonempty.map bindings ~f:(fun (pat_and_type, expr) ->
-                let pattern, type_ = Node.with_value pat_and_type ~f:Fn.id in
-                let type_ = relativize_type' type_ in
-                ( Node.create
-                    (annotated_pattern pattern (fst type_))
-                    (Node.span pat_and_type)
-                , Node.map expr ~f:(convert_expr ~type_) ))
-          ; body = Node.map body ~f:(convert_expr ~type_)
-          }
+        let convert_let_bindings () : Untyped.Expr.t =
+          Let
+            { rec_
+            ; bindings =
+                Nonempty.map bindings ~f:(fun (pat_and_type, expr) ->
+                  let pattern, type_ = Node.with_value pat_and_type ~f:Fn.id in
+                  let type_ = relativize_type' type_ in
+                  ( Node.create
+                      (annotated_pattern pattern (fst type_))
+                      (Node.span pat_and_type)
+                  , Node.map expr ~f:(convert_expr ~type_) ))
+            ; body = Node.map body ~f:(convert_expr ~type_)
+            }
+        in
+        (* Identify op sections. *)
+        (* TODO: This is pretty hacky. Maybe we could bite the bullet and just model op
+           sections explicitly in the typed ast? It might make sense to have a simplified
+           typed IR we only use as an extra step before MIR (or replacing MIR). *)
+        (match bindings, Node.with_value body ~f:Fn.id with
+         | [ (outer_pattern, outer_expr) ], Lambda ([ inner_pattern ], body) ->
+           let outer_pattern, outer_type = Node.with_value outer_pattern ~f:Fn.id in
+           let inner_pattern = Node.with_value inner_pattern ~f:Fn.id in
+           let body = Node.with_value body ~f:Fn.id in
+           (match outer_pattern, inner_pattern, body with
+            | ( Catch_all (Some outer_name)
+              , Catch_all (Some _inner_name)
+              , Fun_call (fun_, _fun_type, [ _; _ ]) ) ->
+              (match Node.with_value fun_ ~f:Fn.id with
+               | Name fun_name ->
+                 let op_side =
+                   if Value_name.equal outer_name (Constant_names.synthetic_arg 0)
+                   then Some `Right
+                   else if Value_name.equal outer_name (Constant_names.synthetic_arg 1)
+                   then Some `Left
+                   else None
+                 in
+                 (match op_side with
+                  | Some op_side ->
+                    Op_section
+                      { op_side
+                      ; op = Node.create (relativize_name fun_name) (Node.span fun_)
+                      ; expr =
+                          Node.map
+                            outer_expr
+                            ~f:(convert_expr ~type_:(relativize_type' outer_type))
+                      }
+                  | None -> convert_let_bindings ())
+               | _ -> convert_let_bindings ())
+            | _ -> convert_let_bindings ())
+         | _ -> convert_let_bindings ())
       | Tuple fields ->
         let field_types =
           match fst type_ with
@@ -543,6 +581,7 @@ let format_to_document
     | Op_tree op_tree ->
       Node.with_value (Op_tree.to_untyped_expr_as_is op_tree) ~f:format_expr
     | Op_section { op_side = `Left; op; expr } ->
+      (* FIXME: This can only handle function calls and expr terms, not any expr *)
       parens
         (Node.with_value op ~f:format_operator_name ^| Node.with_value expr ~f:format_expr)
     | Op_section { op_side = `Right; op; expr } ->
