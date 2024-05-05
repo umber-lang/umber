@@ -796,9 +796,15 @@ and instantiate_type_scheme =
           | Effect_var param ->
             let var = Type_param.Env_to_vars.find_or_add params param in
             concrete_effects, var :: effect_vars
-          | Effect_union _ | Effect_intersection _ ->
+          | Effect_union [] | Effect_intersection [] ->
+            (* FIXME: how are these empty unions/intersections even getting around? I
+               think we might need them as vars for correctness. Just converting them to
+               vars solve the problem for now, but isn't very principled. *)
+            concrete_effects, Type_var.create () :: effect_vars
+          | Effect_union (_ :: _) | Effect_intersection (_ :: _) ->
             (* TODO: Decide if this should be allowed, or statically prevent it from
-             happening by changing the type. *)
+               happening by changing the type. I think the syntax doesn't currently allow
+               it, and we won't generate it. *)
             compiler_bug
               [%message "Nested complex effects" (new_effects : _ Type_scheme.effects)])
       in
@@ -832,7 +838,19 @@ and instantiate_type_scheme =
     | Effect_intersection args ->
       (* FIXME: This doesn't quite make sense for effects. We model them as a row,
          which is like a union. e.g. what does it mean to be `<Foo & Bar>`? Isn't that
-         uninhabited? *)
+         uninhabited?
+         
+         For [Effect_union []]] and [Effect_intersection []], the empty union means
+         "no effects" and the intersection means "any/all effects". So it has a clear and
+         different meaning:
+         
+         - In positive positive, no effects means total and any effects means it could do
+           anything (We have no lower bound on the effects, like an unbound var).
+         - In negative position, no effects means the function passed in must be total,
+           and any effects means it could perform any effect.
+
+          Can we avoid the empty intersections and just have vars maybe? 
+          You could maybe still get an intersection of a union. *)
       collect_effects args ~union_or_intersection:`Intersection
   in
   fun ?(params = Type_param.Env_to_vars.create ())
@@ -924,7 +942,6 @@ let generalize types outer_type =
   let scheme = generalize_internal types substituted_type ~env ~polarity:Positive in
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
   let result = Type_simplification.simplify_type (scheme, constraints) in
-  (* Constraints.print types.constraints; *)
   eprint_s
     [%message
       "generalize result"

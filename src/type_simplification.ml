@@ -182,7 +182,7 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
     in
     let bounds = Map.find bounds_map var |> Option.value ~default:Type_param.Set.empty in
     (* FIXME: Review this logic. Maybe we should just leave this top/bottom handling to
-         later. *)
+       later. *)
     match Set.to_list bounds, on_unconstrained with
     | [], `Keep_var -> make_var var
     | [], `Use_union_or_intersection -> combine Non_single_list.[]
@@ -207,6 +207,8 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
              ~on_unconstrained:`Keep_var)
       | type_ -> Defer type_)
     ~f_effects:(fun ~polarity effects ->
+      (* FIXME: Review the keep_var vs union or intersection choice. This might just be
+         redundant due to later passes. *)
       match effects with
       | Effect_var var ->
         Halt
