@@ -1162,6 +1162,53 @@ let find_absolute_type_decl ?defs_only t type_name =
   (find_absolute_type_entry ?defs_only t type_name).decl
 ;;
 
+let relativize_name_internal t (path, name) ~find_absolute ~find_relative ~identical =
+  (* Idea: if we have "A.B.foo", try "foo", then "B.foo", then "A.B.Foo". This finds local
+     entries, then keeps checking outer modules. It can fail to find the entry if the
+     name is shadowed. *)
+  if Module_path.Absolute.equal (current_path t) path
+  then Some (Module_path.Relative.empty, name)
+  else (
+    let entry = find_absolute t (path, name) in
+    let rec loop to_try current_path =
+      let candidate_path = Module_path.Relative.of_module_names current_path, name in
+      let found =
+        try identical entry (find_relative t candidate_path) with
+        | Compilation_error.Compilation_error { kind = Name_error; _ } -> false
+      in
+      if found
+      then Some candidate_path
+      else (
+        match to_try with
+        | [] -> None
+        | module_name :: to_try -> loop to_try (module_name :: current_path))
+    in
+    loop (List.rev (Module_path.to_module_names path)) [])
+;;
+
+let relativize_value_name =
+  relativize_name_internal
+    ~find_absolute:find_absolute_entry
+    ~find_relative:find_entry
+    ~identical:Name_entry.identical
+;;
+
+let relativize_type_name =
+  relativize_name_internal
+    ~find_absolute:find_absolute_type_entry
+    ~find_relative:(fun t name ->
+      Option.value_exn ~here:[%here] (snd (find_type_entry_with_path t name)))
+    ~identical:Type_entry.identical
+;;
+
+let relativize_effect_name =
+  relativize_name_internal
+    ~find_absolute:find_absolute_effect_entry
+    ~find_relative:(fun t name ->
+      Option.value_exn ~here:[%here] (snd (find_effect_entry_with_path t name)))
+    ~identical:Effect_entry.identical
+;;
+
 let resolve_type_or_import t (decl_or_import : _ Or_imported.t option) =
   match decl_or_import with
   | Some (Local entry) -> entry

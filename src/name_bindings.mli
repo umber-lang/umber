@@ -129,6 +129,10 @@ val absolutify_effect
   -> Module_path.relative Effect.t
   -> Module_path.absolute Effect.t
 
+val relativize_value_name : t -> Value_name.Absolute.t -> Value_name.Relative.t option
+val relativize_type_name : t -> Type_name.Absolute.t -> Type_name.Relative.t option
+val relativize_effect_name : t -> Effect_name.Absolute.t -> Effect_name.Relative.t option
+
 (* Scope handling *)
 val current_path : t -> Module_path.Absolute.t
 val into_module : t -> place:[ `Sig | `Def ] -> Module_name.t -> t
