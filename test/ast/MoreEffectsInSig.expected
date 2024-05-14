@@ -2,9 +2,8 @@
  ((Common_sig (Effect Abstract ((params ()) (operations ()))))
   (Common_sig
    (Val more_effects_in_sig ()
-    ((Function ((Type_app Std.Prelude.Int.Int ()))
-      (Effect MoreEffectsInSig.Abstract ())
-      (Type_app Std.Prelude.Int.Int ()))
+    ((Function ((Type_app Int ())) (Effect MoreEffectsInSig.Abstract ())
+      (Type_app Int ()))
      ())))
   (Common_sig
    (Val equivalent_with_different_vars ()

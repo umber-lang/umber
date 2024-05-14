@@ -21,23 +21,19 @@ module : {
   import .Option.(None, Some)
 
   module Bool : {
-    # TODO: Avoid this hack and just re-export the type rather than defining an alias
-    import Bool as PrimitiveBool
-    type Bool = PrimitiveBool
+    import Bool
 
     val to_string : Bool -> String
   }
 
   module Int : {
-    import Int as PrimitiveInt
-    type Int = PrimitiveInt
+    import Int
 
     val to_string : Int -> String
   }
 
   module Float : {
-    import Float as PrimitiveFloat
-    type Float = PrimitiveFloat
+    import Float
 
     val (+) (infixl 6) : Float, Float -> Float
     val abs : Float, Float -> Float
@@ -135,8 +131,7 @@ module : {
 # TODO: randomness
 
 module Bool = {
-  import Bool as PrimitiveBool
-  type Bool = PrimitiveBool
+  import Bool
 
   let to_string = match
     | True -> "True"
@@ -144,15 +139,13 @@ module Bool = {
 }
 
 module Int = {
-  import Int as PrimitiveInt
-  type Int = PrimitiveInt
+  import Int
 
   extern to_string : Int -> String = "umber_int_to_string"
 }
 
 module Float = {
-  import Float as PrimitiveFloat
-  type Float = PrimitiveFloat
+  import Float
 
   extern (+) (infixl 6) : Float, Float -> Float = "umber_float_add"
   extern abs : Float, Float -> Float = "umber_float_abs"

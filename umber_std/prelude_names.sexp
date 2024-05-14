@@ -53,9 +53,8 @@
                    (Local
                     ((type_
                       (Scheme
-                       ((Function ((Type_app Std.Prelude.Float.Float ()))
-                         (Effect_union ())
-                         (Type_app Std.Prelude.Float.Float ()))
+                       ((Function ((Type_app Float ())) (Effect_union ())
+                         (Type_app Float ()))
                         ()))))))
                   (print
                    (Local
@@ -75,8 +74,8 @@
                    (Local
                     ((type_
                       (Scheme
-                       ((Function ((Type_app Std.Prelude.Int.Int ()))
-                         (Effect_union ()) (Tuple ()))
+                       ((Function ((Type_app Int ())) (Effect_union ())
+                         (Tuple ()))
                         ())))
                      (type_source Extern_declared)
                      (extern_name umber_print_int))))
@@ -84,8 +83,8 @@
                    (Local
                     ((type_
                       (Scheme
-                       ((Function ((Type_app Std.Prelude.Bool.Bool ()))
-                         (Effect_union ()) (Tuple ()))
+                       ((Function ((Type_app Bool ())) (Effect_union ())
+                         (Tuple ()))
                         ())))
                      (type_source Extern_declared)
                      (extern_name umber_print_bool))))))
@@ -99,13 +98,11 @@
                          (Local
                           ((type_
                             (Scheme
-                             ((Function ((Type_app Std.Prelude.Int.Int ()))
-                               (Effect_union ()) (Type_app String ()))
+                             ((Function ((Type_app Int ())) (Effect_union ())
+                               (Type_app String ()))
                               ()))))))))
-                      (types
-                       ((Int ((Local (() (Alias (Type_app Int ()))))))
-                        (PrimitiveInt ((Imported Int)))))
-                      (effects ()) (modules ())))))
+                      (types ((Int ((Imported Int))))) (effects ())
+                      (modules ())))))
                   (Bool
                    (Local
                     (()
@@ -114,13 +111,11 @@
                          (Local
                           ((type_
                             (Scheme
-                             ((Function ((Type_app Std.Prelude.Bool.Bool ()))
+                             ((Function ((Type_app Bool ()))
                                (Effect_union ()) (Type_app String ()))
                               ()))))))))
-                      (types
-                       ((Bool ((Local (() (Alias (Type_app Bool ()))))))
-                        (PrimitiveBool ((Imported Bool)))))
-                      (effects ()) (modules ())))))
+                      (types ((Bool ((Imported Bool))))) (effects ())
+                      (modules ())))))
                   (List
                    (Local
                     (()
@@ -200,51 +195,38 @@
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Float.Float ())
-                                (Type_app Std.Prelude.Float.Float ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Float.Float ()))
+                               ((Type_app Float ()) (Type_app Float ()))
+                               (Effect_union ()) (Type_app Float ()))
                               ())))
                            (fixity (Left 6)))))
                         (pi
-                         (Local
-                          ((type_
-                            (Scheme
-                             ((Type_app Std.Prelude.Float.Float ()) ()))))))
+                         (Local ((type_ (Scheme ((Type_app Float ()) ()))))))
                         (abs
                          (Local
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Float.Float ())
-                                (Type_app Std.Prelude.Float.Float ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Float.Float ()))
+                               ((Type_app Float ()) (Type_app Float ()))
+                               (Effect_union ()) (Type_app Float ()))
                               ()))))))
                         (cos
                          (Local
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Float.Float ())
-                                (Type_app Std.Prelude.Float.Float ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Float.Float ()))
+                               ((Type_app Float ()) (Type_app Float ()))
+                               (Effect_union ()) (Type_app Float ()))
                               ()))))))
                         (sin
                          (Local
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Float.Float ())
-                                (Type_app Std.Prelude.Float.Float ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Float.Float ()))
+                               ((Type_app Float ()) (Type_app Float ()))
+                               (Effect_union ()) (Type_app Float ()))
                               ()))))))))
-                      (types
-                       ((Float ((Local (() (Alias (Type_app Float ()))))))
-                        (PrimitiveFloat ((Imported Float)))))
-                      (effects ()) (modules ())))))
+                      (types ((Float ((Imported Float))))) (effects ())
+                      (modules ())))))
                   (Option
                    (Local
                     (()
@@ -275,44 +257,32 @@
                          (Local
                           ((type_
                             (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.Int.Int ())
-                                (Type_app Std.Prelude.Int.Int ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Int.Int ()))
+                             ((Function ((Type_app Int ()) (Type_app Int ()))
+                               (Effect_union ()) (Type_app Int ()))
                               ())))
                            (fixity (Left 7)))))
                         (*
                          (Local
                           ((type_
                             (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.Int.Int ())
-                                (Type_app Std.Prelude.Int.Int ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Int.Int ()))
+                             ((Function ((Type_app Int ()) (Type_app Int ()))
+                               (Effect_union ()) (Type_app Int ()))
                               ())))
                            (fixity (Left 7)))))
                         (+
                          (Local
                           ((type_
                             (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.Int.Int ())
-                                (Type_app Std.Prelude.Int.Int ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Int.Int ()))
+                             ((Function ((Type_app Int ()) (Type_app Int ()))
+                               (Effect_union ()) (Type_app Int ()))
                               ())))
                            (fixity (Left 6)))))
                         (-
                          (Local
                           ((type_
                             (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.Int.Int ())
-                                (Type_app Std.Prelude.Int.Int ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Int.Int ()))
+                             ((Function ((Type_app Int ()) (Type_app Int ()))
+                               (Effect_union ()) (Type_app Int ()))
                               ())))
                            (fixity (Left 6)))))
                         (.
@@ -341,7 +311,7 @@
                           ((type_
                             (Scheme
                              ((Function ((Var a) (Var a)) (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               (Type_app Bool ()))
                               ())))
                            (fixity (Non_assoc 4)))))
                         (>
@@ -349,18 +319,15 @@
                           ((type_
                             (Scheme
                              ((Function ((Var a) (Var a)) (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               (Type_app Bool ()))
                               ())))
                            (fixity (Non_assoc 4)))))
                         (^
                          (Local
                           ((type_
                             (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.Int.Int ())
-                                (Type_app Std.Prelude.Int.Int ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Int.Int ()))
+                             ((Function ((Type_app Int ()) (Type_app Int ()))
+                               (Effect_union ()) (Type_app Int ()))
                               ())))
                            (fixity (Right 8)))))
                         (!=
@@ -368,7 +335,7 @@
                           ((type_
                             (Scheme
                              ((Function ((Var a) (Var a)) (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               (Type_app Bool ()))
                               ())))
                            (fixity (Non_assoc 4)))))
                         (&&
@@ -376,10 +343,8 @@
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Bool.Bool ())
-                                (Type_app Std.Prelude.Bool.Bool ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               ((Type_app Bool ()) (Type_app Bool ()))
+                               (Effect_union ()) (Type_app Bool ()))
                               ())))
                            (fixity (Left 3)))))
                         (*.
@@ -387,10 +352,8 @@
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Float.Float ())
-                                (Type_app Std.Prelude.Float.Float ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Float.Float ()))
+                               ((Type_app Float ()) (Type_app Float ()))
+                               (Effect_union ()) (Type_app Float ()))
                               ())))
                            (fixity (Left 7)))))
                         (++
@@ -407,10 +370,8 @@
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Float.Float ())
-                                (Type_app Std.Prelude.Float.Float ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Float.Float ()))
+                               ((Type_app Float ()) (Type_app Float ()))
+                               (Effect_union ()) (Type_app Float ()))
                               ())))
                            (fixity (Left 6)))))
                         (-.
@@ -418,10 +379,8 @@
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Float.Float ())
-                                (Type_app Std.Prelude.Float.Float ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Float.Float ()))
+                               ((Type_app Float ()) (Type_app Float ()))
+                               (Effect_union ()) (Type_app Float ()))
                               ())))
                            (fixity (Left 6)))))
                         (::
@@ -440,7 +399,7 @@
                           ((type_
                             (Scheme
                              ((Function ((Var a) (Var a)) (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               (Type_app Bool ()))
                               ())))
                            (fixity (Non_assoc 4)))))
                         (==
@@ -448,7 +407,7 @@
                           ((type_
                             (Scheme
                              ((Function ((Var a) (Var a)) (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               (Type_app Bool ()))
                               ())))
                            (fixity (Non_assoc 4)))))
                         (>=
@@ -456,7 +415,7 @@
                           ((type_
                             (Scheme
                              ((Function ((Var a) (Var a)) (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               (Type_app Bool ()))
                               ())))
                            (fixity (Non_assoc 4)))))
                         (|>
@@ -475,30 +434,24 @@
                           ((type_
                             (Scheme
                              ((Function
-                               ((Type_app Std.Prelude.Bool.Bool ())
-                                (Type_app Std.Prelude.Bool.Bool ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                               ((Type_app Bool ()) (Type_app Bool ()))
+                               (Effect_union ()) (Type_app Bool ()))
                               ())))
                            (fixity (Left 2)))))
                         (mod
                          (Local
                           ((type_
                             (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.Int.Int ())
-                                (Type_app Std.Prelude.Int.Int ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Int.Int ()))
+                             ((Function ((Type_app Int ()) (Type_app Int ()))
+                               (Effect_union ()) (Type_app Int ()))
                               ())))
                            (fixity (Left 7)))))
                         (not
                          (Local
                           ((type_
                             (Scheme
-                             ((Function ((Type_app Std.Prelude.Bool.Bool ()))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
+                             ((Function ((Type_app Bool ()))
+                               (Effect_union ()) (Type_app Bool ()))
                               ()))))))))
                       (types ()) (effects ()) (modules ())))))))))
               ((names
@@ -529,9 +482,8 @@
                   (Local
                    ((type_
                      (Scheme
-                      ((Function ((Type_app Std.Prelude.Float.Float ()))
-                        (Effect_union ())
-                        (Type_app Std.Prelude.Float.Float ()))
+                      ((Function ((Type_app Float ())) (Effect_union ())
+                        (Type_app Float ()))
                        ())))
                     (type_source Extern_declared)
                     (extern_name umber_float_sqrt))))
@@ -556,8 +508,8 @@
                   (Local
                    ((type_
                      (Scheme
-                      ((Function ((Type_app Std.Prelude.Int.Int ()))
-                        (Effect_union ()) (Tuple ()))
+                      ((Function ((Type_app Int ())) (Effect_union ())
+                        (Tuple ()))
                        ())))
                     (type_source Extern_declared)
                     (extern_name umber_print_int))))
@@ -565,8 +517,8 @@
                   (Local
                    ((type_
                      (Scheme
-                      ((Function ((Type_app Std.Prelude.Bool.Bool ()))
-                        (Effect_union ()) (Tuple ()))
+                      ((Function ((Type_app Bool ())) (Effect_union ())
+                        (Tuple ()))
                        ())))
                     (type_source Extern_declared)
                     (extern_name umber_print_bool))))))
@@ -580,15 +532,13 @@
                         (Local
                          ((type_
                            (Scheme
-                            ((Function ((Type_app Std.Prelude.Int.Int ()))
-                              (Effect_union ()) (Type_app String ()))
+                            ((Function ((Type_app Int ())) (Effect_union ())
+                              (Type_app String ()))
                              ())))
                           (type_source Extern_declared)
                           (extern_name umber_int_to_string))))))
-                     (types
-                      ((Int ((Local (() (Alias (Type_app Int ()))))))
-                       (PrimitiveInt ((Imported Int)))))
-                     (effects ()) (modules ())))))
+                     (types ((Int ((Imported Int))))) (effects ())
+                     (modules ())))))
                  (Bool
                   (Local
                    (()
@@ -601,10 +551,8 @@
                               (Type_app String ()))
                              ())))
                           (type_source Let_inferred))))))
-                     (types
-                      ((Bool ((Local (() (Alias (Type_app Bool ()))))))
-                       (PrimitiveBool ((Imported Bool)))))
-                     (effects ()) (modules ())))))
+                     (types ((Bool ((Imported Bool))))) (effects ())
+                     (modules ())))))
                  (List
                   (Local
                    (()
@@ -698,18 +646,14 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Float.Float ()))
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Effect_union ()) (Type_app Float ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_add))))
                        (pi
                         (Local
-                         ((type_
-                           (Scheme
-                            ((Type_app Std.Prelude.Float.Float ()) ())))
+                         ((type_ (Scheme ((Type_app Float ()) ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_pi))))
                        (abs
@@ -717,10 +661,8 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Float.Float ()))
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Effect_union ()) (Type_app Float ()))
                              ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_abs))))
@@ -729,10 +671,8 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Float.Float ()))
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Effect_union ()) (Type_app Float ()))
                              ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_cos))))
@@ -741,17 +681,13 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Float.Float ()))
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Effect_union ()) (Type_app Float ()))
                              ())))
                           (type_source Extern_declared)
                           (extern_name umber_float_sin))))))
-                     (types
-                      ((Float ((Local (() (Alias (Type_app Float ()))))))
-                       (PrimitiveFloat ((Imported Float)))))
-                     (effects ()) (modules ())))))
+                     (types ((Float ((Imported Float))))) (effects ())
+                     (modules ())))))
                  (Option
                   (Local
                    (()
@@ -782,11 +718,8 @@
                         (Local
                          ((type_
                            (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Int.Int ()))
+                            ((Function ((Type_app Int ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_rem))))
@@ -794,11 +727,8 @@
                         (Local
                          ((type_
                            (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Int.Int ()))
+                            ((Function ((Type_app Int ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_mul))))
@@ -806,11 +736,8 @@
                         (Local
                          ((type_
                            (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Int.Int ()))
+                            ((Function ((Type_app Int ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_add))))
@@ -818,11 +745,8 @@
                         (Local
                          ((type_
                            (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Int.Int ()))
+                            ((Function ((Type_app Int ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_int_sub))))
@@ -850,7 +774,7 @@
                          ((type_
                            (Scheme
                             ((Function ((Var a) (Var a)) (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Bool ()))
                              ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lt))))
@@ -859,7 +783,7 @@
                          ((type_
                            (Scheme
                             ((Function ((Var a) (Var a)) (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Bool ()))
                              ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gt))))
@@ -867,11 +791,8 @@
                         (Local
                          ((type_
                            (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Int.Int ()))
+                            ((Function ((Type_app Int ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Extern_declared) (fixity (Right 8))
                           (extern_name umber_int_pow))))
@@ -880,7 +801,7 @@
                          ((type_
                            (Scheme
                             ((Function ((Var a) (Var a)) (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Bool ()))
                              ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_neq))))
@@ -889,10 +810,8 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Bool.Bool ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              ((Type_app Bool ()) (Type_app Bool ()))
+                              (Effect_union ()) (Type_app Bool ()))
                              ())))
                           (type_source Val_and_let) (fixity (Left 3)))))
                        (*.
@@ -900,10 +819,8 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Float.Float ()))
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Effect_union ()) (Type_app Float ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_float_mul))))
@@ -922,10 +839,8 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Float.Float ()))
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Effect_union ()) (Type_app Float ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_add))))
@@ -934,10 +849,8 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Float.Float ())
-                               (Type_app Std.Prelude.Float.Float ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Float.Float ()))
+                              ((Type_app Float ()) (Type_app Float ()))
+                              (Effect_union ()) (Type_app Float ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_sub))))
@@ -957,7 +870,7 @@
                          ((type_
                            (Scheme
                             ((Function ((Var a) (Var a)) (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Bool ()))
                              ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_lte))))
@@ -966,7 +879,7 @@
                          ((type_
                            (Scheme
                             ((Function ((Var a) (Var a)) (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Bool ()))
                              ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_eq))))
@@ -975,7 +888,7 @@
                          ((type_
                            (Scheme
                             ((Function ((Var a) (Var a)) (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              (Type_app Bool ()))
                              ())))
                           (type_source Extern_declared)
                           (fixity (Non_assoc 4)) (extern_name umber_gte))))
@@ -994,21 +907,16 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.Bool.Bool ())
-                               (Type_app Std.Prelude.Bool.Bool ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Bool.Bool ()))
+                              ((Type_app Bool ()) (Type_app Bool ()))
+                              (Effect_union ()) (Type_app Bool ()))
                              ())))
                           (type_source Val_and_let) (fixity (Left 2)))))
                        (mod
                         (Local
                          ((type_
                            (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.Int.Int ())
-                               (Type_app Std.Prelude.Int.Int ()))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.Int.Int ()))
+                            ((Function ((Type_app Int ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Extern_declared) (fixity (Left 7))
                           (extern_name umber_int_mod))))

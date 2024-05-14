@@ -6,7 +6,7 @@
     ((name_diff ((missing_function Missing_from_def)))
      (type_diff
       ((T
-        (Incompatible (() (Alias (Type_app Std.Prelude.Int.Int ())))
+        (Incompatible (() (Alias (Type_app Int ())))
          (() (Alias (Type_app String ())))))
        (Weather
         (Incompatible (() (Variants ((Rainy ()) (Sunny ()))))
@@ -19,16 +19,14 @@
         (Incompatible
          ((a)
           (Alias
-           (Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
-            (Type_app Std.Prelude.Int.Int ()))))
+           (Function ((Type_app Int ())) (Effect_union ()) (Type_app Int ()))))
          ((a) (Alias (Function ((Var a)) (Effect_union ()) (Var a))))))
        (MoreGeneral
         (Incompatible
          ((a) (Alias (Function ((Var a)) (Effect_union ()) (Var a))))
          ((a)
           (Alias
-           (Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
-            (Type_app Std.Prelude.Int.Int ()))))))
+           (Function ((Type_app Int ())) (Effect_union ()) (Type_app Int ()))))))
        (DifferentArity
         (Incompatible ((a) Abstract) (() (Alias (Type_app String ())))))))
      (module_diff

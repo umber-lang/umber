@@ -50,8 +50,8 @@
         (Incompatible
          ((type_
            (Scheme
-            ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
-              (Type_app Std.Prelude.Int.Int ()))
+            ((Function ((Type_app Int ())) (Effect_union ())
+              (Type_app Int ()))
              ()))))
          ((type_
            (Scheme
@@ -85,8 +85,7 @@
              (Incompatible
               (()
                (Variants
-                ((Int ((Type_app Std.Prelude.Int.Int ())))
-                 (Float ((Type_app Std.Prelude.Float.Float ()))))))
+                ((Int ((Type_app Int ()))) (Float ((Type_app Float ()))))))
               (()
                (Variants
                 ((Int ((Type_app ErrorSignatureCompatibility.A.Int ())))

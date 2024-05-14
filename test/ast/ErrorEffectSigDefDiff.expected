@@ -8,6 +8,6 @@
         (Incompatible ((params (a)) (operations ()))
          ((params (a b))
           (operations
-           ((((name foo) (args ((Type_app Std.Prelude.Bool.Bool ())))
+           ((((name foo) (args ((Type_app Bool ())))
               (result (Tuple ((Var b) (Var a))))))))))))))))
   (filename ErrorEffectSigDefDiff.um)))

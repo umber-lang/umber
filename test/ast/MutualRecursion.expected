@@ -37,10 +37,8 @@
                    (Effect_union ()) (Type_app Int ()))
                   ())
                  (((Fun_call (Name Std.Prelude.Operators.+)
-                    ((Function
-                      ((Type_app Std.Prelude.Int.Int ())
-                       (Type_app Std.Prelude.Int.Int ()))
-                      (Effect_union ()) (Type_app Std.Prelude.Int.Int ()))
+                    ((Function ((Type_app Int ()) (Type_app Int ()))
+                      (Effect_union ()) (Type_app Int ()))
                      ())
                     (((Name MutualRecursion.acc) ((Type_app Int ()) ()))
                      ((Fun_call (Name MutualRecursion.sum_tree)
@@ -84,10 +82,8 @@
           ((Cnstr_appl MutualRecursion.Node
             ((Catch_all (x)) (Catch_all (forest))))
            (Fun_call (Name Std.Prelude.Operators.+)
-            ((Function
-              ((Type_app Std.Prelude.Int.Int ())
-               (Type_app Std.Prelude.Int.Int ()))
-              (Effect_union ()) (Type_app Std.Prelude.Int.Int ()))
+            ((Function ((Type_app Int ()) (Type_app Int ()))
+              (Effect_union ()) (Type_app Int ()))
              ())
             (((Name MutualRecursion.x) ((Type_app Int ()) ()))
              ((Fun_call (Name MutualRecursion.sum_forest)
@@ -178,9 +174,7 @@
                 ())))))))
          (body
           (Fun_call (Name Std.Prelude.print_int)
-           ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
-             (Tuple ()))
-            ())
+           ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
            (((Fun_call (Name MutualRecursion.sum_tree)
               ((Function
                 ((Type_app MutualRecursion.Tree ((Type_app Int ()))))
@@ -197,7 +191,7 @@
         (Match
          (Fun_call (Name Std.Prelude.Operators.==)
           ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-            (Type_app Std.Prelude.Bool.Bool ()))
+            (Type_app Bool ()))
            ())
           (((Name MutualRecursion.x) ((Type_app Int ()) ()))
            ((Literal (Int 0)) ((Type_app Int ()) ()))))
@@ -209,10 +203,8 @@
               (Type_app Bool ()))
              ())
             (((Fun_call (Name Std.Prelude.Operators.-)
-               ((Function
-                 ((Type_app Std.Prelude.Int.Int ())
-                  (Type_app Std.Prelude.Int.Int ()))
-                 (Effect_union ()) (Type_app Std.Prelude.Int.Int ()))
+               ((Function ((Type_app Int ()) (Type_app Int ()))
+                 (Effect_union ()) (Type_app Int ()))
                 ())
                (((Name MutualRecursion.x) ((Type_app Int ()) ()))
                 ((Literal (Int 1)) ((Type_app Int ()) ()))))
@@ -224,7 +216,7 @@
         (Match
          (Fun_call (Name Std.Prelude.Operators.==)
           ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-            (Type_app Std.Prelude.Bool.Bool ()))
+            (Type_app Bool ()))
            ())
           (((Name MutualRecursion.x) ((Type_app Int ()) ()))
            ((Literal (Int 0)) ((Type_app Int ()) ()))))
@@ -236,10 +228,8 @@
               (Type_app Bool ()))
              ())
             (((Fun_call (Name Std.Prelude.Operators.-)
-               ((Function
-                 ((Type_app Std.Prelude.Int.Int ())
-                  (Type_app Std.Prelude.Int.Int ()))
-                 (Effect_union ()) (Type_app Std.Prelude.Int.Int ()))
+               ((Function ((Type_app Int ()) (Type_app Int ()))
+                 (Effect_union ()) (Type_app Int ()))
                 ())
                (((Name MutualRecursion.x) ((Type_app Int ()) ()))
                 ((Literal (Int 1)) ((Type_app Int ()) ()))))
@@ -259,10 +249,8 @@
             (bindings
              ((((Catch_all (number)) ((Type_app Int ()) ()))
                (Fun_call (Name Std.Prelude.Operators.+)
-                ((Function
-                  ((Type_app Std.Prelude.Int.Int ())
-                   (Type_app Std.Prelude.Int.Int ()))
-                  (Effect_union ()) (Type_app Std.Prelude.Int.Int ()))
+                ((Function ((Type_app Int ()) (Type_app Int ()))
+                  (Effect_union ()) (Type_app Int ()))
                  ())
                 (((Name MutualRecursion.number) ((Type_app Int ()) ()))
                  ((Name MutualRecursion.number) ((Type_app Int ()) ())))))))

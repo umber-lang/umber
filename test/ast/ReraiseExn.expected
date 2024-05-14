@@ -123,9 +123,7 @@
         (value_branch
          ((Catch_all (value))
           (Fun_call (Name Std.Prelude.print_int)
-           ((Function ((Type_app Std.Prelude.Int.Int ())) (Effect_union ())
-             (Tuple ()))
-            ())
+           ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
            (((Name ReraiseExn.value) ((Type_app Int ()) ()))))))
         (effect_branches
          ((((operation ReraiseExn.raise) (args ((Catch_all (exn)))))

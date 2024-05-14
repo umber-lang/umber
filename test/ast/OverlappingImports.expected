@@ -9,8 +9,6 @@
    (bindings
     (((Catch_all ())
       ((Name Std.Prelude.Float.abs)
-       ((Function
-         ((Type_app Std.Prelude.Float.Float ())
-          (Type_app Std.Prelude.Float.Float ()))
-         (Effect_union ()) (Type_app Std.Prelude.Float.Float ()))
+       ((Function ((Type_app Float ()) (Type_app Float ())) (Effect_union ())
+         (Type_app Float ()))
         ()))))))))

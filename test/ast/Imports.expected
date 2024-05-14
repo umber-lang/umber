@@ -11,8 +11,7 @@
    ((Common_sig
      (Import
       ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Int)))))))))
-    (Common_sig
-     (Type_decl Bar (() (Alias (Type_app Std.Prelude.Int.Int ())))))
+    (Common_sig (Type_decl Bar (() (Alias (Type_app Int ())))))
     (Module_sig C
      ((Common_sig
        (Import
@@ -67,8 +66,7 @@
        ((kind (Relative (nth_parent 1))) (paths (Module B ((Name Bar))))))))))
   (Module
    (B ()
-    ((Common_def
-      (Type_decl Bar (() (Alias (Type_app Std.Prelude.Int.Int ())))))
+    ((Common_def (Type_decl Bar (() (Alias (Type_app Int ())))))
      (Common_def
       (Import
        ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Int)))))))))
