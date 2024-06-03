@@ -195,6 +195,7 @@ end
 type t =
   { current_path : Path.t
   ; toplevel : defs
+  ; type_variables : Type_var.t Type_param_name.Map.t
   }
 
 and sigs = Nothing.t bindings
@@ -235,7 +236,12 @@ let empty_bindings =
   }
 ;;
 
-let empty = { current_path = []; toplevel = empty_bindings }
+let empty =
+  { current_path = []
+  ; toplevel = empty_bindings
+  ; type_variables = Type_param_name.Map.empty
+  }
+;;
 
 (* We maintain the invariant that the current path of [t] is an absolute path from the
    toplevel down. *)
@@ -347,6 +353,7 @@ let core =
               ~key:(Value_name.of_cnstr_name cnstr_name)
               ~data:(Local (Name_entry.val_declared ~extern_name Intrinsics.Bool.typ)))
       }
+  ; type_variables = Type_param_name.Map.empty
   }
 ;;
 
@@ -618,6 +625,12 @@ let ( (find_type_entry_with_path, find_absolute_type_entry_with_path)
   in
   ( make ~field:{ get = (fun bindings -> bindings.types) } ~name:(module Type_name)
   , make ~field:{ get = (fun bindings -> bindings.effects) } ~name:(module Effect_name) )
+;;
+
+let find_type_variable t type_param = Map.find t.type_variables type_param
+
+let set_type_variable t type_param type_var =
+  { t with type_variables = Map.set t.type_variables ~key:type_param ~data:type_var }
 ;;
 
 let absolutify_path t (path : Module_path.Relative.t) =

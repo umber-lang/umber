@@ -110,6 +110,8 @@ val find_absolute_effect_decl
   -> Effect_name.Absolute.t
   -> Module_path.absolute Effect.t
 
+val find_type_variable : t -> Type_param_name.t -> Type_var.t option
+val set_type_variable : t -> Type_param_name.t -> Type_var.t -> t
 val absolutify_value_name : t -> Value_name.Relative.t -> Value_name.Absolute.t
 val absolutify_type_name : t -> Type_name.Relative.t -> Type_name.Absolute.t
 val absolutify_effect_name : t -> Effect_name.Relative.t -> Effect_name.Absolute.t
