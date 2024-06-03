@@ -145,7 +145,6 @@ module Pattern = struct
       in
       pat_names, (As (pat, name), typ)
     | Type_annotation (pat, annotated_type) ->
-      (* TODO: Handle trait bounds for type annotations, once traits are implemented. *)
       let annotated_type =
         Type_bindings.instantiate_type_scheme
           ~names
@@ -685,6 +684,8 @@ module Expr = struct
                   in
                   type_recursive_let_bindings ~names ~types ~f_name ~add_effects bindings)
                 else (
+                  (* FIXME: These are supposed to be parallel bindings, meaning the later
+                     ones can't reference names from the earlier ones. *)
                   (* Process bindings in order without any recursion *)
                   let names, bindings =
                     Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
@@ -706,7 +707,6 @@ module Expr = struct
                   names, false, bindings)
               in
               let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
-              (* eprint_s [%message (body_effects : Internal_type.effects)]; *)
               add_effects body_effects (Node.span body);
               node (Let { rec_; bindings; body }), body_type)
           | Tuple items ->
@@ -724,6 +724,48 @@ module Expr = struct
           | Record_update (_expr, _fields) -> failwith "TODO: record2"
           | Record_field_access (_record, _name) -> failwith "TODO: record3"
           | Type_annotation (expr, annotated_type) ->
+            (* FIXME: Work out type annotation semantics re: type variables.
+               Currently they work like unification variables.
+               We want them to be forced to be generalized variables. Their scope should
+               be at the level of the statement by default, but they can also be brought
+               into scope by explicit forall syntax like `id : a. a -> a`.
+
+               So rather than just instantiating and unifying, we need to remember the
+               constraints and check them later. Maybe handle similarly to `val`?
+               I guess we could re-traverse all the expressions after type-checking?
+               Is it necessary to do it in a later pass?
+
+               Maybe we could do something like set the type of x to be
+               (Quantified_var "a") at the right level, later than say (Var 1).
+            
+               This needs to work:
+               let foo (x : a) : a =
+                let (y : a) = x in
+                x
+
+               While this should not (for both b and c):
+               let foo (x : a) : b =
+                let (y : c) = x in
+                x
+
+            If a type variable appears in the outer scope, ...
+            
+            Re: local let generalizaation, let's not bother, at least for now. Just don't
+            do it (unless there's a type annotation, then we can use that.)
+
+            Actually, we still want to do somemthing that looks like generalization as a
+            post-processing step to give the AST nodes nice types. While doing that we can
+            check type annotations we come across I think. Or that can be a separate
+            traversal. *)
+            let instantiate_annotated_type ~names annotated_type =
+              Type_bindings.instantiate_type_scheme
+                ~names
+                ~types
+                (Type_scheme.map'
+                   annotated_type
+                   ~type_name:(Name_bindings.absolutify_type_name names)
+                   ~effect_name:(Name_bindings.absolutify_effect_name names))
+            in
             let annotated_type =
               Node.with_value annotated_type ~f:(fun annotated_type ->
                 Type_bindings.instantiate_type_scheme
@@ -848,8 +890,75 @@ module Expr = struct
 
   and map' expr ~f ~f_type = Node.map expr ~f:(map ~f ~f_type)
 
+  let rec fold_until expr ~init ~f ~f_type =
+    match (f init expr : _ Fold_action.t) with
+    | Stop _ as stop -> stop
+    | Continue (`Halt acc) -> Continue acc
+    | Continue (`Defer expr) ->
+      (match expr with
+       | Literal _ | Name (_, _) -> Continue init
+       | Let { rec_ = _; bindings; body } ->
+         let%bind.Fold_action init =
+           Nonempty.fold_until bindings ~init ~f:(fun init (pat_and_type, expr) ->
+             let%bind.Fold_action init =
+               Node.with_value pat_and_type ~f:(fun (_pat, typ) -> f_type init typ)
+             in
+             fold_until' expr ~init ~f ~f_type)
+         in
+         fold_until' body ~init ~f ~f_type
+       | Fun_call (fun_, fun_type, args) ->
+         let%bind.Fold_action init = fold_until' fun_ ~init ~f ~f_type in
+         let%bind.Fold_action init = f_type init fun_type in
+         Nonempty.fold_until args ~init ~f:(fun init (arg, arg_type) ->
+           let%bind.Fold_action init = fold_until' arg ~init ~f ~f_type in
+           f_type init arg_type)
+       | Lambda (_args, body) -> fold_until' body ~init ~f ~f_type
+       | Match (expr, expr_type, branches) ->
+         let%bind.Fold_action init = fold_until' expr ~init ~f ~f_type in
+         let%bind.Fold_action init = f_type init expr_type in
+         Nonempty.fold_until branches ~init ~f:(fun init (_pat, branch) ->
+           fold_until' branch ~init ~f ~f_type)
+       | Handle { expr; expr_type; value_branch; effect_branches } ->
+         let%bind.Fold_action init = fold_until' expr ~init ~f ~f_type in
+         let%bind.Fold_action init = f_type init expr_type in
+         let%bind.Fold_action init =
+           Option.fold_until value_branch ~init ~f:(fun init (_, branch) ->
+             fold_until' branch ~init ~f ~f_type)
+         in
+         List.fold_until effect_branches ~init ~f:(fun init (_, branch) ->
+           fold_until' branch ~init ~f ~f_type)
+       | Tuple fields ->
+         List.fold_until fields ~init ~f:(fun init field ->
+           fold_until' field ~init ~f ~f_type)
+       | Record_literal fields ->
+         List.fold_until fields ~init ~f:(fun init (_name, field) ->
+           Option.fold_until field ~init ~f:(fun init field ->
+             fold_until' field ~init ~f ~f_type))
+       | Record_update (expr, fields) ->
+         let%bind.Fold_action init = fold_until' expr ~init ~f ~f_type in
+         List.fold_until fields ~init ~f:(fun init (_name, field) ->
+           Option.fold_until field ~init ~f:(fun init field ->
+             fold_until' field ~init ~f ~f_type))
+       | Record_field_access (record, _field) -> fold_until' record ~init ~f ~f_type)
+
+  and fold_until' expr ~init ~f ~f_type =
+    Node.with_value expr ~f:(fold_until ~init ~f ~f_type)
+  ;;
+
   (* FIXME: Is this supposed to be generalizing local let bindings in expressions? If so,
-     it doesn't seem to work, according to the Generalization.um test. *)
+     it doesn't seem to work, according to the Generalization.um test.
+     
+     Yeah, we do this as like a post-processing step so of course it wouldn't actually
+     work - it affects the type we write on the binding in the final AST but not the one
+     we use to type the rest of the expression after each let binding.
+     
+     The thing we actually want out of this is to transform internal types to type
+     schemes suitable for putting in the AST (as if they were type annotations). We need
+     similar steps for that. Maybe the current setup is kinda fine actually? We might just
+     want to rename [generalize] to somemthing else.
+     
+     The only weird thing is I think I have sometimes observed this putting types on the
+     AST which are too polymorphic. That might have been fixed though. *)
   let rec generalize_let_bindings ~names ~types =
     map
       ~f_type:(fun (typ, _) -> Type_bindings.generalize types typ)
@@ -875,6 +984,8 @@ module Expr = struct
           `Halt (Let { rec_; bindings; body })
         | expr -> `Defer expr)
   ;;
+
+  let check_type_annotations expr = ()
 end
 
 module Module = struct

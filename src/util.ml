@@ -46,6 +46,24 @@ module Fold_action = struct
   ;;
 end
 
+module Option : sig
+  include module type of Option
+
+  val fold_until
+    :  'a t
+    -> init:'acc
+    -> f:('acc -> 'a -> ('acc, 'final) Fold_action.t)
+    -> ('acc, 'final) Fold_action.t
+end = struct
+  include Option
+
+  let fold_until t ~init ~f : _ Fold_action.t =
+    match t with
+    | None -> Continue init
+    | Some value -> f init value
+  ;;
+end
+
 module List : sig
   include module type of List
 
