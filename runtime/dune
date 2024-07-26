@@ -13,7 +13,7 @@
   (progn
    (system "cargo build")
    (system "cargo clippy")
-   (copy target/debug/libruntime.a libruntime.a))))
+   (run cp target/debug/libruntime.a libruntime.a))))
 
 (rule
  (alias runtest)

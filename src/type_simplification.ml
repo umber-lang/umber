@@ -397,6 +397,12 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) =
   let type_ = remove_polar_vars type_ in
   eprint_s [%message "after removing polar vars" (type_ : _ Type_scheme.type_)];
   let type_ = replace_co_occurring_vars type_ in
+  (* FIXME: We don't know whether variables are used elsewhere in the expression without
+     some notion of type variable scope. This means replacing vars only used once in a
+     type expression with Never/Any isn't sound - it is only sound if the variable does
+     not appear anywhere else. Maybe we need to simplify all the types for a statement at
+     the same time? I suppose we could change this to simplify a list of types or
+     something. *)
   let type_ = rename_vars type_ in
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
