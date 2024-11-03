@@ -1,7 +1,9 @@
 open! Import
 open! Names
 
-(* Simplify types using ideas from simple-sub. See https://arxiv.org/pdf/1312.2334.pdf. *)
+(* Simplify types using ideas from these papers:
+   - Inferring Algebraic Effects https://arxiv.org/pdf/1312.2334.pdf
+   - The Simple Essence of Algebraic Subtyping https://dl.acm.org/doi/pdf/10.1145/3409006 *)
 
 (* FIXME: cleanup *)
 let eprint_s = ignore
@@ -222,6 +224,12 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
       | effects -> Defer effects)
 ;;
 
+(* FIXME: Occuring more than once is ok, right? Just being polar is enough, right?
+
+   Actually, the problem is that when a var occurs more than once, if we replace with Any
+   or Never we lose the information that these types were meant to be the same. Just
+   leaving the var in is probably fine, hopefully?
+*)
 (** Remove variables which only occur once in a positive or negative position
     respectively. Replace them with empty unions or intersections (the bottom and top
     types). *)
@@ -402,17 +410,70 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) =
      type expression with Never/Any isn't sound - it is only sound if the variable does
      not appear anywhere else. Maybe we need to simplify all the types for a statement at
      the same time? I suppose we could change this to simplify a list of types or
-     something. *)
+     something.
+
+     This constraint is similar to generalization - we can't get rid of variables which
+     appear elsewhere in the type environment.
+     
+     We also can't just come up with random names like `a`, `b`, etc. since the scope
+     isn't well-defined. We need to make sure we give the same variables the same names,
+     and maintain this in all the simplified types in some expression.
+     
+     So we either need to simplify all the types all at once, or simplify them one at a
+     time but keep some state tracking what variables are mapped to what. For simplicity
+     maybe we can start off assuming that variables are always scoped to the whole
+     statement level. Then we just need to make sure the mappings we make are consistent
+     with that. Though that isn't fully expressive - we still need explicit
+     quantification to express local generalized bindings (though I guess we haven't
+     implemented those yet, so maybe punt).
+     
+     Also consider making binders for type variables explicit in the AST. If we could
+     insert them during inference maybe that could improve things? You'd know if a type
+     variable was local to an expression. But I'm not sure how that'd help when
+     simplifying a variable that appears in multiple places - you still kinda have to know
+     how they interact (the reasoning is fundamentally not local).
+  *)
   let type_ = rename_vars type_ in
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
   eprint_s
     [%message
       "after replacing co-occuring vars and renaming" (type_ : _ Type_scheme.type_)];
-  type_, []
+  type_
 ;;
 
-let%test_module "simplify_type" =
+let simplify_types
+  ~(positive_types : _ Type_scheme.t list)
+  ~(negative_types : _ Type_scheme.t list)
+  =
+  (* eprint_s
+    [%message
+      "simplify_types"
+        (positive_types : _ Type_scheme.t list)
+        (negative_types : _ Type_scheme.t list)]; *)
+  let combine_types : _ Type_scheme.t list -> _ Type_scheme.t = function
+    | [ (type_, constraints) ] -> type_, constraints
+    | ([] | _ :: _ :: _) as types ->
+      let types, constraints = List.unzip types in
+      Tuple types, List.concat constraints
+  in
+  let positive_type, positive_constraints = combine_types positive_types in
+  let negative_type, negative_constraints = combine_types negative_types in
+  match
+    simplify_type
+      ( Function ([ negative_type ], Effect_union [], positive_type)
+      , positive_constraints @ negative_constraints )
+  with
+  | Function ([ negative_type ], _, positive_type) ->
+    let unwrap_types : _ Type_scheme.type_ -> _ Type_scheme.t list = function
+      | Tuple types -> List.map types ~f:(fun type_ -> type_, [])
+      | type_ -> [ type_, [] ]
+    in
+    unwrap_types positive_type, unwrap_types negative_type
+  | _ -> compiler_bug [%message "Expected function"]
+;;
+
+let%test_module _ =
   (module struct
     let parse_var s = Type_param.t_of_sexp (Atom s)
     let v = Type_scheme.var << parse_var
@@ -429,7 +490,7 @@ let%test_module "simplify_type" =
       print_s
         [%sexp
           { original_type : _ Type_scheme.t
-          ; simplified_type = (simplify_type original_type : _ Type_scheme.t)
+          ; simplified_type = (simplify_type original_type : _ Type_scheme.type_)
           }]
     ;;
 
@@ -450,11 +511,10 @@ let%test_module "simplify_type" =
              (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
               ((subtype c) (supertype d)))))
            (simplified_type
-            ((Function
-              ((Type_app List ((Var a)))
-               (Function ((Var a)) (Effect_var b) (Type_app List ((Var c)))))
-              (Effect_var b) (Type_app List ((Var c))))
-             ()))) |}]
+            (Function
+             ((Type_app List ((Var a)))
+              (Function ((Var a)) (Effect_var b) (Type_app List ((Var c)))))
+             (Effect_var b) (Type_app List ((Var c)))))) |}]
     ;;
 
     let%expect_test "if" =
@@ -465,8 +525,7 @@ let%test_module "simplify_type" =
             ((Function ((Type_app Bool ()) (Var a) (Var b)) (Effect_var e1) (Var c))
              (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
            (simplified_type
-            ((Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a))
-             ()))) |}]
+            (Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a)))) |}]
     ;;
 
     let%expect_test "<=" =
@@ -478,7 +537,7 @@ let%test_module "simplify_type" =
             ((Function ((Var a) (Var b)) (Effect_union ()) (Type_app Bool ()))
              (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
            (simplified_type
-            ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ()))) |}]
+            (Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())))) |}]
     ;;
 
     let%expect_test "id" =
@@ -486,14 +545,14 @@ let%test_module "simplify_type" =
       [%expect
         {|
           ((original_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))
-           (simplified_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))) |}];
+           (simplified_type (Function ((Var a)) (Effect_union ()) (Var a)))) |}];
       run_test (Function ([ v "a" ], ev 1, v "b"), [ "a" <: "b" ]);
       [%expect
         {|
           ((original_type
             ((Function ((Var a)) (Effect_var e1) (Var b))
              (((subtype a) (supertype b)))))
-           (simplified_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))) |}]
+           (simplified_type (Function ((Var a)) (Effect_union ()) (Var a)))) |}]
     ;;
 
     let%expect_test "between" =
@@ -507,9 +566,8 @@ let%test_module "simplify_type" =
               (Type_app Bool ()))
              (((subtype c) (supertype a)) ((subtype c) (supertype b)))))
            (simplified_type
-            ((Function ((Intersection ((Var a) (Var b))) (Tuple ((Var b) (Var a))))
-              (Effect_union ()) (Type_app Bool ()))
-             ()))) |}]
+            (Function ((Intersection ((Var a) (Var b))) (Tuple ((Var b) (Var a))))
+             (Effect_union ()) (Type_app Bool ())))) |}]
     ;;
 
     (* TODO: Quickcheck test that type simplification is idempotent. *)

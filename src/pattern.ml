@@ -17,23 +17,33 @@ type ('typ, 'name) t =
   | Type_annotation of ('typ, 'name) t * 'typ
 [@@deriving equal, sexp, variants]
 
-let rec fold pat ~init ~f =
-  let retry init pat = fold pat ~init ~f in
-  let init, result = f ~retry init pat in
-  match result with
-  | None -> init
-  | Some pat ->
+let rec fold_until pat ~init ~f =
+  match (f init pat : _ Fold_action.t) with
+  | Stop _ as stop -> stop
+  | Continue (`Halt acc) -> Continue acc
+  | Continue (`Defer init) ->
     (match pat with
-     | Constant _ | Catch_all _ -> init
-     | As (pat, _) | Type_annotation (pat, _) -> fold pat ~init ~f
+     | Constant _ | Catch_all _ -> Continue init
+     | As (pat, _) | Type_annotation (pat, _) -> fold_until pat ~init ~f
      | Cnstr_appl (_, fields) | Tuple fields ->
-       List.fold fields ~init ~f:(fun init -> fold ~init ~f)
+       List.fold_until fields ~init ~f:(fun init pat -> fold_until pat ~init ~f)
      | Record fields ->
-       Nonempty.fold fields ~init ~f:(fun init (_, pat) ->
-         Option.fold pat ~init ~f:(fun init -> fold ~init ~f))
+       Nonempty.fold_until fields ~init ~f:(fun init (_, pat) ->
+         match pat with
+         | None -> Continue init
+         | Some pat -> fold_until pat ~init ~f)
      | Union (pat1, pat2) ->
-       let init = fold pat1 ~init ~f in
-       fold pat2 ~init ~f)
+       let%bind.Fold_action init = fold_until pat1 ~init ~f in
+       fold_until pat2 ~init ~f)
+;;
+
+let fold_types pat ~init ~f =
+  fold_until pat ~init ~f:(fun acc pat ->
+    match pat with
+    | Type_annotation (_, type_) -> Continue (`Halt (f acc type_))
+    | Constant _ | Catch_all _ | Cnstr_appl _ | As _ | Tuple _ | Record _ | Union _ ->
+      Continue (`Defer acc))
+  |> Fold_action.id
 ;;
 
 (* TODO: consider abstracting this. It would help out with the verbosity of type errors

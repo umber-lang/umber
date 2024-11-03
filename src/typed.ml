@@ -796,16 +796,19 @@ module Expr = struct
   ;;
 
   let rec map expr ~f ~f_type =
-    match f expr with
-    | `Halt expr -> expr
-    | `Retry expr -> map ~f ~f_type expr
-    | `Defer expr ->
+    match (f expr : _ Map_action.t) with
+    | Halt expr -> expr
+    | Retry expr -> map ~f ~f_type expr
+    | Defer expr ->
       (match expr with
        | Let { rec_; bindings; body } ->
          let bindings =
            Nonempty.map bindings ~f:(fun (pat_and_type, expr) ->
-             ( Node.map pat_and_type ~f:(fun (pat, typ) -> pat, f_type typ)
-             , map' expr ~f ~f_type ))
+             let pat_and_type =
+               Node.map pat_and_type ~f:(fun (pat, typ) -> pat, f_type typ)
+             in
+             let expr = map' expr ~f ~f_type in
+             pat_and_type, expr)
          in
          let body = map' body ~f ~f_type in
          Let { rec_; bindings; body }
@@ -815,16 +818,17 @@ module Expr = struct
          let fun_type = f_type fun_type in
          let args =
            Nonempty.map args ~f:(fun (arg, arg_type) ->
-             map' arg ~f ~f_type, f_type arg_type)
+             let arg = map' arg ~f ~f_type in
+             let arg_type = f_type arg_type in
+             arg, arg_type)
          in
          Fun_call (fun_, fun_type, args)
        | Lambda (args, body) -> Lambda (args, map' body ~f ~f_type)
        | Match (expr, expr_type, branches) ->
          let expr = map' expr ~f ~f_type in
-         Match
-           ( expr
-           , f_type expr_type
-           , Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type)) )
+         let expr_type = f_type expr_type in
+         let branches = Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type)) in
+         Match (expr, expr_type, branches)
        | Handle { expr; expr_type; value_branch; effect_branches } ->
          let expr = map' expr ~f ~f_type in
          let expr_type = f_type expr_type in
@@ -847,6 +851,90 @@ module Expr = struct
          Record_field_access (map' ~f ~f_type record, field))
 
   and map' expr ~f ~f_type = Node.map expr ~f:(map ~f ~f_type)
+
+  (* FIXME: Remove unused *)
+  (* let map_types expr ~f = map expr ~f_type:f ~f:(fun expr -> Defer expr) *)
+
+  (* FIXME: Remove unused *)
+  (* let rec fold_until expr ~init:acc ~f ~f_type =
+    match (f acc expr : _ Fold_action.t) with
+    | Stop _ as stop -> stop
+    | Continue (`Halt acc) -> Continue acc
+    | Continue (`Defer acc) ->
+      (match expr with
+       | Literal _ | Name (_, _) -> Continue acc
+       | Let { rec_ = _; bindings; body } ->
+         let%bind.Fold_action acc =
+           Nonempty.fold_until bindings ~init:acc ~f:(fun acc (pat_and_type, expr) ->
+             let acc =
+               Node.with_value pat_and_type ~f:(fun ((_ : Pattern.t), type_) ->
+                 f_type acc type_)
+             in
+             Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type))
+         in
+         Node.with_value body ~f:(fold_until ~init:acc ~f ~f_type)
+       | Fun_call (fun_, fun_type, args) ->
+         let%bind.Fold_action acc =
+           Node.with_value fun_ ~f:(fold_until ~init:acc ~f ~f_type)
+         in
+         let acc = f_type acc fun_type in
+         Nonempty.fold_until args ~init:acc ~f:(fun acc (arg, arg_type) ->
+           let%map.Fold_action acc =
+             Node.with_value arg ~f:(fold_until ~init:acc ~f ~f_type)
+           in
+           f_type acc arg_type)
+       | Lambda ((_ : Pattern.t Node.t Nonempty.t), body) ->
+         Node.with_value body ~f:(fold_until ~init:acc ~f ~f_type)
+       | Match (expr, expr_type, branches) ->
+         let%bind.Fold_action acc =
+           Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type)
+         in
+         let acc = f_type acc expr_type in
+         Nonempty.fold_until
+           branches
+           ~init:acc
+           ~f:(fun acc ((_ : Pattern.t Node.t), expr) ->
+           Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type))
+       | Handle { expr; expr_type; value_branch; effect_branches } ->
+         let%bind.Fold_action acc =
+           Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type)
+         in
+         let acc = f_type acc expr_type in
+         let%bind.Fold_action acc =
+           Option.fold_until
+             value_branch
+             ~init:acc
+             ~f:(fun acc ((_ : Pattern.t Node.t), expr) ->
+             Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type))
+         in
+         List.fold_until
+           effect_branches
+           ~init:acc
+           ~f:(fun acc ((_ : Effect_pattern.t Node.t), expr) ->
+           Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type))
+       | Tuple fields ->
+         List.fold_until fields ~init:acc ~f:(fun acc expr ->
+           Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type))
+       | Record_literal fields ->
+         List.fold_until fields ~init:acc ~f:(fun acc ((_ : Value_name.t), expr) ->
+           Option.fold_until expr ~init:acc ~f:(fun acc expr ->
+             Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type)))
+       | Record_update (expr, fields) ->
+         let%bind.Fold_action acc =
+           Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type)
+         in
+         List.fold_until fields ~init:acc ~f:(fun acc ((_ : Value_name.t), expr) ->
+           Option.fold_until expr ~init:acc ~f:(fun acc expr ->
+             Node.with_value expr ~f:(fold_until ~init:acc ~f ~f_type)))
+       | Record_field_access (record, (_ : Value_name.t Node.t)) ->
+         Node.with_value record ~f:(fold_until ~init:acc ~f ~f_type))
+  ;; *)
+
+  (* FIXME: Remove unused *)
+  (* let fold_types t ~init ~f =
+    fold_until t ~init ~f_type:f ~f:(fun init (_ : _ t) -> Continue (`Defer init))
+    |> Fold_action.id
+  ;; *)
 
   (* FIXME: Is this supposed to be generalizing local let bindings in expressions? If so,
      it doesn't seem to work, according to the Generalization.um test. *)
@@ -872,8 +960,8 @@ module Expr = struct
               , Node.map expr ~f:(generalize_let_bindings ~names ~types) ))
           in
           let body = Node.map body ~f:(generalize_let_bindings ~names ~types) in
-          `Halt (Let { rec_; bindings; body })
-        | expr -> `Defer expr)
+          Halt (Let { rec_; bindings; body })
+        | expr -> Defer expr)
   ;;
 end
 
@@ -1391,22 +1479,76 @@ module Module = struct
         Node.with_value (Node.create effects span) ~f:(fun effects ->
           Type_bindings.constrain_effects_to_be_total ~names ~types effects))
     in
-    Nonempty.fold_map bindings ~init:names ~f:(fun names (pattern_etc, expr) ->
-      let pat_span = Node.span pattern_etc in
-      let pat, (names, scheme) =
-        Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-          ( pat
-          , Pattern.generalize ~names ~types pat_names pat_type ~shadowing_allowed:false ))
+    let names, bindings =
+      Nonempty.fold_map bindings ~init:names ~f:(fun names (pattern_etc, expr) ->
+        let pat_span = Node.span pattern_etc in
+        let pat, (names, scheme) =
+          Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
+            ( pat
+            , Pattern.generalize ~names ~types pat_names pat_type ~shadowing_allowed:false
+            ))
+        in
+        (* Generalize local let bindings just after the parent binding *)
+        let expr_and_scheme =
+          Node.map expr ~f:(fun expr ->
+            let expr = Expr.generalize_let_bindings expr ~names ~types in
+            expr, scheme)
+        in
+        names, (Node.create pat pat_span, expr_and_scheme))
+    in
+    (* FIXME: Remove this hack *)
+    (* let positive_types, negative_types =
+      let add_type (positive_types, negative_types) type_ ~(polarity : Polarity.t) =
+        match polarity with
+        | Positive -> type_ :: positive_types, negative_types
+        | Negative -> positive_types, type_ :: negative_types
       in
-      (* Generalize local let bindings just after the parent binding *)
-      let expr_and_scheme =
-        Node.map expr ~f:(fun expr ->
-          let expr = Expr.generalize_let_bindings expr ~names ~types in
-          expr, scheme)
+      (* FIXME: Adjsut this *)
+      let polarity : Polarity.t = Positive in
+      Nonempty.fold
+        bindings
+        ~init:([], [])
+        ~f:(fun acc ((_ : Pattern.t Node.t), expr_and_scheme) ->
+        Node.with_value expr_and_scheme ~f:(fun (expr, scheme) ->
+          (* FIXME: need to fold over types with polarity - does expr introduce polarity?
+             
+             I think we need to look at *every* type, including implicit ones. The types
+             of the patterns matters (for negative polarity)
+          *)
+          let acc = Expr.fold_types expr ~init:acc ~f:(add_type ~polarity) in
+          add_type acc scheme ~polarity))
+    in
+    let positive_types = List.rev positive_types in
+    let negative_types = List.rev negative_types in
+    let positive_types, negative_types =
+      Type_simplification.simplify_types ~positive_types ~negative_types
+    in
+    let positive_types = Queue.of_list positive_types in
+    let negative_types = Queue.of_list negative_types in
+    let bindings =
+      let get_type ~(polarity : Polarity.t) =
+        match polarity with
+        | Positive ->
+          (match Queue.dequeue positive_types with
+           | None -> compiler_bug [%message "Missing positive type"]
+           | Some type_ -> type_)
+        | Negative ->
+          (match Queue.dequeue negative_types with
+           | None -> compiler_bug [%message "Missing negative type"]
+           | Some type_ -> type_)
       in
-      names, (Node.create pat pat_span, expr_and_scheme))
-    |> Tuple2.map_snd ~f:(fun bindings ->
-         Node.create (Let { rec_; bindings }) representative_span)
+      (* FIXME: Adjust this *)
+      let polarity : Polarity.t = Positive in
+      Nonempty.map bindings ~f:(fun (pat, expr_and_scheme) ->
+        let expr_and_scheme =
+          Node.map expr_and_scheme ~f:(fun (expr, _scheme) ->
+            let expr = Expr.map_types expr ~f:(fun _ -> get_type ~polarity) in
+            let scheme = get_type ~polarity in
+            expr, scheme)
+        in
+        pat, expr_and_scheme)
+    in *)
+    names, Node.create (Let { rec_; bindings }) representative_span
   ;;
 
   (** Reintegrate the re-ordered binding groups from [extract_binding_groups] back into

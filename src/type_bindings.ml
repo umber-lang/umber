@@ -941,17 +941,18 @@ let generalize types outer_type =
   let substituted_type = Substitution.apply_to_type types.substitution outer_type in
   let scheme = generalize_internal types substituted_type ~env ~polarity:Positive in
   let constraints = Constraints.to_constraint_list types.constraints ~params:env in
-  let result = Type_simplification.simplify_type (scheme, constraints) in
+  let pre_simplified_type = scheme, constraints in
+  let simplified_type = Type_simplification.simplify_type (scheme, constraints), [] in
   eprint_s
     [%message
       "generalize result"
         (outer_type : Internal_type.t)
         (substituted_type : Internal_type.t)
-        ~pre_simplified_type:(scheme, constraints : Module_path.absolute Type_scheme.t)
-        ~simplified_type:(result : Module_path.absolute Type_scheme.t)
+        (pre_simplified_type : Module_path.absolute Type_scheme.t)
+        (simplified_type : Module_path.absolute Type_scheme.t)
         (env : Type_param.Env_of_vars.t)
         (types.substitution : Substitution.t)];
-  result
+  simplified_type
 ;;
 
 let%test_module _ =

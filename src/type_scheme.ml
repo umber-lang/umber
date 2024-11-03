@@ -154,6 +154,8 @@ let map' ?f ?f_effects ((type_, constraints) : _ t) ~type_name ~effect_name =
   type_, constraints
 ;;
 
+(* TODO: Maybe do something to standardize the fold_until implementations across different
+   types. Also, it seems really confusing to have [Continue (`Halt (...))] *)
 let rec fold_until typ ~init ~f ~f_effects =
   match (f init typ : _ Fold_action.t) with
   | Stop _ as stop -> stop
