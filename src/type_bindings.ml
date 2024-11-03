@@ -295,8 +295,18 @@ end = struct
 end
 
 type t =
-  { constraints : Constraints.t
+  { constraints : Constraints.t (** The constraints on type variables. *)
   ; substitution : Substitution.t
+      (** A mapping from type variables to type or effect expressions that can be
+          substituted in their place. *)
+  ; context_vars : Type_var.Hash_set.t By_polarity.t
+      (** The polarities of type variables which are associated with regular variables
+          (names) from the context. These are created when instantiating type schemes or
+          when adding new names from a pattern. *)
+  ; generalized_vars : Type_param.Env_of_vars.t
+      (** A mapping from type variables to their names as generalized type parameters.
+          Used to ensure that the same type variable in different places generalizes to
+          the same type parameter name. *)
   ; constrained_types : Type_pair.Hash_set.t [@sexp_drop_if const true]
   ; constrained_effects : Effect_type_pair.Hash_set.t [@sexp_drop_if const true]
   }
@@ -305,6 +315,8 @@ type t =
 let create () =
   { constraints = Constraints.create ()
   ; substitution = Substitution.create ()
+  ; context_vars = By_polarity.init (fun (_ : Polarity.t) -> Type_var.Hash_set.create ())
+  ; generalized_vars = Type_param.Env_of_vars.create ()
   ; constrained_types = Type_pair.Hash_set.create ()
   ; constrained_effects = Effect_type_pair.Hash_set.create ()
   }
@@ -340,6 +352,10 @@ let refresh_type type_ =
   let vars = Type_var.Table.create () in
   let refresh_var = Hashtbl.find_or_add vars ~default:Type_var.create in
   Internal_type.map_vars type_ ~f:refresh_var
+;;
+
+let record_context_var t var ~polarity =
+  Hash_set.add (By_polarity.get t.context_vars ~polarity) var
 ;;
 
 let rec constrain ~names ~types ~subtype ~supertype =
@@ -735,44 +751,66 @@ and constrain_effects ~names ~types ~subtype ~supertype =
 and constrain_effects_to_be_total ~names ~types effects =
   constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
 
+(* FIXME: Every time a new variable is minted, we need to record its polarity *)
+
 and instantiate_type_scheme =
   let rec instantiate_type_scheme
     ~names
     ~types
     ~params
+    ~polarity
     (scheme : Module_path.absolute Type_scheme.type_)
     : Internal_type.t
     =
     match scheme with
-    | Var param -> Var (Type_param.Env_to_vars.find_or_add params param)
+    | Var param ->
+      let var = Type_param.Env_to_vars.find_or_add params param in
+      record_context_var types var ~polarity;
+      Var var
     | Type_app (type_name, args) ->
+      (* FIXME: Handle contravariant type parameters in type application *)
       Type_app
-        (type_name, List.map args ~f:(instantiate_type_scheme ~names ~types ~params))
+        ( type_name
+        , List.map args ~f:(instantiate_type_scheme ~names ~types ~params ~polarity) )
     | Tuple fields ->
-      Tuple (List.map fields ~f:(instantiate_type_scheme ~names ~types ~params))
+      Tuple (List.map fields ~f:(instantiate_type_scheme ~names ~types ~params ~polarity))
     | Function (args, effects, result) ->
-      let args = Nonempty.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
-      let effects = instantiate_effect_type_scheme ~names ~types ~params effects in
-      Function (args, effects, instantiate_type_scheme ~names ~types ~params result)
+      let args =
+        let polarity = Polarity.flip polarity in
+        Nonempty.map args ~f:(instantiate_type_scheme ~names ~types ~params ~polarity)
+      in
+      let effects =
+        instantiate_effect_type_scheme ~names ~types ~params ~polarity effects
+      in
+      Function
+        (args, effects, instantiate_type_scheme ~names ~types ~params result ~polarity)
     | Union [] -> Never
     | Intersection [] -> Any
     | Union args ->
-      let var = Internal_type.fresh_var () in
+      let var = Type_var.create () in
+      record_context_var types var ~polarity;
+      let var : Internal_type.t = Var var in
       let args =
-        Non_single_list.map args ~f:(instantiate_type_scheme ~names ~types ~params)
+        Non_single_list.map
+          args
+          ~f:(instantiate_type_scheme ~names ~types ~params ~polarity)
       in
       Non_single_list.iter args ~f:(fun subtype ->
         constrain ~names ~types ~subtype ~supertype:var);
       var
     | Intersection args ->
-      let var = Internal_type.fresh_var () in
+      let var = Type_var.create () in
+      record_context_var types var ~polarity;
+      let var : Internal_type.t = Var var in
       let args =
-        Non_single_list.map args ~f:(instantiate_type_scheme ~names ~types ~params)
+        Non_single_list.map
+          args
+          ~f:(instantiate_type_scheme ~names ~types ~params ~polarity)
       in
       Non_single_list.iter args ~f:(fun supertype ->
         constrain ~names ~types ~subtype:var ~supertype);
       var
-  and instantiate_effect_type_scheme ~names ~types ~params effects =
+  and instantiate_effect_type_scheme ~names ~types ~params ~polarity effects =
     let collect_effects
       (effects : _ Type_scheme.effects Non_single_list.t)
       ~union_or_intersection
@@ -785,7 +823,9 @@ and instantiate_type_scheme =
           ~f:(fun (concrete_effects, effect_vars) new_effects ->
           match new_effects with
           | Effect (effect_name, args) ->
-            let args = List.map args ~f:(instantiate_type_scheme ~names ~types ~params) in
+            let args =
+              List.map args ~f:(instantiate_type_scheme ~names ~types ~params ~polarity)
+            in
             (match Map.add concrete_effects ~key:effect_name ~data:args with
              | `Ok concrete_effects -> concrete_effects, effect_vars
              | `Duplicate ->
@@ -795,12 +835,15 @@ and instantiate_type_scheme =
                    [%message "Duplicate effects" (effect_name : Effect_name.Absolute.t)])
           | Effect_var param ->
             let var = Type_param.Env_to_vars.find_or_add params param in
+            record_context_var types var ~polarity;
             concrete_effects, var :: effect_vars
           | Effect_union [] | Effect_intersection [] ->
             (* FIXME: how are these empty unions/intersections even getting around? I
                think we might need them as vars for correctness. Just converting them to
                vars solve the problem for now, but isn't very principled. *)
-            concrete_effects, Type_var.create () :: effect_vars
+            let var = Type_var.create () in
+            record_context_var types var ~polarity;
+            concrete_effects, var :: effect_vars
           | Effect_union (_ :: _) | Effect_intersection (_ :: _) ->
             (* TODO: Decide if this should be allowed, or statically prevent it from
                happening by changing the type. I think the syntax doesn't currently allow
@@ -813,6 +856,7 @@ and instantiate_type_scheme =
         then None
         else (
           let effect_var = Type_var.create () in
+          record_context_var types effect_var ~polarity;
           List.iter effect_vars ~f:(fun other_var ->
             match union_or_intersection with
             | `Union ->
@@ -828,11 +872,12 @@ and instantiate_type_scheme =
       { effects =
           Effect_name.Absolute.Map.singleton
             effect_name
-            (List.map args ~f:(instantiate_type_scheme ~names ~types ~params))
+            (List.map args ~f:(instantiate_type_scheme ~names ~types ~params ~polarity))
       ; effect_var = None
       }
     | Effect_var param ->
       let var = Type_param.Env_to_vars.find_or_add params param in
+      record_context_var types var ~polarity;
       { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
     | Effect_union args -> collect_effects args ~union_or_intersection:`Union
     | Effect_intersection args ->
@@ -861,9 +906,9 @@ and instantiate_type_scheme =
       constrain
         ~names
         ~types
-        ~subtype:(instantiate_type_scheme ~names ~types ~params (Var subtype))
-        ~supertype:(instantiate_type_scheme ~names ~types ~params (Var supertype)));
-    instantiate_type_scheme ~names ~types scheme ~params
+        ~subtype:(Var (Type_param.Env_to_vars.find_or_add params subtype))
+        ~supertype:(Var (Type_param.Env_to_vars.find_or_add params supertype)));
+    instantiate_type_scheme ~names ~types scheme ~params ~polarity:Positive
 ;;
 
 let instantiate_type_or_scheme
@@ -877,6 +922,15 @@ let instantiate_type_or_scheme
   | Scheme scheme -> instantiate_type_scheme ?params ~names ~types scheme
 ;;
 
+let record_pattern_names types pat_names =
+  Map.iter pat_names ~f:(fun name_entry ->
+    match Name_bindings.Name_entry.type_ name_entry with
+    | Type type_ -> Internal_type.iter_vars type_ ~f:(record_context_var types)
+    | Scheme scheme ->
+      compiler_bug
+        [%message "Unexpected pattern name entry type" (scheme : _ Type_scheme.t)])
+;;
+
 let constrain' ~names ~types ~subtype ~supertype =
   constrain
     ~names
@@ -885,49 +939,51 @@ let constrain' ~names ~types ~subtype ~supertype =
     ~supertype:(instantiate_type_or_scheme ~names ~types supertype)
 ;;
 
+(* FIXME: Use generalized_vars mapping *)
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
    expresion/statement. *)
 let generalize types outer_type =
-  let rec generalize_internal types typ ~env ~polarity
-    : Module_path.absolute Type_scheme.type_
+  let rec generalize_internal types typ ~polarity : Module_path.absolute Type_scheme.type_
     =
     match (typ : Internal_type.t) with
     | Never -> Union []
     | Any -> Intersection []
-    | Var var -> Var (Type_param.Env_of_vars.find_or_add env var)
+    | Var var -> Var (Type_param.Env_of_vars.find_or_add types.generalized_vars var)
     | Function (args, effects, res) ->
       let args =
         Nonempty.map
           args
-          ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
+          ~f:(generalize_internal types ~polarity:(Polarity.flip polarity))
       in
-      let effects = generalize_effects_internal types effects ~env ~polarity in
-      let res = generalize_internal types res ~env ~polarity in
+      let effects = generalize_effects_internal types effects ~polarity in
+      let res = generalize_internal types res ~polarity in
       Function (args, effects, res)
     | Partial_function (args, effects, result_var) ->
       let args =
         Nonempty.map
           args
-          ~f:(generalize_internal types ~env ~polarity:(Polarity.flip polarity))
+          ~f:(generalize_internal types ~polarity:(Polarity.flip polarity))
       in
-      let effects = generalize_effects_internal types effects ~env ~polarity in
-      let result_var = Type_param.Env_of_vars.find_or_add env result_var in
+      let effects = generalize_effects_internal types effects ~polarity in
+      let result_var =
+        Type_param.Env_of_vars.find_or_add types.generalized_vars result_var
+      in
       Function (args, effects, Var result_var)
     | Type_app (name, fields) ->
-      Type_app (name, List.map fields ~f:(generalize_internal types ~env ~polarity))
-    | Tuple fields ->
-      Tuple (List.map fields ~f:(generalize_internal types ~env ~polarity))
-  and generalize_effects_internal types { effects; effect_var } ~env ~polarity =
+      Type_app (name, List.map fields ~f:(generalize_internal types ~polarity))
+    | Tuple fields -> Tuple (List.map fields ~f:(generalize_internal types ~polarity))
+  and generalize_effects_internal types { effects; effect_var } ~polarity =
     let effects =
       List.map
         (Map.to_alist effects)
         ~f:(fun (effect_name, args) : _ Type_scheme.effects ->
-        Effect (effect_name, List.map args ~f:(generalize_internal types ~env ~polarity)))
+        Effect (effect_name, List.map args ~f:(generalize_internal types ~polarity)))
     in
     let effects_from_effect_var : Module_path.absolute Type_scheme.effects option =
       match effect_var with
-      | Some var -> Some (Effect_var (Type_param.Env_of_vars.find_or_add env var))
+      | Some var ->
+        Some (Effect_var (Type_param.Env_of_vars.find_or_add types.generalized_vars var))
       | None -> None
     in
     Type_scheme.effect_union_list (Option.to_list effects_from_effect_var @ effects)
@@ -937,12 +993,21 @@ let generalize types outer_type =
   (* FIXME: We give different names to the params in different places in the same
      statement. We should have 1 type-bindings per statement, and probably just one param
      name generator for that. *)
-  let env = Type_param.Env_of_vars.create () in
   let substituted_type = Substitution.apply_to_type types.substitution outer_type in
-  let scheme = generalize_internal types substituted_type ~env ~polarity:Positive in
-  let constraints = Constraints.to_constraint_list types.constraints ~params:env in
+  let scheme = generalize_internal types substituted_type ~polarity:Positive in
+  let constraints =
+    Constraints.to_constraint_list types.constraints ~params:types.generalized_vars
+  in
   let pre_simplified_type = scheme, constraints in
-  let simplified_type = Type_simplification.simplify_type (scheme, constraints), [] in
+  let simplified_type =
+    let context_vars =
+      By_polarity.map types.context_vars ~f:(fun vars ->
+        Hash_set.to_list vars
+        |> List.filter_map ~f:(Type_param.Env_of_vars.find types.generalized_vars)
+        |> Type_param.Set.of_list)
+    in
+    Type_simplification.simplify_type (scheme, constraints) ~context_vars
+  in
   eprint_s
     [%message
       "generalize result"
@@ -950,7 +1015,7 @@ let generalize types outer_type =
         (substituted_type : Internal_type.t)
         (pre_simplified_type : Module_path.absolute Type_scheme.t)
         (simplified_type : Module_path.absolute Type_scheme.t)
-        (env : Type_param.Env_of_vars.t)
+        (types.generalized_vars : Type_param.Env_of_vars.t)
         (types.substitution : Substitution.t)];
   simplified_type
 ;;

@@ -105,32 +105,65 @@ let rec map2 ?(f = Map_action.defer) ?(f_contra = f) type1 type2 ~var ~eff =
        compiler_bug [%message "Incompatible types for map2" (type1 : t) (type2 : t)])
 ;;
 
-let rec fold_until typ ~init ~f =
-  match (f init typ : _ Fold_action.t) with
+let rec fold_until typ ~init ~f ~f_effects ~polarity =
+  match (f init typ ~polarity : _ Fold_action.t) with
   | Stop _ as stop -> stop
-  | Continue init as continue ->
+  | Continue (`Halt acc) -> Continue acc
+  | Continue (`Defer init) ->
     (match typ with
-     | Var _ | Never | Any -> continue
+     | Var _ | Never | Any -> Continue init
      | Type_app (_, fields) | Tuple fields ->
-       List.fold_until fields ~init ~f:(fun init -> fold_until ~init ~f)
+       (* FIXME: Handle contravariant type parameters in type applications *)
+       List.fold_until fields ~init ~f:(fun init ->
+         fold_until ~init ~f ~f_effects ~polarity)
      | Function (args, effects, body) ->
        let%bind.Fold_action init =
-         Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
+         let polarity = Polarity.flip polarity in
+         Nonempty.fold_until args ~init ~f:(fun init ->
+           fold_until ~init ~f ~f_effects ~polarity)
        in
-       let%bind.Fold_action init = fold_effects_until effects ~init ~f in
-       fold_until body ~init ~f
+       let%bind.Fold_action init =
+         fold_effects_until effects ~init ~f ~f_effects ~polarity
+       in
+       fold_until body ~init ~f ~f_effects ~polarity
      | Partial_function (args, effects, _) ->
        let%bind.Fold_action init =
-         Nonempty.fold_until args ~init ~f:(fun init -> fold_until ~init ~f)
+         let polarity = Polarity.flip polarity in
+         Nonempty.fold_until args ~init ~f:(fun init ->
+           fold_until ~init ~f ~f_effects ~polarity)
        in
-       fold_effects_until effects ~init ~f)
+       fold_effects_until effects ~init ~f ~f_effects ~polarity)
 
-and fold_effects_until { effects; effect_var = _ } ~init ~f =
-  Map.fold_until effects ~init ~f:(fun ~key:_ ~data:args init ->
-    List.fold_until args ~init ~f)
+and fold_effects_until effects ~init ~f ~f_effects ~polarity =
+  match (f_effects init effects ~polarity : _ Fold_action.t) with
+  | Stop _ as stop -> stop
+  | Continue (`Halt acc) -> Continue acc
+  | Continue (`Defer init) ->
+    let { effect_var = _; effects } = effects in
+    Map.fold_until effects ~init ~f:(fun ~key:_ ~data:args init ->
+      List.fold_until args ~init ~f:(fun init typ ->
+        fold_until typ ~init ~f ~f_effects ~polarity))
 ;;
 
 let fold_vars typ ~init ~f =
+  fold_until
+    typ
+    ~init
+    ~polarity:Positive
+    ~f:(fun init typ ~polarity ->
+      match typ with
+      | Var var -> Continue (`Halt (f init var ~polarity))
+      | _ -> Continue (`Defer init))
+    ~f_effects:(fun init { effect_var; effects = _ } ~polarity ->
+      let init = Option.fold effect_var ~init ~f:(fun init v -> f init v ~polarity) in
+      Continue (`Defer init))
+  |> Fold_action.id
+;;
+
+let iter_vars typ ~f = fold_vars typ ~init:() ~f:(fun () var ~polarity -> f var ~polarity)
+
+(* FIXME: This doesn't include effect vars! That's no good *)
+(* let fold_vars typ ~init ~f =
   fold_until typ ~init ~f:(fun acc -> function
     | Var var -> Continue (f acc var)
     | _ -> Continue acc)
@@ -149,6 +182,6 @@ let exists_var typ ~f =
     | Var var -> if f var then Stop true else Continue false
     | _ -> Continue false)
   |> Fold_action.id
-;;
+;; *)
 
 let no_effects = { effects = Effect_name.Absolute.Map.empty; effect_var = None }

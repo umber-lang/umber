@@ -6,6 +6,20 @@ let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 (* FIXME: cleanup *)
 let eprint_s = ignore
 
+let merge_pattern_names ~names ~types pat_names ~combine =
+  Type_bindings.record_pattern_names types pat_names;
+  Name_bindings.merge_names names pat_names ~combine
+;;
+
+open struct
+  module Name_bindings = struct
+    include Name_bindings
+
+    let merge_names = `Use_merge_pattern_names_function
+    let _ = merge_names
+  end
+end
+
 module Pattern = struct
   include Pattern
 
@@ -171,7 +185,8 @@ module Pattern = struct
       of_untyped_with_names ~names ~types Pattern.Names.empty pattern
     in
     let names =
-      Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
+      merge_pattern_names ~names ~types pat_names ~combine:(fun _ _ new_entry ->
+        new_entry)
     in
     names, pat
   ;;
@@ -281,7 +296,8 @@ module Effect_pattern = struct
         effect_pattern
     in
     let names =
-      Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
+      merge_pattern_names ~names ~types pat_names ~combine:(fun _ _ new_entry ->
+        new_entry)
     in
     names, pat
   ;;
@@ -1158,7 +1174,7 @@ module Module = struct
 
   (** Gather placeholders for all declared names and types.
       (Needed for imports of submodules to work.) *)
-  let rec gather_name_placeholders ~names module_name sigs defs =
+  let rec gather_name_placeholders ~names ~types module_name sigs defs =
     let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
         Name_bindings.add_name_placeholder names name
@@ -1174,12 +1190,13 @@ module Module = struct
           assert_or_compiler_bug ~here:[%here] rec_;
           Nonempty.fold bindings ~init:names ~f:(fun names (pat, _) ->
             Node.with_value pat ~f:(fun pat ->
-              Name_bindings.merge_names
-                names
+              merge_pattern_names
+                ~names
+                ~types
                 (Pattern.Names.gather pat ~type_source:Placeholder)
                 ~combine:(fun _ _ entry' -> entry')))
         | Module (module_name, sigs, defs) ->
-          gather_name_placeholders ~names module_name sigs defs
+          gather_name_placeholders ~names ~types module_name sigs defs
         | Common_def common -> f_common names common
         | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)"))
   ;;
@@ -1385,8 +1402,9 @@ module Module = struct
         in
         let names =
           (* Unify pattern bindings with local type information (e.g. val declarations) *)
-          Name_bindings.merge_names
-            names
+          merge_pattern_names
+            ~names
+            ~types
             pat_names
             ~combine:(fun _ existing_entry new_entry ->
             let existing_type = Name_bindings.Name_entry.type_ existing_entry in
@@ -1648,7 +1666,7 @@ module Module = struct
   let of_untyped ~names ~types ~include_std (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
-      let names = gather_name_placeholders ~names module_name sigs defs in
+      let names = gather_name_placeholders ~names ~types module_name sigs defs in
       let names = gather_imports ~names ~include_std module_name sigs defs in
       let sigs, defs = absolutify_everything ~names module_name sigs defs in
       let names = gather_type_decls ~names ~types module_name sigs defs in

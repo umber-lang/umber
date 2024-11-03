@@ -24,6 +24,7 @@ val tuple : t list -> t
 val effects_of_var : Type_var.t -> effects
 val map : t -> f:(t -> (t, t) Map_action.t) -> t
 val map_vars : t -> f:(Type_var.t -> Type_var.t) -> t
+val iter_vars : t -> f:(Type_var.t -> polarity:Polarity.t -> unit) -> unit
 
 val map2
   :  ?f:(t * t -> (t * t, t) Map_action.t)
@@ -37,10 +38,17 @@ val map2
 val fold_until
   :  t
   -> init:'acc
-  -> f:('acc -> t -> ('acc, 'final) Fold_action.t)
+  -> f:
+       ('acc
+        -> t
+        -> polarity:Polarity.t
+        -> ([< `Defer of 'acc | `Halt of 'acc ], 'final) Fold_action.t)
+  -> f_effects:
+       ('acc
+        -> effects
+        -> polarity:Polarity.t
+        -> ([< `Defer of 'acc | `Halt of 'acc ], 'final) Fold_action.t)
+  -> polarity:Polarity.t
   -> ('acc, 'final) Fold_action.t
 
-val fold_vars : t -> init:'acc -> f:('acc -> Type_var.t -> 'acc) -> 'acc
-val for_all_vars : t -> f:(Type_var.t -> bool) -> bool
-val exists_var : t -> f:(Type_var.t -> bool) -> bool
 val no_effects : effects

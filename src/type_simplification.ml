@@ -149,7 +149,7 @@ let simplify_var_sandwiches type_ ~lower_bounds ~upper_bounds =
     Union_find.get (find_var_class var_classes var))
 ;;
 
-let get_positive_and_negative_vars outer_type =
+let get_positive_and_negative_vars outer_type ~context_vars =
   let add_var vars ~polarity var =
     By_polarity.update vars ~polarity ~f:(fun vars ->
       Map.update vars var ~f:(function
@@ -158,7 +158,10 @@ let get_positive_and_negative_vars outer_type =
   in
   fold_type_with_polarity
     outer_type
-    ~init:{ By_polarity.positive = Type_param.Map.empty; negative = Type_param.Map.empty }
+    ~init:
+      ((* Context vars are treated as "inputs" to an expression, so flip their polarity. *)
+       By_polarity.flip context_vars
+       |> By_polarity.map ~f:(Type_param.Map.of_key_set ~f:(const 1)))
     ~f:(fun ~polarity vars -> function
          | Var var -> Continue (`Halt (add_var vars ~polarity var))
          | _ -> Continue (`Defer vars))
@@ -233,9 +236,9 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
 (** Remove variables which only occur once in a positive or negative position
     respectively. Replace them with empty unions or intersections (the bottom and top
     types). *)
-let remove_polar_vars type_ =
+let remove_polar_vars type_ ~context_vars =
   let { By_polarity.positive = positive_vars; negative = negative_vars } =
-    get_positive_and_negative_vars type_
+    get_positive_and_negative_vars type_ ~context_vars
   in
   eprint_s
     [%message
@@ -379,6 +382,9 @@ let replace_co_occurring_vars type_ =
     Hashtbl.find replacements var |> Option.value_map ~f:Union_find.get ~default:var)
 ;;
 
+(* FIXME: This isn't valid to do per-type, since it will make types in a statement
+inconsistent with each other. We can do this as a full pass over the expression later, or
+as a part of the pretty-printing step. *)
 (* Rename variables in the type to create nicer types (starting with a, b, ...) *)
 let rename_vars type_ =
   let generator = Type_param.Generator.create () in
@@ -387,7 +393,7 @@ let rename_vars type_ =
     Hashtbl.find_or_add vars var ~default:(fun () -> Type_param.Generator.next generator))
 ;;
 
-let simplify_type ((type_, constraints) : _ Type_scheme.t) =
+let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   eprint_s [%message "simplify_type" (type_, constraints : _ Type_scheme.t)];
   let type_ =
     let lower_bounds =
@@ -402,7 +408,7 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) =
     eprint_s [%message "after simplifying sandwiches" (type_ : _ Type_scheme.type_)];
     replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper_bounds
   in
-  let type_ = remove_polar_vars type_ in
+  let type_ = remove_polar_vars type_ ~context_vars in
   eprint_s [%message "after removing polar vars" (type_ : _ Type_scheme.type_)];
   let type_ = replace_co_occurring_vars type_ in
   (* FIXME: We don't know whether variables are used elsewhere in the expression without
@@ -439,38 +445,7 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) =
   eprint_s
     [%message
       "after replacing co-occuring vars and renaming" (type_ : _ Type_scheme.type_)];
-  type_
-;;
-
-let simplify_types
-  ~(positive_types : _ Type_scheme.t list)
-  ~(negative_types : _ Type_scheme.t list)
-  =
-  (* eprint_s
-    [%message
-      "simplify_types"
-        (positive_types : _ Type_scheme.t list)
-        (negative_types : _ Type_scheme.t list)]; *)
-  let combine_types : _ Type_scheme.t list -> _ Type_scheme.t = function
-    | [ (type_, constraints) ] -> type_, constraints
-    | ([] | _ :: _ :: _) as types ->
-      let types, constraints = List.unzip types in
-      Tuple types, List.concat constraints
-  in
-  let positive_type, positive_constraints = combine_types positive_types in
-  let negative_type, negative_constraints = combine_types negative_types in
-  match
-    simplify_type
-      ( Function ([ negative_type ], Effect_union [], positive_type)
-      , positive_constraints @ negative_constraints )
-  with
-  | Function ([ negative_type ], _, positive_type) ->
-    let unwrap_types : _ Type_scheme.type_ -> _ Type_scheme.t list = function
-      | Tuple types -> List.map types ~f:(fun type_ -> type_, [])
-      | type_ -> [ type_, [] ]
-    in
-    unwrap_types positive_type, unwrap_types negative_type
-  | _ -> compiler_bug [%message "Expected function"]
+  type_, []
 ;;
 
 let%test_module _ =
@@ -485,17 +460,20 @@ let%test_module _ =
 
     let bool = fst Intrinsics.Bool.typ
     let list arg = Type_scheme.Type_app (Type_name.Absolute.of_string "List", [ arg ])
+    let empty_context_vars = By_polarity.init (const Type_param.Set.empty)
 
-    let run_test original_type =
+    let run_test original_type ~context_vars =
       print_s
         [%sexp
           { original_type : _ Type_scheme.t
-          ; simplified_type = (simplify_type original_type : _ Type_scheme.type_)
+          ; simplified_type =
+              (simplify_type original_type ~context_vars : _ Type_scheme.t)
           }]
     ;;
 
     let%expect_test "List.concat_map" =
       run_test
+        ~context_vars:empty_context_vars
         ( Function
             ( [ list (v "a"); Function ([ v "b" ], ev 1, list (v "c")) ]
             , ev 2
@@ -511,25 +489,30 @@ let%test_module _ =
              (((subtype a) (supertype b)) ((subtype e1) (supertype e2))
               ((subtype c) (supertype d)))))
            (simplified_type
-            (Function
-             ((Type_app List ((Var a)))
-              (Function ((Var a)) (Effect_var b) (Type_app List ((Var c)))))
-             (Effect_var b) (Type_app List ((Var c)))))) |}]
+            ((Function
+              ((Type_app List ((Var a)))
+               (Function ((Var a)) (Effect_var b) (Type_app List ((Var c)))))
+              (Effect_var b) (Type_app List ((Var c))))
+             ()))) |}]
     ;;
 
     let%expect_test "if" =
-      run_test (Function ([ bool; v "a"; v "b" ], ev 1, v "c"), [ "a" <: "c"; "b" <: "c" ]);
+      run_test
+        ~context_vars:empty_context_vars
+        (Function ([ bool; v "a"; v "b" ], ev 1, v "c"), [ "a" <: "c"; "b" <: "c" ]);
       [%expect
         {|
           ((original_type
             ((Function ((Type_app Bool ()) (Var a) (Var b)) (Effect_var e1) (Var c))
              (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
            (simplified_type
-            (Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a)))) |}]
+            ((Function ((Type_app Bool ()) (Var a) (Var a)) (Effect_union ()) (Var a))
+             ()))) |}]
     ;;
 
     let%expect_test "<=" =
       run_test
+        ~context_vars:empty_context_vars
         (Function ([ v "a"; v "b" ], Effect_union [], bool), [ "a" <: "c"; "b" <: "c" ]);
       [%expect
         {|
@@ -537,26 +520,31 @@ let%test_module _ =
             ((Function ((Var a) (Var b)) (Effect_union ()) (Type_app Bool ()))
              (((subtype a) (supertype c)) ((subtype b) (supertype c)))))
            (simplified_type
-            (Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())))) |}]
+            ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ()))) |}]
     ;;
 
     let%expect_test "id" =
-      run_test (Function ([ v "a" ], Effect_union [], v "a"), []);
+      run_test
+        ~context_vars:empty_context_vars
+        (Function ([ v "a" ], Effect_union [], v "a"), []);
       [%expect
         {|
           ((original_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))
-           (simplified_type (Function ((Var a)) (Effect_union ()) (Var a)))) |}];
-      run_test (Function ([ v "a" ], ev 1, v "b"), [ "a" <: "b" ]);
+           (simplified_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))) |}];
+      run_test
+        ~context_vars:empty_context_vars
+        (Function ([ v "a" ], ev 1, v "b"), [ "a" <: "b" ]);
       [%expect
         {|
           ((original_type
             ((Function ((Var a)) (Effect_var e1) (Var b))
              (((subtype a) (supertype b)))))
-           (simplified_type (Function ((Var a)) (Effect_union ()) (Var a)))) |}]
+           (simplified_type ((Function ((Var a)) (Effect_union ()) (Var a)) ()))) |}]
     ;;
 
     let%expect_test "between" =
       run_test
+        ~context_vars:empty_context_vars
         ( Function ([ v "c"; Tuple [ v "a"; v "b" ] ], Effect_union [], bool)
         , [ "c" <: "a"; "c" <: "b" ] );
       [%expect
@@ -566,9 +554,12 @@ let%test_module _ =
               (Type_app Bool ()))
              (((subtype c) (supertype a)) ((subtype c) (supertype b)))))
            (simplified_type
-            (Function ((Intersection ((Var a) (Var b))) (Tuple ((Var b) (Var a))))
-             (Effect_union ()) (Type_app Bool ())))) |}]
+            ((Function ((Intersection ((Var a) (Var b))) (Tuple ((Var b) (Var a))))
+              (Effect_union ()) (Type_app Bool ()))
+             ()))) |}]
     ;;
+
+    let%expect_test "consider context var polarity" = ()
 
     (* TODO: Quickcheck test that type simplification is idempotent. *)
   end)
