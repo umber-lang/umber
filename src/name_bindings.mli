@@ -177,16 +177,7 @@ val add_extern
   -> t
 
 val add_type_decl : t -> Type_name.t -> Module_path.absolute Type_decl.t -> t
-
-val add_effect
-  :  t
-  -> Effect_name.t
-  -> Module_path.absolute Effect.t
-  -> constrain:
-       (subtype:Name_entry.Type_or_scheme.t
-        -> supertype:Name_entry.Type_or_scheme.t
-        -> unit)
-  -> t
+val add_effect : t -> Effect_name.t -> Module_path.absolute Effect.t -> t
 
 module Sigs_or_defs : sig
   type name_bindings = t

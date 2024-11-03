@@ -11,15 +11,6 @@ let merge_pattern_names ~names ~types pat_names ~combine =
   Name_bindings.merge_names names pat_names ~combine
 ;;
 
-open struct
-  module Name_bindings = struct
-    include Name_bindings
-
-    let merge_names = `Use_merge_pattern_names_function
-    let _ = merge_names
-  end
-end
-
 module Pattern = struct
   include Pattern
 
@@ -868,7 +859,7 @@ module Expr = struct
 
   and map' expr ~f ~f_type = Node.map expr ~f:(map ~f ~f_type)
 
-  (* FIXME: Remove unused *)
+  (* FIXME: use *)
   (* let map_types expr ~f = map expr ~f_type:f ~f:(fun expr -> Defer expr) *)
 
   (* FIXME: Remove unused *)
@@ -1174,7 +1165,7 @@ module Module = struct
 
   (** Gather placeholders for all declared names and types.
       (Needed for imports of submodules to work.) *)
-  let rec gather_name_placeholders ~names ~types module_name sigs defs =
+  let rec gather_name_placeholders ~names module_name sigs defs =
     let f_common names = function
       | Val (name, _, _) | Extern (name, _, _, _) ->
         Name_bindings.add_name_placeholder names name
@@ -1190,13 +1181,12 @@ module Module = struct
           assert_or_compiler_bug ~here:[%here] rec_;
           Nonempty.fold bindings ~init:names ~f:(fun names (pat, _) ->
             Node.with_value pat ~f:(fun pat ->
-              merge_pattern_names
-                ~names
-                ~types
+              Name_bindings.merge_names
+                names
                 (Pattern.Names.gather pat ~type_source:Placeholder)
                 ~combine:(fun _ _ entry' -> entry')))
         | Module (module_name, sigs, defs) ->
-          gather_name_placeholders ~names ~types module_name sigs defs
+          gather_name_placeholders ~names module_name sigs defs
         | Common_def common -> f_common names common
         | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)"))
   ;;
@@ -1293,12 +1283,10 @@ module Module = struct
     absolutify_module
   ;;
 
-  let gather_type_decls ~names ~types sigs defs =
+  let gather_type_decls ~names sigs defs =
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
-      | Effect (effect_name, effect) ->
-        let constrain = Type_bindings.constrain' ~names ~types in
-        Name_bindings.add_effect names effect_name effect ~constrain
+      | Effect (effect_name, effect) -> Name_bindings.add_effect names effect_name effect
       | Trait_sig _ -> failwith "TODO: trait sigs"
       | Val _ | Extern _ | Import _ -> names)
   ;;
@@ -1358,6 +1346,12 @@ module Module = struct
     , Untyped.Expr.t
     , Module_path.absolute )
     Module.def
+
+  (* FIXME: If we want to have 1 Type_bindings per let binding group, this is problematic:
+     - We're instantiating all the pattern types up-front here, which is bad. We should do
+       it while typing each binding group.
+     - We're adding constraints to variables when there's a let + a val
+  *)
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
@@ -1472,6 +1466,24 @@ module Module = struct
     other_defs, binding_groups
   ;;
 
+  (* FIXME: use *)
+  (* let rename_type_vars_in_bindings bindings =
+    let map_var =
+      let generator = Type_param.Generator.create () in
+      let vars = Type_param.Table.create () in
+      Hashtbl.find_or_add vars ~default:(fun () -> Type_param.Generator.next generator)
+    in
+    let map_type : 'a. 'a Type_scheme.t -> 'a Type_scheme.t =
+      Tuple2.map_fst ~f:(Type_scheme.map_vars ~f:map_var)
+    in
+    Nonempty.map bindings ~f:(fun (pat, expr_and_scheme) ->
+      ( pat
+      , Node.map expr_and_scheme ~f:(fun (expr, scheme) ->
+          let scheme = map_type scheme in
+          let expr = Expr.map_types expr ~f:map_type in
+          expr, scheme) ))
+  ;; *)
+
   let type_binding_group ~names ~types bindings =
     (* TODO: The spans should be kept as consistent with the original source as possible
        in order to report accurate errors. It's better that they match the original source
@@ -1514,6 +1526,7 @@ module Module = struct
         in
         names, (Node.create pat pat_span, expr_and_scheme))
     in
+    (* let bindings = rename_type_vars_in_bindings bindings in *)
     (* FIXME: Remove this hack *)
     (* let positive_types, negative_types =
       let add_type (positive_types, negative_types) type_ ~(polarity : Polarity.t) =
@@ -1660,16 +1673,20 @@ module Module = struct
         | Let _ | Trait _ | Impl _ -> ()))
   ;;
 
-  (* TODO: Type inference is local to groups of toplevel let bindings, so we could be
+  (* FIXME: Type inference is local to groups of toplevel let bindings, so we could be
      creating a new [Type_bindings.t] to use for each of those, instead of re-using one
-     for a whole file. This would save some memory and hopefully have the GC scan less. *)
-  let of_untyped ~names ~types ~include_std (module_name, sigs, defs) =
+     for a whole file. This would save some memory and hopefully have the GC scan less.
+     
+     Using only 1 type bindings also makes keeping track of type variable names a lot
+     easier. *)
+  let of_untyped ~names ~include_std (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in
-      let names = gather_name_placeholders ~names ~types module_name sigs defs in
+      let names = gather_name_placeholders ~names module_name sigs defs in
       let names = gather_imports ~names ~include_std module_name sigs defs in
       let sigs, defs = absolutify_everything ~names module_name sigs defs in
-      let names = gather_type_decls ~names ~types module_name sigs defs in
+      let names = gather_type_decls ~names module_name sigs defs in
+      let types = Type_bindings.create () in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
       check_every_val_is_defined ~names module_name defs;

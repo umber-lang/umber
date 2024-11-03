@@ -946,7 +946,7 @@ let add_type_decl t type_name decl =
    or put it in typed.ml. *)
 
 (* TODO: use new logic similar to val/extern/let. Also we could probably share code. *)
-let add_name_entry names name scheme new_entry ~constrain =
+let add_name_entry names name new_entry =
   Map.update names name ~f:(function
     | None ->
       compiler_bug [%message "Missing placeholder name entry" (name : Value_name.t)]
@@ -957,9 +957,6 @@ let add_name_entry names name scheme new_entry ~constrain =
          compiler_bug
            [%message
              "Unexpected non-placeholder name entry" (existing_entry : Name_entry.t)]);
-      constrain
-        ~subtype:(Name_entry.Type_or_scheme.Scheme scheme)
-        ~supertype:(Name_entry.type_ existing_entry);
       Local (Name_entry.merge existing_entry new_entry)
     | Some (Imported imported_name) ->
       name_error
@@ -970,7 +967,7 @@ let add_name_entry names name scheme new_entry ~constrain =
           ^ Value_name.Absolute.to_ustring imported_name))
 ;;
 
-let add_effect t effect_name effect ~constrain =
+let add_effect t effect_name effect =
   if not (Effect.no_free_params effect)
   then
     Compilation_error.raise
@@ -1005,7 +1002,7 @@ let add_effect t effect_name effect ~constrain =
             ; extern_name = None
             }
           in
-          add_name_entry names name scheme new_entry ~constrain)
+          add_name_entry names name new_entry)
     }
   in
   update_current t ~f:{ f }

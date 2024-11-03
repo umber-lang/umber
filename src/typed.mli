@@ -49,7 +49,6 @@ module Module : sig
 
   val of_untyped
     :  names:Name_bindings.t
-    -> types:Type_bindings.t
     -> include_std:bool
     -> Untyped.Module.t
     -> (Name_bindings.t * t, Compilation_error.t) Result.t

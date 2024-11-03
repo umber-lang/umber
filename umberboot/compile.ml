@@ -189,11 +189,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
                  Name_bindings.into_module names module_name ~place:`Def
                | None -> names
              in
-             Ast.Typed.Module.of_untyped
-               ~names
-               ~types:(Type_bindings.create ())
-               ~include_std:(not no_std)
-               untyped_ast
+             Ast.Typed.Module.of_untyped ~names ~include_std:(not no_std) untyped_ast
            in
            let%map.Result names, typed_ast = type_check untyped_ast in
            maybe_output Typed_ast ~f:(fun out ->

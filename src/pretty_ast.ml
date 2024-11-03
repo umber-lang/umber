@@ -351,11 +351,7 @@ module Typed_to_untyped = struct
     in
     let typed =
       match
-        Typed.Module.of_untyped
-          ~names:Name_bindings.core
-          ~types:(Type_bindings.create ())
-          ~include_std:false
-          untyped
+        Typed.Module.of_untyped ~names:Name_bindings.core ~include_std:false untyped
       with
       | Ok (_names, typed) -> typed
       | Error error -> raise (Compilation_error.Compilation_error error)
