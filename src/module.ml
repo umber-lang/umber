@@ -63,18 +63,15 @@ type ('pat, 'expr, 'name) t =
   Module_name.t * 'name sig_ Node.t list * ('pat, 'expr, 'name) def Node.t list
 
 and 'name common =
-  (* TODO: Consider making [Val] sig-only. *)
-  | Val of Value_name.t * Fixity.t option * 'name Type_scheme.t
   | Extern of Value_name.t * Fixity.t option * 'name Type_scheme.t * Extern_name.t
   | Type_decl of Type_name.t * 'name Type_decl.t
   | Effect of Effect_name.t * 'name Effect.t
-  (* TODO: [Trait_sig] actually can't appear in defs as it is just parsed as [Trait].
-     There should probably be a sig-only type. *)
-  | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * 'name sig_ Node.t list
   | Import of Import.t
 
 and 'name sig_ =
   | Common_sig of 'name common
+  | Val of Value_name.t * Fixity.t option * 'name Type_scheme.t
+  | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * 'name sig_ Node.t list
   | Module_sig of Module_name.t * 'name sig_ Node.t list
 
 and ('pat, 'expr, 'name) def =

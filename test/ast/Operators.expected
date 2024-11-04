@@ -2,36 +2,30 @@
  ((Common_sig
    (Import
     ((kind Absolute) (paths (Module Std ((Module Prelude ((Name List)))))))))
-  (Common_sig
-   (Val == ((Non_assoc 4))
-    ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ())))
+  (Val == ((Non_assoc 4))
+   ((Function ((Var a) (Var a)) (Effect_union ()) (Type_app Bool ())) ()))
   (Module_sig Arith
-   ((Common_sig
-     (Val + ((Left 6))
-      ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-        (Type_app Int ()))
-       ())))
-    (Common_sig
-     (Val mod ((Left 7))
-      ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-        (Type_app Int ()))
-       ())))))
-  (Common_sig
-   (Val :: ((Right 5))
-    ((Function ((Var a) (Type_app Std.Prelude.List.List ((Var a))))
-      (Effect_union ()) (Type_app Std.Prelude.List.List ((Var a))))
-     ())))
-  (Common_sig
-   (Val "\195\151" ()
-    ((Function
-      ((Type_app Std.Prelude.List.List ((Var a)))
-       (Type_app Std.Prelude.List.List ((Var b))))
-      (Effect_union ())
-      (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))
-     ())))
-  (Common_sig
-   (Val ~~~ ((Non_assoc 3))
-    ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ()))))
+   ((Val + ((Left 6))
+     ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
+       (Type_app Int ()))
+      ()))
+    (Val mod ((Left 7))
+     ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
+       (Type_app Int ()))
+      ()))))
+  (Val :: ((Right 5))
+   ((Function ((Var a) (Type_app Std.Prelude.List.List ((Var a))))
+     (Effect_union ()) (Type_app Std.Prelude.List.List ((Var a))))
+    ()))
+  (Val "\195\151" ()
+   ((Function
+     ((Type_app Std.Prelude.List.List ((Var a)))
+      (Type_app Std.Prelude.List.List ((Var b))))
+     (Effect_union ())
+     (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))
+    ()))
+  (Val ~~~ ((Non_assoc 3))
+   ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())))
  ((Common_def
    (Import
     ((kind Absolute)

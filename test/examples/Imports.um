@@ -29,7 +29,7 @@ module : {
     }
   }
 
-  val (*) infixl 7 : Int, Int -> Int
+  val infixl 7 (*) : Int, Int -> Int
 }
 
 

@@ -6,8 +6,7 @@ type Direction = | North | South | East | West
 
 let north_is_north = match North | North -> True | _ -> False
 
-val first_letter : Direction -> Char
-let first_letter = match
+let first_letter : Direction -> Char = match
   | North -> 'N'
   | South -> 'S'
   | East -> 'E'
@@ -29,7 +28,7 @@ type Option a =
   | None
 
 # TODO: labelled arguments
-val value : Option a, a -> a
+# FIXME: type annotation?
 let value opt default = match opt
   | Some x -> x
   | None -> default

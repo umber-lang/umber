@@ -263,20 +263,20 @@ module Typed_to_untyped = struct
     let rec convert_common ~names
       : Module_path.absolute Module.common -> Module_path.relative Module.common
       = function
-      | Val (name, fixity, type_) -> Val (name, fixity, relativize_type' ~names type_)
       | Extern (name, fixity, type_, extern_name) ->
         Extern (name, fixity, relativize_type' ~names type_, extern_name)
       | Type_decl (type_name, decl) ->
         Type_decl (type_name, Type_decl.map_exprs decl ~f:(relativize_type ~names))
       | Effect (effect_name, effect) ->
         Effect (effect_name, Effect.map_exprs effect ~f:(relativize_type ~names))
-      | Trait_sig (trait_name, params, sigs) ->
-        Trait_sig (trait_name, params, List.map sigs ~f:(Node.map ~f:(convert_sig ~names)))
       | Import import -> Import import
     and convert_sig ~names
       : Module_path.absolute Module.sig_ -> Module_path.relative Module.sig_
       = function
       | Common_sig common -> Common_sig (convert_common ~names common)
+      | Val (name, fixity, type_) -> Val (name, fixity, relativize_type' ~names type_)
+      | Trait_sig (trait_name, params, sigs) ->
+        Trait_sig (trait_name, params, List.map sigs ~f:(Node.map ~f:(convert_sig ~names)))
       | Module_sig (module_name, sigs) ->
         let names = Name_bindings.into_module names module_name ~place:`Sig in
         Module_sig (module_name, List.map sigs ~f:(Node.map ~f:(convert_sig ~names)))
@@ -744,11 +744,6 @@ let format_to_document
                format_binding "and" pat fixity expr)))
   in
   let rec format_common : _ Module.common -> t = function
-    | Val (name, fixity, type_) ->
-      Group
-        (format_annotated
-           (Text "val" ^| format_value_name name ^| format_fixity fixity)
-           (format_type' type_))
     | Extern (name, fixity, type_, extern_name) ->
       Group
         (format_equals
@@ -796,9 +791,8 @@ let format_to_document
          | Some operations ->
            List.map operations ~f:(fun { name; args; result } ->
              Module.Val (name, None, (Function (args, Effect_union [], result), []))))
-        ~f:format_common
+        ~f:format_sig
         ~on_empty:(Text "{}")
-    | Trait_sig _ -> failwith "TODO: format trait sig"
     | Import { kind; paths } ->
       (* TODO: Put toplevel imports at the top (and they should probably apply to sigs
          too) *)
@@ -826,6 +820,12 @@ let format_to_document
          ^^ format_import_paths paths)
   and format_sig : _ Module.sig_ -> t = function
     | Common_sig common -> format_common common
+    | Val (name, fixity, type_) ->
+      Group
+        (format_annotated
+           (Text "val" ^| format_value_name name ^| format_fixity fixity)
+           (format_type' type_))
+    | Trait_sig _ -> failwith "TODO: format trait sig"
     | Module_sig (module_name, sigs) ->
       format_block
         (Text "module" ^| Text (Module_name.to_string module_name))

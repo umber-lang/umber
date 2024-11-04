@@ -15,5 +15,4 @@ let ((Triple x 5 y) | (Triple x y 5)) = Triple "Weird stuff" 5 7
 let ((u, -5, v) | (u, v, -20)) = ("Weird tuples", 0, 1)
 
 let a = ANewThing
-val a : NewThing
 type NewThing = | ANewThing

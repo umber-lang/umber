@@ -4,11 +4,9 @@ let () = ()
 let id x = x
 let id_for_ints (x : Int) = x
 
-val id_for_floats : Float -> Float
-let id_for_floats = \x -> x
+let id_for_floats : Float -> Float = \x -> x
 
-let id_for_chars = id
-val id_for_chars : Char -> Char
+let id_for_chars : Char -> Char = id
 
 let id_for_bools x = id x : Bool
 

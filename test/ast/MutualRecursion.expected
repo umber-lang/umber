@@ -1,12 +1,9 @@
 (MutualRecursion ()
- ((Common_def (Val f () ((Type_app MutualRecursion.Forest ((Var a))) ())))
-  (Let (rec_ false)
+ ((Let (rec_ false)
    (bindings
     (((Catch_all (f)) ()
       ((Name Std.Prelude.List.Nil)
-       ((Type_app Std.Prelude.List.List
-         ((Type_app MutualRecursion.Tree ((Union ())))))
-        ()))))))
+       ((Type_app MutualRecursion.Forest ((Var a))) ()))))))
   (Let (rec_ true)
    (bindings
     (((Catch_all (sum_forest)) ()

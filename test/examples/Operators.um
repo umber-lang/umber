@@ -1,17 +1,17 @@
 module : {
   import Std.Prelude.List  
 
-  val (==) infix 4 : a, a -> Bool
+  val infix 4 (==) : a, a -> Bool
 
   module Arith : {
-    val (+) infixl 6 : Int, Int -> Int
-    val mod infixl 7 : Int, Int -> Int
+    val infixl 6 (+) : Int, Int -> Int
+    val infixl 7 mod : Int, Int -> Int
   }
   
-  val (::) infixr 5 : a, List a -> List a  # Sequence? []?
+  val infixr 5 (::) : a, List a -> List a  # Sequence? []?
   val (×) : List a, List b -> List (a, b)
 
-  val (~~~) infix 3 : (), () -> ()
+  val infix 3 (~~~) : (), () -> ()
 }
 
 import Std.Prelude.((*), (==), List, (::), Nil)
@@ -28,7 +28,7 @@ let left_section = Arith.((2+))
 let right_section = (*5)
 let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?"::Nil)
 
-let (~~~) infix 3 () () = ()
+let infix 3 (~~~) () () = ()
 
 # FIXME: Correct var renaming here
 let (×) xs ys = List.concat_map xs (\x -> List.map ys (\y -> (x, y)))

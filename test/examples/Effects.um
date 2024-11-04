@@ -2,8 +2,7 @@ effect Read = {
   val ask : () -> Int
 }
 
-val read : () -> <Read> Int
-let read = ask
+let read : () -> <Read> Int = ask
 
 let read_and_add () = ask () + ask ()
 
@@ -50,8 +49,7 @@ let _ =
 #   | Ok value -> value
 #   | Error exn -> raise exn
 
-# val handle_state : a, (() -> <State a> b) -> (a, b)
-# let handle_state init f =
+# let handle_state : a, (() -> <State a> b) -> (a, b) = \init f ->
 #  (handle f ()
 #  | x -> (\s -> (s, x))
 #  | <get ()> -> (\s -> (resume s) s)

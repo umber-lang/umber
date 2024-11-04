@@ -1,18 +1,15 @@
 (Modules ()
  ((Module
-   (A ((Common_sig (Val foo () ((Type_app Int ()) ()))))
+   (A ((Val foo () ((Type_app Int ()) ())))
     ((Let (rec_ true) (bindings (((Catch_all (foo)) () (Literal (Int 5))))))
      (Module
       (B
        ((Module_sig C
-         ((Common_sig
-           (Trait_sig D (d)
-            ((Common_sig
-              (Val d ()
-               ((Function ((Var d)) (Effect_union ()) (Type_app Nat ())) ()))))))))
+         ((Trait_sig D (d)
+           ((Val d ()
+             ((Function ((Var d)) (Effect_union ()) (Type_app Nat ())) ()))))))
         (Module_sig D
-         ((Common_sig
-           (Val wow () ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))))
+         ((Val wow () ((Function ((Var a)) (Effect_union ()) (Var a)) ())))))
        ((Module
          (D ()
           ((Let (rec_ true)

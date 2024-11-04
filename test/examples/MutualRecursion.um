@@ -1,8 +1,7 @@
 # Mutual recursion within a module is allowed for both types and let-bindings
 
 # Types can be used before being defined
-val f : Forest a
-let f = Nil
+let f : Forest a = Nil
 
 let sum_forest =
   let loop acc forest = match forest

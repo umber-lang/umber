@@ -997,16 +997,23 @@ module Module = struct
   type nonrec def = (Pattern.t, Expr.generalized, Module_path.absolute) def
   [@@deriving sexp_of]
 
-  let rec gather_names ~names ~f_common ?f_def module_name sigs defs =
-    let names =
-      Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
-        List.fold sigs ~init:names ~f:(fun names sig_ ->
+  let rec gather_names ~names ~f_common ?f_sig ?f_def module_name sigs defs =
+    let f_sig =
+      match f_sig with
+      | Some f_sig -> f_sig
+      | None ->
+        fun names sig_ ->
           Node.with_value sig_ ~f:(function
             | Common_sig common -> f_common names common
+            | Val _ | Trait_sig _ -> names
             | Module_sig (module_name, sigs) ->
-              gather_names ~names module_name sigs [] ~f_common ?f_def)))
+              gather_names ~names module_name sigs [] ~f_common ?f_def)
     in
-    let f =
+    let names =
+      Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
+        List.fold sigs ~init:names ~f:f_sig)
+    in
+    let f_def =
       match f_def with
       | Some f_def -> f_def
       | None ->
@@ -1018,7 +1025,7 @@ module Module = struct
             | Let _ | Trait _ | Impl _ -> names)
     in
     Name_bindings.with_submodule ~place:`Def names module_name ~f:(fun names ->
-      List.fold defs ~init:names ~f)
+      List.fold defs ~init:names ~f:f_def)
   ;;
 
   module Sig_data : sig
@@ -1108,12 +1115,12 @@ module Module = struct
              | Effect (effect_name, _) ->
                let def = Node.set sig_ (Common_def common) in
                Nested_map.map sig_map ~f:(Sig_data.add_effect_decl ~effect_name ~def)
-             | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-             | Val _
              | Extern _
              (* We could consider handling imports bringing in type declarations to copy
                 over, but the cost-benefit of this feature isn't clear right now. *)
              | Import _ -> sig_map)
+          | Val _ -> sig_map
+          | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
           | Module_sig (module_name, sigs) ->
             Nested_map.with_module sig_map module_name ~f:(fun sig_map ->
               gather_decls
@@ -1139,8 +1146,7 @@ module Module = struct
                      sig_map
                      ~f:(Fn.flip Sig_data.remove_effect_decl effect_name)
                  , def )
-               | Trait_sig _ -> failwith "TODO: copy trait_sigs to defs"
-               | Val _ | Extern _ | Import _ -> sig_map, def)
+               | Extern _ | Import _ -> sig_map, def)
             | Module (module_name, sigs, defs) ->
               (match Nested_map.find_module sig_map module_name with
                | Some child_map ->
@@ -1183,28 +1189,40 @@ module Module = struct
       (Needed for imports of submodules to work.) *)
   let rec gather_name_placeholders ~names module_name sigs defs =
     let f_common names = function
-      | Val (name, _, _) | Extern (name, _, _, _) ->
-        Name_bindings.add_name_placeholder names name
+      | Extern (name, _, _, _) -> Name_bindings.add_name_placeholder names name
       | Type_decl (type_name, decl) ->
         Name_bindings.add_type_decl_placeholder names type_name decl
       | Effect (effect_name, effect) ->
         Name_bindings.add_effect_placeholder names effect_name effect
-      | Import _ | Trait_sig _ -> names
+      | Import _ -> names
     in
-    gather_names ~names module_name sigs defs ~f_common ~f_def:(fun names def ->
-      Node.with_value def ~f:(function
-        | Let { bindings; rec_ } ->
-          assert_or_compiler_bug ~here:[%here] rec_;
-          Nonempty.fold bindings ~init:names ~f:(fun names (pat, _fixity, _expr) ->
-            Node.with_value pat ~f:(fun pat ->
-              Name_bindings.merge_names
-                names
-                (Pattern.Names.gather pat ~type_source:Placeholder)
-                ~combine:(fun _ _ entry' -> entry')))
-        | Module (module_name, sigs, defs) ->
-          gather_name_placeholders ~names module_name sigs defs
-        | Common_def common -> f_common names common
-        | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)"))
+    gather_names
+      ~names
+      module_name
+      sigs
+      defs
+      ~f_common
+      ~f_sig:(fun names sig_ ->
+        Node.with_value sig_ ~f:(function
+          | Common_sig common -> f_common names common
+          | Val (name, _, _) -> Name_bindings.add_name_placeholder names name
+          | Trait_sig _ -> names
+          | Module_sig (module_name, sigs) ->
+            gather_name_placeholders ~names module_name sigs []))
+      ~f_def:(fun names def ->
+        Node.with_value def ~f:(function
+          | Let { bindings; rec_ } ->
+            assert_or_compiler_bug ~here:[%here] rec_;
+            Nonempty.fold bindings ~init:names ~f:(fun names (pat, _fixity, _expr) ->
+              Node.with_value pat ~f:(fun pat ->
+                Name_bindings.merge_names
+                  names
+                  (Pattern.Names.gather pat ~type_source:Placeholder)
+                  ~combine:(fun _ _ entry' -> entry')))
+          | Module (module_name, sigs, defs) ->
+            gather_name_placeholders ~names module_name sigs defs
+          | Common_def common -> f_common names common
+          | Trait _ | Impl _ -> failwith "TODO: trait/impl (gather_name_placeholders)"))
   ;;
 
   let import_mentions_prelude : Module.Import.t -> bool = function
@@ -1230,7 +1248,7 @@ module Module = struct
           if include_std && not !import_mentioned_prelude
           then import_mentioned_prelude := import_mentions_prelude import;
           Name_bindings.import names import
-        | Val _ | Extern _ | Type_decl _ | Effect _ | Trait_sig _ -> names)
+        | Extern _ | Type_decl _ | Effect _ -> names)
     in
     if !import_mentioned_prelude || not include_std
     then names
@@ -1250,8 +1268,6 @@ module Module = struct
   let absolutify_everything =
     let absolutify_common ~names common =
       match (common : _ Module.common) with
-      | Val (name, fixity, type_) ->
-        Val (name, fixity, Name_bindings.absolutify_type_scheme names type_)
       | Extern (name, fixity, type_, extern_name) ->
         Extern
           (name, fixity, Name_bindings.absolutify_type_scheme names type_, extern_name)
@@ -1260,12 +1276,14 @@ module Module = struct
       | Effect (effect_name, effect) ->
         Effect (effect_name, Name_bindings.absolutify_effect names effect)
       | Import _ as common -> common
-      | Trait_sig _ -> failwith "absolutify_everything: traits"
     in
     let rec absolutify_sigs ~names sigs =
       List.map sigs ~f:(fun sig_ ->
         Node.map sig_ ~f:(function
           | Common_sig common -> Common_sig (absolutify_common ~names common)
+          | Val (name, fixity, type_) ->
+            Val (name, fixity, Name_bindings.absolutify_type_scheme names type_)
+          | Trait_sig _ -> failwith "absolutify_everything: traits"
           | Module_sig (module_name, sigs) ->
             Module_sig
               ( module_name
@@ -1303,8 +1321,7 @@ module Module = struct
     gather_names ~names sigs defs ~f_common:(fun names -> function
       | Type_decl (type_name, decl) -> Name_bindings.add_type_decl names type_name decl
       | Effect (effect_name, effect) -> Name_bindings.add_effect names effect_name effect
-      | Trait_sig _ -> failwith "TODO: trait sigs"
-      | Val _ | Extern _ | Import _ -> names)
+      | Extern _ | Import _ -> names)
   ;;
 
   (** Raise an error upon finding any cycles in a given type alias. *)
@@ -1376,9 +1393,6 @@ module Module = struct
     : Name_bindings.t * intermediate_def Node.t list
     =
     let handle_common ~names = function
-      | Val (name, fixity, typ) ->
-        let constrain = Type_bindings.constrain' ~names ~types in
-        Name_bindings.add_val names name fixity typ ~constrain
       | Extern (name, fixity, typ, extern_name) ->
         let constrain = Type_bindings.constrain' ~names ~types in
         Name_bindings.add_extern names name fixity typ extern_name ~constrain
@@ -1388,12 +1402,16 @@ module Module = struct
       | Effect _ ->
         (* TODO: Check for recursive effect type aliases when those are implemented. *)
         names
-      | Type_decl _ | Trait_sig _ | Import _ -> names
+      | Type_decl _ | Import _ -> names
     in
     let rec handle_sigs ~names ~handle_common =
       List.fold ~init:names ~f:(fun names sig_ ->
         Node.with_value sig_ ~f:(function
           | Common_sig common -> handle_common ~names common
+          | Val (name, fixity, typ) ->
+            let constrain = Type_bindings.constrain' ~names ~types in
+            Name_bindings.add_val names name fixity typ ~constrain
+          | Trait_sig _ -> names
           | Module_sig (module_name, sigs) ->
             Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
               handle_sigs ~names ~handle_common sigs)))
@@ -1664,34 +1682,6 @@ module Module = struct
       names, defs)
   ;;
 
-  let rec check_every_val_is_defined ~names module_name (defs : def Node.t list) =
-    let names = Name_bindings.into_module names ~place:`Def module_name in
-    List.iter defs ~f:(fun def ->
-      Node.with_value def ~f:(function
-        | Common_def (Val (name, _, _)) ->
-          let entry =
-            Name_bindings.find_absolute_entry
-              names
-              (Name_bindings.current_path names, name)
-          in
-          (match Name_bindings.Name_entry.type_source entry with
-           | Val_and_let -> ()
-           | Val_declared ->
-             Compilation_error.raise
-               Name_error
-               ~msg:[%message "No definition for val declaration"]
-           | Placeholder | Let_inferred | Extern_declared | Effect_operation ->
-             compiler_bug
-               [%message
-                 "Unexpected type source for val entry"
-                   (name : Value_name.t)
-                   (entry : Name_bindings.Name_entry.t)])
-        | Module (module_name, _sigs, defs) ->
-          check_every_val_is_defined ~names module_name defs
-        | Common_def (Extern _ | Type_decl _ | Effect _ | Trait_sig _ | Import _)
-        | Let _ | Trait _ | Impl _ -> ()))
-  ;;
-
   (* FIXME: Type inference is local to groups of toplevel let bindings, so we could be
      creating a new [Type_bindings.t] to use for each of those, instead of re-using one
      for a whole file. This would save some memory and hopefully have the GC scan less.
@@ -1708,7 +1698,6 @@ module Module = struct
       let types = Type_bindings.create () in
       let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
       let names, defs = type_defs ~names ~types module_name defs in
-      check_every_val_is_defined ~names module_name defs;
       eprint_s [%message "Finished type-checking. Checking sig-def compatbility."];
       Sig_def_diff.check ~names module_name;
       Ok (names, (module_name, sigs, defs))

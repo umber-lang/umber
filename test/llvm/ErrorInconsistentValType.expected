@@ -1,0 +1,83 @@
+; ModuleID = 'examples/ErrorInconsistentValType.um'
+source_filename = "examples/ErrorInconsistentValType.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@Std.Prelude.List.Nil = external global %umber_block*
+
+define i32 @"umber_main:examples/ErrorInconsistentValType.um"() {
+entry:
+  ret i32 0
+}
+
+define tailcc %umber_block* @ErrorInconsistentValType.map(%umber_block* %ErrorInconsistentValType.xs.1, %umber_block* %ErrorInconsistentValType.f.1) {
+entry:
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %ErrorInconsistentValType.xs.11 = ptrtoint %umber_block* %ErrorInconsistentValType.xs.1 to i64
+  %equals = icmp eq i64 %ErrorInconsistentValType.xs.11, 1
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  %block_field_gep = getelementptr %umber_block, %umber_block* %ErrorInconsistentValType.xs.1, i32 0, i32 1, i32 1
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %ErrorInconsistentValType.xs.1, i32 0, i32 1, i32 0
+  %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
+  %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %ErrorInconsistentValType.f.1, %umber_block* %block_field4)
+  %fun_call5 = tail call tailcc %umber_block* @ErrorInconsistentValType.map(%umber_block* %block_field, %umber_block* %ErrorInconsistentValType.f.1)
+  %box = call i64* @umber_gc_alloc(i64 24)
+  %box6 = bitcast i64* %box to i16*
+  store i16 0, i16* %box6, align 2
+  %box7 = getelementptr i16, i16* %box6, i32 1
+  store i16 2, i16* %box7, align 2
+  %box8 = bitcast i64* %box to %umber_block**
+  %box9 = getelementptr %umber_block*, %umber_block** %box8, i32 1
+  store %umber_block* %fun_call, %umber_block** %box9, align 8
+  %box10 = getelementptr %umber_block*, %umber_block** %box8, i32 2
+  store %umber_block* %fun_call5, %umber_block** %box10, align 8
+  %box11 = bitcast %umber_block** %box8 to %umber_block*
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge12 = phi %umber_block* [ %Std.Prelude.List.Nil, %cond_binding_merge ], [ %box11, %cond_otherwise ]
+  ret %umber_block* %cond_otherwise_merge12
+}
+
+define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+entry:
+  %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
+  br i1 %is_on_heap, label %closure_call, label %regular_call
+
+closure_call:                                     ; preds = %entry
+  %closure_gep = getelementptr %umber_block, %umber_block* %0, i32 0, i32 1, i32 0
+  %closure_gep_raw = load i64, i64* %closure_gep, align 8
+  %closure_fun = inttoptr i64 %closure_gep_raw to %umber_block* (%umber_block*, %umber_block*)*
+  %closure_call1 = tail call tailcc %umber_block* %closure_fun(%umber_block* %0, %umber_block* %1)
+  br label %call_phi
+
+regular_call:                                     ; preds = %entry
+  %calling_fun = bitcast %umber_block* %0 to %umber_block* (%umber_block*)*
+  %regular_call2 = tail call tailcc %umber_block* %calling_fun(%umber_block* %1)
+  br label %call_phi
+
+call_phi:                                         ; preds = %regular_call, %closure_call
+  %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
+  ret %umber_block* %call_phi3
+}
+
+declare i1 @umber_gc_is_on_heap(%umber_block*)
+
+declare i64* @umber_gc_alloc(i64)
+

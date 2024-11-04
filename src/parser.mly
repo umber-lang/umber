@@ -203,8 +203,8 @@ let_rec:
   | LET_NONREC { false }
 
 let_binding:
-  | pat = with_loc(pattern); fixity = fixity?; EQUALS; expr = expr { pat, fixity, expr }
-  | fun_name = with_loc(pattern_name); fixity = fixity?;
+  | fixity = fixity?; pat = with_loc(pattern); EQUALS; expr = expr { pat, fixity, expr }
+  | fixity = fixity?; fun_name = with_loc(pattern_name); 
     args = nonempty(with_loc(pattern_term)); EQUALS; body = expr
     { Node.map fun_name ~f:Pattern.catch_all,
       fixity,
@@ -305,9 +305,9 @@ val_name:
   | op = parens(val_operator) { op }
 
 fixity:
-  | INFIX; n = INT { Fixity.(of_decl_exn Non_assoc n) }
-  | INFIXL; n = INT { Fixity.(of_decl_exn Left n) }
-  | INFIXR; n = INT { Fixity.(of_decl_exn Right n) }
+  | INFIX; n = INT { Fixity.of_decl_exn Non_assoc n }
+  | INFIXL; n = INT { Fixity.of_decl_exn Left n }
+  | INFIXR; n = INT { Fixity.of_decl_exn Right n }
 
 n_periods:
   | { 0 }
@@ -334,9 +334,7 @@ import_stmt:
     { { Module.Import.kind = Module.Import.Kind.of_n_periods n_periods ; paths } }
 
 stmt_common:
-  | VAL; name = val_name; fix = fixity?; colon; t = type_expr_constrained
-    { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
-  | EXTERN; name = val_name; fix = fixity?; colon; t = type_expr_constrained;
+  | EXTERN; fix = fixity?; name = val_name; colon; t = type_expr_constrained;
     EQUALS; s = STRING
     { Module.Extern (
         Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }
@@ -353,9 +351,11 @@ stmt_common:
 
 stmt_sig_:
   | s = stmt_common { Module.Common_sig s }
+  | VAL; fix = fixity?; name = val_name; colon; t = type_expr_constrained
+    { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
   (* TODO: support trait bounds (inheritance) on traits *)
   | TRAIT; name = UPPER_NAME; params = type_params_nonempty; sigs = colon_sigs 
-    { Module.Common_sig (Trait_sig (Trait_name.of_ustring_unchecked name, params, sigs)) }
+    { Module.Trait_sig (Trait_name.of_ustring_unchecked name, params, sigs) }
   | MODULE; name = UPPER_NAME; colon; stmts = braces(list(stmt_sig))
     { Module.Module_sig (Module_name.of_ustring_unchecked name, stmts) }
 

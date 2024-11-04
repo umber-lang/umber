@@ -1511,7 +1511,7 @@ let of_typed_module =
           ( ctx
           , Extern_decl { name; extern_name; arity = arity_of_type ~names (fst type_) }
             :: stmts )
-        | Common_def (Effect _ | Val _ | Trait_sig _ | Import _) -> ctx, stmts))
+        | Common_def (Effect _ | Import _) -> ctx, stmts))
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     let names = Name_bindings.into_module names module_name ~place:`Def in

@@ -9,7 +9,7 @@ module Name_entry : sig
       | Placeholder
       | Let_inferred
       | Val_declared
-      | Val_and_let
+      | Val_and_let (* FIXME: Remove, it's unused *)
       | Extern_declared
       | Effect_operation
     [@@deriving compare, enumerate, equal, sexp, variants]

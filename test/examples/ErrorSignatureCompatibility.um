@@ -23,8 +23,7 @@ module : {
   }
 }
 
-val id : a -> a
-let id x = x
+let id : a -> a = \x -> x
 
 type Foo b a = | Bar b | Baz a
 

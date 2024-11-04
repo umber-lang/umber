@@ -7,5 +7,5 @@ module : {
 
 let more_effects_in_sig x = x
 
-val equivalent_with_different_vars : (() -> <e> ()), (() -> <e> ()) -> <e> ()
-let equivalent_with_different_vars f g = f (); g ()
+let equivalent_with_different_vars : (() -> <e> ()), (() -> <e> ()) -> <e> () =
+  \f g -> f (); g ()

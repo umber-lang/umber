@@ -1,3 +1,5 @@
-extern foo : Int, Int -> Int = ""
+module : {
+  extern foo : Int, Int -> Int = ""
 
-val foo : Int -> Int
+  val foo : Int -> Int
+}

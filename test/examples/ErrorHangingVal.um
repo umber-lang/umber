@@ -1,1 +1,2 @@
+# Val is not allowed in module definitions. The error message unfortunately sucks.
 val a : Int

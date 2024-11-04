@@ -1,5 +1,7 @@
-effect Foo = {
+module : {
+  effect Foo = {
+    val foo : () -> ()
+  }
+
   val foo : () -> ()
 }
-
-val foo : () -> ()

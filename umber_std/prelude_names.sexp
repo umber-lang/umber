@@ -755,12 +755,12 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Function ((Var b)) (Effect_union ()) (Var c))
-                               (Function ((Var a)) (Effect_union ()) (Var b))
-                               (Var a))
-                              (Effect_union ()) (Var c))
+                              ((Function ((Var a)) (Effect_var b) (Var c))
+                               (Function ((Var d)) (Effect_var b) (Var a))
+                               (Var d))
+                              (Effect_var b) (Var c))
                              ())))
-                          (type_source Val_and_let) (fixity (Right 9)))))
+                          (type_source Let_inferred) (fixity (Right 9)))))
                        (";"
                         (Local
                          ((type_
@@ -768,7 +768,7 @@
                             ((Function ((Tuple ()) (Var a)) (Effect_union ())
                               (Var a))
                              ())))
-                          (type_source Val_and_let) (fixity (Left 0)))))
+                          (type_source Let_inferred) (fixity (Left 0)))))
                        (<
                         (Local
                          ((type_
@@ -813,7 +813,7 @@
                               ((Type_app Bool ()) (Type_app Bool ()))
                               (Effect_union ()) (Type_app Bool ()))
                              ())))
-                          (type_source Val_and_let) (fixity (Left 3)))))
+                          (type_source Let_inferred) (fixity (Left 3)))))
                        (*.
                         (Local
                          ((type_
@@ -864,7 +864,7 @@
                               (Effect_union ())
                               (Type_app Std.Prelude.List.List ((Var a))))
                              ())))
-                          (type_source Val_and_let) (fixity (Right 5)))))
+                          (type_source Let_inferred) (fixity (Right 5)))))
                        (<=
                         (Local
                          ((type_
@@ -898,10 +898,10 @@
                            (Scheme
                             ((Function
                               ((Var a)
-                               (Function ((Var a)) (Effect_union ()) (Var b)))
-                              (Effect_union ()) (Var b))
+                               (Function ((Var a)) (Effect_var b) (Var c)))
+                              (Effect_var b) (Var c))
                              ())))
-                          (type_source Val_and_let) (fixity (Left 0)))))
+                          (type_source Let_inferred) (fixity (Left 0)))))
                        (||
                         (Local
                          ((type_
@@ -910,7 +910,7 @@
                               ((Type_app Bool ()) (Type_app Bool ()))
                               (Effect_union ()) (Type_app Bool ()))
                              ())))
-                          (type_source Val_and_let) (fixity (Left 2)))))
+                          (type_source Let_inferred) (fixity (Left 2)))))
                        (mod
                         (Local
                          ((type_

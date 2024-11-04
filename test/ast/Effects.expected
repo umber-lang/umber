@@ -4,9 +4,6 @@
     ((params ())
      (operations
       ((((name ask) (args ((Tuple ()))) (result (Type_app Int ())))))))))
-  (Common_def
-   (Val read ()
-    ((Function ((Tuple ())) (Effect Effects.Read ()) (Type_app Int ())) ())))
   (Let (rec_ false)
    (bindings
     (((Catch_all (read)) ()

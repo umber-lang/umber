@@ -1,2 +1,4 @@
-val a : Int
-val a : Int
+module : {
+  val a : Int
+  val a : Int
+}

@@ -11,14 +11,13 @@
     (((Catch_all (north_is_north)) ()
       (Match (Name North)
        (((Cnstr_appl North ()) (Name True)) ((Catch_all ()) (Name False))))))))
-  (Common_def
-   (Val first_letter ()
-    ((Function ((Type_app Direction ())) (Effect_union ())
-      (Type_app Char ()))
-     ())))
   (Let (rec_ true)
    (bindings
-    (((Catch_all (first_letter)) ()
+    (((Type_annotation (Catch_all (first_letter))
+       ((Function ((Type_app Direction ())) (Effect_union ())
+         (Type_app Char ()))
+        ()))
+      ()
       (Match_function
        (((Cnstr_appl North ()) (Literal (Char N)))
         ((Cnstr_appl South ()) (Literal (Char S)))
@@ -66,11 +65,6 @@
       (Op_tree (. (((Name double_length)) ((Name double_width)))))))))
   (Common_def
    (Type_decl Option ((a) (Variants ((Some ((Var a))) (None ()))))))
-  (Common_def
-   (Val value ()
-    ((Function ((Type_app Option ((Var a))) (Var a)) (Effect_union ())
-      (Var a))
-     ())))
   (Let (rec_ true)
    (bindings
     (((Catch_all (value)) ()

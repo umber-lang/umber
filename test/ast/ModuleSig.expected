@@ -2,16 +2,14 @@
  ((Module
    (Range
     ((Common_sig (Type_decl Range (() Abstract)))
-     (Common_sig
-      (Val between ()
-       ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-         (Type_app ModuleSig.Range.Range ()))
-        ())))
-     (Common_sig
-      (Val elem ()
-       ((Function ((Type_app Int ()) (Type_app ModuleSig.Range.Range ()))
-         (Effect_union ()) (Type_app Bool ()))
-        ()))))
+     (Val between ()
+      ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
+        (Type_app ModuleSig.Range.Range ()))
+       ()))
+     (Val elem ()
+      ((Function ((Type_app Int ()) (Type_app ModuleSig.Range.Range ()))
+        (Effect_union ()) (Type_app Bool ()))
+       ())))
     ((Common_def
       (Type_decl Range
        (() (Alias (Tuple ((Type_app Int ()) (Type_app Int ())))))))

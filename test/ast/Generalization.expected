@@ -3,4 +3,4 @@
   (msg
    ("Type application mismatch" (type1 (Type_app Bool ()))
     (type2 (Type_app Char ()))))
-  (filename Generalization.um) (span 10:11-10:17)))
+  (filename Generalization.um) (span 9:11-9:17)))

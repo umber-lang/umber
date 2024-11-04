@@ -147,11 +147,11 @@ end
 
 let create_effect_operation sig_ : _ Effect.Operation.t =
   match (sig_ : _ Module.sig_) with
-  | Common_sig (Val (_, Some _, _)) ->
+  | Val (_, Some _, _) ->
     Compilation_error.raise
       Other
       ~msg:[%message "Fixity declarations are not supported on effect operations"]
-  | Common_sig (Val (name, None, ((scheme, constraints) as type_))) ->
+  | Val (name, None, ((scheme, constraints) as type_)) ->
     if not (List.is_empty constraints)
     then failwith "TODO: constraints on effect operations";
     (match scheme with
@@ -165,7 +165,7 @@ let create_effect_operation sig_ : _ Effect.Operation.t =
        Compilation_error.raise
          Other
          ~msg:[%message "Effect operations must be functions" (type_ : _ Type_scheme.t)])
-  | Module_sig _ | Common_sig (Extern _ | Type_decl _ | Effect _ | Trait_sig _ | Import _)
+  | Module_sig _ | Trait_sig _ | Common_sig (Extern _ | Type_decl _ | Effect _ | Import _)
     ->
     Compilation_error.raise
       Other

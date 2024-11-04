@@ -1,30 +1,21 @@
 (MoreEffectsInSig
  ((Common_sig (Effect Abstract ((params ()) (operations ()))))
-  (Common_sig
-   (Val more_effects_in_sig ()
-    ((Function ((Type_app Int ())) (Effect MoreEffectsInSig.Abstract ())
-      (Type_app Int ()))
-     ())))
-  (Common_sig
-   (Val equivalent_with_different_vars ()
-    ((Function
-      ((Function ((Tuple ())) (Effect_var e1) (Tuple ()))
-       (Function ((Tuple ())) (Effect_var e2) (Tuple ())))
-      (Effect_union ((Effect_var e1) (Effect_var e2))) (Tuple ()))
-     ()))))
+  (Val more_effects_in_sig ()
+   ((Function ((Type_app Int ())) (Effect MoreEffectsInSig.Abstract ())
+     (Type_app Int ()))
+    ()))
+  (Val equivalent_with_different_vars ()
+   ((Function
+     ((Function ((Tuple ())) (Effect_var e1) (Tuple ()))
+      (Function ((Tuple ())) (Effect_var e2) (Tuple ())))
+     (Effect_union ((Effect_var e1) (Effect_var e2))) (Tuple ()))
+    ())))
  ((Common_def (Effect Abstract ((params ()) (operations ()))))
   (Let (rec_ false)
    (bindings
     (((Catch_all (more_effects_in_sig)) ()
       ((Lambda ((Catch_all (x))) (Name MoreEffectsInSig.x))
        ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))))
-  (Common_def
-   (Val equivalent_with_different_vars ()
-    ((Function
-      ((Function ((Tuple ())) (Effect_var e) (Tuple ()))
-       (Function ((Tuple ())) (Effect_var e) (Tuple ())))
-      (Effect_var e) (Tuple ()))
-     ())))
   (Let (rec_ false)
    (bindings
     (((Catch_all (equivalent_with_different_vars)) ()

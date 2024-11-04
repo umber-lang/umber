@@ -1,17 +1,35 @@
-("Compilation error"
- ((kind Type_error)
-  (msg
-   ("Type mismatch"
-    (expected
-     ((Function
-       ((Type_app Std.Prelude.List.List ((Var a)))
-        (Function ((Var a)) (Effect_union ()) (Var a)))
-       (Effect_union ()) (Type_app Std.Prelude.List.List ((Var b))))
-      ()))
-    (inferred
-     ((Function
-       ((Type_app Std.Prelude.List.List ((Var a)))
-        (Function ((Var a)) (Effect_union ()) (Var a)))
-       (Effect_union ()) (Type_app Std.Prelude.List.List ((Var a))))
-      ()))))
-  (filename ErrorInconsistentValType.um) (span 6:5-6:8)))
+(ErrorInconsistentValType ()
+ ((Let (rec_ true)
+   (bindings
+    (((Catch_all (map)) ()
+      ((Lambda ((Catch_all (xs)) (Catch_all (f)))
+        (Match (Name ErrorInconsistentValType.xs)
+         ((Type_app Std.Prelude.List.List ((Var a))) ())
+         (((Cnstr_appl Std.Prelude.List.Nil ()) (Name Std.Prelude.List.Nil))
+          ((Cnstr_appl Std.Prelude.List.Cons
+            ((Catch_all (x)) (Catch_all (xs))))
+           (Fun_call (Name Std.Prelude.List.Cons)
+            ((Function ((Var a) (Type_app Std.Prelude.List.List ((Var a))))
+              (Effect_union ()) (Type_app Std.Prelude.List.List ((Var a))))
+             ())
+            (((Fun_call (Name ErrorInconsistentValType.f)
+               ((Function ((Var a)) (Effect_union ()) (Var a)) ())
+               (((Name ErrorInconsistentValType.x) ((Var a) ()))))
+              ((Var a) ()))
+             ((Fun_call (Name ErrorInconsistentValType.map)
+               ((Function
+                 ((Type_app Std.Prelude.List.List ((Var a)))
+                  (Function ((Var a)) (Effect_union ()) (Var a)))
+                 (Effect_union ())
+                 (Type_app Std.Prelude.List.List ((Union ()))))
+                ())
+               (((Name ErrorInconsistentValType.xs)
+                 ((Type_app Std.Prelude.List.List ((Var a))) ()))
+                ((Name ErrorInconsistentValType.f)
+                 ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))
+              ((Type_app Std.Prelude.List.List ((Union ()))) ()))))))))
+       ((Function
+         ((Type_app Std.Prelude.List.List ((Var a)))
+          (Function ((Var a)) (Effect_union ()) (Var a)))
+         (Effect_union ()) (Type_app Std.Prelude.List.List ((Var a))))
+        ()))))))))
