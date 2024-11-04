@@ -1,12 +1,12 @@
 (AsPattern ()
  ((Let (rec_ false)
    (bindings
-    (((As (Tuple ((Catch_all (one)) (Catch_all (two)))) pair)
+    (((As (Tuple ((Catch_all (one)) (Catch_all (two)))) pair) ()
       ((Tuple ((Literal (Int 1)) (Literal (Int 2))))
        ((Tuple ((Type_app Int ()) (Type_app Int ()))) ()))))))
   (Let (rec_ true)
    (bindings
-    (((Catch_all (iter_pairs))
+    (((Catch_all (iter_pairs)) ()
       ((Lambda ((Catch_all (f)) (Catch_all (lst)))
         (Match (Name AsPattern.lst)
          ((Type_app Std.Prelude.List.List ((Var a))) ())
@@ -56,7 +56,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name AsPattern.iter_pairs)
         ((Function
           ((Function ((Type_app String ()) (Type_app String ()))

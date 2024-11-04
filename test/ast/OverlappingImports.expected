@@ -7,7 +7,7 @@
      (paths (Module Std ((Module Prelude ((Name_excluded Float)))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Name Std.Prelude.Float.abs)
        ((Function ((Type_app Float ()) (Type_app Float ())) (Effect_union ())
          (Type_app Float ()))

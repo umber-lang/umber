@@ -1,9 +1,10 @@
 (LetBindingGroups ()
  ((Let (rec_ false)
-   (bindings (((Catch_all (a)) ((Literal (Int 1)) ((Type_app Int ()) ()))))))
+   (bindings
+    (((Catch_all (a)) () ((Literal (Int 1)) ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (fun))
+    (((Catch_all (fun)) ()
       ((Lambda ((Catch_all (n)))
         (Fun_call (Name Std.Prelude.Operators.+)
          ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
@@ -51,7 +52,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (b))
+    (((Catch_all (b)) ()
       ((Fun_call (Name Std.Prelude.Operators.+)
         ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
           (Type_app Int ()))
@@ -61,18 +62,19 @@
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Let
         ((rec_ false)
          (bindings
-          ((((Tuple ()) ((Tuple ()) ())) (Tuple ()))
+          ((((Tuple ()) ((Tuple ()) ())) () (Tuple ()))
            (((Catch_all ())
              ((Function ((Type_app Int ())) (Effect_union ())
                (Type_app Int ()))
               ()))
-            (Name LetBindingGroups.fun))
+            () (Name LetBindingGroups.fun))
            (((Catch_all (list))
              ((Type_app Std.Prelude.List.List ((Type_app String ()))) ()))
+            ()
             (Fun_call (Name Std.Prelude.Operators.::)
              ((Function
                ((Type_app String ())
@@ -138,12 +140,13 @@
        ((Type_app Bool ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (bottom))
+    (((Catch_all (bottom)) ()
       ((Let
         ((rec_ false)
          (bindings
           ((((Catch_all (bottom_again))
              ((Function ((Intersection ())) (Effect_union ()) (Union ())) ()))
+            ()
             (Lambda ((Catch_all ()))
              (Let
               ((rec_ true)
@@ -152,6 +155,7 @@
                    ((Function ((Type_app Int ())) (Effect_union ())
                      (Union ()))
                     ()))
+                  ()
                   (Lambda ((Catch_all (x)))
                    (Fun_call (Name LetBindingGroups.go_right)
                     ((Function ((Type_app Int ())) (Effect_union ())
@@ -162,6 +166,7 @@
                    ((Function ((Type_app Int ())) (Effect_union ())
                      (Union ()))
                     ()))
+                  ()
                   (Lambda ((Catch_all (x)))
                    (Fun_call (Name LetBindingGroups.go_left)
                     ((Function ((Type_app Int ())) (Effect_union ())

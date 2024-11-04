@@ -2,14 +2,14 @@
  ((Common_def (Val f () ((Type_app MutualRecursion.Forest ((Var a))) ())))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (f))
+    (((Catch_all (f)) ()
       ((Name Std.Prelude.List.Nil)
        ((Type_app Std.Prelude.List.List
          ((Type_app MutualRecursion.Tree ((Union ())))))
         ()))))))
   (Let (rec_ true)
    (bindings
-    (((Catch_all (sum_forest))
+    (((Catch_all (sum_forest)) ()
       ((Let
         ((rec_ true)
          (bindings
@@ -20,6 +20,7 @@
                  ((Type_app MutualRecursion.Tree ((Type_app Int ()))))))
                (Effect_union ()) (Type_app Int ()))
               ()))
+            ()
             (Lambda ((Catch_all (acc)) (Catch_all (forest)))
              (Match (Name MutualRecursion.forest)
               ((Type_app Std.Prelude.List.List
@@ -74,7 +75,7 @@
            ((Type_app MutualRecursion.Tree ((Type_app Int ()))))))
          (Effect_union ()) (Type_app Int ()))
         ())))
-     ((Catch_all (sum_tree))
+     ((Catch_all (sum_tree)) ()
       ((Lambda ((Catch_all (match)))
         (Match (Name MutualRecursion.match)
          ((Type_app MutualRecursion.Tree ((Type_app Int ()))) ())
@@ -114,12 +115,13 @@
        (Node ((Var a) (Type_app MutualRecursion.Forest ((Var a))))))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Let
         ((rec_ false)
          (bindings
           ((((Catch_all (tree))
              ((Type_app MutualRecursion.Tree ((Type_app Int ()))) ()))
+            ()
             (Fun_call (Name MutualRecursion.Node)
              ((Function
                ((Type_app Int ())
@@ -186,7 +188,7 @@
        ((Tuple ()) ()))))))
   (Let (rec_ true)
    (bindings
-    (((Catch_all (even))
+    (((Catch_all (even)) ()
       ((Lambda ((Catch_all (x)))
         (Match
          (Fun_call (Name Std.Prelude.Operators.==)
@@ -211,7 +213,7 @@
               ((Type_app Int ()) ()))))))))
        ((Function ((Type_app Int ())) (Effect_union ()) (Type_app Bool ()))
         ())))
-     ((Catch_all (odd))
+     ((Catch_all (odd)) ()
       ((Lambda ((Catch_all (x)))
         (Match
          (Fun_call (Name Std.Prelude.Operators.==)
@@ -238,16 +240,17 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (number))
+    (((Catch_all (number)) ()
       ((Let
         ((rec_ false)
          (bindings
-          ((((Catch_all (number)) ((Type_app Int ()) ())) (Literal (Int 5)))))
+          ((((Catch_all (number)) ((Type_app Int ()) ())) ()
+            (Literal (Int 5)))))
          (body
           (Let
            ((rec_ false)
             (bindings
-             ((((Catch_all (number)) ((Type_app Int ()) ()))
+             ((((Catch_all (number)) ((Type_app Int ()) ())) ()
                (Fun_call (Name Std.Prelude.Operators.+)
                 ((Function ((Type_app Int ()) (Type_app Int ()))
                   (Effect_union ()) (Type_app Int ()))

@@ -10,19 +10,19 @@
           ((Common_def (Type_decl Foo (() (Alias (Type_app String ()))))))))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (int))
+    (((Catch_all (int)) ()
       ((Literal (Int 5)) ((Type_app TypeModuleNamePunning.Foo.Foo ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (int'))
+    (((Catch_all (int')) ()
       ((Literal (Int 5)) ((Type_app TypeModuleNamePunning.Foo.Foo ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (float))
+    (((Catch_all (float)) ()
       ((Literal (Float 5))
        ((Type_app TypeModuleNamePunning.Foo.Foo.Foo ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (string))
+    (((Catch_all (string)) ()
       ((Literal (String 5))
        ((Type_app TypeModuleNamePunning.Foo.Foo.Foo.Foo ()) ()))))))))

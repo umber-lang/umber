@@ -1,7 +1,7 @@
 (HelloWorld ()
  ((Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name Std.Prelude.print)
         ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
         (((Literal (String "Hello world!")) ((Type_app String ()) ()))))

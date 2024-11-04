@@ -17,7 +17,7 @@
        (() (Alias (Tuple ((Type_app Int ()) (Type_app Int ())))))))
      (Let (rec_ false)
       (bindings
-       (((Catch_all (between))
+       (((Catch_all (between)) ()
          ((Lambda ((Catch_all (lo)) (Catch_all (hi)))
            (Tuple ((Name ModuleSig.Range.lo) (Name ModuleSig.Range.hi))))
           ((Function ((Var a) (Var b)) (Effect_union ())
@@ -25,7 +25,7 @@
            ()))))))
      (Let (rec_ false)
       (bindings
-       (((Catch_all (elem))
+       (((Catch_all (elem)) ()
          ((Lambda
            ((Catch_all (x)) (Tuple ((Catch_all (lo)) (Catch_all (hi)))))
            (Fun_call (Name Std.Prelude.Operators.&&)
@@ -52,7 +52,7 @@
            ())))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (my_range))
+    (((Catch_all (my_range)) ()
       ((Fun_call (Name ModuleSig.Range.between)
         ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
           (Type_app ModuleSig.Range.Range ()))
@@ -62,7 +62,7 @@
        ((Type_app ModuleSig.Range.Range ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (is_10_in_range))
+    (((Catch_all (is_10_in_range)) ()
       ((Fun_call (Name ModuleSig.Range.elem)
         ((Function ((Type_app Int ()) (Type_app ModuleSig.Range.Range ()))
           (Effect_union ()) (Type_app Bool ()))
@@ -72,7 +72,7 @@
        ((Type_app Bool ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name "Std.Prelude.Operators.;")
         ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
         (((Fun_call (Name Std.Prelude.print_bool)

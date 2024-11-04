@@ -1,7 +1,7 @@
 (OpSectionRight ()
  ((Let (rec_ false)
    (bindings
-    (((Catch_all (~+~))
+    (((Catch_all (~+~)) ()
       ((Lambda ((Catch_all (x)) (Catch_all (y)))
         (Fun_call (Name Std.Prelude.print_int)
          ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
@@ -17,16 +17,17 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Let
         ((rec_ false)
          (bindings
           ((((Catch_all (lambda))
              ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ()))
+            ()
             (Let
              ((rec_ false)
               (bindings
-               ((((Catch_all (*arg1)) ((Type_app Int ()) ()))
+               ((((Catch_all (*arg1)) ((Type_app Int ()) ())) ()
                  (Fun_call (Name "Std.Prelude.Operators.;")
                   ((Function ((Tuple ()) (Type_app Int ())) (Effect_union ())
                     (Type_app Int ()))

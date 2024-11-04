@@ -1,7 +1,7 @@
 (Modules ()
  ((Module
    (A ((Common_sig (Val foo () ((Type_app Int ()) ()))))
-    ((Let (rec_ true) (bindings (((Catch_all (foo)) (Literal (Int 5))))))
+    ((Let (rec_ true) (bindings (((Catch_all (foo)) () (Literal (Int 5))))))
      (Module
       (B
        ((Module_sig C
@@ -17,19 +17,19 @@
          (D ()
           ((Let (rec_ true)
             (bindings
-             (((Catch_all (wow)) (Lambda ((Catch_all (x))) (Name x)))))))))
+             (((Catch_all (wow)) () (Lambda ((Catch_all (x))) (Name x)))))))))
         (Common_def (Type_decl Bacon (() (Variants ((Delicious ()))))))))))))
   (Let (rec_ true)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       (Match (Name A.B.Delicious)
        (((Cnstr_appl A.B.Delicious ()) (Tuple ()))))))))
   (Let (rec_ true)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       (Match (Name A.B.Delicious) (((Cnstr_appl Delicious ()) (Name True))))))))
   (Let (rec_ true)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       (Match (Type_annotation (Name Delicious) ((Type_app A.B.Bacon ()) ()))
        (((Cnstr_appl Delicious ()) (Literal (String yep)))))))))))

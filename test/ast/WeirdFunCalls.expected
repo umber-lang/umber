@@ -1,14 +1,14 @@
 (WeirdFunCalls ()
  ((Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name Std.Prelude.print)
         ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
         (((Literal (String plain)) ((Type_app String ()) ()))))
        ((Tuple ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (fun_call))
+    (((Catch_all (fun_call)) ()
       ((Lambda ((Tuple ()))
         (Lambda ((Tuple ()))
          (Fun_call (Name Std.Prelude.print)
@@ -19,7 +19,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call
         (Fun_call (Name WeirdFunCalls.fun_call)
          ((Function ((Tuple ())) (Effect_union ())
@@ -31,7 +31,7 @@
        ((Tuple ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (print_twice))
+    (((Catch_all (print_twice)) ()
       ((Lambda ((Catch_all (msg)))
         (Fun_call (Name "Std.Prelude.Operators.;")
          ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
@@ -48,7 +48,7 @@
        ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (if_))
+    (((Catch_all (if_)) ()
       ((Fun_call
         (Match (Name True) ((Type_app Bool ()) ())
          (((Cnstr_appl True ()) (Name WeirdFunCalls.print_twice))
@@ -58,10 +58,11 @@
        ((Tuple ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call
         (Let
-         ((rec_ false) (bindings ((((Tuple ()) ((Tuple ()) ())) (Tuple ()))))
+         ((rec_ false)
+          (bindings ((((Tuple ()) ((Tuple ()) ())) () (Tuple ()))))
           (body (Name Std.Prelude.print))))
         ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
         (((Literal (String let)) ((Type_app String ()) ()))))

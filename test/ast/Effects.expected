@@ -9,13 +9,13 @@
     ((Function ((Tuple ())) (Effect Effects.Read ()) (Type_app Int ())) ())))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (read))
+    (((Catch_all (read)) ()
       ((Name Effects.ask)
        ((Function ((Tuple ())) (Effect Effects.Read ()) (Type_app Int ()))
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (read_and_add))
+    (((Catch_all (read_and_add)) ()
       ((Lambda ((Tuple ()))
         (Fun_call (Name Std.Prelude.Operators.+)
          ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
@@ -37,7 +37,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (run_both))
+    (((Catch_all (run_both)) ()
       ((Lambda ((Catch_all (f)) (Catch_all (g)) (Catch_all (x)))
         (Tuple
          ((Fun_call (Name Effects.f)
@@ -53,7 +53,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (foo))
+    (((Catch_all (foo)) ()
       ((Lambda ((Tuple ()))
         (Fun_call (Name Effects.run_both)
          ((Function
@@ -97,14 +97,14 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Handle (expr (Literal (Int 5))) (expr_type ((Type_app Int ()) ()))
         (effect_branches
          ((((operation Effects.ask) (args ((Tuple ())))) (Literal (Int 6))))))
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Handle
         (expr
          (Fun_call (Name Effects.read_and_add)
@@ -122,7 +122,7 @@
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (_value_branch))
+    (((Catch_all (_value_branch)) ()
       ((Handle
         (expr
          (Fun_call (Name Effects.foo)
@@ -143,7 +143,7 @@
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (_nested_handler))
+    (((Catch_all (_nested_handler)) ()
       ((Handle
         (expr
          (Handle
@@ -180,7 +180,7 @@
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (higher_order_handler))
+    (((Catch_all (higher_order_handler)) ()
       ((Lambda ((Catch_all (f)))
         (Handle
          (expr
@@ -201,7 +201,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Fun_call (Name Effects.higher_order_handler)
         ((Function
           ((Function ((Tuple ()))

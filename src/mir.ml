@@ -905,12 +905,12 @@ module Expr = struct
                Node.dummy_span (Pattern.Catch_all (Some name), arg_type)
              in
              let arg_name = Node.dummy_span (Typed.Expr.Name (current_path, name)) in
-             (arg_name, arg_type), (arg_pat_and_type, arg_expr))
+             (arg_name, arg_type), (arg_pat_and_type, None, arg_expr))
            |> Nonempty.unzip
          in
          let bindings =
            Nonempty.cons
-             (Node.dummy_span (Pattern.Catch_all (Some fun_name), fun_type), fun_)
+             (Node.dummy_span (Pattern.Catch_all (Some fun_name), fun_type), None, fun_)
              bindings
          in
          let n_applied_args = Nonempty.length applied_args in
@@ -1044,7 +1044,7 @@ module Expr = struct
           Nonempty.fold_map
             bindings
             ~init:ctx
-            ~f:(fun ctx_for_body ((pat_and_type, _) as binding) ->
+            ~f:(fun ctx_for_body ((pat_and_type, _fixity, _expr) as binding) ->
             let ctx_for_body, names_bound =
               Node.with_value pat_and_type ~f:(fun (pattern, _) ->
                 Pattern.Names.fold
@@ -1067,7 +1067,7 @@ module Expr = struct
                           mir_expr
                           (_ : Module_path.absolute Type_scheme.type_) ->
               (name, mir_expr) :: bindings)
-            ~extract_binding:(fun (pat_and_type, expr) ->
+            ~extract_binding:(fun (pat_and_type, (_ : Fixity.t option), expr) ->
               Node.map pat_and_type ~f:fst, expr, Node.with_value pat_and_type ~f:snd)
             ~process_expr:(fun bindings ~just_bound ~ctx expr typ ->
               ( bindings
@@ -1398,7 +1398,9 @@ let of_typed_module =
     ~stmts
     ~rec_
     ~fun_decls
-    (bindings : (Typed.Pattern.t Node.t * Typed.Expr.generalized Node.t) Nonempty.t)
+    (bindings :
+      (Typed.Pattern.t Node.t * Fixity.t option * Typed.Expr.generalized Node.t)
+      Nonempty.t)
     =
     let process_expr (stmts : Stmt.t list) ~just_bound ~ctx expr typ =
       let stmts = ref stmts in
@@ -1441,7 +1443,7 @@ let of_typed_module =
         else Value_def (name, mir_expr) :: stmts
     in
     let bindings =
-      Nonempty.map bindings ~f:(fun ((pattern, _) as binding) ->
+      Nonempty.map bindings ~f:(fun ((pattern, (_ : Fixity.t option), _) as binding) ->
         let names_bound =
           Node.with_value pattern ~f:(fun pattern ->
             Pattern.Names.fold
@@ -1459,7 +1461,7 @@ let of_typed_module =
       ~rec_
       ~init:stmts
       ~add_let
-      ~extract_binding:(fun (pat, expr_and_type) ->
+      ~extract_binding:(fun (pat, (_ : Fixity.t option), expr_and_type) ->
         pat, Node.map expr_and_type ~f:fst, Node.with_value expr_and_type ~f:snd)
       ~process_expr
   in

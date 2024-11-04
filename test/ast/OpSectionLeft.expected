@@ -1,7 +1,7 @@
 (OpSectionLeft ()
  ((Let (rec_ false)
    (bindings
-    (((Catch_all (:/))
+    (((Catch_all (:/)) ()
       ((Lambda ((Catch_all (x)) (Catch_all (y)))
         (Fun_call (Name Std.Prelude.print)
          ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
@@ -24,12 +24,12 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (apply))
+    (((Catch_all (apply)) ()
       ((Lambda ((Catch_all (f)))
         (Let
          ((rec_ false)
           (bindings
-           ((((Catch_all (*arg0)) ((Type_app String ()) ()))
+           ((((Catch_all (*arg0)) ((Type_app String ()) ())) ()
              (Fun_call (Name "Std.Prelude.Operators.;")
               ((Function ((Tuple ()) (Type_app String ())) (Effect_union ())
                 (Type_app String ()))
@@ -56,12 +56,13 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Let
         ((rec_ false)
          (bindings
           ((((Catch_all (g))
              ((Function ((Type_app String ())) (Effect_var a) (Tuple ())) ()))
+            ()
             (Fun_call (Name OpSectionLeft.apply)
              ((Function
                ((Function ((Type_app String ()) (Type_app String ()))

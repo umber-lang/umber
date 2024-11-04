@@ -1,20 +1,20 @@
 (CrossModuleUsage ()
  ((Let (rec_ false)
    (bindings
-    (((Catch_all (source))
+    (((Catch_all (source)) ()
       ((Literal (String "everything depends on me"))
        ((Type_app String ()) ()))))))
   (Module
    (A ()
     ((Let (rec_ true)
       (bindings
-       (((Catch_all (a))
+       (((Catch_all (a)) ()
          ((Lambda ((Tuple ()))
            (Fun_call (Name CrossModuleUsage.A.b)
             ((Function ((Tuple ())) (Effect_union ()) (Union ())) ())
             (((Tuple ()) ((Tuple ()) ())))))
           ((Function ((Tuple ())) (Effect_union ()) (Union ())) ())))
-        ((Catch_all (b))
+        ((Catch_all (b)) ()
          ((Lambda ((Tuple ()))
            (Fun_call (Name CrossModuleUsage.A.a)
             ((Function ((Tuple ())) (Effect_union ()) (Union ())) ())
@@ -22,12 +22,12 @@
           ((Function ((Tuple ())) (Effect_union ()) (Union ())) ()))))))
      (Let (rec_ false)
       (bindings
-       (((Catch_all (print))
+       (((Catch_all (print)) ()
          ((Name Std.Prelude.print)
           ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ()))))))
      (Let (rec_ false)
       (bindings
-       (((Catch_all (print_source))
+       (((Catch_all (print_source)) ()
          ((Lambda ((Tuple ()))
            (Fun_call (Name CrossModuleUsage.A.print)
             ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
@@ -36,7 +36,7 @@
           ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (print_source))
+    (((Catch_all (print_source)) ()
       ((Lambda ((Tuple ()))
         (Fun_call (Name "Std.Prelude.Operators.;")
          ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
@@ -53,6 +53,6 @@
   (Common_def (Val empty () ((Type_app Std.Prelude.List.List ((Var a))) ())))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (empty))
+    (((Catch_all (empty)) ()
       ((Name Std.Prelude.List.Nil)
        ((Type_app Std.Prelude.List.List ((Var a))) ()))))))))

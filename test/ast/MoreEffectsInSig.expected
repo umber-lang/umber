@@ -15,7 +15,7 @@
  ((Common_def (Effect Abstract ((params ()) (operations ()))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (more_effects_in_sig))
+    (((Catch_all (more_effects_in_sig)) ()
       ((Lambda ((Catch_all (x))) (Name MoreEffectsInSig.x))
        ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))))
   (Common_def
@@ -27,7 +27,7 @@
      ())))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (equivalent_with_different_vars))
+    (((Catch_all (equivalent_with_different_vars)) ()
       ((Lambda ((Catch_all (f)) (Catch_all (g)))
         (Fun_call (Name "Std.Prelude.Operators.;")
          ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())

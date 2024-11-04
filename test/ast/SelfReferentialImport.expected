@@ -5,7 +5,7 @@
      (paths (Module SelfReferentialImport ((Name_as goose gander)))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (goose))
+    (((Catch_all (goose)) ()
       ((Lambda ((Tuple ()))
         (Fun_call (Name Std.Prelude.print)
          ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
@@ -13,7 +13,7 @@
        ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name SelfReferentialImport.goose)
         ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())
         (((Tuple ()) ((Tuple ()) ()))))

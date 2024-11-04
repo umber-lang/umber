@@ -38,7 +38,7 @@ module Pattern = struct
     | Unequal_lengths -> type_error_msg "Wrong number of arguments in application"
   ;;
 
-  let rec of_untyped_with_names ~names ~types pat_names
+  let rec of_untyped_with_names ?fixity ~names ~types pat_names
     : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
     = function
     | Constant lit ->
@@ -49,7 +49,7 @@ module Pattern = struct
       let pat_names, typ =
         match name with
         | Some name ->
-          Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder
+          Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder ?fixity
         | None -> pat_names, Internal_type.fresh_var ()
       in
       eprint_s
@@ -146,7 +146,7 @@ module Pattern = struct
     | As (pat, name) ->
       let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
       let pat_names =
-        Pattern.Names.add_name pat_names name typ ~type_source:Placeholder
+        Pattern.Names.add_name pat_names name typ ~type_source:Placeholder ?fixity
       in
       pat_names, (As (pat, name), typ)
     | Type_annotation (pat, annotated_type) ->
@@ -171,9 +171,9 @@ module Pattern = struct
       pat_names, (pat, annotated_type)
   ;;
 
-  let of_untyped_into ~names ~types pattern =
+  let of_untyped_into ?fixity ~names ~types pattern =
     let ((pat_names, _) as pat) =
-      of_untyped_with_names ~names ~types Pattern.Names.empty pattern
+      of_untyped_with_names ?fixity ~names ~types Pattern.Names.empty pattern
     in
     let names =
       merge_pattern_names ~names ~types pat_names ~combine:(fun _ _ new_entry ->
@@ -402,6 +402,7 @@ module Expr = struct
                     [ ( Node.create
                           (Untyped.Pattern.catch_all (Some applied_arg_var))
                           expr_span
+                      , None
                       , expr )
                     ]
                 ; body =
@@ -683,21 +684,33 @@ module Expr = struct
                 if rec_
                 then (
                   let names, bindings =
-                    Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
+                    Nonempty.fold_map
+                      bindings
+                      ~init:names
+                      ~f:(fun names (pat, fixity, expr) ->
                       let pat_span = Node.span pat in
                       let names, (pat_names, (pat, pat_type)) =
-                        Node.with_value pat ~f:(Pattern.of_untyped_into ~names ~types)
+                        Node.with_value
+                          pat
+                          ~f:(Pattern.of_untyped_into ~names ~types ?fixity)
                       in
-                      names, (Node.create (pat, (pat_type, pat_names)) pat_span, expr))
+                      ( names
+                      , (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr)
+                      ))
                   in
                   type_recursive_let_bindings ~names ~types ~f_name ~add_effects bindings)
                 else (
                   (* Process bindings in order without any recursion *)
                   let names, bindings =
-                    Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, expr) ->
+                    Nonempty.fold_map
+                      bindings
+                      ~init:names
+                      ~f:(fun names (pat, fixity, expr) ->
                       let pat_span = Node.span pat in
                       let names, (pat_names, (pat, pat_type)) =
-                        Node.with_value pat ~f:(Pattern.of_untyped_into ~names ~types)
+                        Node.with_value
+                          pat
+                          ~f:(Pattern.of_untyped_into ~names ~types ?fixity)
                       in
                       let expr, expr_type, expr_effects =
                         of_untyped ~names ~types ~f_name expr
@@ -708,7 +721,9 @@ module Expr = struct
                         ~types
                         ~subtype:expr_type
                         ~supertype:pat_type;
-                      names, (Node.create (pat, (pat_type, pat_names)) pat_span, expr))
+                      ( names
+                      , (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr)
+                      ))
                   in
                   names, false, bindings)
               in
@@ -764,7 +779,7 @@ module Expr = struct
         Nonempty.fold
           bindings
           ~init:Pattern.Names.empty
-          ~f:(fun all_bound_names (pattern_etc, _expr) ->
+          ~f:(fun all_bound_names (pattern_etc, (_ : Fixity.t option), _expr) ->
           Node.with_value pattern_etc ~f:(fun (_, (_, pat_names)) ->
             let all_bound_names =
               Pattern.Names.merge all_bound_names pat_names ~combine:(fun ~key:_ v _ -> v)
@@ -783,7 +798,7 @@ module Expr = struct
         then used_a_bound_name := true
       in
       let bindings =
-        Nonempty.map bindings ~f:(fun (pat, expr) ->
+        Nonempty.map bindings ~f:(fun (pat, fixity, expr) ->
           let expr, expr_type, expr_effects = of_untyped expr ~f_name ~names ~types in
           eprint_s
             [%message
@@ -794,7 +809,7 @@ module Expr = struct
           add_effects expr_effects (Node.span expr);
           Node.with_value pat ~f:(fun (_, (pat_type, _)) ->
             Type_bindings.constrain ~names ~types ~subtype:expr_type ~supertype:pat_type);
-          pat, expr)
+          pat, fixity, expr)
       in
       let rec_ = !used_a_bound_name in
       names, rec_, bindings
@@ -810,12 +825,12 @@ module Expr = struct
       (match expr with
        | Let { rec_; bindings; body } ->
          let bindings =
-           Nonempty.map bindings ~f:(fun (pat_and_type, expr) ->
+           Nonempty.map bindings ~f:(fun (pat_and_type, fixity, expr) ->
              let pat_and_type =
                Node.map pat_and_type ~f:(fun (pat, typ) -> pat, f_type typ)
              in
              let expr = map' expr ~f ~f_type in
-             pat_and_type, expr)
+             pat_and_type, fixity, expr)
          in
          let body = map' body ~f ~f_type in
          Let { rec_; bindings; body }
@@ -951,7 +966,7 @@ module Expr = struct
       ~f:(function
         | Let { rec_; bindings; body } ->
           let bindings =
-            Nonempty.map bindings ~f:(fun (pattern_etc, expr) ->
+            Nonempty.map bindings ~f:(fun (pattern_etc, fixity, expr) ->
               let pat_span = Node.span pattern_etc in
               let pat, (names, scheme) =
                 Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
@@ -964,6 +979,7 @@ module Expr = struct
                       ~shadowing_allowed:true ))
               in
               ( Node.create (pat, scheme) pat_span
+              , fixity
               , Node.map expr ~f:(generalize_let_bindings ~names ~types) ))
           in
           let body = Node.map body ~f:(generalize_let_bindings ~names ~types) in
@@ -1179,7 +1195,7 @@ module Module = struct
       Node.with_value def ~f:(function
         | Let { bindings; rec_ } ->
           assert_or_compiler_bug ~here:[%here] rec_;
-          Nonempty.fold bindings ~init:names ~f:(fun names (pat, _) ->
+          Nonempty.fold bindings ~init:names ~f:(fun names (pat, _fixity, _expr) ->
             Node.with_value pat ~f:(fun pat ->
               Name_bindings.merge_names
                 names
@@ -1387,12 +1403,12 @@ module Module = struct
         handle_sigs ~names ~handle_common sigs)
     in
     let handle_bindings ~names =
-      Nonempty.fold_map ~init:names ~f:(fun names (pat, expr) ->
+      Nonempty.fold_map ~init:names ~f:(fun names (pat, fixity, expr) ->
         let pat_span = Node.span pat in
         let pat_names, pat =
           Node.with_value
             pat
-            ~f:(Pattern.of_untyped_with_names ~names ~types Pattern.Names.empty)
+            ~f:(Pattern.of_untyped_with_names ?fixity ~names ~types Pattern.Names.empty)
         in
         let names =
           (* Unify pattern bindings with local type information (e.g. val declarations) *)
@@ -1411,7 +1427,7 @@ module Module = struct
             Name_bindings.Name_entry.merge existing_entry new_entry)
         in
         let pat, pat_type = pat in
-        names, (Node.create (pat, (pat_type, pat_names)) pat_span, expr))
+        names, (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr))
     in
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
       List.fold_map defs ~init:names ~f:(fun def ->
@@ -1442,14 +1458,17 @@ module Module = struct
              be non-recursive, we will set `rec_ = false` later. *)
           assert_or_compiler_bug ~here:[%here] rec_;
           ( other_defs
-          , Nonempty.fold_right bindings' ~init:bindings ~f:(fun (pat, expr) bindings ->
+          , Nonempty.fold_right
+              bindings'
+              ~init:bindings
+              ~f:(fun (pat, fixity, expr) bindings ->
               let pat_names =
                 Node.with_value pat ~f:(fun (_, (_, pat_names)) -> pat_names)
               in
               let current_path = Name_bindings.current_path names in
               let bound_names = Map.key_set pat_names in
               let used_names = Node.with_value expr ~f:(Untyped.Expr.names_used ~names) in
-              ( { Call_graph.Binding.bound_names; used_names; info = pat, expr }
+              ( { Call_graph.Binding.bound_names; used_names; info = pat, fixity, expr }
               , current_path )
               :: bindings) )
         | Module (module_name, sigs, defs) ->
@@ -1490,7 +1509,7 @@ module Module = struct
        location of the code than they actually make sense for the AST itself. *)
     (* Order bindings in the group by span, then take the first span to represent the
        whole group. This is done to get a consistent ordering among bindings. *)
-    let get_spans (pat, expr) = Node.span pat, Node.span expr in
+    let get_spans (pat, (_ : Fixity.t option), expr) = Node.span pat, Node.span expr in
     let bindings =
       Nonempty.map bindings ~f:Call_graph.Binding.info
       |> Nonempty.sort ~compare:(Comparable.lift [%compare: Span.t * Span.t] ~f:get_spans)
@@ -1510,7 +1529,7 @@ module Module = struct
           Type_bindings.constrain_effects_to_be_total ~names ~types effects))
     in
     let names, bindings =
-      Nonempty.fold_map bindings ~init:names ~f:(fun names (pattern_etc, expr) ->
+      Nonempty.fold_map bindings ~init:names ~f:(fun names (pattern_etc, fixity, expr) ->
         let pat_span = Node.span pattern_etc in
         let pat, (names, scheme) =
           Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
@@ -1524,7 +1543,7 @@ module Module = struct
             let expr = Expr.generalize_let_bindings expr ~names ~types in
             expr, scheme)
         in
-        names, (Node.create pat pat_span, expr_and_scheme))
+        names, (Node.create pat pat_span, fixity, expr_and_scheme))
     in
     (* let bindings = rename_type_vars_in_bindings bindings in *)
     (* FIXME: Remove this hack *)

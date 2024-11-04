@@ -132,6 +132,11 @@ entry:
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block*, %umber_block*)
 
+define tailcc %umber_block* @"Operators.~~~"(%umber_block* %"Operators.*lambda_arg.1", %umber_block* %"Operators.*lambda_arg.2") {
+entry:
+  ret %umber_block* inttoptr (i64 1 to %umber_block*)
+}
+
 declare tailcc %umber_block* @Std.Prelude.List.concat_map(%umber_block*, %umber_block*)
 
 declare tailcc %umber_block* @Std.Prelude.List.map(%umber_block*, %umber_block*)
@@ -196,12 +201,12 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_bl
 
 declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
-define tailcc %umber_block* @"Operators.*fun.5"(%umber_block* %"Operators.*lambda_arg.1") {
+define tailcc %umber_block* @"Operators.*fun.5"(%umber_block* %"Operators.*lambda_arg.3") {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*lambda_arg.1", i32 0, i32 1, i32 0
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"Operators.*lambda_arg.3", i32 0, i32 1, i32 0
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"Operators.*lambda_arg.1", i32 0, i32 1, i32 1
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"Operators.*lambda_arg.3", i32 0, i32 1, i32 1
   %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
   %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %block_field)

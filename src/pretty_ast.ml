@@ -190,12 +190,13 @@ module Typed_to_untyped = struct
         Let
           { rec_
           ; bindings =
-              Nonempty.map bindings ~f:(fun (pat_and_type, expr) ->
+              Nonempty.map bindings ~f:(fun (pat_and_type, fixity, expr) ->
                 let pattern, type_ = Node.with_value pat_and_type ~f:Fn.id in
                 let type_ = relativize_type' ~names type_ in
                 ( Node.create
                     (annotated_pattern ~names pattern (fst type_))
                     (Node.span pat_and_type)
+                , fixity
                 , Node.map expr ~f:(convert_expr ~names ~type_) ))
           ; body = Node.map body ~f:(convert_expr ~names ~type_)
           }
@@ -205,7 +206,7 @@ module Typed_to_untyped = struct
            sections explicitly in the typed ast? It might make sense to have a simplified
            typed IR we only use as an extra step before MIR (or replacing MIR). *)
       (match bindings, Node.with_value body ~f:Fn.id with
-       | [ (outer_pattern, outer_expr) ], Lambda ([ inner_pattern ], body) ->
+       | [ (outer_pattern, None, outer_expr) ], Lambda ([ inner_pattern ], body) ->
          let outer_pattern, outer_type = Node.with_value outer_pattern ~f:Fn.id in
          let inner_pattern = Node.with_value inner_pattern ~f:Fn.id in
          let body = Node.with_value body ~f:Fn.id in
@@ -285,11 +286,12 @@ module Typed_to_untyped = struct
         Let
           { rec_
           ; bindings =
-              Nonempty.map bindings ~f:(fun (pattern, expr_and_type) ->
+              Nonempty.map bindings ~f:(fun (pattern, fixity, expr_and_type) ->
                 let expr, type_ = Node.with_value expr_and_type ~f:Fn.id in
                 let type_ = relativize_type' ~names type_ in
                 ( Node.map pattern ~f:(fun pattern ->
                     annotated_pattern ~names pattern (fst type_))
+                , fixity
                 , Node.create
                     (convert_expr expr ~names ~type_ ~should_annotate:false)
                     (Node.span expr_and_type) ))
@@ -341,6 +343,7 @@ module Typed_to_untyped = struct
                { rec_ = true
                ; bindings =
                    [ ( node (Pattern.Catch_all (Some (Value_name.of_string_exn "foo")))
+                     , None
                      , node
                          (Untyped.Expr.Match_function
                             [ node (Pattern.Catch_all None), node (Untyped.Expr.Tuple [])
@@ -364,7 +367,7 @@ module Typed_to_untyped = struct
          (bindings
           (((Type_annotation (Catch_all (foo))
              ((Function ((Var a)) (Effect_union ()) (Tuple ())) ()))
-            (Match_function (((Catch_all ()) (Tuple ())))))))))) |}]
+            () (Match_function (((Catch_all ()) (Tuple ())))))))))) |}]
   ;;
 end
 
@@ -710,9 +713,9 @@ let format_to_document
         ^^ Text ">")
   and format_let_binding
     ~rec_
-    ~bindings:((first_pat, first_expr) :: bindings : _ Nonempty.t)
+    ~bindings:((first_pat, first_fixity, first_expr) :: bindings : _ Nonempty.t)
     =
-    let format_binding keyword pattern expr =
+    let format_binding keyword pattern fixity expr =
       Node.with_value2
         pattern
         expr
@@ -723,6 +726,7 @@ let format_to_document
             format_equals
               (Text keyword
                ^| format_pattern pattern
+               ^| format_fixity fixity
                ^| separated
                     (List.map
                        (Nonempty.to_list args)
@@ -734,9 +738,10 @@ let format_to_document
         | _ -> format_equals (Text keyword ^| format_pattern pattern) (format_expr expr))
     in
     Group
-      (format_binding (if rec_ then "let" else "let'") first_pat first_expr
+      (format_binding (if rec_ then "let" else "let'") first_pat first_fixity first_expr
        ^| separated
-            (List.map bindings ~f:(fun (pat, expr) -> format_binding "and" pat expr)))
+            (List.map bindings ~f:(fun (pat, fixity, expr) ->
+               format_binding "and" pat fixity expr)))
   in
   let rec format_common : _ Module.common -> t = function
     | Val (name, fixity, type_) ->

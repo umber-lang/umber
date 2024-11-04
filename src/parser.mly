@@ -203,10 +203,11 @@ let_rec:
   | LET_NONREC { false }
 
 let_binding:
-  | pat = with_loc(pattern); EQUALS; expr = expr { pat, expr }
-  | fun_name = with_loc(pattern_name); args = nonempty(with_loc(pattern_term));
-    EQUALS; body = expr
+  | pat = with_loc(pattern); fixity = fixity?; EQUALS; expr = expr { pat, fixity, expr }
+  | fun_name = with_loc(pattern_name); fixity = fixity?;
+    args = nonempty(with_loc(pattern_term)); EQUALS; body = expr
     { Node.map fun_name ~f:Pattern.catch_all,
+      fixity,
       Node.create (Expr.Lambda (args, body)) (Span.of_loc ($startpos(args), $endpos(body))) }
 
 expr_:
@@ -333,9 +334,9 @@ import_stmt:
     { { Module.Import.kind = Module.Import.Kind.of_n_periods n_periods ; paths } }
 
 stmt_common:
-  | VAL; name = val_name; fix = parens(fixity)?; colon; t = type_expr_constrained
+  | VAL; name = val_name; fix = fixity?; colon; t = type_expr_constrained
     { Module.Val (Value_name.of_ustring_unchecked name, fix, t) }
-  | EXTERN; name = val_name; fix = parens(fixity)?; colon; t = type_expr_constrained;
+  | EXTERN; name = val_name; fix = fixity?; colon; t = type_expr_constrained;
     EQUALS; s = STRING
     { Module.Extern (
         Value_name.of_ustring_unchecked name, fix, t, Extern_name.of_ustring s) }

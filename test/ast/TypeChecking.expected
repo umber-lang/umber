@@ -3,15 +3,16 @@
    (Import
     ((kind Absolute)
      (paths (Module Std ((Module Prelude ((Name_excluded |>) All))))))))
-  (Let (rec_ false) (bindings (((Tuple ()) ((Tuple ()) ((Tuple ()) ()))))))
+  (Let (rec_ false)
+   (bindings (((Tuple ()) () ((Tuple ()) ((Tuple ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (id))
+    (((Catch_all (id)) ()
       ((Lambda ((Catch_all (x))) (Name TypeChecking.x))
        ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (id_for_ints))
+    (((Catch_all (id_for_ints)) ()
       ((Lambda ((Catch_all (x))) (Name TypeChecking.x))
        ((Function ((Type_app Int ())) (Effect_union ()) (Type_app Int ()))
         ()))))))
@@ -21,14 +22,14 @@
      ())))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (id_for_floats))
+    (((Catch_all (id_for_floats)) ()
       ((Lambda ((Catch_all (x))) (Name TypeChecking.x))
        ((Function ((Type_app Float ())) (Effect_union ())
          (Type_app Float ()))
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (id_for_chars))
+    (((Catch_all (id_for_chars)) ()
       ((Name TypeChecking.id)
        ((Function ((Type_app Char ())) (Effect_union ()) (Type_app Char ()))
         ()))))))
@@ -37,7 +38,7 @@
     ((Function ((Type_app Char ())) (Effect_union ()) (Type_app Char ())) ())))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (id_for_bools))
+    (((Catch_all (id_for_bools)) ()
       ((Lambda ((Catch_all (x)))
         (Fun_call (Name TypeChecking.id)
          ((Function ((Type_app Bool ())) (Effect_union ())
@@ -48,14 +49,14 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ((Catch_all (id_alias)) (Catch_all (five))))
+    (((Tuple ((Catch_all (id_alias)) (Catch_all (five)))) ()
       ((Tuple ((Name TypeChecking.id) (Literal (Int 5))))
        ((Tuple
          ((Function ((Var a)) (Effect_union ()) (Var a)) (Type_app Int ())))
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (|>))
+    (((Catch_all (|>)) ()
       ((Lambda ((Catch_all (x)) (Catch_all (f)))
         (Fun_call (Name TypeChecking.f)
          ((Function ((Intersection ())) (Effect_union ()) (Union ())) ())
@@ -65,7 +66,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (if_))
+    (((Catch_all (if_)) ()
       ((Lambda ((Catch_all (then_)) (Catch_all (else_)))
         (Lambda ((Catch_all (match)))
          (Match (Name TypeChecking.match) ((Type_app Bool ()) ())
@@ -85,7 +86,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (if'))
+    (((Catch_all (if')) ()
       ((Lambda ((Catch_all (then_)) (Catch_all (else_)) (Catch_all (cond)))
         (Match (Name TypeChecking.cond) ((Type_app Bool ()) ())
          (((Cnstr_appl True ())

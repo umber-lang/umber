@@ -1,7 +1,7 @@
 (Closures ()
  ((Let (rec_ false)
    (bindings
-    (((Catch_all (count_up))
+    (((Catch_all (count_up)) ()
       ((Lambda
         ((Catch_all (start_at)) (Catch_all (count_by))
          (Catch_all (end_after)))
@@ -12,6 +12,7 @@
               ((Function ((Type_app Int ())) (Effect_union ())
                 (Type_app Int ()))
                ()))
+             ()
              (Lambda ((Catch_all (current)))
               (Match
                (Fun_call (Name Std.Prelude.Operators.<)
@@ -45,7 +46,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name Std.Prelude.print_int)
         ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
         (((Fun_call (Name Closures.count_up)

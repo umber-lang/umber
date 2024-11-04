@@ -169,7 +169,8 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
       : Parser_scope.Module_path.relative Type_scheme.effects list nonterminal
   | N_separated_nonempty_list_COMMA_import_paths_ : Module.Import.Paths.t list nonterminal
   | N_separated_nonempty_list_AND_let_binding_
-      : (Umber__Untyped.Pattern.t Node.t * Untyped.Expr.t Node.t) list nonterminal
+      : (Umber__Untyped.Pattern.t Node.t * Fixity.t option * Untyped.Expr.t Node.t) list
+        nonterminal
   | N_separated_nonempty_list_AMPERSAND_type_non_fun_
       : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_qualified_with_loc_tuple_expr___
@@ -207,7 +208,7 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_option_preceded_EQUALS_expr__ : Untyped.Expr.t Node.t option nonterminal
   | N_option_preceded_EQUALS_braces_list_stmt_sig____
       : Parser_scope.Module_path.relative Module.sig_ Node.t list option nonterminal
-  | N_option_parens_fixity__ : Fixity.t option nonterminal
+  | N_option_fixity_ : Fixity.t option nonterminal
   | N_operator : (Ustring.t list * Ustring.t) nonterminal
   | N_op_section : Untyped.Expr.t nonterminal
   | N_nonempty_list_with_loc_pattern_term__
@@ -271,7 +272,9 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
         nonterminal
   | N_list_LOWER_NAME_ : Ustring.t list nonterminal
   | N_let_rec : bool nonterminal
-  | N_let_binding : (Umber__Untyped.Pattern.t Node.t * Untyped.Expr.t Node.t) nonterminal
+  | N_let_binding
+      : (Umber__Untyped.Pattern.t Node.t * Fixity.t option * Untyped.Expr.t Node.t)
+        nonterminal
   | N_import_stmt : Module.Import.t nonterminal
   | N_import_paths_after_module : Module.Import.Paths.t Nonempty.t nonterminal
   | N_import_paths : Module.Import.Paths.t nonterminal

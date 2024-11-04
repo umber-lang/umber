@@ -1,7 +1,7 @@
 (Classics ()
  ((Let (rec_ true)
    (bindings
-    (((Catch_all (fact))
+    (((Catch_all (fact)) ()
       ((Lambda ((Catch_all (match)))
         (Match (Name Classics.match) ((Type_app Int ()) ())
          (((Union (Constant (Int 0)) (Constant (Int 1))) (Literal (Int 1)))
@@ -27,7 +27,7 @@
         ()))))))
   (Let (rec_ true)
    (bindings
-    (((Catch_all (fib))
+    (((Catch_all (fib)) ()
       ((Lambda ((Catch_all (n)))
         (Match (Name Classics.n) ((Type_app Int ()) ())
          (((Union (Constant (Int 0)) (Constant (Int 1))) (Literal (Int 1)))
@@ -64,7 +64,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name "Std.Prelude.Operators.;")
         ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
         (((Fun_call (Name "Std.Prelude.Operators.;")

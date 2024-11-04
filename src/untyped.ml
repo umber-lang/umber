@@ -38,6 +38,7 @@ module Expr = struct
         t Node.t
         * ([ `Effect of Effect_pattern.t | `Value of Pattern.t ] Node.t * t Node.t)
           Nonempty.t
+    (* TODO: Support fixity declarations on local let bindings *)
     | Let of (Pattern.t, t) Let_binding.t
     | Tuple of t Node.t list
     | Seq_literal of t Node.t list
@@ -107,12 +108,15 @@ module Expr = struct
           Node.with_value branch ~f:(loop ~names used locals))
       | Let { rec_; bindings; body } ->
         let new_locals =
-          Nonempty.fold bindings ~init:locals ~f:(fun locals (pat, _) ->
+          Nonempty.fold
+            bindings
+            ~init:locals
+            ~f:(fun locals (pat, (_ : Fixity.t option), _expr) ->
             Node.with_value pat ~f:(add_locals locals))
         in
         let binding_locals = if rec_ then new_locals else locals in
         let used =
-          Nonempty.fold bindings ~init:used ~f:(fun used (_, expr) ->
+          Nonempty.fold bindings ~init:used ~f:(fun used (_pat, _fixity, expr) ->
             Node.with_value expr ~f:(loop ~names used binding_locals))
         in
         Node.with_value body ~f:(loop ~names used new_locals)

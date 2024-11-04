@@ -30,14 +30,16 @@ module Names : sig
   val empty : t
 
   val add_name
-    :  t
+    :  ?fixity:Fixity.t
+    -> t
     -> Value_name.t
     -> Internal_type.t
     -> type_source:Name_bindings.Name_entry.Type_source.t
     -> t
 
   val add_fresh_name
-    :  t
+    :  ?fixity:Fixity.t
+    -> t
     -> Value_name.t
     -> type_source:Name_bindings.Name_entry.Type_source.t
     -> t * Internal_type.t

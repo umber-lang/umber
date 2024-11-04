@@ -10,7 +10,7 @@
          (result (Type_app Never ())))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Handle
         (expr
          (Match (Name True) ((Type_app Bool ()) ())
@@ -28,7 +28,7 @@
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (reraise))
+    (((Catch_all (reraise)) ()
       ((Lambda ((Catch_all (msg)) (Catch_all (f)))
         (Let
          ((rec_ false)
@@ -36,6 +36,7 @@
            ((((Catch_all (result))
               ((Type_app ReraiseExn.Result ((Var a) (Type_app String ())))
                ()))
+             ()
              (Handle
               (expr
                (Fun_call (Name ReraiseExn.f)
@@ -92,7 +93,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Handle
         (expr
          (Fun_call (Name ReraiseExn.reraise)

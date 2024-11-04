@@ -59,6 +59,10 @@
        ((Primitive (String product))
         (Fun_call Std.Prelude.Operators.::
          ((Primitive (String maybe?)) (Name Std.Prelude.List.Nil))))))))))
+ (Fun_def
+  ((fun_name Operators.~~~)
+   (args (Operators.*lambda_arg.1 Operators.*lambda_arg.2))
+   (body (Make_block (tag 0)))))
  (Fun_decl ((name Std.Prelude.List.concat_map) (arity 2)))
  (Fun_decl ((name Std.Prelude.List.map) (arity 2)))
  (Fun_def
@@ -87,10 +91,10 @@
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Fun_def
-  ((fun_name Operators.*fun.5) (args (Operators.*lambda_arg.1))
+  ((fun_name Operators.*fun.5) (args (Operators.*lambda_arg.3))
    (body
-    (Let Operators.x.3 (Get_block_field 0 (Name Operators.*lambda_arg.1))
-     (Let Operators.y.2 (Get_block_field 1 (Name Operators.*lambda_arg.1))
+    (Let Operators.x.3 (Get_block_field 0 (Name Operators.*lambda_arg.3))
+     (Let Operators.y.2 (Get_block_field 1 (Name Operators.*lambda_arg.3))
       (Fun_call "Std.Prelude.Operators.;"
        ((Fun_call Std.Prelude.print ((Name Operators.x.3)))
         (Fun_call Std.Prelude.print ((Name Operators.y.2))))))))))

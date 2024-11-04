@@ -28,7 +28,10 @@
        (Type_app Std.Prelude.List.List ((Var b))))
       (Effect_union ())
       (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))
-     ()))))
+     ())))
+  (Common_sig
+   (Val ~~~ ((Non_assoc 3))
+    ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ()))))
  ((Common_def
    (Import
     ((kind Absolute)
@@ -44,7 +47,7 @@
         (paths (Module Std ((Module Prelude ((Name +) (Name mod))))))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (true))
+    (((Catch_all (true)) ()
       ((Fun_call (Name Std.Prelude.Operators.==)
         ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
           (Type_app Bool ()))
@@ -66,7 +69,7 @@
        ((Type_app Bool ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (four))
+    (((Catch_all (four)) ()
       ((Fun_call (Name Std.Prelude.Operators.+)
         ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
           (Type_app Int ()))
@@ -76,7 +79,7 @@
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (one))
+    (((Catch_all (one)) ()
       ((Fun_call (Name Std.Prelude.Operators.mod)
         ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
           (Type_app Int ()))
@@ -86,11 +89,12 @@
        ((Type_app Int ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (left_section))
+    (((Catch_all (left_section)) ()
       ((Let
         ((rec_ false)
          (bindings
-          ((((Catch_all (*arg0)) ((Type_app Int ()) ())) (Literal (Int 2)))))
+          ((((Catch_all (*arg0)) ((Type_app Int ()) ())) ()
+            (Literal (Int 2)))))
          (body
           (Lambda ((Catch_all (*arg1)))
            (Fun_call (Name Std.Prelude.Operators.+)
@@ -103,11 +107,12 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (right_section))
+    (((Catch_all (right_section)) ()
       ((Let
         ((rec_ false)
          (bindings
-          ((((Catch_all (*arg1)) ((Type_app Int ()) ())) (Literal (Int 5)))))
+          ((((Catch_all (*arg1)) ((Type_app Int ()) ())) ()
+            (Literal (Int 5)))))
          (body
           (Lambda ((Catch_all (*arg0)))
            (Fun_call (Name Std.Prelude.Operators.*)
@@ -120,7 +125,7 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all (unicode_my_dudes))
+    (((Catch_all (unicode_my_dudes)) ()
       ((Fun_call (Name "Operators.\195\151")
         ((Function
           ((Type_app Std.Prelude.List.List ((Type_app String ())))
@@ -184,7 +189,12 @@
         ()))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ("\195\151"))
+    (((Catch_all (~~~)) ((Non_assoc 3))
+      ((Lambda ((Tuple ()) (Tuple ())) (Tuple ()))
+       ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ()))))))
+  (Let (rec_ false)
+   (bindings
+    (((Catch_all ("\195\151")) ()
       ((Lambda ((Catch_all (xs)) (Catch_all (ys)))
         (Fun_call (Name Std.Prelude.List.concat_map)
          ((Function
@@ -230,7 +240,7 @@
          ((Name ";") (Name print) (Name ++) (Name Int) (Name Bool)))))))))
   (Let (rec_ false)
    (bindings
-    (((Catch_all ())
+    (((Catch_all ()) ()
       ((Fun_call (Name Std.Prelude.List.map)
         ((Function
           ((Type_app Std.Prelude.List.List
@@ -265,7 +275,7 @@
        ((Type_app Std.Prelude.List.List ((Tuple ()))) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name Std.Prelude.print)
         ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
         (((Fun_call (Name Std.Prelude.Operators.++)
@@ -283,7 +293,7 @@
        ((Tuple ()) ()))))))
   (Let (rec_ false)
    (bindings
-    (((Tuple ())
+    (((Tuple ()) ()
       ((Fun_call (Name Std.Prelude.print)
         ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
         (((Fun_call (Name Std.Prelude.Operators.++)

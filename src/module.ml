@@ -82,7 +82,7 @@ and ('pat, 'expr, 'name) def =
   | Module of ('pat, 'expr, 'name) t
   | Let of
       { rec_ : bool
-      ; bindings : ('pat Node.t * 'expr Node.t) Nonempty.t
+      ; bindings : ('pat Node.t * Fixity.t option * 'expr Node.t) Nonempty.t
       }
   | Trait of
       Trait_name.t
