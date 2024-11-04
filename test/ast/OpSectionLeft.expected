@@ -49,7 +49,7 @@
                (Effect_union ()) (Union ()))
               ())
              (((Name OpSectionLeft.*arg0) ((Type_app String ()) ()))
-              ((Name OpSectionLeft.*arg1) ((Union ()) ())))))))))
+              ((Name OpSectionLeft.*arg1) ((Var a) ())))))))))
        ((Function
          ((Function ((Type_app String ()) (Var a)) (Effect_var b) (Var c)))
          (Effect_union ()) (Function ((Var a)) (Effect_var b) (Var c)))
@@ -61,12 +61,11 @@
         ((rec_ false)
          (bindings
           ((((Catch_all (g))
-             ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-              ()))
+             ((Function ((Type_app String ())) (Effect_var a) (Tuple ())) ()))
             (Fun_call (Name OpSectionLeft.apply)
              ((Function
                ((Function ((Type_app String ()) (Type_app String ()))
-                 (Effect_intersection ()) (Tuple ())))
+                 (Effect_var a) (Tuple ())))
                (Effect_union ())
                (Function ((Type_app String ())) (Effect_union ()) (Tuple ())))
               ())
@@ -84,7 +83,7 @@
               (((Literal (String between)) ((Type_app String ()) ()))))
              ((Tuple ()) ()))
             ((Fun_call (Name OpSectionLeft.g)
-              ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
+              ((Function ((Type_app String ())) (Effect_var a) (Tuple ()))
                ())
               (((Literal (String penne)) ((Type_app String ()) ()))))
              ((Tuple ()) ())))))))

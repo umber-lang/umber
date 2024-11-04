@@ -34,7 +34,7 @@
          ((rec_ false)
           (bindings
            ((((Catch_all (result))
-              ((Type_app ReraiseExn.Result ((Union ()) (Type_app String ())))
+              ((Type_app ReraiseExn.Result ((Var a) (Type_app String ())))
                ()))
              (Handle
               (expr
@@ -51,19 +51,18 @@
                    (Type_app ReraiseExn.Result
                     ((Var a) (Type_app String ()))))
                   ())
-                 (((Name ReraiseExn.value) ((Union ()) ()))))))
+                 (((Name ReraiseExn.value) ((Var a) ()))))))
               (effect_branches
                ((((operation ReraiseExn.raise) (args ((Catch_all (exn)))))
                  (Fun_call (Name ReraiseExn.Error)
                   ((Function ((Type_app String ())) (Effect_union ())
                     (Type_app ReraiseExn.Result
-                     ((Union ()) (Type_app String ()))))
+                     ((Var a) (Type_app String ()))))
                    ())
                   (((Name ReraiseExn.exn) ((Type_app String ()) ())))))))))))
           (body
            (Match (Name ReraiseExn.result)
-            ((Type_app ReraiseExn.Result ((Union ()) (Type_app String ())))
-             ())
+            ((Type_app ReraiseExn.Result ((Var a) (Type_app String ()))) ())
             (((Cnstr_appl ReraiseExn.Ok ((Catch_all (value))))
               (Name ReraiseExn.value))
              ((Cnstr_appl ReraiseExn.Error ((Catch_all (exn))))
@@ -116,7 +115,8 @@
                  (((Literal (String "My exception"))
                    ((Type_app String ()) ())))))
                ((Cnstr_appl False ()) (Literal (Int 42))))))
-            ((Function ((Tuple ())) (Effect ReraiseExn.Exn ())
+            ((Function ((Tuple ()))
+              (Effect_union ((Effect ReraiseExn.Exn ()) (Effect_var a)))
               (Type_app Int ()))
              ())))))
         (expr_type ((Type_app Int ()) ()))

@@ -59,7 +59,7 @@
       ((Lambda ((Catch_all (x)) (Catch_all (f)))
         (Fun_call (Name TypeChecking.f)
          ((Function ((Intersection ())) (Effect_union ()) (Union ())) ())
-         (((Name TypeChecking.x) ((Union ()) ())))))
+         (((Name TypeChecking.x) ((Var a) ())))))
        ((Function ((Var a) (Function ((Var a)) (Effect_var b) (Var c)))
          (Effect_var b) (Var c))
         ()))))))

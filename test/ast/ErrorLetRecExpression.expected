@@ -1,5 +1,5 @@
 (ErrorLetRecExpression ()
  ((Let (rec_ true)
    (bindings
-    (((Catch_all (a)) ((Name ErrorLetRecExpression.b) ((Union ()) ())))
-     ((Catch_all (b)) ((Name ErrorLetRecExpression.a) ((Union ()) ()))))))))
+    (((Catch_all (a)) ((Name ErrorLetRecExpression.b) ((Var a) ())))
+     ((Catch_all (b)) ((Name ErrorLetRecExpression.a) ((Var a) ()))))))))

@@ -210,10 +210,10 @@
               ((Lambda ((Catch_all (y)))
                 (Tuple ((Name Operators.x) (Name Operators.y))))
                ((Function ((Var a)) (Effect_union ())
-                 (Tuple ((Union ()) (Var a))))
+                 (Tuple ((Var b) (Var a))))
                 ())))))
            ((Function ((Var a)) (Effect_union ())
-             (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Union ()))))))
+             (Type_app Std.Prelude.List.List ((Tuple ((Var a) (Var b))))))
             ())))))
        ((Function
          ((Type_app Std.Prelude.List.List ((Var a)))

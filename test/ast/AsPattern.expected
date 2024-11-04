@@ -9,7 +9,7 @@
     (((Catch_all (iter_pairs))
       ((Lambda ((Catch_all (f)) (Catch_all (lst)))
         (Match (Name AsPattern.lst)
-         ((Type_app Std.Prelude.List.List ((Union ()))) ())
+         ((Type_app Std.Prelude.List.List ((Var a))) ())
          (((Union (Cnstr_appl Std.Prelude.List.Nil ())
             (Cnstr_appl Std.Prelude.List.Cons
              ((Catch_all ()) (Cnstr_appl Std.Prelude.List.Nil ()))))
@@ -25,8 +25,8 @@
                ((Function ((Intersection ()) (Intersection ()))
                  (Effect_union ()) (Tuple ()))
                 ())
-               (((Name AsPattern.a) ((Union ()) ()))
-                ((Name AsPattern.b) ((Union ()) ()))))
+               (((Name AsPattern.a) ((Var a) ()))
+                ((Name AsPattern.b) ((Var a) ()))))
               ((Tuple ()) ()))
              ((Fun_call (Name AsPattern.iter_pairs)
                ((Function
@@ -44,10 +44,10 @@
                     (Effect_union ())
                     (Type_app Std.Prelude.List.List ((Var a))))
                    ())
-                  (((Name AsPattern.b) ((Union ()) ()))
+                  (((Name AsPattern.b) ((Var a) ()))
                    ((Name AsPattern.rest)
-                    ((Type_app Std.Prelude.List.List ((Union ()))) ()))))
-                 ((Type_app Std.Prelude.List.List ((Union ()))) ()))))
+                    ((Type_app Std.Prelude.List.List ((Var a))) ()))))
+                 ((Type_app Std.Prelude.List.List ((Var a))) ()))))
               ((Tuple ()) ()))))))))
        ((Function
          ((Function ((Var a) (Var a)) (Effect_var b) (Tuple ()))

@@ -32,11 +32,11 @@
         (Fun_call (Name "Std.Prelude.Operators.;")
          ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
          (((Fun_call (Name MoreEffectsInSig.f)
-            ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())
+            ((Function ((Tuple ())) (Effect_var a) (Tuple ())) ())
             (((Tuple ()) ((Tuple ()) ()))))
            ((Tuple ()) ()))
           ((Fun_call (Name MoreEffectsInSig.g)
-            ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())
+            ((Function ((Tuple ())) (Effect_var a) (Tuple ())) ())
             (((Tuple ()) ((Tuple ()) ()))))
            ((Tuple ()) ())))))
        ((Function

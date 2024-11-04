@@ -35,18 +35,16 @@
         ((Catch_all (a)) (Catch_all (b)) (Catch_all (c)) (Catch_all (d))
          (Catch_all (e)))
         (Tuple ()))
-       ((Function
-         ((Intersection ()) (Intersection ()) (Intersection ())
-          (Intersection ()) (Intersection ()))
-         (Effect_union ()) (Tuple ()))
+       ((Function ((Var a) (Var b) (Var c) (Var d) (Var e)) (Effect_union ())
+         (Tuple ()))
         ()))))))
   (Let (rec_ false)
    (bindings
     (((Tuple ())
       ((Fun_call (Name Functions.lots_of_args)
         ((Function
-          ((Intersection ()) (Intersection ()) (Intersection ())
-           (Intersection ()) (Intersection ()))
+          ((Type_app Int ()) (Type_app Float ()) (Type_app Int ())
+           (Type_app String ()) (Type_app Char ()))
           (Effect_union ()) (Tuple ()))
          ())
         (((Literal (Int 5)) ((Type_app Int ()) ()))

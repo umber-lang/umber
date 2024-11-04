@@ -42,10 +42,10 @@
         (Tuple
          ((Fun_call (Name Effects.f)
            ((Function ((Intersection ())) (Effect_union ()) (Union ())) ())
-           (((Name Effects.x) ((Union ()) ()))))
+           (((Name Effects.x) ((Var a) ()))))
           (Fun_call (Name Effects.g)
            ((Function ((Intersection ())) (Effect_union ()) (Union ())) ())
-           (((Name Effects.x) ((Union ()) ())))))))
+           (((Name Effects.x) ((Var a) ())))))))
        ((Function
          ((Function ((Var a)) (Effect_var b) (Var c))
           (Function ((Var a)) (Effect_var b) (Var d)) (Var a))
@@ -165,7 +165,7 @@
           (effect_branches
            ((((operation Effects.ask) (args ((Tuple ()))))
              (Fun_call (Name Effects.resume)
-              ((Function ((Type_app Int ())) (Effect_union ())
+              ((Function ((Type_app Int ())) (Effect_var a)
                 (Type_app Int ()))
                ())
               (((Literal (Int 5)) ((Type_app Int ()) ())))))))))
@@ -185,7 +185,10 @@
         (Handle
          (expr
           (Fun_call (Name Effects.f)
-           ((Function ((Tuple ())) (Effect Effects.Read ()) (Tuple ())) ())
+           ((Function ((Tuple ()))
+             (Effect_union ((Effect Effects.Read ()) (Effect_var a)))
+             (Tuple ()))
+            ())
            (((Tuple ()) ((Tuple ()) ())))))
          (expr_type ((Tuple ()) ()))
          (effect_branches

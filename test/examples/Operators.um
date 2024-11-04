@@ -26,6 +26,7 @@ let left_section = Arith.((2+))
 let right_section = (*5)
 let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?"::Nil)
 
+# FIXME: Correct var renaming here
 let (×) xs ys = List.concat_map xs (\x -> List.map ys (\y -> (x, y)))
 
 import Std.Prelude.((;), print, (++), Int, Bool)

@@ -55,4 +55,4 @@
    (bindings
     (((Catch_all (empty))
       ((Name Std.Prelude.List.Nil)
-       ((Type_app Std.Prelude.List.List ((Union ()))) ()))))))))
+       ((Type_app Std.Prelude.List.List ((Var a))) ()))))))))
