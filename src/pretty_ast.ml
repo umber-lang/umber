@@ -533,7 +533,7 @@ let format_to_document
         | Left -> "infixl"
         | Right -> "infixr"
       in
-      parens (Text assoc_keyword ^| Text (Int.to_string (level :> int))))
+      Text assoc_keyword ^| Text (Int.to_string (level :> int)))
   in
   let format_char_literal c =
     (* FIXME: Handle escaping *)
@@ -725,17 +725,23 @@ let format_to_document
           Node.with_value body ~f:(fun body ->
             format_equals
               (Text keyword
-               ^| format_pattern pattern
                ^| format_fixity fixity
+               ^| format_pattern pattern
                ^| separated
                     (List.map
                        (Nonempty.to_list args)
                        ~f:(Node.with_value ~f:format_pattern_term)))
               (format_expr body))
         | Catch_all (Some _fun_name), Match_function branches ->
-          Group (format_equals (Text keyword ^| format_pattern pattern) (Text "match"))
+          Group
+            (format_equals
+               (Text keyword ^| format_fixity fixity ^| format_pattern pattern)
+               (Text "match"))
           ^^ indent ~prefix:Empty (format_match_branches branches)
-        | _ -> format_equals (Text keyword ^| format_pattern pattern) (format_expr expr))
+        | _ ->
+          format_equals
+            (Text keyword ^| format_fixity fixity ^| format_pattern pattern)
+            (format_expr expr))
     in
     Group
       (format_binding (if rec_ then "let" else "let'") first_pat first_fixity first_expr
@@ -748,7 +754,7 @@ let format_to_document
       Group
         (format_equals
            (format_annotated
-              (Text "extern" ^| format_value_name name ^| format_fixity fixity)
+              (Text "extern" ^| format_fixity fixity ^| format_value_name name)
               (format_type' type_))
            (format_string_literal (Extern_name.to_ustring extern_name)))
     | Type_decl (type_name, (params, decl)) ->
@@ -823,7 +829,7 @@ let format_to_document
     | Val (name, fixity, type_) ->
       Group
         (format_annotated
-           (Text "val" ^| format_value_name name ^| format_fixity fixity)
+           (Text "val" ^| format_fixity fixity ^| format_value_name name)
            (format_type' type_))
     | Trait_sig _ -> failwith "TODO: format trait sig"
     | Module_sig (module_name, sigs) ->
