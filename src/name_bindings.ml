@@ -8,7 +8,6 @@ module Name_entry = struct
         | Placeholder
         | Let_inferred
         | Val_declared
-        | Val_and_let
         | Extern_declared
         | Effect_operation
       [@@deriving compare, enumerate, equal, sexp, variants]
@@ -21,13 +20,7 @@ module Name_entry = struct
       List.equal
         equal
         (List.sort ~compare all)
-        [ Placeholder
-        ; Let_inferred
-        ; Val_declared
-        ; Val_and_let
-        ; Extern_declared
-        ; Effect_operation
-        ]
+        [ Placeholder; Let_inferred; Val_declared; Extern_declared; Effect_operation ]
     ;;
   end
 
@@ -87,15 +80,10 @@ module Name_entry = struct
         in
         entry', typ, entry
     in
-    let type_source : Type_source.t =
-      match preferred.type_source, other.type_source with
-      | Val_declared, Let_inferred | Let_inferred, Val_declared -> Val_and_let
-      | _ -> preferred.type_source
-    in
     let pick getter = Option.first_some (getter preferred) (getter other) in
     { ids = Set.union entry.ids entry'.ids
     ; type_
-    ; type_source
+    ; type_source = preferred.type_source
     ; fixity = pick fixity
     ; extern_name = pick extern_name
     }
@@ -845,7 +833,7 @@ let add_val_or_extern ?extern_name t name fixity scheme ~constrain ~type_source 
           | Some (Local existing_entry) ->
             (match existing_entry.type_source with
              | Placeholder | Let_inferred -> ()
-             | Val_declared | Val_and_let | Extern_declared | Effect_operation ->
+             | Val_declared | Extern_declared | Effect_operation ->
                Compilation_error.raise
                  Name_error
                  ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
@@ -1031,8 +1019,7 @@ let set_inferred_scheme t name scheme ~shadowing_allowed ~check_existing =
             (match existing_entry.type_source with
              | Placeholder | Val_declared -> ()
              | Extern_declared | Effect_operation -> multiple_definitions ()
-             | Let_inferred | Val_and_let ->
-               if not shadowing_allowed then multiple_definitions ());
+             | Let_inferred -> if not shadowing_allowed then multiple_definitions ());
             check_existing existing_entry;
             Local (Name_entry.merge existing_entry inferred_entry)
           | Some (Imported _) ->
