@@ -887,8 +887,7 @@ module Expr = struct
 
   and map' expr ~f ~f_type = Node.map expr ~f:(map ~f ~f_type)
 
-  (* FIXME: use *)
-  (* let map_types expr ~f = map expr ~f_type:f ~f:(fun expr -> Defer expr) *)
+  let map_types expr ~f = map expr ~f_type:f ~f:(fun expr -> Defer expr)
 
   (* FIXME: Remove unused *)
   (* let rec fold_until expr ~init:acc ~f ~f_type =
@@ -1494,8 +1493,7 @@ module Module = struct
     other_defs, binding_groups
   ;;
 
-  (* FIXME: use *)
-  (* let rename_type_vars_in_bindings bindings =
+  let rename_type_vars_in_bindings bindings =
     let map_var =
       let generator = Type_param.Generator.create () in
       let vars = Type_param.Table.create () in
@@ -1504,13 +1502,14 @@ module Module = struct
     let map_type : 'a. 'a Type_scheme.t -> 'a Type_scheme.t =
       Tuple2.map_fst ~f:(Type_scheme.map_vars ~f:map_var)
     in
-    Nonempty.map bindings ~f:(fun (pat, expr_and_scheme) ->
+    Nonempty.map bindings ~f:(fun (pat, fixity, expr_and_scheme) ->
       ( pat
+      , fixity
       , Node.map expr_and_scheme ~f:(fun (expr, scheme) ->
           let scheme = map_type scheme in
           let expr = Expr.map_types expr ~f:map_type in
           expr, scheme) ))
-  ;; *)
+  ;;
 
   let type_binding_group
     ~names
@@ -1581,59 +1580,7 @@ module Module = struct
         in
         names, (Node.create pat pat_span, fixity, expr_and_scheme))
     in
-    (* let bindings = rename_type_vars_in_bindings bindings in *)
-    (* FIXME: Remove this hack *)
-    (* let positive_types, negative_types =
-      let add_type (positive_types, negative_types) type_ ~(polarity : Polarity.t) =
-        match polarity with
-        | Positive -> type_ :: positive_types, negative_types
-        | Negative -> positive_types, type_ :: negative_types
-      in
-      (* FIXME: Adjsut this *)
-      let polarity : Polarity.t = Positive in
-      Nonempty.fold
-        bindings
-        ~init:([], [])
-        ~f:(fun acc ((_ : Pattern.t Node.t), expr_and_scheme) ->
-        Node.with_value expr_and_scheme ~f:(fun (expr, scheme) ->
-          (* FIXME: need to fold over types with polarity - does expr introduce polarity?
-             
-             I think we need to look at *every* type, including implicit ones. The types
-             of the patterns matters (for negative polarity)
-          *)
-          let acc = Expr.fold_types expr ~init:acc ~f:(add_type ~polarity) in
-          add_type acc scheme ~polarity))
-    in
-    let positive_types = List.rev positive_types in
-    let negative_types = List.rev negative_types in
-    let positive_types, negative_types =
-      Type_simplification.simplify_types ~positive_types ~negative_types
-    in
-    let positive_types = Queue.of_list positive_types in
-    let negative_types = Queue.of_list negative_types in
-    let bindings =
-      let get_type ~(polarity : Polarity.t) =
-        match polarity with
-        | Positive ->
-          (match Queue.dequeue positive_types with
-           | None -> compiler_bug [%message "Missing positive type"]
-           | Some type_ -> type_)
-        | Negative ->
-          (match Queue.dequeue negative_types with
-           | None -> compiler_bug [%message "Missing negative type"]
-           | Some type_ -> type_)
-      in
-      (* FIXME: Adjust this *)
-      let polarity : Polarity.t = Positive in
-      Nonempty.map bindings ~f:(fun (pat, expr_and_scheme) ->
-        let expr_and_scheme =
-          Node.map expr_and_scheme ~f:(fun (expr, _scheme) ->
-            let expr = Expr.map_types expr ~f:(fun _ -> get_type ~polarity) in
-            let scheme = get_type ~polarity in
-            expr, scheme)
-        in
-        pat, expr_and_scheme)
-    in *)
+    let bindings = rename_type_vars_in_bindings bindings in
     names, Node.create (Let { rec_; bindings }) representative_span
   ;;
 
