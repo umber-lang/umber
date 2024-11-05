@@ -157,10 +157,6 @@ val add_val
   -> Value_name.t
   -> Fixity.t option
   -> Module_path.absolute Type_scheme.t
-  -> constrain:
-       (subtype:Name_entry.Type_or_scheme.t
-        -> supertype:Name_entry.Type_or_scheme.t
-        -> unit)
   -> t
 
 val add_extern
@@ -169,10 +165,6 @@ val add_extern
   -> Fixity.t option
   -> Module_path.absolute Type_scheme.t
   -> Extern_name.t
-  -> constrain:
-       (subtype:Name_entry.Type_or_scheme.t
-        -> supertype:Name_entry.Type_or_scheme.t
-        -> unit)
   -> t
 
 val add_type_decl : t -> Type_name.t -> Module_path.absolute Type_decl.t -> t

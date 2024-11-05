@@ -38,7 +38,7 @@ module Pattern = struct
     | Unequal_lengths -> type_error_msg "Wrong number of arguments in application"
   ;;
 
-  let rec of_untyped_with_names ?fixity ~names ~types pat_names
+  let rec of_untyped_with_names ~names ~types ~fixity pat_names
     : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
     = function
     | Constant lit ->
@@ -70,7 +70,7 @@ module Pattern = struct
       in
       let pat_names, args =
         List.fold_map args ~init:pat_names ~f:(fun pat_names arg ->
-          of_untyped_with_names ~names ~types pat_names arg)
+          of_untyped_with_names ~names ~types pat_names arg ~fixity)
       in
       let args, arg_types = List.unzip args in
       let effects, result_type =
@@ -90,7 +90,7 @@ module Pattern = struct
           ~init:(pat_names, [], [])
           ~f:(fun field (pat_names, fields, field_types) ->
           let pat_names, (field, field_type) =
-            of_untyped_with_names ~names ~types pat_names field
+            of_untyped_with_names ~names ~types pat_names field ~fixity
           in
           pat_names, field :: fields, field_type :: field_types)
       in
@@ -118,8 +118,12 @@ module Pattern = struct
               | None -> Type_bindings.fresh_var ())))*)
       failwith "TODO: record types in patterns"
     | Union (pat1, pat2) ->
-      let pat_names1, (pat1, typ1) = of_untyped_with_names ~names ~types pat_names pat1 in
-      let pat_names2, (pat2, typ2) = of_untyped_with_names ~names ~types pat_names pat2 in
+      let pat_names1, (pat1, typ1) =
+        of_untyped_with_names ~names ~types pat_names pat1 ~fixity
+      in
+      let pat_names2, (pat2, typ2) =
+        of_untyped_with_names ~names ~types pat_names pat2 ~fixity
+      in
       let result_type = Internal_type.fresh_var () in
       Type_bindings.constrain ~names ~types ~subtype:typ1 ~supertype:result_type;
       Type_bindings.constrain ~names ~types ~subtype:typ2 ~supertype:result_type;
@@ -144,7 +148,9 @@ module Pattern = struct
       then type_error_msg "Pattern unions must define the same names";
       pat_names1, (Union (pat1, pat2), result_type)
     | As (pat, name) ->
-      let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
+      let pat_names, (pat, typ) =
+        of_untyped_with_names ~names ~types pat_names pat ~fixity
+      in
       let pat_names =
         Pattern.Names.add_name pat_names name typ ~type_source:Placeholder ~fixity
       in
@@ -161,7 +167,7 @@ module Pattern = struct
              ~effect_name:(Name_bindings.absolutify_effect_name names))
       in
       let pat_names, (pat, inferred_type) =
-        of_untyped_with_names ~names ~types pat_names pat
+        of_untyped_with_names ~names ~types pat_names pat ~fixity
       in
       Type_bindings.constrain
         ~names
@@ -171,9 +177,9 @@ module Pattern = struct
       pat_names, (pat, annotated_type)
   ;;
 
-  let of_untyped_into ?fixity ~names ~types pattern =
+  let of_untyped_into ~names ~types ~fixity pattern =
     let ((pat_names, _) as pat) =
-      of_untyped_with_names ?fixity ~names ~types Pattern.Names.empty pattern
+      of_untyped_with_names ~names ~types Pattern.Names.empty pattern ~fixity
     in
     let names =
       merge_pattern_names ~names ~types pat_names ~combine:(fun _ _ new_entry ->
@@ -244,7 +250,7 @@ module Effect_pattern = struct
     in
     let pat_names, args =
       Nonempty.fold_map args ~init:pat_names ~f:(fun pat_names arg ->
-        Pattern.of_untyped_with_names ~names ~types pat_names arg)
+        Pattern.of_untyped_with_names ~names ~types pat_names arg ~fixity:None)
     in
     let args, arg_types = Nonempty.unzip args in
     let operation_effects, operation_result_type =
@@ -435,7 +441,9 @@ module Expr = struct
               Nonempty.fold_map args ~init:names ~f:(fun names arg ->
                 let span = Node.span arg in
                 let names, ((_ : Pattern.Names.t), (arg, arg_type)) =
-                  Node.with_value arg ~f:(Pattern.of_untyped_into ~names ~types)
+                  Node.with_value
+                    arg
+                    ~f:(Pattern.of_untyped_into ~names ~types ~fixity:None)
                 in
                 names, (Node.create arg span, arg_type))
             in
@@ -495,7 +503,9 @@ module Expr = struct
                 Nonempty.map branches ~f:(fun (pat, branch) ->
                   let pat_span = Node.span pat in
                   let names, ((_ : Pattern.Names.t), (pat, pat_type)) =
-                    Node.with_value pat ~f:(Pattern.of_untyped_into ~names ~types)
+                    Node.with_value
+                      pat
+                      ~f:(Pattern.of_untyped_into ~names ~types ~fixity:None)
                   in
                   Type_bindings.constrain
                     ~names
@@ -546,7 +556,7 @@ module Expr = struct
                 match Node.with_value pattern ~f:Fn.id with
                 | `Value pattern ->
                   let names, ((_ : Pattern.Names.t), (pattern, pattern_type)) =
-                    Pattern.of_untyped_into ~names ~types pattern
+                    Pattern.of_untyped_into ~names ~types pattern ~fixity:None
                   in
                   Type_bindings.constrain
                     ~names
@@ -695,7 +705,7 @@ module Expr = struct
                       let names, (pat_names, (pat, pat_type)) =
                         Node.with_value
                           pat
-                          ~f:(Pattern.of_untyped_into ~names ~types ?fixity)
+                          ~f:(Pattern.of_untyped_into ~names ~types ~fixity)
                       in
                       ( names
                       , (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr)
@@ -713,7 +723,7 @@ module Expr = struct
                       let names, (pat_names, (pat, pat_type)) =
                         Node.with_value
                           pat
-                          ~f:(Pattern.of_untyped_into ~names ~types ?fixity)
+                          ~f:(Pattern.of_untyped_into ~names ~types ~fixity)
                       in
                       let expr, expr_type, expr_effects =
                         of_untyped ~names ~types ~f_name expr
@@ -1387,6 +1397,9 @@ module Module = struct
      - We're instantiating all the pattern types up-front here, which is bad. We should do
        it while typing each binding group.
      - We're adding constraints to variables when there's a let + a val
+
+     - you can't just remove the type bindings from here, you need to have the type
+       variables in the pattern names match up
   *)
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
@@ -1397,12 +1410,7 @@ module Module = struct
     =
     let handle_common ~names = function
       | Extern (name, fixity, typ, extern_name) ->
-        (* FIXME: We shouldn't need to do constraints here
-           - except, the pattern instantiating types creates some constraints which I'm
-             sus of
-        *)
-        let constrain = Type_bindings.constrain' ~names ~types in
-        Name_bindings.add_extern names name fixity typ extern_name ~constrain
+        Name_bindings.add_extern names name fixity typ extern_name
       | Type_decl (_, (_, Alias alias)) ->
         check_cyclic_type_alias ~names alias;
         names
@@ -1415,9 +1423,7 @@ module Module = struct
       List.fold ~init:names ~f:(fun names sig_ ->
         Node.with_value sig_ ~f:(function
           | Common_sig common -> handle_common ~names common
-          | Val (name, fixity, typ) ->
-            let constrain = Type_bindings.constrain' ~names ~types in
-            Name_bindings.add_val names name fixity typ ~constrain
+          | Val (name, fixity, typ) -> Name_bindings.add_val names name fixity typ
           | Trait_sig _ -> names
           | Module_sig (module_name, sigs) ->
             Name_bindings.with_submodule ~place:`Sig names module_name ~f:(fun names ->
@@ -1433,23 +1439,14 @@ module Module = struct
         let pat_names, pat =
           Node.with_value
             pat
-            ~f:(Pattern.of_untyped_with_names ?fixity ~names ~types Pattern.Names.empty)
+            ~f:(Pattern.of_untyped_with_names ~fixity ~names ~types Pattern.Names.empty)
         in
         let names =
-          (* Unify pattern bindings with local type information (e.g. val declarations) *)
-          merge_pattern_names
-            ~names
-            ~types
+          Name_bindings.merge_names
+            names
             pat_names
-            ~combine:(fun _ existing_entry new_entry ->
-            let existing_type = Name_bindings.Name_entry.type_ existing_entry in
-            let new_type = Name_bindings.Name_entry.type_ new_entry in
-            Type_bindings.constrain'
-              ~names
-              ~types
-              ~subtype:new_type
-              ~supertype:existing_type;
-            Name_bindings.Name_entry.merge existing_entry new_entry)
+            ~combine:(fun (_ : Value_name.t) old_entry new_entry ->
+            Name_bindings.Name_entry.merge old_entry new_entry)
         in
         let pat, pat_type = pat in
         names, (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr))

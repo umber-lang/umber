@@ -823,7 +823,7 @@ let absolutify_type_scheme' t type_ =
 
 let prelude = lazy (into_parent (t_of_sexp (force Sites.prelude_names)))
 
-let add_val_or_extern ?extern_name t name fixity scheme ~constrain ~type_source =
+let add_val_or_extern ?extern_name t name fixity scheme ~type_source =
   let f bindings =
     { bindings with
       names =
@@ -837,9 +837,6 @@ let add_val_or_extern ?extern_name t name fixity scheme ~constrain ~type_source 
                Compilation_error.raise
                  Name_error
                  ~msg:[%message "Multiple definitions for name" (name : Value_name.t)]);
-            constrain
-              ~subtype:existing_entry.type_
-              ~supertype:(Name_entry.Type_or_scheme.Scheme scheme);
             Local
               (Name_entry.merge
                  existing_entry
@@ -866,8 +863,8 @@ let add_val_or_extern ?extern_name t name fixity scheme ~constrain ~type_source 
 
 let add_val = add_val_or_extern ?extern_name:None ~type_source:Val_declared
 
-let add_extern t name fixity typ extern_name ~constrain =
-  add_val_or_extern t name fixity typ ~extern_name ~constrain ~type_source:Extern_declared
+let add_extern t name fixity typ extern_name =
+  add_val_or_extern t name fixity typ ~extern_name ~type_source:Extern_declared
 ;;
 
 let absolutify_type_decl t = Type_decl.map_exprs ~f:(absolutify_type_scheme' t)
