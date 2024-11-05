@@ -94,9 +94,9 @@ let to_regrouped_bindings t =
                      "Mutually recursive functions are not allowed across module \
                       boundaries"
                        (modules : Module_path.Absolute.t list)]);
-             binding)
+             binding.info)
          in
-         Nonempty.(binding :: bindings), path)
+         Nonempty.(binding.info :: bindings), path)
 ;;
 
 let regroup_bindings bindings = of_bindings bindings |> to_regrouped_bindings

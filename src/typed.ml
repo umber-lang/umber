@@ -1386,12 +1386,12 @@ module Module = struct
   ;;
 
   (* TODO: We should make this a record type, it would a lot of this code way easier to
-     read. *)
+     read. It is also kind of hacky to include the type bindings here. We could just 
+     compute the set of names in each pattern more than once, it should be very cheap. (We
+     need the set of names up-front to determine dependencies, but only need the types
+     later when we type each binding group individually.)*)
   type intermediate_def =
-    ( Pattern.t * (Internal_type.t * Pattern.Names.t)
-    , Untyped.Expr.t
-    , Module_path.absolute )
-    Module.def
+    (Untyped.Pattern.t * Pattern.Names.t, Untyped.Expr.t, Module_path.absolute) Module.def
 
   (* FIXME: If we want to have 1 Type_bindings per let binding group, this is problematic:
      - We're instantiating all the pattern types up-front here, which is bad. We should do
@@ -1405,7 +1405,7 @@ module Module = struct
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
       variables. *)
-  let rec handle_value_bindings ~names ~types module_name sigs defs
+  let rec handle_value_bindings ~names module_name sigs defs
     : Name_bindings.t * intermediate_def Node.t list
     =
     let handle_common ~names = function
@@ -1435,30 +1435,21 @@ module Module = struct
     in
     let handle_bindings ~names =
       Nonempty.fold_map ~init:names ~f:(fun names (pat, fixity, expr) ->
-        let pat_span = Node.span pat in
-        let pat_names, pat =
-          Node.with_value
-            pat
-            ~f:(Pattern.of_untyped_with_names ~fixity ~names ~types Pattern.Names.empty)
+        let pat =
+          Node.map pat ~f:(fun pat ->
+            let pat_names = Pattern.Names.gather pat ~type_source:Placeholder ~fixity in
+            pat, pat_names)
         in
-        let names =
-          Name_bindings.merge_names
-            names
-            pat_names
-            ~combine:(fun (_ : Value_name.t) old_entry new_entry ->
-            Name_bindings.Name_entry.merge old_entry new_entry)
-        in
-        let pat, pat_type = pat in
-        names, (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr))
+        names, (pat, fixity, expr))
     in
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
       List.fold_map defs ~init:names ~f:(fun def ->
         Node.fold_map def ~f:(fun names -> function
-          | Let { bindings; rec_ } ->
+          | Let { rec_; bindings } ->
             handle_bindings ~names bindings
             |> Tuple2.map_snd ~f:(fun bindings -> Let { rec_; bindings })
           | Module (module_name, sigs, defs) ->
-            let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
+            let names, defs = handle_value_bindings ~names module_name sigs defs in
             names, Module (module_name, sigs, defs)
           | Common_def common as def -> handle_common ~names common, def
           | Impl _ | Trait _ -> failwith "TODO: handle_value_bindings traits/impls")))
@@ -1468,9 +1459,7 @@ module Module = struct
       recursive, and the groups are given in an order appropriate for generalization.
       This is done by topologically sorting the strongly-connected components of the call
       graph (dependencies between bindings). *)
-  let extract_binding_groups ~names (defs : intermediate_def Node.t list)
-    : _ * (_ Call_graph.Binding.t Nonempty.t * Module_path.Absolute.t) list
-    =
+  let extract_binding_groups ~names (defs : intermediate_def Node.t list) =
     let rec gather_bindings_in_defs ~names defs acc =
       List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
     and gather_bindings ~names (def : intermediate_def Node.t) (other_defs, bindings) =
@@ -1484,9 +1473,7 @@ module Module = struct
               bindings'
               ~init:bindings
               ~f:(fun (pat, fixity, expr) bindings ->
-              let pat_names =
-                Node.with_value pat ~f:(fun (_, (_, pat_names)) -> pat_names)
-              in
+              let pat_names = Node.with_value pat ~f:snd in
               let current_path = Name_bindings.current_path names in
               let bound_names = Map.key_set pat_names in
               let used_names = Node.with_value expr ~f:(Untyped.Expr.names_used ~names) in
@@ -1525,7 +1512,14 @@ module Module = struct
           expr, scheme) ))
   ;; *)
 
-  let type_binding_group ~names ~types bindings =
+  let type_binding_group
+    ~names
+    (bindings :
+      ((Untyped.Pattern.t * Pattern.Names.t) Node.t
+      * Fixity.t option
+      * Untyped.Expr.t Node.t)
+      Nonempty.t)
+    =
     (* TODO: The spans should be kept as consistent with the original source as possible
        in order to report accurate errors. It's better that they match the original source
        location of the code than they actually make sense for the AST itself. *)
@@ -1533,11 +1527,31 @@ module Module = struct
        whole group. This is done to get a consistent ordering among bindings. *)
     let get_spans (pat, (_ : Fixity.t option), expr) = Node.span pat, Node.span expr in
     let bindings =
-      Nonempty.map bindings ~f:Call_graph.Binding.info
-      |> Nonempty.sort ~compare:(Comparable.lift [%compare: Span.t * Span.t] ~f:get_spans)
+      Nonempty.sort
+        bindings
+        ~compare:(Comparable.lift [%compare: Span.t * Span.t] ~f:get_spans)
     in
     let representative_span =
       get_spans (Nonempty.hd bindings) |> Tuple2.uncurry Span.combine
+    in
+    let types = Type_bindings.create () in
+    let names, bindings =
+      Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, fixity, expr) ->
+        let pat_span = Node.span pat in
+        let pat_names, (pat, pat_type) =
+          Node.with_value pat ~f:(fun (pat, (_ : Pattern.Names.t)) ->
+            (* TODO: Maybe we could reuse the names from before? *)
+            Pattern.of_untyped_with_names ~fixity ~names ~types Pattern.Names.empty pat)
+        in
+        let names =
+          Name_bindings.merge_names
+            names
+            pat_names
+            ~combine:(fun (_ : Value_name.t) old_entry new_entry ->
+            Name_bindings.Name_entry.merge old_entry new_entry)
+        in
+        let pat = Node.create (pat, (pat_type, pat_names)) pat_span in
+        names, (pat, fixity, expr))
     in
     let (_ : Name_bindings.t), rec_, bindings =
       Expr.type_recursive_let_bindings
@@ -1659,7 +1673,7 @@ module Module = struct
       Performs let-generalization on free variables in let statement bindings.
       (Let-generalization is not currently done for local let bindings within expressions.)
       This is the final step in the type checking process. *)
-  let type_defs ~names ~types module_name (defs : intermediate_def Node.t list)
+  let type_defs ~names module_name (defs : intermediate_def Node.t list)
     : Name_bindings.t * def Node.t list
     =
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
@@ -1667,7 +1681,7 @@ module Module = struct
       let names, binding_groups =
         List.fold_map binding_groups ~init:names ~f:(fun names (bindings, path) ->
           Name_bindings.with_path_into_defs names path ~f:(fun names ->
-            let names, def = type_binding_group ~names ~types bindings in
+            let names, def = type_binding_group ~names bindings in
             names, (def, path)))
       in
       let path = Name_bindings.current_path names in
@@ -1699,9 +1713,8 @@ module Module = struct
       let names = gather_imports ~names ~include_std module_name sigs defs in
       let sigs, defs = absolutify_everything ~names module_name sigs defs in
       let names = gather_type_decls ~names module_name sigs defs in
-      let types = Type_bindings.create () in
-      let names, defs = handle_value_bindings ~names ~types module_name sigs defs in
-      let names, defs = type_defs ~names ~types module_name defs in
+      let names, defs = handle_value_bindings ~names module_name sigs defs in
+      let names, defs = type_defs ~names module_name defs in
       eprint_s [%message "Finished type-checking. Checking sig-def compatbility."];
       Sig_def_diff.check ~names module_name;
       Ok (names, (module_name, sigs, defs))

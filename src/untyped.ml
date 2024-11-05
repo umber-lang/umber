@@ -112,6 +112,8 @@ module Expr = struct
             bindings
             ~init:locals
             ~f:(fun locals (pat, (_ : Fixity.t option), _expr) ->
+            (* FIXME: Names used in nested exprs here aren't considered? Seems wrong.
+               Write a test to show this messes up dependency checking *)
             Node.with_value pat ~f:(add_locals locals))
         in
         let binding_locals = if rec_ then new_locals else locals in

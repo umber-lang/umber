@@ -14,4 +14,4 @@ end
 
 val regroup_bindings
   :  ('a Binding.t * Module_path.Absolute.t) list
-  -> ('a Binding.t Nonempty.t * Module_path.Absolute.t) list
+  -> ('a Nonempty.t * Module_path.Absolute.t) list
