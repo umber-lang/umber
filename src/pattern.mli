@@ -30,18 +30,18 @@ module Names : sig
   val empty : t
 
   val add_name
-    :  ?fixity:Fixity.t
-    -> t
+    :  t
     -> Value_name.t
     -> Internal_type.t
     -> type_source:Name_bindings.Name_entry.Type_source.t
+    -> fixity:Fixity.t option
     -> t
 
   val add_fresh_name
-    :  ?fixity:Fixity.t
-    -> t
+    :  t
     -> Value_name.t
     -> type_source:Name_bindings.Name_entry.Type_source.t
+    -> fixity:Fixity.t option
     -> t * Internal_type.t
 
   val fold
@@ -53,6 +53,7 @@ module Names : sig
   val gather
     :  ('a, 'b) pattern
     -> type_source:Name_bindings.Name_entry.Type_source.t
+    -> fixity:Fixity.t option
     -> Name_bindings.Name_entry.t Value_name.Map.t
 
   val find : t -> Value_name.t -> Name_bindings.Name_entry.t option

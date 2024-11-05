@@ -49,7 +49,7 @@ module Pattern = struct
       let pat_names, typ =
         match name with
         | Some name ->
-          Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder ?fixity
+          Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder ~fixity
         | None -> pat_names, Internal_type.fresh_var ()
       in
       eprint_s
@@ -146,7 +146,7 @@ module Pattern = struct
     | As (pat, name) ->
       let pat_names, (pat, typ) = of_untyped_with_names ~names ~types pat_names pat in
       let pat_names =
-        Pattern.Names.add_name pat_names name typ ~type_source:Placeholder ?fixity
+        Pattern.Names.add_name pat_names name typ ~type_source:Placeholder ~fixity
       in
       pat_names, (As (pat, name), typ)
     | Type_annotation (pat, annotated_type) ->
@@ -202,6 +202,8 @@ module Pattern = struct
           inferred_scheme
           ~shadowing_allowed
           ~check_existing:(fun existing_entry ->
+          (* FIXME: I don't think this is necessary anymore. Sig_def_diff also shouldn't
+             need to expose the function *)
           match Name_bindings.Name_entry.type_ existing_entry with
           | Type _ -> ()
           | Scheme existing_scheme ->
@@ -272,6 +274,7 @@ module Effect_pattern = struct
         Value_name.resume_keyword
         (Function ([ operation_result_type ], result_effects, result_type))
         ~type_source:Placeholder
+        ~fixity:None
     in
     pat_names, ({ operation; args }, operation_effects)
   ;;
@@ -1213,11 +1216,11 @@ module Module = struct
         Node.with_value def ~f:(function
           | Let { bindings; rec_ } ->
             assert_or_compiler_bug ~here:[%here] rec_;
-            Nonempty.fold bindings ~init:names ~f:(fun names (pat, _fixity, _expr) ->
+            Nonempty.fold bindings ~init:names ~f:(fun names (pat, fixity, _expr) ->
               Node.with_value pat ~f:(fun pat ->
                 Name_bindings.merge_names
                   names
-                  (Pattern.Names.gather pat ~type_source:Placeholder)
+                  (Pattern.Names.gather pat ~type_source:Placeholder ~fixity)
                   ~combine:(fun _ _ entry' -> entry')))
           | Module (module_name, sigs, defs) ->
             gather_name_placeholders ~names module_name sigs defs
@@ -1394,6 +1397,10 @@ module Module = struct
     =
     let handle_common ~names = function
       | Extern (name, fixity, typ, extern_name) ->
+        (* FIXME: We shouldn't need to do constraints here
+           - except, the pattern instantiating types creates some constraints which I'm
+             sus of
+        *)
         let constrain = Type_bindings.constrain' ~names ~types in
         Name_bindings.add_extern names name fixity typ extern_name ~constrain
       | Type_decl (_, (_, Alias alias)) ->

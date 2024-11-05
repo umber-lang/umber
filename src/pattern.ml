@@ -53,7 +53,7 @@ module Names = struct
 
   let empty = Value_name.Map.empty
 
-  let add_name ?fixity pat_names name typ ~type_source =
+  let add_name pat_names name typ ~type_source ~fixity =
     let name_entry = Name_bindings.Name_entry.create typ ~type_source ?fixity in
     match Map.add pat_names ~key:name ~data:name_entry with
     | `Ok pat_names -> pat_names
@@ -63,9 +63,9 @@ module Names = struct
         (Value_name.to_ustring name)
   ;;
 
-  let add_fresh_name ?fixity pat_names name ~type_source =
+  let add_fresh_name pat_names name ~type_source ~fixity =
     let var = Internal_type.fresh_var () in
-    add_name ?fixity pat_names name var ~type_source, var
+    add_name pat_names name var ~type_source ~fixity, var
   ;;
 
   let fold pat ~init ~f =
@@ -86,9 +86,9 @@ module Names = struct
     loop init ~f pat
   ;;
 
-  let gather pat ~type_source =
+  let gather pat ~type_source ~fixity =
     fold pat ~init:Value_name.Map.empty ~f:(fun pat_names name ->
-      fst (add_fresh_name pat_names name ~type_source))
+      fst (add_fresh_name pat_names name ~type_source ~fixity))
   ;;
 
   let find = Map.find
