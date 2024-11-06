@@ -110,7 +110,10 @@ end = struct
     and mir = flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
     and llvm = flag "llvm" no_arg ~doc:"Print LLVM IR"
     and exe_filename =
-      flag "exe" (optional Filename_unix.arg_type) ~doc:"Output a compiled executable"
+      flag
+        "exe"
+        (optional Filename_unix.arg_type)
+        ~doc:"FILENAME Output a compiled executable"
     in
     let add present t (variant : Target.t Variant.t) =
       if present then add_target t variant.constructor Stdout else t
