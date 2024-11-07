@@ -29,15 +29,16 @@ let replace_vars_in_sexp env sexp =
   loop sexp
 ;;
 
-let type_error msg t1 t2 =
+let type_error msg ~subtype ~supertype =
   let env = Type_param.Env_of_vars.create () in
   Compilation_error.raise
     Type_error
     ~msg:
       [%message
         msg
-          ~type1:(replace_vars_in_sexp env [%sexp (t1 : Internal_type.t)] : Sexp.t)
-          ~type2:(replace_vars_in_sexp env [%sexp (t2 : Internal_type.t)] : Sexp.t)]
+          ~subtype:(replace_vars_in_sexp env [%sexp (subtype : Internal_type.t)] : Sexp.t)
+          ~supertype:
+            (replace_vars_in_sexp env [%sexp (supertype : Internal_type.t)] : Sexp.t)]
 ;;
 
 type 'a var_bounds =
@@ -160,6 +161,10 @@ end = struct
   let to_constraint_list t ~params =
     Hashtbl.to_alist t.upper_bounds
     |> List.concat_map ~f:(fun (subtype, supertypes) ->
+         (* FIXME: We were using this to check if the subtype was mentioned in the type,
+            but now it's only if the var has been generalized. Maybe fine/good? We also
+            add the vars here... I think generalized vars just needs to keep track of any
+            vars we might have generalized, so should be fine *)
          let subtype_relevant = Type_param.Env_of_vars.mem params subtype in
          let subtype = Type_param.Env_of_vars.find_or_add params subtype in
          Hash_set.to_list supertypes
@@ -202,6 +207,14 @@ module Substitution : sig
   val compose : t -> t -> unit
   val apply_to_type : t -> Internal_type.t -> Internal_type.t
   val apply_to_effects : t -> Internal_type.effects -> Internal_type.effects
+
+  val iter_reachable_vars
+    :  t
+    -> Type_var.t
+    -> polarity:Polarity.t
+    -> f:(Type_var.t -> polarity:Polarity.t -> unit)
+    -> unit
+
   val is_empty : t -> bool
 end = struct
   type data =
@@ -291,6 +304,18 @@ end = struct
         | Some (Effects effects) -> Effects (apply_to_effects t' effects)))
   ;;
 
+  let rec iter_reachable_vars t var ~polarity ~f =
+    Option.iter (Hashtbl.find t var) ~f:(function
+      | Type type_ ->
+        Internal_type.iter_vars type_ ~polarity ~f:(fun var ~polarity ->
+          f var ~polarity;
+          iter_reachable_vars t var ~polarity ~f)
+      | Effects effects ->
+        Internal_type.iter_effects_vars effects ~polarity ~f:(fun var ~polarity ->
+          f var ~polarity;
+          iter_reachable_vars t var ~polarity ~f))
+  ;;
+
   let is_empty = Hashtbl.is_empty
 end
 
@@ -345,7 +370,7 @@ let fun_arg_number_mismatch = type_error "Function argument number mismatch"
 let iter2_types xs ys ~subtype ~supertype ~f =
   match List.iter2 ~f xs ys with
   | Ok () -> ()
-  | Unequal_lengths -> type_error "Type item length mismatch" subtype supertype
+  | Unequal_lengths -> type_error "Type item length mismatch" ~subtype ~supertype
 ;;
 
 let refresh_type type_ =
@@ -363,7 +388,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
     let type_entry = Name_bindings.find_absolute_type_entry names name in
     if List.length args = Type_decl.arity (Name_bindings.Type_entry.decl type_entry)
     then type_entry
-    else type_error "Partially applied type constructor" subtype supertype
+    else type_error "Partially applied type constructor" ~subtype ~supertype
   in
   let rec expand_aliases (type_ : Internal_type.t) =
     match type_ with
@@ -383,7 +408,9 @@ let rec constrain ~names ~types ~subtype ~supertype =
         (subtype : Internal_type.t)
         (supertype : Internal_type.t)
         (types.constraints : Constraints.t)
-        (types.substitution : Substitution.t)];
+        (types.substitution : Substitution.t)
+        (types.context_vars : Type_var.Hash_set.t By_polarity.t)
+        (types.generalized_vars : Type_param.Env_of_vars.t)];
   (* It's important to apply the substitution before checking [constrained_types] since
      the substitution can change as we do more [constrain] calls. *)
   let subtype = Substitution.apply_to_type types.substitution subtype in
@@ -403,19 +430,19 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | Any, Never
     | Any, (Type_app _ | Tuple _ | Function _ | Partial_function _)
     | (Type_app _ | Tuple _ | Function _ | Partial_function _), Never ->
-      type_error "Type mismatch" subtype supertype
+      type_error "Type mismatch" ~subtype ~supertype
     | Var var1, Var var2 ->
       if not (Type_var.equal var1 var2)
       then Constraints.add types.constraints ~subtype:var1 ~supertype:var2
     | Var var, type_ ->
       (* FIXME: Need a more robust occurs check *)
-      if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
+      if occurs_in var type_ then type_error "Occurs check failed" ~subtype ~supertype;
       (match type_ with
        | Any -> ()
        | _ -> check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Left)
     | type_, Var var ->
       (* FIXME: Need a more robust occurs check *)
-      if occurs_in var type_ then (type_error "Occurs check failed") subtype supertype;
+      if occurs_in var type_ then type_error "Occurs check failed" ~subtype ~supertype;
       (match type_ with
        | Never -> ()
        | _ -> check_var_vs_type ~names ~types ~var ~type_ ~var_side:`Right)
@@ -423,7 +450,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
       let type_entry1 = lookup_type names name1 args1 in
       let type_entry2 = lookup_type names name2 args2 in
       if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
-      then type_error "Type application mismatch" subtype supertype;
+      then type_error "Type application mismatch" ~subtype ~supertype;
       (* TODO: We don't know what the variance of the type parameters to the type
          are, so we conservatively assume they are invariant. Implement inference
          and manual specification of type parameter variance, similar to what OCaml
@@ -439,7 +466,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
            ~types
            ~subtype:(instantiate_type_scheme ~names ~types (expr, []))
            ~supertype
-       | _ -> type_error "Type application mismatch" subtype supertype)
+       | _ -> type_error "Type application mismatch" ~subtype ~supertype)
     | (Tuple _ | Function _ | Partial_function _), Type_app (name, args) ->
       (match Name_bindings.Type_entry.decl (lookup_type names name args) with
        | _params, Alias expr ->
@@ -448,14 +475,14 @@ let rec constrain ~names ~types ~subtype ~supertype =
            ~types
            ~subtype
            ~supertype:(instantiate_type_scheme ~names ~types (expr, []))
-       | _ -> type_error "Type application mismatch" subtype supertype)
+       | _ -> type_error "Type application mismatch" ~subtype ~supertype)
     | Function (args1, effects1, res1), Function (args2, effects2, res2) ->
       (match
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
        with
        | Same_length -> ()
-       | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch subtype supertype);
+       | Left_trailing _ | Right_trailing _ -> fun_arg_number_mismatch ~subtype ~supertype);
       constrain_effects ~names ~types ~subtype:effects1 ~supertype:effects2;
       constrain ~names ~types ~subtype:res1 ~supertype:res2
     | Partial_function (args1, effects1, var1), Partial_function (args2, effects2, var2)
@@ -490,7 +517,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
          Nonempty.iter2 args1 args2 ~f:(fun arg1 arg2 ->
            constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
        with
-       | Left_trailing _ -> fun_arg_number_mismatch subtype supertype
+       | Left_trailing _ -> fun_arg_number_mismatch ~subtype ~supertype
        | Right_trailing args2_trailing ->
          constrain_effects_to_be_total ~names ~types effects1;
          let var' = Type_var.create () in
@@ -517,7 +544,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
            ~types
            ~subtype:(Partial_function (args1_trailing, effects1, var'))
            ~supertype:(Var var)
-       | Right_trailing _ -> fun_arg_number_mismatch subtype supertype
+       | Right_trailing _ -> fun_arg_number_mismatch ~subtype ~supertype
        | Same_length ->
          constrain_effects ~names ~types ~subtype:effects1 ~supertype:effects2;
          constrain ~names ~types ~subtype:res ~supertype:(Var var))
@@ -526,7 +553,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
         constrain ~names ~types ~subtype:arg1 ~supertype:arg2)
     | Tuple _, (Function _ | Partial_function _)
     | Function _, Tuple _
-    | Partial_function _, Tuple _ -> type_error "Types do not match" subtype supertype)
+    | Partial_function _, Tuple _ -> type_error "Types do not match" ~subtype ~supertype)
 
 and check_var_vs_type ~names ~types ~var ~type_ ~var_side =
   let vars_with_same_shape =
@@ -922,10 +949,11 @@ let instantiate_type_or_scheme
   | Scheme scheme -> instantiate_type_scheme ?params ~names ~types scheme
 ;;
 
-let record_pattern_names types pat_names =
+let record_context_vars types pat_names =
   Map.iter pat_names ~f:(fun name_entry ->
     match Name_bindings.Name_entry.type_ name_entry with
-    | Type type_ -> Internal_type.iter_vars type_ ~f:(record_context_var types)
+    | Type type_ ->
+      Internal_type.iter_vars type_ ~polarity:Positive ~f:(record_context_var types)
     | Scheme scheme ->
       compiler_bug
         [%message "Unexpected pattern name entry type" (scheme : _ Type_scheme.t)])
@@ -1001,11 +1029,53 @@ let generalize types outer_type =
   let pre_simplified_type = scheme, constraints in
   let simplified_type =
     let context_vars =
+      (* FIXME: I think we also need to extend this with the substitution - anything we'd
+         substitute in place of context vars should count as "from the context". e.g. if
+         we have a function as an argument, it starts out with just one var as the known
+         type. We'll later get some constraints on that. Hopefully just looking at the
+         substitution is good enough?
+         
+         How can we efficiently keep the context vars updated? They can change whenever we
+         change the substitution? Maybe keep them as part of the substitution? Or just
+         apply the substitution here every time?
+         
+         Actually I'm not 100% sure we need this, hmmm.
+         This seems expensive, can we amortize the cost by doing it each time we edit the
+         substitution or add a context var? (instead of each time we generalize anything,
+         which should be more often)
+         
+         I think this is most likely needed, it makes sense.
+
+         One problem: when typing a recursive definition, the context vars include the var
+         itself, which is weird. Maybe those should be exempted? We could add them as
+         context vars after typing the body. They aren't really "inputs" in the same
+         sense, I think? Yeah, they never appeared in negative position, or something
+         equivalent. (It's kinda similar to instantiated vars though?)
+         *)
+      eprint_s
+        [%message
+          "context vars before checking substitutions"
+            (types.context_vars : Type_var.Hash_set.t By_polarity.t)];
+      By_polarity.iter types.context_vars ~f:(fun context_vars ~polarity ->
+        Hash_set.to_list context_vars
+        |> List.iter ~f:(fun var ->
+             Substitution.iter_reachable_vars
+               types.substitution
+               var
+               ~polarity
+               ~f:(fun var ~polarity ->
+               eprint_s [%message "iter var" (var : Type_var.t) (polarity : Polarity.t)];
+               Hash_set.add (By_polarity.get types.context_vars ~polarity) var)));
       By_polarity.map types.context_vars ~f:(fun vars ->
         Hash_set.to_list vars
-        |> List.filter_map ~f:(Type_param.Env_of_vars.find types.generalized_vars)
+        |> List.map ~f:(Type_param.Env_of_vars.find_or_add types.generalized_vars)
         |> Type_param.Set.of_list)
     in
+    eprint_s
+      [%message
+        "context vars after checking substitutions"
+          (types.context_vars : Type_var.Hash_set.t By_polarity.t)
+          (context_vars : Type_param.Set.t By_polarity.t)];
     Type_simplification.simplify_type (scheme, constraints) ~context_vars
   in
   eprint_s

@@ -145,22 +145,36 @@ and fold_effects_until effects ~init ~f ~f_effects ~polarity =
         fold_until typ ~init ~f ~f_effects ~polarity))
 ;;
 
-let fold_vars typ ~init ~f =
-  fold_until
-    typ
-    ~init
-    ~polarity:Positive
-    ~f:(fun init typ ~polarity ->
-      match typ with
-      | Var var -> Continue (`Halt (f init var ~polarity))
-      | _ -> Continue (`Defer init))
-    ~f_effects:(fun init { effect_var; effects = _ } ~polarity ->
-      let init = Option.fold effect_var ~init ~f:(fun init v -> f init v ~polarity) in
-      Continue (`Defer init))
-  |> Fold_action.id
+let fold_vars, fold_effects_vars =
+  let f_type init typ ~polarity ~f : _ Fold_action.t =
+    match typ with
+    | Var var -> Continue (`Halt (f init var ~polarity))
+    | Partial_function (_, _, result_var) ->
+      Continue (`Defer (f init result_var ~polarity))
+    | Never | Any | Type_app _ | Tuple _ | Function _ -> Continue (`Defer init)
+  in
+  let f_effects init { effect_var; effects = _ } ~polarity ~f : _ Fold_action.t =
+    let init = Option.fold effect_var ~init ~f:(fun init v -> f init v ~polarity) in
+    Continue (`Defer init)
+  in
+  let fold_vars typ ~polarity ~init ~f =
+    fold_until typ ~init ~polarity ~f:(f_type ~f) ~f_effects:(f_effects ~f)
+    |> Fold_action.id
+  in
+  let fold_effects_vars typ ~polarity ~init ~f =
+    fold_effects_until typ ~init ~polarity ~f:(f_type ~f) ~f_effects:(f_effects ~f)
+    |> Fold_action.id
+  in
+  fold_vars, fold_effects_vars
 ;;
 
-let iter_vars typ ~f = fold_vars typ ~init:() ~f:(fun () var ~polarity -> f var ~polarity)
+let iter_vars typ ~polarity ~f =
+  fold_vars typ ~polarity ~init:() ~f:(fun () var ~polarity -> f var ~polarity)
+;;
+
+let iter_effects_vars typ ~polarity ~f =
+  fold_effects_vars typ ~polarity ~init:() ~f:(fun () var ~polarity -> f var ~polarity)
+;;
 
 (* FIXME: This doesn't include effect vars! That's no good *)
 (* let fold_vars typ ~init ~f =

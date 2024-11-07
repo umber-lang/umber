@@ -24,7 +24,18 @@ val tuple : t list -> t
 val effects_of_var : Type_var.t -> effects
 val map : t -> f:(t -> (t, t) Map_action.t) -> t
 val map_vars : t -> f:(Type_var.t -> Type_var.t) -> t
-val iter_vars : t -> f:(Type_var.t -> polarity:Polarity.t -> unit) -> unit
+
+val iter_vars
+  :  t
+  -> polarity:Polarity.t
+  -> f:(Type_var.t -> polarity:Polarity.t -> unit)
+  -> unit
+
+val iter_effects_vars
+  :  effects
+  -> polarity:Polarity.t
+  -> f:(Type_var.t -> polarity:Polarity.t -> unit)
+  -> unit
 
 val map2
   :  ?f:(t * t -> (t * t, t) Map_action.t)

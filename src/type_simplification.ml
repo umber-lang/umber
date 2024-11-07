@@ -383,7 +383,11 @@ let replace_co_occurring_vars type_ =
 ;;
 
 let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
-  eprint_s [%message "simplify_type" (type_, constraints : _ Type_scheme.t)];
+  eprint_s
+    [%message
+      "simplify_type"
+        (type_, constraints : _ Type_scheme.t)
+        (context_vars : Type_param.Set.t By_polarity.t)];
   let type_ =
     let lower_bounds =
       List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)

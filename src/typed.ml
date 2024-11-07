@@ -6,11 +6,6 @@ let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 (* FIXME: cleanup *)
 let eprint_s = ignore
 
-let merge_pattern_names ~names ~types pat_names ~combine =
-  Type_bindings.record_pattern_names types pat_names;
-  Name_bindings.merge_names names pat_names ~combine
-;;
-
 module Pattern = struct
   include Pattern
 
@@ -182,9 +177,9 @@ module Pattern = struct
       of_untyped_with_names ~names ~types Pattern.Names.empty pattern ~fixity
     in
     let names =
-      merge_pattern_names ~names ~types pat_names ~combine:(fun _ _ new_entry ->
-        new_entry)
+      Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
     in
+    Type_bindings.record_context_vars types pat_names;
     names, pat
   ;;
 
@@ -296,9 +291,9 @@ module Effect_pattern = struct
         effect_pattern
     in
     let names =
-      merge_pattern_names ~names ~types pat_names ~combine:(fun _ _ new_entry ->
-        new_entry)
+      Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
     in
+    Type_bindings.record_context_vars types pat_names;
     names, pat
   ;;
 end
@@ -495,10 +490,15 @@ module Expr = struct
               , result_type ))
           | Match (expr, branches) ->
             collect_effects ~names ~types (fun ~add_effects ->
+              (* FIXME: we match on expr type so it gets used negatively, right? *)
               let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
               add_effects expr_effects (Node.span expr);
               let result_type = Internal_type.fresh_var () in
-              eprint_s [%message "typing match" (result_type : Internal_type.t)];
+              eprint_s
+                [%message
+                  "typing match"
+                    (result_type : Internal_type.t)
+                    (expr_type : Internal_type.t)];
               let branches =
                 Nonempty.map branches ~f:(fun (pat, branch) ->
                   let pat_span = Node.span pat in
@@ -693,6 +693,9 @@ module Expr = struct
             , result_effects )
           | Let { rec_; bindings; body } ->
             collect_effects ~names ~types (fun ~add_effects ->
+              (* FIXME: Don't use Pattern.of_untyped_into because it records context vars
+                 Can we get away with not recording context vars for let bindings at all?
+                 I think not, e.g. `let foo x = let y = x in y` might not work. *)
               let names, rec_, bindings =
                 if rec_
                 then (
@@ -702,10 +705,21 @@ module Expr = struct
                       ~init:names
                       ~f:(fun names (pat, fixity, expr) ->
                       let pat_span = Node.span pat in
-                      let names, (pat_names, (pat, pat_type)) =
+                      let pat_names, (pat, pat_type) =
                         Node.with_value
                           pat
-                          ~f:(Pattern.of_untyped_into ~names ~types ~fixity)
+                          ~f:
+                            (Pattern.of_untyped_with_names
+                               ~names
+                               ~types
+                               Pattern.Names.empty
+                               ~fixity)
+                      in
+                      let names =
+                        Name_bindings.merge_names
+                          names
+                          pat_names
+                          ~combine:(fun _ _ new_entry -> new_entry)
                       in
                       ( names
                       , (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr)
@@ -713,6 +727,8 @@ module Expr = struct
                   in
                   type_recursive_let_bindings ~names ~types ~f_name ~add_effects bindings)
                 else (
+                  (* FIXME: For parallel nonrec bindings, they are not supposed to be in
+                     each other's scopes (or their own scope!). Write a test. *)
                   (* Process bindings in order without any recursion *)
                   let names, bindings =
                     Nonempty.fold_map
@@ -720,11 +736,24 @@ module Expr = struct
                       ~init:names
                       ~f:(fun names (pat, fixity, expr) ->
                       let pat_span = Node.span pat in
-                      let names, (pat_names, (pat, pat_type)) =
+                      let pat_names, (pat, pat_type) =
                         Node.with_value
                           pat
-                          ~f:(Pattern.of_untyped_into ~names ~types ~fixity)
+                          ~f:
+                            (Pattern.of_untyped_with_names
+                               ~names
+                               ~types
+                               ~fixity
+                               Pattern.Names.empty)
                       in
+                      let names =
+                        Name_bindings.merge_names
+                          names
+                          pat_names
+                          ~combine:(fun _ _ entry -> entry)
+                      in
+                      (* FIXME: pretty sure we need this*)
+                      (* Type_bindings.record_context_vars types bound_names; *)
                       let expr, expr_type, expr_effects =
                         of_untyped ~names ~types ~f_name expr
                       in
@@ -740,6 +769,11 @@ module Expr = struct
                   in
                   names, false, bindings)
               in
+              (* FIXME: We can't have context vars recorded while generalizing the exprs
+                 in a recursive binding group, but they need to be present when
+                 generalizing the body. This doesn't really work since we record context
+                 vars up front, then generalize everything after in a separate pass. We
+                 could maybe change to generalize as we go? *)
               let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
               (* eprint_s [%message (body_effects : Internal_type.effects)]; *)
               add_effects body_effects (Node.span body);
@@ -772,6 +806,11 @@ module Expr = struct
             let expr, inferred_type, expr_effects =
               of_untyped ~names ~types ~f_name expr
             in
+            eprint_s
+              [%message
+                "type annotation constraint"
+                  (inferred_type : Internal_type.t)
+                  (annotated_type : Internal_type.t)];
             Type_bindings.constrain
               ~names
               ~types
@@ -971,7 +1010,13 @@ module Expr = struct
   ;; *)
 
   (* FIXME: Is this supposed to be generalizing local let bindings in expressions? If so,
-     it doesn't seem to work, according to the Generalization.um test. *)
+     it doesn't seem to work, according to the Generalization.um test.
+     
+     Also, why special-case let bindings and not generalize all patterns with
+     Pattern.generalize? Does this make any sense? Maybe all we need to do is "generalize"
+     (bad terminology) all the types. This involves type simplification. I suspect the
+     special treatment for let bindings is not needed, or is maybe only needed at toplevel
+     to set the inferred schemes. *)
   let rec generalize_let_bindings ~names ~types =
     map
       ~f_type:(fun (typ, _) -> Type_bindings.generalize types typ)
@@ -1543,6 +1588,7 @@ module Module = struct
             Pattern.of_untyped_with_names ~fixity ~names ~types Pattern.Names.empty pat)
         in
         let names =
+          (* TODO: I'm not sure why we merge here instead of shadowing. It might be wrong. *)
           Name_bindings.merge_names
             names
             pat_names

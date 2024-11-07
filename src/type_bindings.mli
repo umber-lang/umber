@@ -22,7 +22,7 @@ val instantiate_type_or_scheme
   -> Name_bindings.Name_entry.Type_or_scheme.t
   -> Internal_type.t
 
-val record_pattern_names : t -> Pattern.Names.t -> unit
+val record_context_vars : t -> Pattern.Names.t -> unit
 
 val constrain
   :  names:Name_bindings.t
@@ -52,9 +52,3 @@ val constrain_effects_to_be_total
   -> unit
 
 val generalize : t -> Internal_type.t -> Module_path.absolute Type_scheme.t
-
-(* Want a message like "this expression has type ... but an expression was
-   expected with type ..."
-   TODO: look to Elm, Rust, etc. for error message inspiration
-   Not all errors fit this mold exactly - probably need a proper dedicated type. *)
-val type_error : string -> Internal_type.t -> Internal_type.t -> _
