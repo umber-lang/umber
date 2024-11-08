@@ -12,6 +12,11 @@ type ('typ, 'name) t =
   | Type_annotation of ('typ, 'name) t * 'typ
 [@@deriving equal, sexp, variants]
 
+val map
+  :  ('typ, 'name) t
+  -> f:(('typ, 'name) t -> (('typ, 'name) t, ('typ, 'name) t) Map_action.t)
+  -> ('typ, 'name) t
+
 val fold_until
   :  ('typ, 'name) t
   -> init:'acc

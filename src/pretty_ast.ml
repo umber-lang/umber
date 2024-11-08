@@ -65,22 +65,28 @@ module Typed_to_untyped = struct
     | Type_annotation _ -> .
   ;;
 
+  let extract_type type_ ~f =
+    match f type_ with
+    | Some value -> value
+    | None -> compiler_bug [%message "Unexpected type" (type_ : _ Type_scheme.type_)]
+  ;;
+
   let annotated_pattern ~names (pattern : Typed.Pattern.t) (type_ : _ Type_scheme.type_)
     : Untyped.Pattern.t
     =
     match pattern with
+    | Type_annotation _ -> relativize_pattern ~names pattern
     | Tuple fields ->
       let field_types =
-        match type_ with
-        | Tuple field_types -> field_types
-        | _ ->
-          compiler_bug
-            [%message "Unexpected type for tuple" (type_ : _ Type_scheme.type_)]
+        extract_type type_ ~f:(function
+          | Tuple field_types -> Some field_types
+          | _ -> None)
       in
       Tuple
         (List.map2_exn fields field_types ~f:(fun field field_type ->
            Pattern.Type_annotation (relativize_pattern ~names field, (field_type, []))))
-    | _ -> Type_annotation (relativize_pattern ~names pattern, (type_, []))
+    | Constant _ | Catch_all _ | As _ | Cnstr_appl _ | Record _ | Union _ ->
+      Type_annotation (relativize_pattern ~names pattern, (type_, []))
   ;;
 
   let rec convert_expr
@@ -146,11 +152,10 @@ module Typed_to_untyped = struct
            | _ -> convert_lambda ())
        | _ -> convert_lambda ())
     | Match (expr, expr_type, branches) ->
+      let expr_type = relativize_type' ~names expr_type in
       annotated
         (Match
-           ( Node.map
-               expr
-               ~f:(convert_expr ~names ~type_:(relativize_type' ~names expr_type))
+           ( Node.map expr ~f:(convert_expr ~names ~type_:expr_type)
            , Nonempty.map branches ~f:(fun (pattern, branch) ->
                ( Node.map pattern ~f:(relativize_pattern ~names)
                , Node.map branch ~f:(convert_expr ~names ~type_ ~should_annotate:false) ))
@@ -702,10 +707,18 @@ let format_to_document
          ^^ Group
               (Group (Text "|" ^| Node.with_value pattern ~f ^| Text "->")
                ^^ indent_expr expr)))
-  and format_match_branches branches = format_branches_aux branches ~f:format_pattern
+  and format_match_branch_pattern (pattern : Untyped.Pattern.t) =
+    match pattern with
+    | Type_annotation _ ->
+      (* An unparenthesized type annotation in a match branch gets confused with a
+         function type due to the following arrow, so force parentheses to be added. *)
+      format_pattern_term pattern
+    | _ -> format_pattern pattern
+  and format_match_branches branches =
+    format_branches_aux branches ~f:format_match_branch_pattern
   and format_handle_branches branches =
     format_branches_aux branches ~f:(function
-      | `Value pattern -> format_pattern pattern
+      | `Value pattern -> format_match_branch_pattern pattern
       | `Effect ({ operation; args } : _ Effect_pattern.t) ->
         Text "<"
         ^^ format_application

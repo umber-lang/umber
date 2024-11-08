@@ -17,6 +17,25 @@ type ('typ, 'name) t =
   | Type_annotation of ('typ, 'name) t * 'typ
 [@@deriving equal, sexp, variants]
 
+let rec map pat ~f =
+  match (f pat : _ Map_action.t) with
+  | Halt pat -> pat
+  | Retry pat -> map pat ~f
+  | Defer pat ->
+    (match pat with
+     | Constant _ | Catch_all _ -> pat
+     | As (pat, name) -> As (map pat ~f, name)
+     | Cnstr_appl (cnstr, args) -> Cnstr_appl (cnstr, List.map args ~f:(map ~f))
+     | Tuple fields -> Tuple (List.map fields ~f:(map ~f))
+     | Record fields ->
+       Record (Nonempty.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f))))
+     | Union (pat1, pat2) ->
+       let pat1 = map pat1 ~f in
+       let pat2 = map pat2 ~f in
+       Union (pat1, pat2)
+     | Type_annotation (pat, type_) -> Type_annotation (map pat ~f, type_))
+;;
+
 let rec fold_until pat ~init ~f =
   match (f init pat : _ Fold_action.t) with
   | Stop _ as stop -> stop
