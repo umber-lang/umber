@@ -781,6 +781,9 @@ and constrain_effects_to_be_total ~names ~types effects =
 (* FIXME: Every time a new variable is minted, we need to record its polarity *)
 
 and instantiate_type_scheme =
+  (* FIXME: Actually, I think it should be fine to restrict the instantiated variables of
+     other functions we use. *)
+  let record_context_var _ _ ~polarity:_ = () in
   let rec instantiate_type_scheme
     ~names
     ~types
