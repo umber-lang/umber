@@ -574,8 +574,9 @@ let format_to_document
     | Record _ -> failwith "TODO: format record patterns"
   and format_pattern_term (pattern : Untyped.Pattern.t) =
     match pattern with
-    | Constant _ | Catch_all _ | Tuple _ | Record _ -> format_pattern pattern
-    | As (_, _) | Cnstr_appl (_, _) | Union (_, _) | Type_annotation (_, _) ->
+    | Constant _ | Catch_all _ | Tuple _ | Record _ | Cnstr_appl (_, []) ->
+      format_pattern pattern
+    | As (_, _) | Cnstr_appl (_, _ :: _) | Union (_, _) | Type_annotation (_, _) ->
       parens (format_pattern pattern)
   in
   let rec format_expr : Untyped.Expr.t -> t = function
