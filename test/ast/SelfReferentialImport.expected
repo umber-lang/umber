@@ -1,20 +1,5 @@
-(SelfReferentialImport ()
- ((Common_def
-   (Import
-    ((kind (Relative (nth_parent 1)))
-     (paths (Module SelfReferentialImport ((Name_as goose gander)))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (goose)) ()
-      ((Lambda ((Tuple ()))
-        (Fun_call (Name Std.Prelude.print)
-         ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
-         (((Literal (String Honk!)) ((Type_app String ()) ())))))
-       ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Tuple ()) ()
-      ((Fun_call (Name SelfReferentialImport.goose)
-        ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())
-        (((Tuple ()) ((Tuple ()) ()))))
-       ((Tuple ()) ()))))))))
+import ..SelfReferentialImport.goose as gander
+
+let goose : () -> () = \() -> print "Honk!"
+
+let () = goose ()

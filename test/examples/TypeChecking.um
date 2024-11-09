@@ -12,12 +12,10 @@ let id_for_bools x = id x : Bool
 
 let (id_alias, five) = (id, 5)
 
-# `a, (a -> b) -> b`
 let (|>) x f = f x
 
 # Now that we took out auto-currying, this no longer has a nice type. You probably just
 # shouldn't write this kind of thing, and be forced to list out the arguments explicitly.
-# `(() -> a), (() -> a) -> Bool -> a`
 let if_ then_ else_ = match
   | True -> then_ ()
   | False -> else_ ()

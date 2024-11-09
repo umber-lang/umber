@@ -1,28 +1,19 @@
-(TypeModuleNamePunning ()
- ((Module
-   (Foo ()
-    ((Common_def (Type_decl Foo (() (Alias (Type_app Int ())))))
-     (Module
-      (Foo ()
-       ((Common_def (Type_decl Foo (() (Alias (Type_app Float ())))))
-        (Module
-         (Foo ()
-          ((Common_def (Type_decl Foo (() (Alias (Type_app String ()))))))))))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (int)) ()
-      ((Literal (Int 5)) ((Type_app TypeModuleNamePunning.Foo.Foo ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (int')) ()
-      ((Literal (Int 5)) ((Type_app TypeModuleNamePunning.Foo.Foo ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (float)) ()
-      ((Literal (Float 5))
-       ((Type_app TypeModuleNamePunning.Foo.Foo.Foo ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (string)) ()
-      ((Literal (String 5))
-       ((Type_app TypeModuleNamePunning.Foo.Foo.Foo.Foo ()) ()))))))))
+module Foo = {
+  type Foo = Int
+  
+  module Foo = {
+    type Foo = Float
+    
+    module Foo = {
+      type Foo = String
+    }
+  }
+}
+
+let int : Foo = 5
+
+let int' : Foo = 5
+
+let float : Foo.Foo.Foo = 5.
+
+let string : Foo.Foo.Foo.Foo = "5"

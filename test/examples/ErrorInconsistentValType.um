@@ -1,3 +1,6 @@
+# FIXME: This test shouldn't cause any errors anymore - rename it
+# FIXME: What's going on with this test?
+
 # This is inferred to have type `List a, (a -> a) -> List a`, which is not compatible with
 # the type given in the annotation. It doesn't get the most general type of
 # `List a, (a -> b) -> List b` inferred because the type is unified.

@@ -1,69 +1,22 @@
-(WeirdFunCalls ()
- ((Let (rec_ false)
-   (bindings
-    (((Tuple ()) ()
-      ((Fun_call (Name Std.Prelude.print)
-        ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
-        (((Literal (String plain)) ((Type_app String ()) ()))))
-       ((Tuple ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (fun_call)) ()
-      ((Lambda ((Tuple ()))
-        (Lambda ((Tuple ()))
-         (Fun_call (Name Std.Prelude.print)
-          ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
-          (((Literal (String "fun call")) ((Type_app String ()) ()))))))
-       ((Function ((Tuple ())) (Effect_union ())
-         (Function ((Tuple ())) (Effect_union ()) (Tuple ())))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Tuple ()) ()
-      ((Fun_call
-        (Fun_call (Name WeirdFunCalls.fun_call)
-         ((Function ((Tuple ())) (Effect_union ())
-           (Function ((Tuple ())) (Effect_union ()) (Tuple ())))
-          ())
-         (((Tuple ()) ((Tuple ()) ()))))
-        ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())
-        (((Tuple ()) ((Tuple ()) ()))))
-       ((Tuple ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (print_twice)) ()
-      ((Lambda ((Catch_all (msg)))
-        (Fun_call (Name "Std.Prelude.Operators.;")
-         ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
-         (((Fun_call (Name Std.Prelude.print)
-            ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-             ())
-            (((Name WeirdFunCalls.msg) ((Type_app String ()) ()))))
-           ((Tuple ()) ()))
-          ((Fun_call (Name Std.Prelude.print)
-            ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-             ())
-            (((Name WeirdFunCalls.msg) ((Type_app String ()) ()))))
-           ((Tuple ()) ())))))
-       ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (if_)) ()
-      ((Fun_call
-        (Match (Name True) ((Type_app Bool ()) ())
-         (((Cnstr_appl True ()) (Name WeirdFunCalls.print_twice))
-          ((Cnstr_appl False ()) (Name Std.Prelude.print))))
-        ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
-        (((Literal (String if)) ((Type_app String ()) ()))))
-       ((Tuple ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Tuple ()) ()
-      ((Fun_call
-        (Let
-         ((rec_ false)
-          (bindings ((((Tuple ()) ((Tuple ()) ())) () (Tuple ()))))
-          (body (Name Std.Prelude.print))))
-        ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ())
-        (((Literal (String let)) ((Type_app String ()) ()))))
-       ((Tuple ()) ()))))))))
+let () = print "plain"
+
+let fun_call : () -> (() -> ()) = \() -> (\() -> print "fun call") : () -> ()
+
+let () = (fun_call () : () -> ()) ()
+
+let print_twice : String -> () =
+  \msg ->
+    print msg;
+    print msg
+
+let if_ : () =
+  ((match True
+  | True -> print_twice
+  | False -> print)
+    : String -> ())
+    "if"
+
+let () =
+  (let' () = () in
+  print)
+    "let"

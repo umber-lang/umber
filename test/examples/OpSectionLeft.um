@@ -3,8 +3,6 @@ let (:/) x y = print (x ++ " is mid. I prefer " ++ y)
 let apply f = ((print "called apply"; "lasagna") :f:)
 
 let () = 
-  # FIXME: Would be nice to get the type inference to notice this function is pure
-  # - would need to eliminate the effect type variable
   let g = apply (:/) in
   print "between";
   g "penne"

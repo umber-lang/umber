@@ -23,6 +23,8 @@ let reraise msg f =
   | Ok value -> value
   | Error exn -> raise (msg ++ ": " ++ exn)
 
+# FIXME: The lambda has an effect variable which it doesn't need - seems important to
+# be able to infer that it can only perform `Exn` and no other effects
 let _ =
   handle
     reraise "Reraised" (\() ->
