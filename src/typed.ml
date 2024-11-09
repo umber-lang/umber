@@ -476,7 +476,6 @@ module Expr = struct
               , result_type ))
           | Match (expr, branches) ->
             collect_effects ~names ~types (fun ~add_effects ->
-              (* FIXME: we match on expr type so it gets used negatively, right? *)
               let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
               add_effects expr_effects (Node.span expr);
               let result_type = Internal_type.fresh_var () in
@@ -1423,15 +1422,6 @@ module Module = struct
   type intermediate_def =
     (Untyped.Pattern.t * Pattern.Names.t, Untyped.Expr.t, Module_path.absolute) Module.def
 
-  (* FIXME: If we want to have 1 Type_bindings per let binding group, this is problematic:
-     - We're instantiating all the pattern types up-front here, which is bad. We should do
-       it while typing each binding group.
-     - We're adding constraints to variables when there's a let + a val
-
-     - you can't just remove the type bindings from here, you need to have the type
-       variables in the pattern names match up
-  *)
-
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
       variables. *)
@@ -1679,12 +1669,6 @@ module Module = struct
       names, defs)
   ;;
 
-  (* FIXME: Type inference is local to groups of toplevel let bindings, so we could be
-     creating a new [Type_bindings.t] to use for each of those, instead of re-using one
-     for a whole file. This would save some memory and hopefully have the GC scan less.
-     
-     Using only 1 type bindings also makes keeping track of type variable names a lot
-     easier. *)
   let of_untyped ~names ~include_std (module_name, sigs, defs) =
     try
       let defs = copy_some_sigs_to_defs sigs defs in

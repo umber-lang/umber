@@ -7,9 +7,3 @@
 let f : a -> ((a, Char), (a, Bool)) = \x ->
   let g y = (x, y) in
   (g 'v', g True)
-
-let f x =
-  let y = x in
-  y
-
-# FIXME: How come multiple `f`s are allowed here? That should be an error, right?
