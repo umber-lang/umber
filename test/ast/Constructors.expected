@@ -1,15 +1,13 @@
-(Constructors ()
- ((Module (A () ((Common_def (Type_decl Foo (() (Variants ((Foo ())))))))))
-  (Module
-   (B ()
-    ((Common_def (Type_decl Foo (() (Variants ((Foo ()))))))
-     (Let (rec_ false)
-      (bindings
-       (((Catch_all (of_a)) ()
-         ((Lambda ((Catch_all (match)))
-           (Match (Name Constructors.B.match)
-            ((Type_app Constructors.A.Foo ()) ())
-            (((Cnstr_appl Constructors.A.Foo ()) (Name Constructors.B.Foo)))))
-          ((Function ((Type_app Constructors.A.Foo ())) (Effect_union ())
-            (Type_app Constructors.B.Foo ()))
-           ())))))))))))
+module A = {
+  type Foo =
+    | Foo
+}
+
+module B = {
+  type Foo =
+    | Foo
+  
+  let of_a : A.Foo -> Foo =
+    match
+    | A.Foo -> Foo
+}

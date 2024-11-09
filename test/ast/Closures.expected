@@ -1,60 +1,12 @@
-(Closures ()
- ((Let (rec_ false)
-   (bindings
-    (((Catch_all (count_up)) ()
-      ((Lambda
-        ((Catch_all (start_at)) (Catch_all (count_by))
-         (Catch_all (end_after)))
-        (Let
-         ((rec_ true)
-          (bindings
-           ((((Catch_all (loop))
-              ((Function ((Type_app Int ())) (Effect_union ())
-                (Type_app Int ()))
-               ()))
-             ()
-             (Lambda ((Catch_all (current)))
-              (Match
-               (Fun_call (Name Std.Prelude.Operators.<)
-                ((Function ((Type_app Int ()) (Type_app Int ()))
-                  (Effect_union ()) (Type_app Bool ()))
-                 ())
-                (((Name Closures.current) ((Type_app Int ()) ()))
-                 ((Name Closures.end_after) ((Type_app Int ()) ()))))
-               ((Type_app Bool ()) ())
-               (((Cnstr_appl True ())
-                 (Fun_call (Name Closures.loop)
-                  ((Function ((Type_app Int ())) (Effect_union ())
-                    (Type_app Int ()))
-                   ())
-                  (((Fun_call (Name Std.Prelude.Operators.+)
-                     ((Function ((Type_app Int ()) (Type_app Int ()))
-                       (Effect_union ()) (Type_app Int ()))
-                      ())
-                     (((Name Closures.current) ((Type_app Int ()) ()))
-                      ((Name Closures.count_by) ((Type_app Int ()) ()))))
-                    ((Type_app Int ()) ())))))
-                ((Cnstr_appl False ()) (Name Closures.current))))))))
-          (body
-           (Fun_call (Name Closures.loop)
-            ((Function ((Type_app Int ())) (Effect_union ())
-              (Type_app Int ()))
-             ())
-            (((Name Closures.start_at) ((Type_app Int ()) ()))))))))
-       ((Function ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))
-         (Effect_union ()) (Type_app Int ()))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Tuple ()) ()
-      ((Fun_call (Name Std.Prelude.print_int)
-        ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
-        (((Fun_call (Name Closures.count_up)
-           ((Function ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))
-             (Effect_union ()) (Type_app Int ()))
-            ())
-           (((Literal (Int 0)) ((Type_app Int ()) ()))
-            ((Literal (Int 2)) ((Type_app Int ()) ()))
-            ((Literal (Int 5)) ((Type_app Int ()) ()))))
-          ((Type_app Int ()) ()))))
-       ((Tuple ()) ()))))))))
+let count_up : Int, Int, Int -> Int =
+  \start_at count_by end_after ->
+    let loop : Int -> Int =
+      \current ->
+        (match current < end_after : Bool
+        | True -> loop (current + count_by : Int)
+        | False -> current)
+          : Int
+    in
+    loop start_at : Int
+
+let () = print_int (count_up 0 2 5 : Int)

@@ -208,14 +208,14 @@ module Typed_to_untyped = struct
                     (annotated_pattern ~names pattern (fst type_))
                     (Node.span pat_and_type)
                 , fixity
-                , Node.map expr ~f:(convert_expr ~names ~type_) ))
+                , Node.map expr ~f:(convert_expr ~names ~type_ ~should_annotate:false) ))
           ; body = Node.map body ~f:(convert_expr ~names ~type_)
           }
       in
       (* Identify op sections. *)
       (* TODO: This is pretty hacky. Maybe we could bite the bullet and just model op
-           sections explicitly in the typed ast? It might make sense to have a simplified
-           typed IR we only use as an extra step before MIR (or replacing MIR). *)
+         sections explicitly in the typed ast? It might make sense to have a simplified
+         typed IR we only use as an extra step before MIR (or replacing MIR). *)
       (match bindings, Node.with_value body ~f:Fn.id with
        | [ (outer_pattern, None, outer_expr) ], Lambda ([ inner_pattern ], body) ->
          let outer_pattern, outer_type = Node.with_value outer_pattern ~f:Fn.id in
@@ -745,34 +745,34 @@ let format_to_document
         pattern
         expr
         ~f:(fun (pattern : Untyped.Pattern.t) (expr : Untyped.Expr.t) ->
-        match pattern, expr with
-        | Catch_all (Some _fun_name), Lambda (args, body) ->
-          Node.with_value body ~f:(fun body ->
-            format_equals
-              (Text keyword
-               ^| format_fixity fixity
-               ^| format_pattern pattern
-               ^| separated
-                    (List.map
-                       (Nonempty.to_list args)
-                       ~f:(Node.with_value ~f:format_pattern_term)))
-              (format_expr body))
-        | Catch_all (Some _fun_name), Match_function branches ->
-          Group
-            (format_equals
+        Group
+          (match pattern, expr with
+           | Catch_all (Some _fun_name), Lambda (args, body) ->
+             Node.with_value body ~f:(fun body ->
+               format_equals
+                 (Text keyword
+                  ^| format_fixity fixity
+                  ^| format_pattern pattern
+                  ^| separated
+                       (List.map
+                          (Nonempty.to_list args)
+                          ~f:(Node.with_value ~f:format_pattern_term)))
+                 (format_expr body))
+           | Catch_all (Some _fun_name), Match_function branches ->
+             format_equals
                (Text keyword ^| format_fixity fixity ^| format_pattern pattern)
-               (Text "match"))
-          ^^ indent ~prefix:Empty (format_match_branches branches)
-        | _ ->
-          format_equals
-            (Text keyword ^| format_fixity fixity ^| format_pattern pattern)
-            (format_expr expr))
+               (Text "match")
+             ^^ indent ~prefix:Empty (format_match_branches branches)
+           | _ ->
+             format_equals
+               (Text keyword ^| format_fixity fixity ^| format_pattern pattern)
+               (format_expr expr)))
     in
-    Group
+    separated
+      ~sep:Force_break
       (format_binding (if rec_ then "let" else "let'") first_pat first_fixity first_expr
-       ^| separated
-            (List.map bindings ~f:(fun (pat, fixity, expr) ->
-               format_binding "and" pat fixity expr)))
+       :: List.map bindings ~f:(fun (pat, fixity, expr) ->
+            format_binding "and" pat fixity expr))
   in
   let rec format_common : _ Module.common -> t = function
     | Extern (name, fixity, type_, extern_name) ->

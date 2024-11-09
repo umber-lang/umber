@@ -1,57 +1,17 @@
-(CrossModuleUsage ()
- ((Let (rec_ false)
-   (bindings
-    (((Catch_all (source)) ()
-      ((Literal (String "everything depends on me"))
-       ((Type_app String ()) ()))))))
-  (Module
-   (A ()
-    ((Let (rec_ true)
-      (bindings
-       (((Catch_all (a)) ()
-         ((Lambda ((Tuple ()))
-           (Fun_call (Name CrossModuleUsage.A.b)
-            ((Function ((Tuple ())) (Effect_union ()) (Union ())) ())
-            (((Tuple ()) ((Tuple ()) ())))))
-          ((Function ((Tuple ())) (Effect_union ()) (Union ())) ())))
-        ((Catch_all (b)) ()
-         ((Lambda ((Tuple ()))
-           (Fun_call (Name CrossModuleUsage.A.a)
-            ((Function ((Tuple ())) (Effect_union ()) (Union ())) ())
-            (((Tuple ()) ((Tuple ()) ())))))
-          ((Function ((Tuple ())) (Effect_union ()) (Union ())) ()))))))
-     (Let (rec_ false)
-      (bindings
-       (((Catch_all (print)) ()
-         ((Name Std.Prelude.print)
-          ((Function ((Type_app String ())) (Effect_union ()) (Tuple ())) ()))))))
-     (Let (rec_ false)
-      (bindings
-       (((Catch_all (print_source)) ()
-         ((Lambda ((Tuple ()))
-           (Fun_call (Name CrossModuleUsage.A.print)
-            ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-             ())
-            (((Name CrossModuleUsage.source) ((Type_app String ()) ())))))
-          ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())))))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (print_source)) ()
-      ((Lambda ((Tuple ()))
-        (Fun_call (Name "Std.Prelude.Operators.;")
-         ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
-         (((Fun_call (Name CrossModuleUsage.A.print_source)
-            ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ())
-            (((Tuple ()) ((Tuple ()) ()))))
-           ((Tuple ()) ()))
-          ((Fun_call (Name Std.Prelude.print)
-            ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-             ())
-            (((Name CrossModuleUsage.source) ((Type_app String ()) ()))))
-           ((Tuple ()) ())))))
-       ((Function ((Tuple ())) (Effect_union ()) (Tuple ())) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (empty)) ()
-      ((Name Std.Prelude.List.Nil)
-       ((Type_app Std.Prelude.List.List ((Var a))) ()))))))))
+let source : String = "everything depends on me"
+
+module A = {
+  let a : () -> Never = \() -> b () : Never
+  and b : () -> Never = \() -> a () : Never
+  
+  let print : String -> () = Std.Prelude.print
+  
+  let print_source : () -> () = \() -> print source
+}
+
+let print_source : () -> () =
+  \() ->
+    A.print_source ();
+    print source
+
+let empty : List Never = Nil

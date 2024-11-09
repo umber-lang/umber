@@ -1,220 +1,44 @@
-(Effects ()
- ((Common_def
-   (Effect Read
-    ((params ())
-     (operations
-      ((((name ask) (args ((Tuple ()))) (result (Type_app Int ())))))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (read)) ()
-      ((Name Effects.ask)
-       ((Function ((Tuple ())) (Effect Effects.Read ()) (Type_app Int ()))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (read_and_add)) ()
-      ((Lambda ((Tuple ()))
-        (Fun_call (Name Std.Prelude.Operators.+)
-         ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-           (Type_app Int ()))
-          ())
-         (((Fun_call (Name Effects.ask)
-            ((Function ((Tuple ())) (Effect Effects.Read ())
-              (Type_app Int ()))
-             ())
-            (((Tuple ()) ((Tuple ()) ()))))
-           ((Type_app Int ()) ()))
-          ((Fun_call (Name Effects.ask)
-            ((Function ((Tuple ())) (Effect Effects.Read ())
-              (Type_app Int ()))
-             ())
-            (((Tuple ()) ((Tuple ()) ()))))
-           ((Type_app Int ()) ())))))
-       ((Function ((Tuple ())) (Effect Effects.Read ()) (Type_app Int ()))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (run_both)) ()
-      ((Lambda ((Catch_all (f)) (Catch_all (g)) (Catch_all (x)))
-        (Tuple
-         ((Fun_call (Name Effects.f)
-           ((Function ((Intersection ())) (Effect_union ()) (Union ())) ())
-           (((Name Effects.x) ((Var a) ()))))
-          (Fun_call (Name Effects.g)
-           ((Function ((Intersection ())) (Effect_union ()) (Union ())) ())
-           (((Name Effects.x) ((Var a) ())))))))
-       ((Function
-         ((Function ((Var a)) (Effect_var b) (Var c))
-          (Function ((Var a)) (Effect_var b) (Var d)) (Var a))
-         (Effect_var b) (Tuple ((Var c) (Var d))))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (foo)) ()
-      ((Lambda ((Tuple ()))
-        (Fun_call (Name Effects.run_both)
-         ((Function
-           ((Function ((Type_app Int ()))
-             (Effect_union
-              ((Effect Effects.Read ())
-               (Effect_intersection
-                ((Effect_var a) (Effect_var b) (Effect_var c) (Effect_var d)
-                 (Effect_var e)))))
-             (Type_app Int ()))
-            (Function ((Type_app Int ()))
-             (Effect_union
-              ((Effect Effects.Read ())
-               (Effect_intersection
-                ((Effect_var a) (Effect_var b) (Effect_var c) (Effect_var d)
-                 (Effect_var e)))))
-             (Tuple ()))
-            (Type_app Int ()))
-           (Effect Effects.Read ()) (Tuple ((Type_app Int ()) (Tuple ()))))
-          ())
-         (((Lambda ((Catch_all (x)))
-            (Fun_call (Name Std.Prelude.Operators.+)
-             ((Function ((Type_app Int ()) (Type_app Int ()))
-               (Effect_union ()) (Type_app Int ()))
-              ())
-             (((Name Effects.x) ((Type_app Int ()) ()))
-              ((Fun_call (Name Effects.read_and_add)
-                ((Function ((Tuple ())) (Effect Effects.Read ())
-                  (Type_app Int ()))
-                 ())
-                (((Tuple ()) ((Tuple ()) ()))))
-               ((Type_app Int ()) ())))))
-           ((Function ((Type_app Int ())) (Effect Effects.Read ())
-             (Type_app Int ()))
-            ()))
-          ((Name Std.Prelude.print_int)
-           ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ()))
-          ((Literal (Int 5)) ((Type_app Int ()) ())))))
-       ((Function ((Tuple ())) (Effect Effects.Read ())
-         (Tuple ((Type_app Int ()) (Tuple ()))))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Handle (expr (Literal (Int 5))) (expr_type ((Type_app Int ()) ()))
-        (effect_branches
-         ((((operation Effects.ask) (args ((Tuple ())))) (Literal (Int 6))))))
-       ((Type_app Int ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Handle
-        (expr
-         (Fun_call (Name Effects.read_and_add)
-          ((Function ((Tuple ())) (Effect Effects.Read ()) (Type_app Int ()))
-           ())
-          (((Tuple ()) ((Tuple ()) ())))))
-        (expr_type ((Type_app Int ()) ()))
-        (effect_branches
-         ((((operation Effects.ask) (args ((Tuple ()))))
-           (Fun_call (Name Effects.resume)
-            ((Function ((Type_app Int ())) (Effect_union ())
-              (Type_app Int ()))
-             ())
-            (((Literal (Int 1)) ((Type_app Int ()) ()))))))))
-       ((Type_app Int ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (_value_branch)) ()
-      ((Handle
-        (expr
-         (Fun_call (Name Effects.foo)
-          ((Function ((Tuple ())) (Effect Effects.Read ())
-            (Tuple ((Type_app Int ()) (Tuple ()))))
-           ())
-          (((Tuple ()) ((Tuple ()) ())))))
-        (expr_type ((Tuple ((Type_app Int ()) (Tuple ()))) ()))
-        (value_branch
-         ((Tuple ((Catch_all (x)) (Tuple ()))) (Name Effects.x)))
-        (effect_branches
-         ((((operation Effects.ask) (args ((Tuple ()))))
-           (Fun_call (Name Effects.resume)
-            ((Function ((Type_app Int ())) (Effect_union ())
-              (Type_app Int ()))
-             ())
-            (((Literal (Int 0)) ((Type_app Int ()) ()))))))))
-       ((Type_app Int ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (_nested_handler)) ()
-      ((Handle
-        (expr
-         (Handle
-          (expr
-           (Fun_call (Name Effects.ask)
-            ((Function ((Tuple ())) (Effect Effects.Read ())
-              (Type_app Int ()))
-             ())
-            (((Tuple ()) ((Tuple ()) ())))))
-          (expr_type ((Type_app Int ()) ()))
-          (value_branch
-           ((Catch_all (x))
-            (Fun_call (Name Std.Prelude.Operators.+)
-             ((Function ((Type_app Int ()) (Type_app Int ()))
-               (Effect_union ()) (Type_app Int ()))
-              ())
-             (((Name Effects.x) ((Type_app Int ()) ()))
-              ((Literal (Int 1)) ((Type_app Int ()) ()))))))
-          (effect_branches
-           ((((operation Effects.ask) (args ((Tuple ()))))
-             (Fun_call (Name Effects.resume)
-              ((Function ((Type_app Int ())) (Effect_var a)
-                (Type_app Int ()))
-               ())
-              (((Literal (Int 5)) ((Type_app Int ()) ())))))))))
-        (expr_type ((Type_app Int ()) ()))
-        (effect_branches
-         ((((operation Effects.ask) (args ((Tuple ()))))
-           (Fun_call (Name Effects.resume)
-            ((Function ((Type_app Int ())) (Effect_union ())
-              (Type_app Int ()))
-             ())
-            (((Literal (Int 7)) ((Type_app Int ()) ()))))))))
-       ((Type_app Int ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (higher_order_handler)) ()
-      ((Lambda ((Catch_all (f)))
-        (Handle
-         (expr
-          (Fun_call (Name Effects.f)
-           ((Function ((Tuple ()))
-             (Effect_union ((Effect Effects.Read ()) (Effect_var a)))
-             (Tuple ()))
-            ())
-           (((Tuple ()) ((Tuple ()) ())))))
-         (expr_type ((Tuple ()) ()))
-         (effect_branches
-          ((((operation Effects.ask) (args ((Tuple ())))) (Tuple ()))))))
-       ((Function
-         ((Function ((Tuple ()))
-           (Effect_union ((Effect Effects.Read ()) (Effect_var a)))
-           (Tuple ())))
-         (Effect_var a) (Tuple ()))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Fun_call (Name Effects.higher_order_handler)
-        ((Function
-          ((Function ((Tuple ()))
-            (Effect_union
-             ((Effect Effects.Read ()) (Effect_intersection ())))
-            (Tuple ())))
-          (Effect_union ()) (Tuple ()))
-         ())
-        (((Lambda ((Tuple ()))
-           (Fun_call (Name Std.Prelude.ignore)
-            ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
-            (((Fun_call (Name Effects.ask)
-               ((Function ((Tuple ())) (Effect Effects.Read ())
-                 (Type_app Int ()))
-                ())
-               (((Tuple ()) ((Tuple ()) ()))))
-              ((Type_app Int ()) ())))))
-          ((Function ((Tuple ())) (Effect Effects.Read ()) (Tuple ())) ()))))
-       ((Tuple ()) ()))))))))
+effect Read = {
+  val ask : () -> Int
+}
+
+let read : () -> <Read> Int = ask
+
+let read_and_add : () -> <Read> Int = \() -> (ask () : Int) + (ask () : Int) : Int
+
+let run_both : (a -> <b> c), (a -> <b> d), a -> <b> (c, d) =
+  \f g x -> ((f x : c), (g x : d))
+
+let foo : () -> <Read> (Int, ()) =
+  \() ->
+    run_both
+      ((\(x : Int) -> x + (read_and_add () : Int) : Int) : Int -> <Read> Int) print_int 5
+      : (Int, ())
+
+let _ : Int =
+  handle 5
+  | <ask ()> -> 6
+
+let _ : Int =
+  handle read_and_add () : Int
+  | <ask ()> -> resume 1
+
+let _value_branch : Int =
+  handle foo () : (Int, ())
+  | (x, ()) -> x
+  | <ask ()> -> resume 0
+
+let _nested_handler : Int =
+  handle
+    (handle ask () : Int
+    | x -> x + 1 : Int
+    | <ask ()> -> resume 5)
+      : Int
+  | <ask ()> -> resume 7
+
+let higher_order_handler : (() -> <Read, a> ()) -> <a> () =
+  \f ->
+    handle f ()
+    | <ask ()> -> ()
+
+let _ : () = higher_order_handler ((\() -> ignore (ask () : Int)) : () -> <Read> ())
