@@ -1,6 +1,6 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ("Type application mismatch" (type1 (Type_app Char ()))
-    (type2 (Type_app Int ()))))
+   ("Type application mismatch" (subtype (Type_app Char ()))
+    (supertype (Type_app Int ()))))
   (filename ErrorPatternUnionNameTypes.um) (span 1:9-2:34)))

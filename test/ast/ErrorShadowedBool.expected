@@ -1,6 +1,7 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ("Type application mismatch" (type1 (Type_app ErrorShadowedBool.Bool ()))
-    (type2 (Type_app Bool ()))))
+   ("Type application mismatch"
+    (subtype (Type_app ErrorShadowedBool.Bool ()))
+    (supertype (Type_app Bool ()))))
   (filename ErrorShadowedBool.um) (span 5:9-5:29)))

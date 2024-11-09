@@ -1,4 +1,4 @@
 ("Compilation error"
  ((kind Type_error)
-  (msg ("Type mismatch" (type1 (Type_app Int ())) (type2 Never)))
+  (msg ("Type mismatch" (subtype (Type_app Int ())) (supertype Never)))
   (filename ErrorNeverSubtyping.um) (span 3:10-3:28)))

@@ -1,5 +1,2 @@
-(ErrorLetRecExpression ()
- ((Let (rec_ true)
-   (bindings
-    (((Catch_all (a)) () ((Name ErrorLetRecExpression.b) ((Var a) ())))
-     ((Catch_all (b)) () ((Name ErrorLetRecExpression.a) ((Var a) ()))))))))
+let a : Never = b
+and b : Never = a

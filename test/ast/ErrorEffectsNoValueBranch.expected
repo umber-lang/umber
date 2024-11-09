@@ -1,5 +1,6 @@
 ("Compilation error"
  ((kind Type_error)
   (msg
-   ("Type application mismatch" (type1 (Type_app Int ())) (type2 (Tuple ()))))
+   ("Type application mismatch" (subtype (Type_app Int ()))
+    (supertype (Tuple ()))))
   (filename ErrorEffectsNoValueBranch.um) (span 6:3-7:19)))

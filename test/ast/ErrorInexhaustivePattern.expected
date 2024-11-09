@@ -1,4 +1,1 @@
-(ErrorInexhaustivePattern ()
- ((Let (rec_ false)
-   (bindings
-    (((Constant (Int 1)) () ((Literal (Int 1)) ((Type_app Int ()) ()))))))))
+let 1 : Int = 1
