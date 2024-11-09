@@ -39,16 +39,6 @@ let _ =
   higher_order_handler (\() -> ignore (ask ()))
 
 # FIXME: Move these to separate tests
-# let reraise f =
-#   let result =
-#     handle f ()
-#     | value -> Ok value
-#     | <raise exn> -> Error exn
-#   in
-#   match result
-#   | Ok value -> value
-#   | Error exn -> raise exn
-
 # let handle_state : a, (() -> <State a> b) -> (a, b) = \init f ->
 #  (handle f ()
 #  | x -> (\s -> (s, x))

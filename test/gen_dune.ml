@@ -6,7 +6,7 @@ open! Core
 
 let test_dirs = [ "tokens"; "ast"; "mir"; "llvm"; "output" ]
 
-(* FIXME: Will stop at the first error instead of propagating them, bad. Maybe try
+(* TODO: This will stop at the first error instead of propagating them, bad. Maybe try
    "concurrent" or generate separate rules. *)
 
 let gen_rule ~test_file =

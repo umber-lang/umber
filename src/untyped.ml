@@ -38,7 +38,6 @@ module Expr = struct
         t Node.t
         * ([ `Effect of Effect_pattern.t | `Value of Pattern.t ] Node.t * t Node.t)
           Nonempty.t
-    (* TODO: Support fixity declarations on local let bindings *)
     | Let of (Pattern.t, t) Let_binding.t
     | Tuple of t Node.t list
     | Seq_literal of t Node.t list
@@ -111,9 +110,7 @@ module Expr = struct
           Nonempty.fold
             bindings
             ~init:locals
-            ~f:(fun locals (pat, (_ : Fixity.t option), _expr) ->
-            (* FIXME: Names used in nested exprs here aren't considered? Seems wrong.
-               Write a test to show this messes up dependency checking *)
+            ~f:(fun locals (pat, (_ : Fixity.t option), (_expr : t Node.t)) ->
             Node.with_value pat ~f:(add_locals locals))
         in
         let binding_locals = if rec_ then new_locals else locals in
