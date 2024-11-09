@@ -1,142 +1,43 @@
-(ReraiseExn ()
- ((Common_def
-   (Type_decl Result ((a e) (Variants ((Ok ((Var a))) (Error ((Var e))))))))
-  (Common_def (Type_decl Exn (() (Alias (Type_app String ())))))
-  (Common_def
-   (Effect Exn
-    ((params ())
-     (operations
-      ((((name raise) (args ((Type_app ReraiseExn.Exn ())))
-         (result (Type_app Never ())))))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Handle
-        (expr
-         (Match (Name True) ((Type_app Bool ()) ())
-          (((Cnstr_appl True ()) (Literal (Int 1)))
-           ((Cnstr_appl False ())
-            (Fun_call (Name ReraiseExn.raise)
-             ((Function ((Type_app ReraiseExn.Exn ()))
-               (Effect ReraiseExn.Exn ()) (Type_app Never ()))
-              ())
-             (((Literal (String exn)) ((Type_app String ()) ()))))))))
-        (expr_type ((Type_app Int ()) ()))
-        (effect_branches
-         ((((operation ReraiseExn.raise) (args ((Catch_all ()))))
-           (Literal (Int 2))))))
-       ((Type_app Int ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (reraise)) ()
-      ((Lambda ((Catch_all (msg)) (Catch_all (f)))
-        (Let
-         ((rec_ false)
-          (bindings
-           ((((Catch_all (result))
-              ((Type_app ReraiseExn.Result ((Var a) (Type_app String ())))
-               ()))
-             ()
-             (Handle
-              (expr
-               (Fun_call (Name ReraiseExn.f)
-                ((Function ((Tuple ())) (Effect ReraiseExn.Exn ())
-                  (Union ()))
-                 ())
-                (((Tuple ()) ((Tuple ()) ())))))
-              (expr_type ((Union ()) ()))
-              (value_branch
-               ((Catch_all (value))
-                (Fun_call (Name ReraiseExn.Ok)
-                 ((Function ((Var a)) (Effect_union ())
-                   (Type_app ReraiseExn.Result
-                    ((Var a) (Type_app String ()))))
-                  ())
-                 (((Name ReraiseExn.value) ((Var a) ()))))))
-              (effect_branches
-               ((((operation ReraiseExn.raise) (args ((Catch_all (exn)))))
-                 (Fun_call (Name ReraiseExn.Error)
-                  ((Function ((Type_app String ())) (Effect_union ())
-                    (Type_app ReraiseExn.Result
-                     ((Var a) (Type_app String ()))))
-                   ())
-                  (((Name ReraiseExn.exn) ((Type_app String ()) ())))))))))))
-          (body
-           (Match (Name ReraiseExn.result)
-            ((Type_app ReraiseExn.Result ((Var a) (Type_app String ()))) ())
-            (((Cnstr_appl ReraiseExn.Ok ((Catch_all (value))))
-              (Name ReraiseExn.value))
-             ((Cnstr_appl ReraiseExn.Error ((Catch_all (exn))))
-              (Fun_call (Name ReraiseExn.raise)
-               ((Function ((Type_app ReraiseExn.Exn ()))
-                 (Effect ReraiseExn.Exn ()) (Type_app Never ()))
-                ())
-               (((Fun_call (Name Std.Prelude.Operators.++)
-                  ((Function ((Type_app String ()) (Type_app String ()))
-                    (Effect_union ()) (Type_app String ()))
-                   ())
-                  (((Fun_call (Name Std.Prelude.Operators.++)
-                     ((Function ((Type_app String ()) (Type_app String ()))
-                       (Effect_union ()) (Type_app String ()))
-                      ())
-                     (((Name ReraiseExn.msg) ((Type_app String ()) ()))
-                      ((Literal (String ": ")) ((Type_app String ()) ()))))
-                    ((Type_app String ()) ()))
-                   ((Name ReraiseExn.exn) ((Type_app String ()) ()))))
-                 ((Type_app String ()) ())))))))))))
-       ((Function
-         ((Type_app String ())
-          (Function ((Tuple ()))
-           (Effect_union ((Effect ReraiseExn.Exn ()) (Effect_var a)))
-           (Var b)))
-         (Effect_union ((Effect ReraiseExn.Exn ()) (Effect_var a))) (Var b))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Handle
-        (expr
-         (Fun_call (Name ReraiseExn.reraise)
-          ((Function
-            ((Type_app String ())
-             (Function ((Tuple ()))
-              (Effect_union ((Effect ReraiseExn.Exn ()) (Effect_var a)))
-              (Type_app Int ())))
-            (Effect_union ((Effect ReraiseExn.Exn ()) (Effect_var a)))
-            (Type_app Int ()))
-           ())
-          (((Literal (String Reraised)) ((Type_app String ()) ()))
-           ((Lambda ((Tuple ()))
-             (Match (Name True) ((Type_app Bool ()) ())
-              (((Cnstr_appl True ())
-                (Fun_call (Name ReraiseExn.raise)
-                 ((Function ((Type_app ReraiseExn.Exn ()))
-                   (Effect ReraiseExn.Exn ()) (Type_app Never ()))
-                  ())
-                 (((Literal (String "My exception"))
-                   ((Type_app String ()) ())))))
-               ((Cnstr_appl False ()) (Literal (Int 42))))))
-            ((Function ((Tuple ()))
-              (Effect_union ((Effect ReraiseExn.Exn ()) (Effect_var a)))
-              (Type_app Int ()))
-             ())))))
-        (expr_type ((Type_app Int ()) ()))
-        (value_branch
-         ((Catch_all (value))
-          (Fun_call (Name Std.Prelude.print_int)
-           ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
-           (((Name ReraiseExn.value) ((Type_app Int ()) ()))))))
-        (effect_branches
-         ((((operation ReraiseExn.raise) (args ((Catch_all (exn)))))
-           (Fun_call (Name Std.Prelude.print)
-            ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-             ())
-            (((Fun_call (Name Std.Prelude.Operators.++)
-               ((Function ((Type_app String ()) (Type_app String ()))
-                 (Effect_union ()) (Type_app String ()))
-                ())
-               (((Literal (String "Unhandled exception: "))
-                 ((Type_app String ()) ()))
-                ((Name ReraiseExn.exn) ((Type_app String ()) ()))))
-              ((Type_app String ()) ()))))))))
-       ((Tuple ()) ()))))))))
+type Result a e =
+  | Ok a
+  | Error e
+
+type Exn = String
+
+effect Exn = {
+  val raise : Exn -> Never
+}
+
+let _ : Int =
+  handle
+    (match True
+    | True -> 1
+    | False -> raise "exn")
+      : Int
+  | <raise _> -> 2
+
+let reraise : String, (() -> <Exn, a> b) -> <Exn, a> b =
+  \msg f ->
+    let' result : Result c String =
+      handle f () : e
+      | value -> Ok value : Result c String
+      | <raise exn> -> Error exn
+    in
+    (match result
+    | Ok value -> value
+    | Error exn -> raise ((msg ++ ": " : String) ++ exn : String))
+      : b
+
+let _ : () =
+  handle
+    reraise
+      "Reraised"
+      ((\() ->
+        (match True
+        | True -> raise "My exception"
+        | False -> 42)
+          : Int)
+        : () -> <Exn> Int)
+      : Int
+  | value -> print_int value
+  | <raise exn> -> print ("Unhandled exception: " ++ exn : String)

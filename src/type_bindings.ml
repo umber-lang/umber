@@ -379,10 +379,6 @@ let refresh_type type_ =
   Internal_type.map_vars type_ ~f:refresh_var
 ;;
 
-let record_context_var t var ~polarity =
-  Hash_set.add (By_polarity.get t.context_vars ~polarity) var
-;;
-
 let rec constrain ~names ~types ~subtype ~supertype =
   let lookup_type names name args =
     let type_entry = Name_bindings.find_absolute_type_entry names name in
@@ -953,10 +949,19 @@ let instantiate_type_or_scheme
 ;;
 
 let record_context_vars types pat_names =
-  Map.iter pat_names ~f:(fun name_entry ->
+  eprint_s [%message "Type_bindings.record_context_vars" (pat_names : Pattern.Names.t)];
+  let record_context_var types var ~polarity =
+    Hash_set.add (By_polarity.get types.context_vars ~polarity) var
+  in
+  Map.iteri pat_names ~f:(fun ~key:name ~data:name_entry ->
     match Name_bindings.Name_entry.type_ name_entry with
     | Type type_ ->
-      Internal_type.iter_vars type_ ~polarity:Positive ~f:(record_context_var types)
+      (* The `resume` keyword works differently to other pattern-bound names. The type
+         variables in its type are guaranteed to come from within the same expression,
+         not as an input. So, it's safe to not consider its type to include context
+         variables. *)
+      if not (Value_name.equal name Value_name.resume_keyword)
+      then Internal_type.iter_vars type_ ~polarity:Positive ~f:(record_context_var types)
     | Scheme scheme ->
       compiler_bug
         [%message "Unexpected pattern name entry type" (scheme : _ Type_scheme.t)])
