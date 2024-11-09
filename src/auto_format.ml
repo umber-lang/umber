@@ -104,6 +104,9 @@ let format doc ~max_line_length =
            [%message "formatting group" (mode : [ `Break | `Flat ]) (doc : Document.t)]; *)
          format ~used_length ({ indent; mode; doc } :: fragments))
   and format_break indent fragments =
+    (* TODO: Extra spaces on a blank line should be removed. Maybe we could "buffer" the
+       spaces and then output them later (once it's confirmed that non-space characters
+       will appear before a newline)? *)
     Sequence.append
       (Sequence.singleton ("\n" ^ String.make indent ' '))
       (format fragments ~used_length:indent)

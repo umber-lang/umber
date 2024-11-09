@@ -1,182 +1,26 @@
-(LetBindingGroups ()
- ((Let (rec_ false)
-   (bindings
-    (((Catch_all (a)) () ((Literal (Int 1)) ((Type_app Int ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (fun)) ()
-      ((Lambda ((Catch_all (n)))
-        (Fun_call (Name Std.Prelude.Operators.+)
-         ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-           (Type_app Int ()))
-          ())
-         (((Fun_call (Name Std.Prelude.Operators.+)
-            ((Function ((Type_app Int ()) (Type_app Int ()))
-              (Effect_union ()) (Type_app Int ()))
-             ())
-            (((Fun_call (Name Std.Prelude.Operators.-)
-               ((Function ((Type_app Int ()) (Type_app Int ()))
-                 (Effect_union ()) (Type_app Int ()))
-                ())
-               (((Fun_call (Name Std.Prelude.Operators.^)
-                  ((Function ((Type_app Int ()) (Type_app Int ()))
-                    (Effect_union ()) (Type_app Int ()))
-                   ())
-                  (((Name LetBindingGroups.n) ((Type_app Int ()) ()))
-                   ((Literal (Int 2)) ((Type_app Int ()) ()))))
-                 ((Type_app Int ()) ()))
-                ((Literal (Int 2)) ((Type_app Int ()) ()))))
-              ((Type_app Int ()) ()))
-             ((Name LetBindingGroups.n) ((Type_app Int ()) ()))))
-           ((Type_app Int ()) ()))
-          ((Fun_call (Name Std.Prelude.Operators.*)
-            ((Function ((Type_app Int ()) (Type_app Int ()))
-              (Effect_union ()) (Type_app Int ()))
-             ())
-            (((Fun_call (Name Std.Prelude.Operators.*)
-               ((Function ((Type_app Int ()) (Type_app Int ()))
-                 (Effect_union ()) (Type_app Int ()))
-                ())
-               (((Name LetBindingGroups.n) ((Type_app Int ()) ()))
-                ((Fun_call (Name Std.Prelude.Operators.-)
-                  ((Function ((Type_app Int ()) (Type_app Int ()))
-                    (Effect_union ()) (Type_app Int ()))
-                   ())
-                  (((Name LetBindingGroups.n) ((Type_app Int ()) ()))
-                   ((Literal (Int 8)) ((Type_app Int ()) ()))))
-                 ((Type_app Int ()) ()))))
-              ((Type_app Int ()) ()))
-             ((Literal (Int 5)) ((Type_app Int ()) ()))))
-           ((Type_app Int ()) ())))))
-       ((Function ((Type_app Int ())) (Effect_union ()) (Type_app Int ()))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (b)) ()
-      ((Fun_call (Name Std.Prelude.Operators.+)
-        ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-          (Type_app Int ()))
-         ())
-        (((Name LetBindingGroups.a) ((Type_app Int ()) ()))
-         ((Literal (Int 6)) ((Type_app Int ()) ()))))
-       ((Type_app Int ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Let
-        ((rec_ false)
-         (bindings
-          ((((Tuple ()) ((Tuple ()) ())) () (Tuple ()))
-           (((Catch_all ())
-             ((Function ((Type_app Int ())) (Effect_union ())
-               (Type_app Int ()))
-              ()))
-            () (Name LetBindingGroups.fun))
-           (((Catch_all (list))
-             ((Type_app Std.Prelude.List.List ((Type_app String ()))) ()))
-            ()
-            (Fun_call (Name Std.Prelude.Operators.::)
-             ((Function
-               ((Type_app String ())
-                (Type_app Std.Prelude.List.List ((Type_app String ()))))
-               (Effect_union ())
-               (Type_app Std.Prelude.List.List ((Type_app String ()))))
-              ())
-             (((Literal (String a)) ((Type_app String ()) ()))
-              ((Fun_call (Name Std.Prelude.Operators.::)
-                ((Function
-                  ((Type_app String ())
-                   (Type_app Std.Prelude.List.List ((Type_app String ()))))
-                  (Effect_union ())
-                  (Type_app Std.Prelude.List.List ((Type_app String ()))))
-                 ())
-                (((Literal (String list)) ((Type_app String ()) ()))
-                 ((Fun_call (Name Std.Prelude.Operators.::)
-                   ((Function
-                     ((Type_app String ())
-                      (Type_app Std.Prelude.List.List ((Type_app String ()))))
-                     (Effect_union ())
-                     (Type_app Std.Prelude.List.List ((Type_app String ()))))
-                    ())
-                   (((Literal (String of)) ((Type_app String ()) ()))
-                    ((Fun_call (Name Std.Prelude.Operators.::)
-                      ((Function
-                        ((Type_app String ())
-                         (Type_app Std.Prelude.List.List
-                          ((Type_app String ()))))
-                        (Effect_union ())
-                        (Type_app Std.Prelude.List.List
-                         ((Type_app String ()))))
-                       ())
-                      (((Literal (String words)) ((Type_app String ()) ()))
-                       ((Name Std.Prelude.List.Nil)
-                        ((Type_app Std.Prelude.List.List
-                          ((Type_app String ())))
-                         ()))))
-                     ((Type_app Std.Prelude.List.List ((Type_app String ())))
-                      ()))))
-                  ((Type_app Std.Prelude.List.List ((Type_app String ())))
-                   ()))))
-               ((Type_app Std.Prelude.List.List ((Type_app String ()))) ())))))))
-         (body
-          (Fun_call (Name Std.Prelude.Operators.||)
-           ((Function ((Type_app Bool ()) (Type_app Bool ()))
-             (Effect_union ()) (Type_app Bool ()))
-            ())
-           (((Fun_call (Name Std.Prelude.Operators.==)
-              ((Function ((Type_app Int ()) (Type_app Int ()))
-                (Effect_union ()) (Type_app Bool ()))
-               ())
-              (((Literal (Int 1)) ((Type_app Int ()) ()))
-               ((Literal (Int 2)) ((Type_app Int ()) ()))))
-             ((Type_app Bool ()) ()))
-            ((Fun_call (Name Std.Prelude.Operators.==)
-              ((Function ((Type_app Int ()) (Type_app Int ()))
-                (Effect_union ()) (Type_app Bool ()))
-               ())
-              (((Literal (Int 3)) ((Type_app Int ()) ()))
-               ((Literal (Int 4)) ((Type_app Int ()) ()))))
-             ((Type_app Bool ()) ())))))))
-       ((Type_app Bool ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (bottom)) ()
-      ((Let
-        ((rec_ false)
-         (bindings
-          ((((Catch_all (bottom_again))
-             ((Function ((Intersection ())) (Effect_union ()) (Union ())) ()))
-            ()
-            (Lambda ((Catch_all ()))
-             (Let
-              ((rec_ true)
-               (bindings
-                ((((Catch_all (go_left))
-                   ((Function ((Type_app Int ())) (Effect_union ())
-                     (Union ()))
-                    ()))
-                  ()
-                  (Lambda ((Catch_all (x)))
-                   (Fun_call (Name LetBindingGroups.go_right)
-                    ((Function ((Type_app Int ())) (Effect_union ())
-                      (Union ()))
-                     ())
-                    (((Name LetBindingGroups.x) ((Type_app Int ()) ()))))))
-                 (((Catch_all (go_right))
-                   ((Function ((Type_app Int ())) (Effect_union ())
-                     (Union ()))
-                    ()))
-                  ()
-                  (Lambda ((Catch_all (x)))
-                   (Fun_call (Name LetBindingGroups.go_left)
-                    ((Function ((Type_app Int ())) (Effect_union ())
-                      (Union ()))
-                     ())
-                    (((Name LetBindingGroups.x) ((Type_app Int ()) ()))))))))
-               (body
-                (Fun_call (Name LetBindingGroups.go_left)
-                 ((Function ((Type_app Int ())) (Effect_union ()) (Union ()))
-                  ())
-                 (((Literal (Int 17)) ((Type_app Int ()) ())))))))))))
-         (body (Name LetBindingGroups.bottom_again))))
-       ((Function ((Intersection ())) (Effect_union ()) (Union ())) ()))))))))
+let a : Int = 1
+
+let fun : Int -> Int =
+  \n ->
+    (((n ^ 2 : Int) - 2 : Int) + n : Int) + ((n * (n - 8 : Int) : Int) * 5 : Int) : Int
+
+let b : Int = a + 6
+
+let _ : Bool =
+  let' () = ()
+  and _ : Int -> Int = fun
+  and list : List String =
+    "a"
+    :: ("list" :: ("of" :: ("words" :: Nil : List String) : List String) : List String)
+  in
+  (1 == 2 : Bool) || (3 == 4 : Bool) : Bool
+
+let bottom : Any -> Never =
+  let' bottom_again : Any -> Never =
+    \_ ->
+      let go_left : Int -> Never = \x -> go_right x : Never
+      and go_right : Int -> Never = \x -> go_left x : Never
+      in
+      go_left 17 : Never
+  in
+  bottom_again

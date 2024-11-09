@@ -1,85 +1,22 @@
-(ModuleSig ()
- ((Module
-   (Range
-    ((Common_sig (Type_decl Range (() Abstract)))
-     (Val between ()
-      ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-        (Type_app ModuleSig.Range.Range ()))
-       ()))
-     (Val elem ()
-      ((Function ((Type_app Int ()) (Type_app ModuleSig.Range.Range ()))
-        (Effect_union ()) (Type_app Bool ()))
-       ())))
-    ((Common_def
-      (Type_decl Range
-       (() (Alias (Tuple ((Type_app Int ()) (Type_app Int ())))))))
-     (Let (rec_ false)
-      (bindings
-       (((Catch_all (between)) ()
-         ((Lambda ((Catch_all (lo)) (Catch_all (hi)))
-           (Tuple ((Name ModuleSig.Range.lo) (Name ModuleSig.Range.hi))))
-          ((Function ((Var a) (Var b)) (Effect_union ())
-            (Tuple ((Var a) (Var b))))
-           ()))))))
-     (Let (rec_ false)
-      (bindings
-       (((Catch_all (elem)) ()
-         ((Lambda
-           ((Catch_all (x)) (Tuple ((Catch_all (lo)) (Catch_all (hi)))))
-           (Fun_call (Name Std.Prelude.Operators.&&)
-            ((Function ((Type_app Bool ()) (Type_app Bool ()))
-              (Effect_union ()) (Type_app Bool ()))
-             ())
-            (((Fun_call (Name Std.Prelude.Operators.<=)
-               ((Function ((Var a) (Var a)) (Effect_union ())
-                 (Type_app Bool ()))
-                ())
-               (((Name ModuleSig.Range.lo) ((Var a) ()))
-                ((Name ModuleSig.Range.x) ((Var a) ()))))
-              ((Type_app Bool ()) ()))
-             ((Fun_call (Name Std.Prelude.Operators.<=)
-               ((Function ((Var a) (Var a)) (Effect_union ())
-                 (Type_app Bool ()))
-                ())
-               (((Name ModuleSig.Range.x) ((Var a) ()))
-                ((Name ModuleSig.Range.hi) ((Var a) ()))))
-              ((Type_app Bool ()) ())))))
-          ((Function
-            ((Intersection ((Var a) (Var b))) (Tuple ((Var b) (Var a))))
-            (Effect_union ()) (Type_app Bool ()))
-           ())))))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (my_range)) ()
-      ((Fun_call (Name ModuleSig.Range.between)
-        ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-          (Type_app ModuleSig.Range.Range ()))
-         ())
-        (((Literal (Int 1)) ((Type_app Int ()) ()))
-         ((Literal (Int 10)) ((Type_app Int ()) ()))))
-       ((Type_app ModuleSig.Range.Range ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (is_10_in_range)) ()
-      ((Fun_call (Name ModuleSig.Range.elem)
-        ((Function ((Type_app Int ()) (Type_app ModuleSig.Range.Range ()))
-          (Effect_union ()) (Type_app Bool ()))
-         ())
-        (((Literal (Int 10)) ((Type_app Int ()) ()))
-         ((Name ModuleSig.my_range) ((Type_app ModuleSig.Range.Range ()) ()))))
-       ((Type_app Bool ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Tuple ()) ()
-      ((Fun_call (Name "Std.Prelude.Operators.;")
-        ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
-        (((Fun_call (Name Std.Prelude.print_bool)
-           ((Function ((Type_app Bool ())) (Effect_union ()) (Tuple ())) ())
-           (((Name ModuleSig.is_10_in_range) ((Type_app Bool ()) ()))))
-          ((Tuple ()) ()))
-         ((Fun_call (Name Std.Prelude.print)
-           ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-            ())
-           (((Literal (String "")) ((Type_app String ()) ()))))
-          ((Tuple ()) ()))))
-       ((Tuple ()) ()))))))))
+module Range : {
+  type Range
+  
+  val between : Int, Int -> Range
+  
+  val elem : Int, Range -> Bool
+} = {
+  type Range = (Int, Int)
+  
+  let between : a, b -> (a, b) = \lo hi -> (lo, hi)
+  
+  let elem : (a & b), (a, b) -> Bool =
+    \x (lo, hi) -> (lo <= x : Bool) && (x <= hi : Bool) : Bool
+}
+
+let my_range : Range = Range.between 1 10
+
+let is_10_in_range : Bool = Range.elem 10 my_range
+
+let () =
+  print_bool is_10_in_range;
+  print ""

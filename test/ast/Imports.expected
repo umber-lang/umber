@@ -1,79 +1,56 @@
-(Imports
- ((Common_sig
-   (Import
-    ((kind (Relative (nth_parent 0))) (paths (Module A ((Name Foo)))))))
-  (Module_sig A
-   ((Common_sig
-     (Import
-      ((kind (Relative (nth_parent 1))) (paths (Module B ((Name Bar)))))))
-    (Common_sig (Type_decl Foo (() (Alias (Type_app Imports.B.Bar ())))))))
-  (Module_sig B
-   ((Common_sig
-     (Import
-      ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Int)))))))))
-    (Common_sig (Type_decl Bar (() (Alias (Type_app Int ())))))
-    (Module_sig C
-     ((Common_sig
-       (Import
-        ((kind (Relative (nth_parent 2))) (paths (Module A ((Name Foo)))))))))))
-  (Val * ((Left 7))
-   ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-     (Type_app Int ()))
-    ())))
- ((Common_def
-   (Import
-    ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Float)))))))))
-  (Common_def
-   (Import
-    ((kind Absolute)
-     (paths (Module Std ((Module Prelude ((Name Int) (Name Option)))))))))
-  (Common_def
-   (Import
-    ((kind Absolute)
-     (paths (Module Std ((Module Prelude ((Module Float ((Name abs)))))))))))
-  (Common_def
-   (Import
-    ((kind Absolute)
-     (paths
-      (Module Std
-       ((Module Prelude ((Module Float ((Name sin) (Name cos)))))))))))
-  (Common_def
-   (Type_decl Cool
-    (()
-     (Variants
-      ((You_can_define_types_in_between_imports ((Tuple ())))
-       (Bad_style_though ((Type_app Std.Prelude.Option.Option ((Tuple ()))))))))))
-  (Common_def
-   (Import
-    ((kind Absolute)
-     (paths (Module Std ((Module Prelude ((Module Int (All))))))))))
-  (Common_def
-   (Import
-    ((kind Absolute)
-     (paths (Module Std ((Module Prelude ((Module Operators ((Name *)))))))))))
-  (Common_def
-   (Import
-    ((kind Absolute)
-     (paths
-      (Module Std
-       ((Module Prelude ((Name List) (Module Float ((Name pi) (Name +)))))))))))
-  (Module
-   (A ()
-    ((Common_def (Type_decl Foo (() (Alias (Type_app Imports.B.Bar ())))))
-     (Common_def
-      (Import
-       ((kind (Relative (nth_parent 1))) (paths (Module B ((Name Bar))))))))))
-  (Module
-   (B ()
-    ((Common_def (Type_decl Bar (() (Alias (Type_app Int ())))))
-     (Common_def
-      (Import
-       ((kind Absolute) (paths (Module Std ((Module Prelude ((Name Int)))))))))
-     (Module
-      (C ()
-       ((Common_def
-         (Import
-          ((kind (Relative (nth_parent 2))) (paths (Module A ((Name Foo)))))))))))))
-  (Common_def
-   (Import
-    ((kind (Relative (nth_parent 0))) (paths (Module A ((Name Foo)))))))))
+module : {
+  import .A.Foo
+  
+  module A : {
+    import ..B.Bar
+    
+    type Foo = Bar
+  }
+  
+  module B : {
+    import Std.Prelude.Int
+    
+    type Bar = Int
+    
+    module C : {
+      import ...A.Foo
+    }
+  }
+  
+  val infixl 7 (*) : Int, Int -> Int
+}
+import Std.Prelude.Float
+
+import Std.Prelude.(Int, Option)
+
+import Std.Prelude.Float.abs
+
+import Std.Prelude.Float.(sin, cos)
+
+type Cool =
+  | You_can_define_types_in_between_imports ()
+  | Bad_style_though (Option ())
+
+import Std.Prelude.Int._
+
+import Std.Prelude.Operators.(*)
+
+import Std.Prelude.(List, Float.(pi, (+)))
+
+module A = {
+  type Foo = Bar
+  
+  import ..B.Bar
+}
+
+module B = {
+  type Bar = Int
+  
+  import Std.Prelude.Int
+  
+  module C = {
+    import ...A.Foo
+  }
+}
+
+import .A.Foo

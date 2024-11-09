@@ -1,8 +1,3 @@
-(ExternInt ()
- ((Common_def (Type_decl MyInt (() (Alias (Type_app Int ())))))
-  (Common_def
-   (Extern plus ((Left 6))
-    ((Function ((Type_app ExternInt.MyInt ()) (Type_app ExternInt.MyInt ()))
-      (Effect_union ()) (Type_app ExternInt.MyInt ()))
-     ())
-    umber_int_add))))
+type MyInt = Int
+
+extern infixl 6 plus : MyInt, MyInt -> MyInt = "umber_int_add"
