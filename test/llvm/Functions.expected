@@ -53,9 +53,12 @@ entry:
   ret %umber_block* inttoptr (i64 1 to %umber_block*)
 }
 
+declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_block*)
+
 define tailcc %umber_block* @"Functions.*fun.1"(%umber_block* %"Functions.*lambda_arg.1", %umber_block* %"Functions.*lambda_arg.2", %umber_block* %"Functions.*lambda_arg.3") {
 entry:
   %fun_call = tail call tailcc %umber_block* @Functions.sqr(%umber_block* bitcast (%umber_block1* @int.9999 to %umber_block*))
-  ret %umber_block* %fun_call
+  %fun_call1 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* inttoptr (i64 1 to %umber_block*), %umber_block* %fun_call)
+  ret %umber_block* %fun_call1
 }
 

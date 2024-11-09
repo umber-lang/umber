@@ -12,4 +12,12 @@ let () = lots_of_args 5 10000000000000. -89 "huh" 'c'
 
 let _trailing_lambda : () =
   lots_of_args
-    1 2 3 4 ((\(_ : Any) (_ : Any) (_ : Any) -> sqr 9999 : Int) : Any, Any, Any -> Int)
+    1
+    2
+    3
+    4
+    ((\(_ : Any) (_ : Any) (_ : Any) ->
+      ();
+      (sqr 9999 : Int)
+        : Int)
+      : Any, Any, Any -> Int)
