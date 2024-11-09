@@ -993,7 +993,7 @@ let add_effect t effect_name effect =
   update_current t ~f:{ f }
 ;;
 
-let set_inferred_scheme t name scheme ~shadowing_allowed ~check_existing =
+let set_inferred_scheme t name scheme ~shadowing_allowed =
   let f bindings =
     let inferred_entry : Name_entry.t =
       { ids = Name_entry.Id.Set.singleton (Name_entry.Id.create ())
@@ -1017,7 +1017,6 @@ let set_inferred_scheme t name scheme ~shadowing_allowed ~check_existing =
              | Placeholder | Val_declared -> ()
              | Extern_declared | Effect_operation -> multiple_definitions ()
              | Let_inferred -> if not shadowing_allowed then multiple_definitions ());
-            check_existing existing_entry;
             Local (Name_entry.merge existing_entry inferred_entry)
           | Some (Imported _) ->
             (* TODO: Think about the exact semantics of this. I think we want to disallow

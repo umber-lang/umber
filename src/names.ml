@@ -145,18 +145,7 @@ end = struct
   type relative = [ `Relative ] [@@deriving compare, equal, hash, sexp]
 
   let is_empty = List.is_empty
-
-  (* FIXME: Use List.is_prefix *)
-  let rec is_prefix t' ~prefix:t =
-    match t, t' with
-    | [], ([] | _ :: _) -> true
-    | _ :: _, [] -> false
-    | module_name :: rest, module_name' :: rest' ->
-      if Module_name.equal module_name module_name'
-      then is_prefix ~prefix:rest rest'
-      else false
-  ;;
-
+  let is_prefix t ~prefix = List.is_prefix t ~prefix ~equal:Module_name.equal
   let append = ( @ )
   let append' = ( @ )
   let last = List.last
@@ -469,53 +458,6 @@ module Type_param_name : sig
   val default : t
 end = struct
   include Lower_name_qualified
-
-  (* FIXME: cleanup *)
-  (* let default = of_string_unchecked "a"
-
-  (* Generates names like: "a", .., "z", "aa", "ab", .. *)
-  let next
-    (* let rec loop buf param len =
-      if Int.(len - 1 < Ustring.length param)
-      then (
-        let letter = Ustring.get param (len - 1) in
-        match Uchar.to_char letter with
-        | Some ('a' .. 'y' as letter) ->
-          Ustring.add_substring_to_buffer buf param ~pos:0 ~len:(len - 1);
-          Buffer.add_char buf (Char.unsafe_of_int (Char.to_int letter + 1))
-        | Some _ | None ->
-          loop buf param (len - 1);
-          Buffer.add_char buf 'a')
-      else Buffer.add_char buf 'a'
-    in
-    fun param ->
-      let param = to_ustring param in
-      let buf = Buffer.create (Ustring.length param) in
-      loop buf param (Ustring.length param);
-      of_string_unchecked (Buffer.contents buf) *)
-      param
-    =
-    let param = to_ustring param in
-    if Ustring.is_empty param
-    then default
-    else (
-      let new_param =
-        match Uchar.to_char (Ustring.get param (Ustring.length param - 1)) with
-        | Some ('a' .. 'y' as letter) ->
-          let next_letter = Uchar.of_char (Char.unsafe_of_int (Char.to_int letter + 1)) in
-          let new_param = Ustring.to_array param |> Array.copy in
-          new_param.(Array.length new_param - 1) <- next_letter;
-          new_param
-        | Some _ | None ->
-          Array.init
-            (Ustring.length param + 1)
-            ~f:(fun i ->
-              if Int.O.(i < Ustring.length param)
-              then Ustring.get param i
-              else Uchar.of_char 'a')
-      in
-      of_ustring_unchecked (Ustring.of_array_unchecked new_param))
-  ;; *)
 
   (* TODO: Consider having effect vars use 'e1', 'e2', etc. and regular type vars skip
      'e'. This would make inferred types easier to read. *)

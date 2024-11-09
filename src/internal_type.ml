@@ -176,26 +176,4 @@ let iter_effects_vars typ ~polarity ~f =
   fold_effects_vars typ ~polarity ~init:() ~f:(fun () var ~polarity -> f var ~polarity)
 ;;
 
-(* FIXME: This doesn't include effect vars! That's no good *)
-(* let fold_vars typ ~init ~f =
-  fold_until typ ~init ~f:(fun acc -> function
-    | Var var -> Continue (f acc var)
-    | _ -> Continue acc)
-  |> Fold_action.id
-;;
-
-let for_all_vars typ ~f =
-  fold_until typ ~init:true ~f:(fun _ -> function
-    | Var var -> if f var then Continue true else Stop false
-    | _ -> Continue true)
-  |> Fold_action.id
-;;
-
-let exists_var typ ~f =
-  fold_until typ ~init:false ~f:(fun _ -> function
-    | Var var -> if f var then Stop true else Continue false
-    | _ -> Continue false)
-  |> Fold_action.id
-;; *)
-
 let no_effects = { effects = Effect_name.Absolute.Map.empty; effect_var = None }

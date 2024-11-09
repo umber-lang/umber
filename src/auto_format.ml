@@ -90,18 +90,12 @@ let format doc ~max_line_length =
          format ~used_length ({ indent = indent + indent_to_add; mode; doc } :: fragments)
        | Group doc ->
          let mode =
-           (* FIXME: Is fits checking if the whole rest of the document fits in one line??
-              Is this just nonsense? Am I missing something? Why would it need to look
-               beyond the current group? *)
            if fits
                 [ { indent; mode = `Flat; doc } ]
                 ~length:(max_line_length - used_length)
            then `Flat
            else `Break
          in
-         (* FIXME: cleanup *)
-         (* print_s
-           [%message "formatting group" (mode : [ `Break | `Flat ]) (doc : Document.t)]; *)
          format ~used_length ({ indent; mode; doc } :: fragments))
   and format_break indent fragments =
     (* TODO: Extra spaces on a blank line should be removed. Maybe we could "buffer" the
@@ -173,7 +167,6 @@ let%test_module _ =
       in
       print example ~max_line_length:33;
       [%expect {| let _ = if false then 1. else 2.5 |}];
-      (* FIXME: This seems weird. Ah, I didn't make the let + pattern a group. *)
       print example ~max_line_length:32;
       [%expect {|
         let

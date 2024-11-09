@@ -5,9 +5,6 @@ type t [@@deriving sexp_of]
 
 val create : unit -> t
 
-(* FIXME: Instantiating schemes is used to bind vars for variables
-   The other place is patterns *)
-
 val instantiate_type_scheme
   :  ?params:Type_param.Env_to_vars.t
   -> names:Name_bindings.t

@@ -344,17 +344,3 @@ let raise_if_nonempty t ~module_name =
 ;;
 
 let check ~names module_name = create ~names module_name |> raise_if_nonempty ~module_name
-
-let check_val_scheme_vs_inferred_scheme ~names ~val_scheme ~inferred_scheme =
-  if not
-       (no_errors (fun () ->
-          check_val_type_schemes ~names { sig_ = val_scheme; def = inferred_scheme }))
-  then
-    Compilation_error.raise
-      Type_error
-      ~msg:
-        [%message
-          "Type mismatch"
-            ~expected:(val_scheme : Module_path.absolute Type_scheme.t)
-            ~inferred:(inferred_scheme : Module_path.absolute Type_scheme.t)]
-;;

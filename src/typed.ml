@@ -197,21 +197,7 @@ module Pattern = struct
           | Scheme scheme -> scheme
           | Type type_ -> Type_bindings.generalize types type_
         in
-        Name_bindings.set_inferred_scheme
-          names
-          name
-          inferred_scheme
-          ~shadowing_allowed
-          ~check_existing:(fun existing_entry ->
-          (* FIXME: I don't think this is necessary anymore. Sig_def_diff also shouldn't
-             need to expose the function *)
-          match Name_bindings.Name_entry.type_ existing_entry with
-          | Type _ -> ()
-          | Scheme existing_scheme ->
-            Sig_def_diff.check_val_scheme_vs_inferred_scheme
-              ~names
-              ~val_scheme:existing_scheme
-              ~inferred_scheme))
+        Name_bindings.set_inferred_scheme names name inferred_scheme ~shadowing_allowed)
     in
     names, Type_bindings.generalize types typ
   ;;

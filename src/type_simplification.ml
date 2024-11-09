@@ -227,15 +227,10 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
       | effects -> Defer effects)
 ;;
 
-(* FIXME: Occuring more than once is ok, right? Just being polar is enough, right?
-
-   Actually, the problem is that when a var occurs more than once, if we replace with Any
-   or Never we lose the information that these types were meant to be the same. Just
-   leaving the var in is probably fine, hopefully?
-*)
 (** Remove variables which only occur once in a positive or negative position
     respectively. Replace them with empty unions or intersections (the bottom and top
-    types). *)
+    types). It's important not to remove variables which occur more than once, since that
+    erases the information that they are the same. *)
 let remove_polar_vars type_ ~context_vars =
   let { By_polarity.positive = positive_vars; negative = negative_vars } =
     get_positive_and_negative_vars type_ ~context_vars
@@ -404,7 +399,7 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   let type_ = remove_polar_vars type_ ~context_vars in
   eprint_s [%message "after removing polar vars" (type_ : _ Type_scheme.type_)];
   let type_ = replace_co_occurring_vars type_ in
-  (* FIXME: We don't know whether variables are used elsewhere in the expression without
+  (* TODO: We don't know whether variables are used elsewhere in the expression without
      some notion of type variable scope. This means replacing vars only used once in a
      type expression with Never/Any isn't sound - it is only sound if the variable does
      not appear anywhere else. Maybe we need to simplify all the types for a statement at

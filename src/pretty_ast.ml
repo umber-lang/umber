@@ -410,7 +410,7 @@ let format_to_document
   in
   let parens doc = Text "(" ^^ doc ^^ Text ")" in
   let comma_separated = separated ~sep:(Text "," ^^ Break) in
-  (* FIXME: How to express "two line breaks between multi-line elements, and only one
+  (* TODO: How to express "two line breaks between multi-line elements, and only one
      between single-line elements"? We'd need to support that explicitly in the document
      language, I think, since only it knows whether something ends up being broken.
      Conditional syntax based on mode of adjacent groups or something?
@@ -911,5 +911,3 @@ let format ?(config = Config.default) module_ =
   format_to_document ~config module_
   |> Auto_format.format ~max_line_length:config.max_line_length
 ;;
-
-(* FIXME: Also test let _ = match ... formatting *)

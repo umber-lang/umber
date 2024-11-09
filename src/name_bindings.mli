@@ -68,7 +68,6 @@ val set_inferred_scheme
   -> Value_name.t
   -> Module_path.absolute Type_scheme.t
   -> shadowing_allowed:bool
-  -> check_existing:(Name_entry.t -> unit)
   -> t
 
 val add_name_placeholder : t -> Value_name.t -> t
