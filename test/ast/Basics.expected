@@ -1,40 +1,28 @@
-(Basics ()
- ((Let (rec_ false)
-   (bindings
-    (((Catch_all (false)) () ((Name False) ((Type_app Bool ()) ()))))))
-  (Let (rec_ false)
-   (bindings (((Catch_all (true)) () ((Name True) ((Type_app Bool ()) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Match (Name Basics.false) ((Type_app Bool ()) ())
-        (((Cnstr_appl True ()) (Literal (Float 1)))
-         ((Cnstr_appl False ()) (Literal (Float 2.5)))))
-       ((Type_app Float ()) ()))))))
-  (Common_def (Type_decl Bottom (() (Variants ()))))
-  (Common_def (Type_decl Color (() (Variants ((Red ()) (Blue ()))))))
-  (Common_def
-   (Type_decl ExpandedColor
-    (() (Variants ((Green ()) (Yellow ()) (Purple ()))))))
-  (Common_def
-   (Type_decl GeneralColor
-    (()
-     (Variants
-      ((Regular ((Type_app Basics.Color ())))
-       (Expanded ((Type_app Basics.ExpandedColor ()))))))))
-  (Common_def
-   (Type_decl Point3
-    (()
-     (Variants
-      ((Point3 ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (xyz)) ()
-      ((Fun_call (Name Basics.Point3)
-        ((Function ((Type_app Int ()) (Type_app Int ()) (Type_app Int ()))
-          (Effect_union ()) (Type_app Basics.Point3 ()))
-         ())
-        (((Literal (Int 1)) ((Type_app Int ()) ()))
-         ((Literal (Int 2)) ((Type_app Int ()) ()))
-         ((Literal (Int 3)) ((Type_app Int ()) ()))))
-       ((Type_app Basics.Point3 ()) ()))))))))
+let false : Bool = False
+
+let true : Bool = True
+
+let _ : Float =
+  match false
+  | True -> 1.
+  | False -> 2.5
+
+type Bottom = |
+
+type Color =
+  | Red
+  | Blue
+
+type ExpandedColor =
+  | Green
+  | Yellow
+  | Purple
+
+type GeneralColor =
+  | Regular Color
+  | Expanded ExpandedColor
+
+type Point3 =
+  | Point3 Int Int Int
+
+let xyz : Point3 = Point3 1 2 3

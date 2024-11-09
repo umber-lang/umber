@@ -93,12 +93,18 @@ module Typed_to_untyped = struct
     ?(should_annotate = true)
     ~names
     (expr : Module_path.absolute Type_scheme.t Typed.Expr.t)
-    ~type_
+    ~(type_ : Module_path.relative Type_scheme.t)
     : Untyped.Expr.t
     =
     let annotated expr =
       if should_annotate
-      then Untyped.Expr.Type_annotation (Node.dummy_span expr, Node.dummy_span type_)
+      then (
+        match fst type_ with
+        | Tuple [] ->
+          (* On balance, annotating unit `()` types tends to reduce readability and isn't
+             particularly necessary to see. *)
+          expr
+        | _ -> Untyped.Expr.Type_annotation (Node.dummy_span expr, Node.dummy_span type_))
       else expr
     in
     match expr with
@@ -415,7 +421,9 @@ let format_to_document
       
      Or, like Pprint, we can have [Check_mode { if_flat; if_break }]. *)
   let format_inside_block sigs_or_defs ~f =
-    indent ~prefix:Force_break (separated ~sep:Force_break (List.map sigs_or_defs ~f))
+    indent
+      ~prefix:Force_break
+      (separated ~sep:(Force_break ^^ Force_break) (List.map sigs_or_defs ~f))
     ^^ Force_break
   in
   let format_block prefix eq_or_colon sigs_or_defs ~on_empty ~f =
@@ -607,8 +615,11 @@ let format_to_document
              Group
                (match name with
                 | ";" ->
-                  (* Format as `a; b` instead of `a ; b`. *)
-                  Group (left ^^ Text name) ^| right
+                  (* TODO: Maybe semicolon should just be represented explicitly as a
+                     separate kind of expression in the AST if we're going to treat it so
+                     specially. *)
+                  (* Format as `A;\nB` instead of `A ; B`. *)
+                  Group (left ^^ Text ";") ^^ Force_break ^^ Group right
                 | _ -> left ^| Group (Text name ^| right))
            | _ ->
              format_fun_call
@@ -874,7 +885,9 @@ let format_to_document
        sigs
        ~f:(Node.with_value ~f:format_sig)
        ~on_empty:Empty)
-  ^| separated ~sep:Force_break (List.map defs ~f:(Node.with_value ~f:format_def))
+  ^| separated
+       ~sep:(Force_break ^^ Force_break)
+       (List.map defs ~f:(Node.with_value ~f:format_def))
 ;;
 
 let format ?(config = Config.default) module_ =
