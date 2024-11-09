@@ -671,11 +671,11 @@ let format_to_document
        | `Left ->
          parens
            (Node.with_value op ~f:format_operator_name
-            ^| Node.with_value expr ~f:format_expr_op_term)
+            ^^ Node.with_value expr ~f:(indent << format_expr_op_term))
        | `Right ->
          parens
            (Node.with_value expr ~f:format_expr_op_term
-            ^| Node.with_value op ~f:format_operator_name))
+            ^^ Node.with_value op ~f:(indent << format_operator_name)))
     | Seq_literal _ -> failwith "TODO: format seq literal"
     | Record_literal _ | Record_update (_, _) | Record_field_access (_, _) ->
       failwith "TODO: format record expressions"
@@ -813,17 +813,20 @@ let format_to_document
            body
            ?body_prefix)
     | Effect (effect_name, { params; operations }) ->
-      format_block
-        (Text "effect"
-         ^| format_params_application (Effect_name.to_string effect_name) params)
-        '='
-        (match operations with
-         | None -> []
-         | Some operations ->
-           List.map operations ~f:(fun { name; args; result } ->
-             Module.Val (name, None, (Function (args, Effect_union [], result), []))))
-        ~f:format_sig
-        ~on_empty:(Text "{}")
+      let effect_and_params =
+        Text "effect"
+        ^| format_params_application (Effect_name.to_string effect_name) params
+      in
+      (match operations with
+       | None -> Group effect_and_params
+       | Some operations ->
+         format_block
+           effect_and_params
+           '='
+           (List.map operations ~f:(fun { name; args; result } ->
+              Module.Val (name, None, (Function (args, Effect_union [], result), []))))
+           ~f:format_sig
+           ~on_empty:(Text "{}"))
     | Import { kind; paths } ->
       (* TODO: Put toplevel imports at the top (and they should probably apply to sigs
          too) *)
@@ -876,18 +879,26 @@ let format_to_document
         ~f_defs:(Node.with_value ~f:format_def)
     | Trait _ | Impl _ -> failwith "TODO: formatting traits and impls"
   in
-  (if List.is_empty sigs
-   then Empty
-   else
-     format_block
-       (Text "module")
-       ':'
-       sigs
-       ~f:(Node.with_value ~f:format_sig)
-       ~on_empty:Empty)
-  ^| separated
-       ~sep:(Force_break ^^ Force_break)
-       (List.map defs ~f:(Node.with_value ~f:format_def))
+  (* TODO: We don't distinguish in the AST between empty sigs and no sigs at all, which
+     seems wrong - it can make sense to have e.g. a test file with an empty signature. *)
+  let module_sig =
+    if List.is_empty sigs
+    then Empty
+    else
+      format_block
+        (Text "module")
+        ':'
+        sigs
+        ~f:(Node.with_value ~f:format_sig)
+        ~on_empty:Empty
+  in
+  let defs = List.map defs ~f:(Node.with_value ~f:format_def) in
+  let sigs_and_defs =
+    match module_sig with
+    | Empty -> defs
+    | _ -> module_sig :: defs
+  in
+  separated ~sep:(Force_break ^^ Force_break) sigs_and_defs
 ;;
 
 let format ?(config = Config.default) module_ =

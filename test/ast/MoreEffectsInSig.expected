@@ -1,37 +1,16 @@
-(MoreEffectsInSig
- ((Common_sig (Effect Abstract ((params ()) (operations ()))))
-  (Val more_effects_in_sig ()
-   ((Function ((Type_app Int ())) (Effect MoreEffectsInSig.Abstract ())
-     (Type_app Int ()))
-    ()))
-  (Val equivalent_with_different_vars ()
-   ((Function
-     ((Function ((Tuple ())) (Effect_var e1) (Tuple ()))
-      (Function ((Tuple ())) (Effect_var e2) (Tuple ())))
-     (Effect_union ((Effect_var e1) (Effect_var e2))) (Tuple ()))
-    ())))
- ((Common_def (Effect Abstract ((params ()) (operations ()))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (more_effects_in_sig)) ()
-      ((Lambda ((Catch_all (x))) (Name MoreEffectsInSig.x))
-       ((Function ((Var a)) (Effect_union ()) (Var a)) ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all (equivalent_with_different_vars)) ()
-      ((Lambda ((Catch_all (f)) (Catch_all (g)))
-        (Fun_call (Name "Std.Prelude.Operators.;")
-         ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ())) ())
-         (((Fun_call (Name MoreEffectsInSig.f)
-            ((Function ((Tuple ())) (Effect_var a) (Tuple ())) ())
-            (((Tuple ()) ((Tuple ()) ()))))
-           ((Tuple ()) ()))
-          ((Fun_call (Name MoreEffectsInSig.g)
-            ((Function ((Tuple ())) (Effect_var a) (Tuple ())) ())
-            (((Tuple ()) ((Tuple ()) ()))))
-           ((Tuple ()) ())))))
-       ((Function
-         ((Function ((Tuple ())) (Effect_var a) (Tuple ()))
-          (Function ((Tuple ())) (Effect_var a) (Tuple ())))
-         (Effect_var a) (Tuple ()))
-        ()))))))))
+module : {
+  effect Abstract
+  
+  val more_effects_in_sig : Int -> <Abstract> Int
+  
+  val equivalent_with_different_vars : (() -> <e1> ()), (() -> <e2> ()) -> <e1, e2> ()
+}
+
+effect Abstract
+
+let more_effects_in_sig : a -> a = \x -> x
+
+let equivalent_with_different_vars : (() -> <a> ()), (() -> <a> ()) -> <a> () =
+  \f g ->
+    f ();
+    g ()

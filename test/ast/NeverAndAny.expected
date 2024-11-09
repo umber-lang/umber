@@ -1,6 +1,1 @@
-(NeverAndAny ()
- ((Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Name Std.Prelude.List.Nil)
-       ((Type_app Std.Prelude.List.List ((Type_app Never ()))) ()))))))))
+let _ : List Never = Nil

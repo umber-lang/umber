@@ -1,64 +1,11 @@
-(OpSectionRight ()
- ((Let (rec_ false)
-   (bindings
-    (((Catch_all (~+~)) ()
-      ((Lambda ((Catch_all (x)) (Catch_all (y)))
-        (Fun_call (Name Std.Prelude.print_int)
-         ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ())
-         (((Fun_call (Name Std.Prelude.Operators.+)
-            ((Function ((Type_app Int ()) (Type_app Int ()))
-              (Effect_union ()) (Type_app Int ()))
-             ())
-            (((Name OpSectionRight.x) ((Type_app Int ()) ()))
-             ((Name OpSectionRight.y) ((Type_app Int ()) ()))))
-           ((Type_app Int ()) ())))))
-       ((Function ((Type_app Int ()) (Type_app Int ())) (Effect_union ())
-         (Tuple ()))
-        ()))))))
-  (Let (rec_ false)
-   (bindings
-    (((Tuple ()) ()
-      ((Let
-        ((rec_ false)
-         (bindings
-          ((((Catch_all (lambda))
-             ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ())) ()))
-            ()
-            (Let
-             ((rec_ false)
-              (bindings
-               ((((Catch_all (*arg1)) ((Type_app Int ()) ())) ()
-                 (Fun_call (Name "Std.Prelude.Operators.;")
-                  ((Function ((Tuple ()) (Type_app Int ())) (Effect_union ())
-                    (Type_app Int ()))
-                   ())
-                  (((Fun_call (Name Std.Prelude.print)
-                     ((Function ((Type_app String ())) (Effect_union ())
-                       (Tuple ()))
-                      ())
-                     (((Literal (String arg)) ((Type_app String ()) ()))))
-                    ((Tuple ()) ()))
-                   ((Literal (Int 5)) ((Type_app Int ()) ())))))))
-              (body
-               (Lambda ((Catch_all (*arg0)))
-                (Fun_call (Name OpSectionRight.~+~)
-                 ((Function ((Type_app Int ()) (Type_app Int ()))
-                   (Effect_union ()) (Tuple ()))
-                  ())
-                 (((Name OpSectionRight.*arg0) ((Type_app Int ()) ()))
-                  ((Name OpSectionRight.*arg1) ((Type_app Int ()) ())))))))))))
-         (body
-          (Fun_call (Name "Std.Prelude.Operators.;")
-           ((Function ((Tuple ()) (Tuple ())) (Effect_union ()) (Tuple ()))
-            ())
-           (((Fun_call (Name Std.Prelude.print)
-              ((Function ((Type_app String ())) (Effect_union ()) (Tuple ()))
-               ())
-              (((Literal (String between)) ((Type_app String ()) ()))))
-             ((Tuple ()) ()))
-            ((Fun_call (Name OpSectionRight.lambda)
-              ((Function ((Type_app Int ())) (Effect_union ()) (Tuple ()))
-               ())
-              (((Literal (Int 6)) ((Type_app Int ()) ()))))
-             ((Tuple ()) ())))))))
-       ((Tuple ()) ()))))))))
+let (~+~) : Int, Int -> () = \x y -> print_int (x + y : Int)
+
+let () =
+  let' lambda : Int -> () =
+    (~+~
+      (print "arg";
+      5
+        : Int))
+  in
+  print "between";
+  lambda 6

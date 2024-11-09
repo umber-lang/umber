@@ -19,6 +19,7 @@ module : {
   
   val infixl 7 (*) : Int, Int -> Int
 }
+
 import Std.Prelude.Float
 
 import Std.Prelude.(Int, Option)
