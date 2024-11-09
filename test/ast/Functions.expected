@@ -9,3 +9,7 @@ let sqr : Int -> Int = \x -> x * x : Int
 let lots_of_args : a, b, c, d, e -> () = \a b c d e -> ()
 
 let () = lots_of_args 5 10000000000000. -89 "huh" 'c'
+
+let _trailing_lambda : () =
+  lots_of_args
+    1 2 3 4 ((\(_ : Any) (_ : Any) (_ : Any) -> sqr 9999 : Int) : Any, Any, Any -> Int)

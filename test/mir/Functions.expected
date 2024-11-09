@@ -18,4 +18,13 @@
  (Value_def Functions.*binding.1
   (Fun_call Functions.lots_of_args
    ((Primitive (Int 5)) (Primitive (Float 10000000000000))
-    (Primitive (Int -89)) (Primitive (String huh)) (Primitive (Char c))))))
+    (Primitive (Int -89)) (Primitive (String huh)) (Primitive (Char c)))))
+ (Fun_def
+  ((fun_name Functions.*fun.1)
+   (args
+    (Functions.*lambda_arg.1 Functions.*lambda_arg.2 Functions.*lambda_arg.3))
+   (body (Fun_call Functions.sqr ((Primitive (Int 9999)))))))
+ (Value_def Functions._trailing_lambda
+  (Fun_call Functions.lots_of_args
+   ((Primitive (Int 1)) (Primitive (Int 2)) (Primitive (Int 3))
+    (Primitive (Int 4)) (Name Functions.*fun.1)))))

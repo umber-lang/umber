@@ -18,3 +18,8 @@ let () =
     -89
     "huh"
     'c'
+
+let _trailing_lambda =
+  lots_of_args 1 2 3 4 (\_ _ _ ->
+    ();
+    sqr 9999)

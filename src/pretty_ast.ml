@@ -599,9 +599,24 @@ let format_to_document
       format_qualified (path, expr) ~f:(Node.with_value ~f:format_expr_term)
     | Fun_call (fun_, args) ->
       let format_fun_call fun_ =
-        format_application
-          fun_
-          (List.map (Nonempty.to_list args) ~f:(Node.with_value ~f:format_expr_term))
+        (* Special-case formatting of applications which end in a lambda e.g. 
+           `foo arg1 arg2 (fun x y z -> ...)`
+           We'd like to group the function, initial args, and lambda args, onto one line,
+           and then break before the lambda body. *)
+        let initial_args, last_arg = Nonempty.split_last args in
+        match Node.with_value last_arg ~f:Fn.id with
+        | Lambda (lambda_args, lambda_body) ->
+          let fun_args_and_lambda_args =
+            List.map initial_args ~f:(Node.with_value ~f:format_expr_term)
+            @ [ Text "(" ^^ format_lambda_args lambda_args ]
+          in
+          Group (format_application fun_ fun_args_and_lambda_args)
+          ^^ indent_expr lambda_body
+          ^^ Text ")"
+        | _ ->
+          format_application
+            fun_
+            (List.map (Nonempty.to_list args) ~f:(Node.with_value ~f:format_expr_term))
       in
       Node.with_value fun_ ~f:(function
         | Name (path, name) when Parsing.Utils.value_name_is_infix_operator name ->
@@ -624,15 +639,7 @@ let format_to_document
                (format_qualified (path, ()) ~f:(fun () ->
                   parens (Text (Value_name.to_string name)))))
         | _ -> format_fun_call (Node.with_value fun_ ~f:format_expr_term))
-    | Lambda (args, body) ->
-      Group
-        (Text "\\"
-         ^^ separated
-              (List.map
-                 (Nonempty.to_list args)
-                 ~f:(Node.with_value ~f:format_pattern_term))
-         ^| Text "->")
-      ^^ indent_expr body
+    | Lambda (args, body) -> Group (format_lambda_args args) ^^ indent_expr body
     | If (cond, then_, else_) ->
       Text "if"
       ^^ indent_expr cond
@@ -677,6 +684,11 @@ let format_to_document
     | Seq_literal _ -> failwith "TODO: format seq literal"
     | Record_literal _ | Record_update (_, _) | Record_field_access (_, _) ->
       failwith "TODO: format record expressions"
+  and format_lambda_args args =
+    Text "\\"
+    ^^ separated
+         (List.map (Nonempty.to_list args) ~f:(Node.with_value ~f:format_pattern_term))
+    ^| Text "->"
   and format_expr_term (expr : Untyped.Expr.t) =
     match expr with
     | Literal _
