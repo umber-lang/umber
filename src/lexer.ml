@@ -25,26 +25,64 @@ let operator_symbol =
 ;;
 
 let line_comment = [%sedlex.regexp? '#', Star (Compl (Chars "\r\n"))]
-let unescape _ = failwith "Escapes not implemented yet"
+
+let read_escape lexbuf =
+  match%sedlex lexbuf with
+  | '\\' | '"' | '\'' -> lexeme_char lexbuf 0
+  | 'n' -> Uchar.of_char '\n'
+  | 'r' -> Uchar.of_char '\r'
+  | 't' -> Uchar.of_char '\t'
+  | 'b' -> Uchar.of_char '\b'
+  | Rep (digit, 3) ->
+    (* Decimal ASCII escape *)
+    lexeme lexbuf
+    |> Ustring.to_string
+    |> Int.of_string
+    |> Char.of_int_exn
+    |> Uchar.of_char
+  (* TODO: hex escapes, octal, unicode! *)
+  | _ -> syntax_error lexbuf
+;;
+
+let escape_char_to_buffer buf c =
+  Buffer.add_char buf '\\';
+  let escaped_char =
+    match c with
+    | '\n' -> "n"
+    | '\r' -> "r"
+    | '\t' -> "t"
+    | '\b' -> "b"
+    | _ ->
+      (* Decimal ASCII escape. *)
+      Char.to_int c |> Int.to_string
+  in
+  Buffer.add_string buf escaped_char
+;;
+
+(** This should roughly do the inverse of [read_escape] above. *)
+let escape_string_literal ustr =
+  let buf = Buffer.create (Ustring.length ustr) in
+  Ustring.iter ustr ~f:(fun uchar ->
+    match Uchar.to_char uchar with
+    | Some (('"' | '\\' | '\000' .. '\031' | '\127') as c) -> escape_char_to_buffer buf c
+    | _ ->
+      (* TODO: There are surely plenty of unicode characters we'd want to escape. *)
+      Uchar.add_to_buffer buf uchar);
+  Buffer.contents buf
+;;
+
+let escape_char_literal uchar =
+  match Uchar.to_char uchar with
+  | Some (('\'' | '\\' | '\000' .. '\031' | '\127') as c) ->
+    let buf = Buffer.create 4 in
+    escape_char_to_buffer buf c;
+    Buffer.contents buf
+  | _ ->
+    (* TODO: There are surely plenty of unicode characters we'd want to escape. *)
+    Uchar.to_string uchar
+;;
 
 let read_string lexbuf =
-  let read_escape lexbuf =
-    match%sedlex lexbuf with
-    | '\\' | '"' | '\'' -> lexeme_char lexbuf 0
-    | 'n' -> Uchar.of_char '\n'
-    | 'r' -> Uchar.of_char '\r'
-    | 't' -> Uchar.of_char '\t'
-    | 'b' -> Uchar.of_char '\b'
-    | Rep (digit, 3) ->
-      (* Decimal ASCII escape *)
-      lexeme lexbuf
-      |> Ustring.to_string
-      |> Int.of_string
-      |> Char.of_int_exn
-      |> Uchar.of_char
-    (* TODO: hex escapes, octal, unicode! *)
-    | _ -> syntax_error lexbuf
-  in
   let rec loop lexbuf buf =
     let add c =
       Queue.enqueue buf c;
@@ -54,6 +92,9 @@ let read_string lexbuf =
     (* TODO: add escaping + string interpolation *)
     | '"' -> Queue.to_array buf |> Ustring.of_array_unchecked
     | "\\" -> add (read_escape lexbuf)
+    (* TODO: It seems a bit suspicious to allow literally any character to appear inside
+       strings. In particular, newlines, any whitespace and random control characters,
+       which is sus. Also, it means the error below should be unreachable. *)
     | any -> add (lexeme_char lexbuf 0)
     | _ -> syntax_error ~msg:"String literal ended unexpectedly" lexbuf
   in
@@ -78,6 +119,8 @@ let rec read lexbuf =
   | '\'', Compl (Chars "'\n\r"), '\'' -> CHAR (lexeme_char lexbuf 1)
   | "'\\''" -> CHAR (Uchar.of_char '\'')
   | "'\\", Plus (Compl (Chars "'\n\r")), '\'' ->
+    (* TODO: Implement character escapes *)
+    let unescape _ = failwith "escapes not implemented yet" in
     CHAR (unescape (sub_lexeme lexbuf 2 (lexeme_length lexbuf)))
   (* String literals *)
   | '"' -> STRING (read_string lexbuf)

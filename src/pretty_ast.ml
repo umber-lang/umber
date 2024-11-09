@@ -548,14 +548,8 @@ let format_to_document
       in
       Text assoc_keyword ^| Text (Int.to_string (level :> int)))
   in
-  let format_char_literal c =
-    (* FIXME: Handle escaping *)
-    Text ("'" ^ Uchar.to_string c ^ "'")
-  in
-  let format_string_literal str =
-    (* FIXME: Handle escaping *)
-    Text ("\"" ^ Ustring.to_string str ^ "\"")
-  in
+  let format_char_literal c = Text ("'" ^ Lexer.escape_char_literal c ^ "'") in
+  let format_string_literal str = Text ("\"" ^ Lexer.escape_string_literal str ^ "\"") in
   let format_literal : Literal.t -> t = function
     (* TODO: int/float formatting may not match up exactly with parsing *)
     | Int i -> Text (Int.to_string i)
