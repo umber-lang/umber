@@ -1,14 +1,5 @@
-(OverlappingImports ()
- ((Common_def
-   (Import ((kind Absolute) (paths (Module Std ((Module Prelude (All))))))))
-  (Common_def
-   (Import
-    ((kind Absolute)
-     (paths (Module Std ((Module Prelude ((Name_excluded Float)))))))))
-  (Let (rec_ false)
-   (bindings
-    (((Catch_all ()) ()
-      ((Name Std.Prelude.Float.abs)
-       ((Function ((Type_app Float ()) (Type_app Float ())) (Effect_union ())
-         (Type_app Float ()))
-        ()))))))))
+import Std.Prelude._
+
+import Std.Prelude.Float as _
+
+let _ : Float, Float -> Float = Float.abs

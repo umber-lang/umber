@@ -1,10 +1,3 @@
-(RecursiveEffectDecl ()
- ((Common_def
-   (Effect Cyclic
-    ((params ())
-     (operations
-      ((((name go)
-         (args
-          ((Function ((Tuple ())) (Effect RecursiveEffectDecl.Cyclic ())
-            (Tuple ()))))
-         (result (Tuple ())))))))))))
+effect Cyclic = {
+  val go : (() -> <Cyclic> ()) -> ()
+}

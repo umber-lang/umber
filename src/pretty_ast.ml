@@ -607,8 +607,6 @@ let format_to_document
         | Name (path, name) when Parsing.Utils.value_name_is_infix_operator name ->
           (match (path :> Module_name.t list), args with
            | [], [ left; right ] ->
-             (* TODO: Remove unnecessary parentheses. Requires understanding precedence
-                and associativity again. *)
              let name = Value_name.to_string name in
              let left = Node.with_value left ~f:format_expr_term_or_fun_call in
              let right = Node.with_value right ~f:format_expr_term_or_fun_call in
@@ -620,7 +618,7 @@ let format_to_document
                      specially. *)
                   (* Format as `A;\nB` instead of `A ; B`. *)
                   Group (left ^^ Text ";") ^^ Force_break ^^ Group right
-                | _ -> left ^| Group (Text name ^| right))
+                | _ -> Group left ^| Group (Text name ^| right))
            | _ ->
              format_fun_call
                (format_qualified (path, ()) ~f:(fun () ->
@@ -892,6 +890,8 @@ let format_to_document
         ~f:(Node.with_value ~f:format_sig)
         ~on_empty:Empty
   in
+  (* TODO: We don't keep track of where the module sig is written in the original code,
+     which leads to shuffling it around, which is confusing. *)
   let defs = List.map defs ~f:(Node.with_value ~f:format_def) in
   let sigs_and_defs =
     match module_sig with
