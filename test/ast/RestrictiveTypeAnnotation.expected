@@ -1,0 +1,6 @@
+let map : List a, (a -> a) -> List a =
+  \xs f ->
+    (match xs
+    | Nil -> Nil
+    | Cons x xs -> Cons (f x : b) (map xs f : List Never))
+      : List a

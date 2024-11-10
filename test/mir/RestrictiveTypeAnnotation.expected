@@ -1,0 +1,22 @@
+((Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
+ (Fun_def
+  ((fun_name RestrictiveTypeAnnotation.map)
+   (args (RestrictiveTypeAnnotation.xs.1 RestrictiveTypeAnnotation.f.1))
+   (body
+    (Cond_assign
+     (conds
+      (((Constant_tag_equals (Name RestrictiveTypeAnnotation.xs.1) 0) ())))
+     (body (Name Std.Prelude.List.Nil))
+     (if_none_matched
+      (Otherwise
+       (Let RestrictiveTypeAnnotation.xs.2
+        (Get_block_field 1 (Name RestrictiveTypeAnnotation.xs.1))
+        (Let RestrictiveTypeAnnotation.x.1
+         (Get_block_field 0 (Name RestrictiveTypeAnnotation.xs.1))
+         (Make_block (tag 0)
+          (fields
+           ((Fun_call RestrictiveTypeAnnotation.f.1
+             ((Name RestrictiveTypeAnnotation.x.1)))
+            (Fun_call RestrictiveTypeAnnotation.map
+             ((Name RestrictiveTypeAnnotation.xs.2)
+              (Name RestrictiveTypeAnnotation.f.1)))))))))))))))

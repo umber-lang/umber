@@ -249,20 +249,6 @@
      output/ErrorIncompatibleSig.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
-  (progn (run %{dep:test.exe} %{dep:examples/ErrorInconsistentValType.um})
-   (concurrent
-    (diff? tokens/ErrorInconsistentValType.expected
-     tokens/ErrorInconsistentValType.out)
-    (diff? ast/ErrorInconsistentValType.expected
-     ast/ErrorInconsistentValType.out)
-    (diff? mir/ErrorInconsistentValType.expected
-     mir/ErrorInconsistentValType.out)
-    (diff? llvm/ErrorInconsistentValType.expected
-     llvm/ErrorInconsistentValType.out)
-    (diff? output/ErrorInconsistentValType.expected
-     output/ErrorInconsistentValType.out)))))
-(rule (alias runtest) (deps (package umber))
- (action
   (progn (run %{dep:test.exe} %{dep:examples/ErrorInexhaustivePattern.um})
    (concurrent
     (diff? tokens/ErrorInexhaustivePattern.expected
@@ -634,6 +620,20 @@
     (diff? mir/ReraiseExn.expected mir/ReraiseExn.out)
     (diff? llvm/ReraiseExn.expected llvm/ReraiseExn.out)
     (diff? output/ReraiseExn.expected output/ReraiseExn.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
+  (progn (run %{dep:test.exe} %{dep:examples/RestrictiveTypeAnnotation.um})
+   (concurrent
+    (diff? tokens/RestrictiveTypeAnnotation.expected
+     tokens/RestrictiveTypeAnnotation.out)
+    (diff? ast/RestrictiveTypeAnnotation.expected
+     ast/RestrictiveTypeAnnotation.out)
+    (diff? mir/RestrictiveTypeAnnotation.expected
+     mir/RestrictiveTypeAnnotation.out)
+    (diff? llvm/RestrictiveTypeAnnotation.expected
+     llvm/RestrictiveTypeAnnotation.out)
+    (diff? output/RestrictiveTypeAnnotation.expected
+     output/RestrictiveTypeAnnotation.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
   (progn (run %{dep:test.exe} %{dep:examples/SelfReferentialImport.um})

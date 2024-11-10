@@ -1,5 +1,5 @@
-; ModuleID = 'examples/ErrorInconsistentValType.um'
-source_filename = "examples/ErrorInconsistentValType.um"
+; ModuleID = 'examples/RestrictiveTypeAnnotation.um'
+source_filename = "examples/RestrictiveTypeAnnotation.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 %umber_block = type { %umber_header, [0 x i64] }
@@ -7,12 +7,12 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 @Std.Prelude.List.Nil = external global %umber_block*
 
-define i32 @"umber_main:examples/ErrorInconsistentValType.um"() {
+define i32 @"umber_main:examples/RestrictiveTypeAnnotation.um"() {
 entry:
   ret i32 0
 }
 
-define tailcc %umber_block* @ErrorInconsistentValType.map(%umber_block* %ErrorInconsistentValType.xs.1, %umber_block* %ErrorInconsistentValType.f.1) {
+define tailcc %umber_block* @RestrictiveTypeAnnotation.map(%umber_block* %RestrictiveTypeAnnotation.xs.1, %umber_block* %RestrictiveTypeAnnotation.f.1) {
 entry:
   br label %cond
 
@@ -21,22 +21,22 @@ cond_binding_merge:                               ; preds = %cond_binding
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
-  %ErrorInconsistentValType.xs.11 = ptrtoint %umber_block* %ErrorInconsistentValType.xs.1 to i64
-  %equals = icmp eq i64 %ErrorInconsistentValType.xs.11, 1
+  %RestrictiveTypeAnnotation.xs.11 = ptrtoint %umber_block* %RestrictiveTypeAnnotation.xs.1 to i64
+  %equals = icmp eq i64 %RestrictiveTypeAnnotation.xs.11, 1
   br i1 %equals, label %cond_binding, label %cond_otherwise
 
 cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond
-  %block_field_gep = getelementptr %umber_block, %umber_block* %ErrorInconsistentValType.xs.1, i32 0, i32 1, i32 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %RestrictiveTypeAnnotation.xs.1, i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep2 = getelementptr %umber_block, %umber_block* %ErrorInconsistentValType.xs.1, i32 0, i32 1, i32 0
+  %block_field_gep2 = getelementptr %umber_block, %umber_block* %RestrictiveTypeAnnotation.xs.1, i32 0, i32 1, i32 0
   %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
   %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %ErrorInconsistentValType.f.1, %umber_block* %block_field4)
-  %fun_call5 = tail call tailcc %umber_block* @ErrorInconsistentValType.map(%umber_block* %block_field, %umber_block* %ErrorInconsistentValType.f.1)
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %RestrictiveTypeAnnotation.f.1, %umber_block* %block_field4)
+  %fun_call5 = tail call tailcc %umber_block* @RestrictiveTypeAnnotation.map(%umber_block* %block_field, %umber_block* %RestrictiveTypeAnnotation.f.1)
   %box = call i64* @umber_gc_alloc(i64 24)
   %box6 = bitcast i64* %box to i16*
   store i16 0, i16* %box6, align 2

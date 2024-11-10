@@ -1,0 +1,7 @@
+# This is inferred to have type `List a, (a -> a) -> List a`, because the type variables
+# "a" and "b" in the type annotation are instantiated and we effectively find that a = b.
+let map : List a, (a -> a) -> List b =
+  \xs f ->
+    match xs
+    | Nil -> Nil
+    | Cons x xs -> Cons (f x) (map xs f)
