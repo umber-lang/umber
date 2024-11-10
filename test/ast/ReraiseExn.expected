@@ -41,3 +41,24 @@ let _ : () =
       : Int
   | value -> print_int value
   | <raise exn> -> print ("Unhandled exception: " ++ exn : String)
+
+let catch : (() -> <Exn, a> b), (String -> <a> b) -> <a> b =
+  \f exn_handler ->
+    (match
+      (handle f () : d
+      | x -> Ok x : Result d String
+      | <raise exn> -> Error exn)
+        : Result d String
+    | Ok x -> x
+    | Error exn -> exn_handler exn)
+      : b
+
+let fail : () -> <Exn> Never = \() -> raise "failure" : Never
+
+let this_should_not_raise : () -> () = \() -> catch fail ((\(_ : Exn) -> ()) : Exn -> ())
+
+let this_should_raise : () -> <Exn> Never =
+  \() ->
+    catch
+      fail ((\(_ : Exn) -> raise "outer exception" : Never) : Exn -> <Exn> Never)
+      : Never

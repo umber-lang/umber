@@ -200,3 +200,57 @@ let zip itr itr' () =
 let rec cycle itr () =
   yield_from itr;
   cycle itr ()
+
+
+# --- Trying some new ideas ---
+
+module : {
+  effect Iter a {
+    val yield : a -> ()
+  }
+
+  type Iterator a = () -> <Iter a> ()
+
+  val for_each : Iterator a, (a -> e> ()) -> <e> ()
+
+  val fold : Iterator a, acc, (acc, a -> <e> b) -> <e> b
+  
+  val map : Iterator a -> (a -> <e> b) -> <e> Iterator a
+}
+
+# Idea 1: Masking
+let for_each next f =
+  handle next ()
+  | <yield x> ->
+    # TODO: The fact that we handle Iter here is pretty unfortunate.
+    # I think to compose handlers and higher order functions properly we need some way to
+    # "pass through" effects - basically, this effect should skip the enclosing handler
+    # Not sure exactly how that should work.
+    # Koka calls this "masking": https://koka-lang.github.io/koka/doc/book.html#sec-mask
+    # Koka allows duplicate effect labels to signify multiple handlers are needed.
+    mask<Iter> (f x);
+    resume ()
+
+# Idea 2: just let it happen - if you use Iter, it gets handled like "continue"
+# Not great because it's not clear what to do about `map`
+# Having to re-install the handler on every element seems pretty bad
+let for_each next f =
+  handle next ()
+  | <yield x> ->
+    mask<Iter> (f x);
+    resume ()
+
+# TODO: How to handle `map`?
+let map next f =
+  handle next ()
+  | <yield x> ->
+    yield (f x)
+    resume ()
+
+# Idea 3: shallow handlers
+# You have to re-install the shallow handler every time - can that be made performant?
+let for_each next f =
+  handle shallow next ()
+  | <yield x> ->
+    f x
+    for_each resume f

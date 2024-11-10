@@ -32,6 +32,33 @@ let _ =
   | value -> print_int value
   | <raise exn> -> print ("Unhandled exception: " ++ exn) 
 
+# FIXME: This type:
+# `(() -> <Exn, a> b), (String -> <a> b) -> <a> b`
+# implies that `a` doesn't include `Exn`, but it can - we don't handle exceptions raised
+# by `exn_handler`.
+# We might need to represent the "lacks" constraint explicitly or allow duplicate labels
+# and abandon it. Implicit "lacks" constraints seem pretty subtle.
+# Maybe a valid type could be:
+# `(() -> <Exn, e1> b), (String -> <e2> b) -> <e1,e2> b`
+#
+# For some reasons I don't fully understand, it seems like we don't get immediate
+# unsoundness with our inferred type, though.
+let catch f exn_handler =
+  match 
+    (handle f ()
+    | x -> Ok x
+    | <raise exn> -> Error exn)
+  | Ok x -> x
+  | Error exn -> exn_handler exn
+
+let fail () = raise "failure"
+
+let this_should_not_raise () =
+  catch fail (\(_ : Exn) -> ())
+
+let this_should_raise () =
+  catch fail (\(_ : Exn) -> raise "outer exception")
+
 # FIXME: Write a test to see what happens if you mix one var between types and effects
 # - might need some notion of variable kind which is tracked properly
 # (Also, what happens if you try to use a type param in a decl as an effect var?)
