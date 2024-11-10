@@ -511,6 +511,17 @@
     (diff? output/LetPattern.expected output/LetPattern.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/MixTypeAndEffectVars.um})
+   (concurrent
+    (diff? tokens/MixTypeAndEffectVars.expected
+     tokens/MixTypeAndEffectVars.out)
+    (diff? ast/MixTypeAndEffectVars.expected ast/MixTypeAndEffectVars.out)
+    (diff? mir/MixTypeAndEffectVars.expected mir/MixTypeAndEffectVars.out)
+    (diff? llvm/MixTypeAndEffectVars.expected llvm/MixTypeAndEffectVars.out)
+    (diff? output/MixTypeAndEffectVars.expected
+     output/MixTypeAndEffectVars.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/ModuleSig.um})
    (concurrent (diff? tokens/ModuleSig.expected tokens/ModuleSig.out)
     (diff? ast/ModuleSig.expected ast/ModuleSig.out)

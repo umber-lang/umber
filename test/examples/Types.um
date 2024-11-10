@@ -28,7 +28,8 @@ type Option a =
   | None
 
 # TODO: labelled arguments
-# FIXME: type annotation?
+# TODO: Should be able to write a type annotation on a let binding for the function return
+# type
 let value opt default = match opt
   | Some x -> x
   | None -> default

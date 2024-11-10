@@ -1,0 +1,7 @@
+let foo : (() -> <a> a) -> () = \_ -> ()
+
+effect Effect = {
+  val operation : () -> ()
+}
+
+let () = foo ((\() -> ()) : () -> ())

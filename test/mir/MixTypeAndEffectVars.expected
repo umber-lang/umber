@@ -1,0 +1,8 @@
+((Fun_def
+  ((fun_name MixTypeAndEffectVars.foo)
+   (args (MixTypeAndEffectVars.*lambda_arg.1)) (body (Make_block (tag 0)))))
+ (Fun_def
+  ((fun_name MixTypeAndEffectVars.*fun.1)
+   (args (MixTypeAndEffectVars.*lambda_arg.2)) (body (Make_block (tag 0)))))
+ (Value_def MixTypeAndEffectVars.*binding.1
+  (Fun_call MixTypeAndEffectVars.foo ((Name MixTypeAndEffectVars.*fun.1)))))
