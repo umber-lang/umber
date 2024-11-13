@@ -45,3 +45,23 @@ let _ =
 #  | <get ()> -> (\s -> (resume s) s)
 #  | <set s> -> (\_ -> (resume ()) s))
 #  init
+
+# CPS conversion?
+let read_and_add : () -> <Read> Int = ask () + ask ()
+let _ =
+  handle 
+   (let x = read_and_add () in
+    x + 2)
+  | <ask ()> -> resume 1
+
+# Becomes:
+let read_and_add : (), (Int -> a) -> a = 
+let _ =
+  handle 
+   (read_and_add () (fun x ->
+    x + 2))
+  | <ask ()> -> resume 1
+
+# Or, what if the runtime just maintained the stack of handlers separately?
+#
+# Then, when you would call a function, you call into the runtime 

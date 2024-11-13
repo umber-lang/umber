@@ -472,6 +472,7 @@ let rec codegen_expr t expr =
         associate_conds (next_cond_and_binding :: rest)
     in
     associate_conds conds
+  | Handle_effects _ | Perform_effect _ -> failwith "TODO: effects in llvm"
 
 and codegen_cond t cond =
   let make_icmp value value' = Llvm.build_icmp Eq value value' "equals" t.builder in

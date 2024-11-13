@@ -294,7 +294,7 @@ module Expr = struct
     | Handle of
         { expr : 'typ t Node.t
         ; expr_type : 'typ
-        ; value_branch : (Pattern.t Node.t * 'typ t Node.t) option [@sexp.option]
+        ; value_branch : ((Pattern.t * 'typ) Node.t * 'typ t Node.t) option [@sexp.option]
         ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
         }
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
@@ -540,7 +540,7 @@ module Expr = struct
                 let pattern_span = Node.span pattern in
                 match Node.with_value pattern ~f:Fn.id with
                 | `Value pattern ->
-                  let names, ((_ : Pattern.Names.t), (pattern, pattern_type)) =
+                  let names, (pattern_names, (pattern, pattern_type)) =
                     Pattern.of_untyped_into ~names ~types pattern ~fixity:None
                   in
                   Type_bindings.constrain
@@ -557,7 +557,9 @@ module Expr = struct
                     ~subtype:branch_type
                     ~supertype:result_type;
                   Queue.enqueue all_branch_effects branch_effects;
-                  First (Node.create pattern pattern_span, branch_expr)
+                  First
+                    ( Node.create (pattern, (pattern_type, pattern_names)) pattern_span
+                    , branch_expr )
                 | `Effect effect_pattern ->
                   let ( names
                       , ( (_ : Pattern.Names.t)
@@ -615,7 +617,7 @@ module Expr = struct
                     [%message
                       "Multiple value branches in handle expression are not supported"
                         (value_branches
-                          : (Pattern.t Node.t
+                          : ((Pattern.t * (Internal_type.t * Pattern.Names.t)) Node.t
                             * (Internal_type.t * Pattern.Names.t) t Node.t)
                             list)]
             in
@@ -892,7 +894,10 @@ module Expr = struct
          let expr = map' expr ~f ~f_type in
          let expr_type = f_type expr_type in
          let value_branch =
-           Option.map value_branch ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))
+           Option.map value_branch ~f:(fun (pat_and_type, expr) ->
+             let pat_and_type = Node.map pat_and_type ~f:(Tuple2.map_snd ~f:f_type) in
+             let expr = map' expr ~f ~f_type in
+             pat_and_type, expr)
          in
          let effect_branches =
            List.map effect_branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))

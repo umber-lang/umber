@@ -1,6 +1,10 @@
 open! Import
 open Names
 
+(* FIXME: Let's require that effects have only 1 argument. We could also syntactically
+   allow multiple but make it equivalent to allocating a tuple. We need to store the
+   arguments somewhere so we're gonna need an allocation, basically. *)
+
 module Operation : sig
   type 'n t =
     { name : Value_name.t
