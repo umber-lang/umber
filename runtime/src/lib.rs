@@ -22,6 +22,7 @@ pub use no_std_setup::*;
 
 mod block;
 mod bool;
+mod effects;
 mod float;
 mod gc;
 mod int;
