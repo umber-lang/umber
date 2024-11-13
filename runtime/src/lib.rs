@@ -1,3 +1,4 @@
+#![allow(internal_features)]
 #![feature(lang_items)]
 #![no_std]
 
@@ -17,6 +18,7 @@ mod no_std_setup {
     extern "C" fn eh_personality() {}
 }
 
+#[allow(unused_imports)]
 #[cfg(not(test))]
 pub use no_std_setup::*;
 

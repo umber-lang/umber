@@ -1,3 +1,5 @@
+#![allow(static_mut_refs)]
+
 use crate::block::BlockPtr;
 use heapless::Vec;
 
@@ -7,6 +9,7 @@ use heapless::Vec;
 // Maybe we just bite the bullet and use std? Maybe it's fine to do that?
 // Or I guess we can treat it like an actual stack and just allocate a bunch of space at
 // startup and make sure we don't exceed that. 100 handlers is definitely way too few.
+
 static mut HANDLER_STACK: Vec<EffectHandler, 100> = Vec::new();
 
 struct EffectHandler {
@@ -16,18 +19,22 @@ struct EffectHandler {
 
 #[no_mangle]
 pub unsafe extern "C" fn umber_push_handler(effect_op: i64, handler_fun: BlockPtr) {
-    HANDLER_STACK.push(EffectHandler {
-        effect_op,
-        handler_fun,
-    })
+    HANDLER_STACK
+        .push(EffectHandler {
+            effect_op,
+            handler_fun,
+        })
+        .unwrap_or_else(|_| panic!("Effect handler stack overflow"))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn umber_perform_effect(effect_op: i64) {
+pub unsafe extern "C" fn umber_find_handler(effect_op: i64) -> BlockPtr {
     HANDLER_STACK
         .iter()
         .rev()
         .find(|handler| handler.effect_op == effect_op)
+        .unwrap_or_else(|| panic!("Unhandled effect"))
+        .handler_fun
 }
 
 #[no_mangle]

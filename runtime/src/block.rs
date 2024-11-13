@@ -65,11 +65,7 @@ impl BlockPtr {
         let len: u16 = fields.len().try_into().unwrap();
         unsafe {
             Self::new_with_initializer(tag, len, |block| {
-                copy_nonoverlapping(
-                    fields.as_ptr(),
-                    block.0.as_ptr().add(1) as *mut BlockPtr,
-                    len as usize,
-                )
+                copy_nonoverlapping(fields.as_ptr(), block.0.as_ptr().add(1), len as usize)
             })
         }
     }
