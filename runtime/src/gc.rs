@@ -24,37 +24,35 @@ pub unsafe extern "C" fn umber_gc_init() {
     }
 }
 
-impl Gc {
-    pub unsafe fn get() -> &'static mut Self {
-        if GC.heap.is_null() {
-            panic!("GC was not initialized! `umber_gc_init` must be called before use")
-        } else {
-            &mut GC
-        }
+pub unsafe fn get() -> *mut Gc {
+    if GC.heap.is_null() {
+        panic!("GC was not initialized! `umber_gc_init` must be called before use")
+    } else {
+        &raw mut GC
     }
+}
 
-    pub unsafe fn alloc(&mut self, n_bytes: usize) -> *mut u8 {
-        if self.next_free + n_bytes >= self.heap_capacity {
-            panic!("Out of memory (the \"garbage collection\" part of the garbage collector is not implemented yet)")
-        } else {
-            let result = self.heap.add(self.next_free);
-            self.next_free += n_bytes;
-            result
-        }
+pub unsafe fn alloc(gc: *mut Gc, n_bytes: usize) -> *mut u8 {
+    if (*gc).next_free + n_bytes >= (*gc).heap_capacity {
+        panic!("Out of memory (the \"garbage collection\" part of the garbage collector is not implemented yet)")
+    } else {
+        let result = (*gc).heap.add((*gc).next_free);
+        (*gc).next_free += n_bytes;
+        result
     }
+}
 
-    pub unsafe fn is_on_heap(&self, x: *const c_void) -> bool {
-        ((x as usize) >= (self.heap as usize))
-            && ((x as usize) < (self.heap.add(self.heap_capacity) as usize))
-    }
+pub unsafe fn is_on_heap(gc: *mut Gc, x: *const c_void) -> bool {
+    ((x as usize) >= ((*gc).heap as usize))
+        && ((x as usize) < ((*gc).heap.add((*gc).heap_capacity) as usize))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn umber_gc_is_on_heap(x: *const c_void) -> bool {
-    Gc::get().is_on_heap(x)
+    is_on_heap(get(), x)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn umber_gc_alloc(n_bytes: usize) -> *mut u8 {
-    Gc::get().alloc(n_bytes)
+    alloc(get(), n_bytes)
 }

@@ -1,4 +1,4 @@
-use crate::gc::Gc;
+use crate::gc;
 use core::ptr::{copy_nonoverlapping, NonNull};
 use core::{mem, slice, str};
 
@@ -65,11 +65,7 @@ impl BlockPtr {
         let len: u16 = fields.len().try_into().unwrap();
         unsafe {
             Self::new_with_initializer(tag, len, |block| {
-                copy_nonoverlapping(
-                    fields.as_ptr(),
-                    block.0.as_ptr().add(1) as *mut BlockPtr,
-                    len as usize,
-                )
+                copy_nonoverlapping(fields.as_ptr(), block.0.as_ptr().add(1), len as usize)
             })
         }
     }
@@ -80,7 +76,7 @@ impl BlockPtr {
         initialize: impl FnOnce(Block),
     ) -> BlockPtr {
         let n_bytes = 8 * (len + 1) as usize;
-        let header = Gc::get().alloc(n_bytes) as *mut BlockHeader;
+        let header = gc::alloc(gc::get(), n_bytes) as *mut BlockHeader;
         (*header).tag = tag as u16;
         (*header).len = len;
         let block = Block(NonNull::new_unchecked(header as *mut BlockPtr));
