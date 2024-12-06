@@ -1,7 +1,6 @@
 use crate::block::{Block, BlockPtr, KnownTag};
 use core::fmt::Write;
 use core::mem;
-use heapless::String;
 
 impl Block {
     pub fn as_int(self) -> i64 {
@@ -62,14 +61,9 @@ pub extern "C" fn umber_int_mod(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     BlockPtr::new_int(r)
 }
 
-// The largest i64 has 19 decimal digits. The smallest i64 also has a "-" prefix.
-const MAX_INT_DIGITS: usize = 20;
-
 #[no_mangle]
 pub extern "C" fn umber_int_to_string(x: BlockPtr) -> BlockPtr {
-    let mut buf = String::<MAX_INT_DIGITS>::new();
-    write!(buf, "{}", x.as_int()).unwrap();
-    BlockPtr::new_string(&buf)
+    BlockPtr::new_string(&x.as_int().to_string())
 }
 
 #[cfg(test)]
