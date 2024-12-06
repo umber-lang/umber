@@ -1,5 +1,7 @@
 #![allow(internal_features)]
 #![feature(lang_items)]
+#![feature(c_variadic)]
+#![feature(gen_blocks)]
 #![no_std]
 
 #[cfg(not(test))]
