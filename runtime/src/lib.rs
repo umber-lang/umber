@@ -18,9 +18,6 @@ mod no_std_setup {
     extern "C" fn eh_personality() {}
 }
 
-#[cfg(not(test))]
-pub use no_std_setup::*;
-
 mod block;
 mod bool;
 mod float;
