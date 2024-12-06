@@ -13,6 +13,9 @@
 		},
 		{
 			"include": "#characters"
+		},
+		{
+			"include": "#literals"
 		}
 	],
 	"repository": {
@@ -20,9 +23,7 @@
 			"patterns": [
 				{
 					"name": "comment.line.number-sign.umber",
-					"begin": "#",
-					"end": "\n",
-					"patterns": []
+					"match": "#[^\n]*\n"
 				}
 			]
 		},
@@ -57,6 +58,25 @@
 				{
 					"name": "constant.character.escape.umber",
 					"match": "\\\\."
+				}
+			]
+		},
+		"literals": {
+			"patterns": [
+				{
+					"comment": "floating point decimal literal with exponent",
+					"name": "constant.numeric.decimal.float.umber",
+					"match": "\\b([[:digit:]][[:digit:]_]*(\\.[[:digit:]_]*)?[eE][+-]?[[:digit:]][[:digit:]_]*)\\b"
+				},
+				{
+					"comment": "floating point decimal literal",
+					"name": "constant.numeric.decimal.float.umber",
+					"match": "\\b([[:digit:]][[:digit:]_]*)(\\.[[:digit:]_]*\\b|\\.)"
+				},
+				{
+					"comment": "decimal integer literal",
+					"name": "constant.numeric.decimal.integer.umber",
+					"match": "\\b([[:digit:]][[:digit:]_]*)\\b"
 				}
 			]
 		}
