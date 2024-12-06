@@ -1,0 +1,25 @@
+{
+  "name": "umber",
+  "displayName": "Umber",
+  "description": "Umber language support",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "umber",
+      "aliases": ["Umber", "umber"],
+      "extensions": [".um"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "umber",
+      "scopeName": "source.umber",
+      "path": "./syntaxes/umber.tmLanguage.json"
+    }]
+  }
+}
