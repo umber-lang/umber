@@ -7,19 +7,39 @@
 		},
 		{
 			"include": "#strings"
+		},
+		{
+			"include": "#characters"
 		}
 	],
 	"repository": {
 		"keywords": {
-			"patterns": [{
-				"name": "keyword.control.umber",
-				"match": "\\b(if|while|for|return)\\b"
-			}]
+			"patterns": [
+				{
+					"name": "keyword.umber",
+					"match": "\\b(if|then|else|let|let'|and|in|match|handle|with|as|type|val|extern|infix|infixl|infixr|module|trait|impl|import|effect)\\b"
+				},
+				{
+					"name": "keyword.control.umber",
+					"match": "\\b(resume)\\b"
+				}
+			]
 		},
 		"strings": {
 			"name": "string.quoted.double.umber",
 			"begin": "\"",
 			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.umber",
+					"match": "\\\\."
+				}
+			]
+		},
+		"characters": {
+			"name": "string.quoted.single.umber",
+			"begin": "'",
+			"end": "'",
 			"patterns": [
 				{
 					"name": "constant.character.escape.umber",
