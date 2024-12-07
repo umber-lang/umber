@@ -16,6 +16,9 @@
 		},
 		{
 			"include": "#literals"
+		},
+		{
+			"include": "#operators"
 		}
 	],
 	"repository": {
@@ -30,7 +33,7 @@
 		"keywords": {
 			"patterns": [
 				{
-					"name": "keyword.umber",
+					"name": "keyword.other.umber",
 					"match": "\\b(if|then|else|let|let'|and|in|match|handle|with|as|type|val|extern|infix|infixl|infixr|module|trait|impl|import|effect)\\b"
 				},
 				{
@@ -77,6 +80,14 @@
 					"comment": "decimal integer literal",
 					"name": "constant.numeric.decimal.integer.umber",
 					"match": "\\b([[:digit:]][[:digit:]_]*)\\b"
+				}
+			]
+		},
+		"operators": {
+			"patterns": [
+				{
+					"name": "keyword.operator.umber",
+					"match": "[[:punct:]\\p{s}&&[^'\"()\\[\\]{},#_]]+"
 				}
 			]
 		}
