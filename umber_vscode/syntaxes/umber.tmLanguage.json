@@ -1,0 +1,169 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Umber",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#literals"
+		},
+		{
+			"include": "#operators"
+		},
+		{
+			"include": "#functions"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#names"
+		},
+		{
+			"include": "#characters"
+		}
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.number-sign.umber",
+					"match": "#[^\n]*\n"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.umber",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.umber",
+					"match": "\\\\."
+				}
+			]
+		},
+		"literals": {
+			"patterns": [
+				{
+					"comment": "floating point decimal literal with exponent",
+					"name": "constant.numeric.decimal.float.umber",
+					"match": "\\b([[:digit:]][[:digit:]_]*(\\.[[:digit:]_]*)?[eE][+-]?[[:digit:]][[:digit:]_]*)\\b"
+				},
+				{
+					"comment": "floating point decimal literal",
+					"name": "constant.numeric.decimal.float.umber",
+					"match": "\\b([[:digit:]][[:digit:]_]*)(\\.[[:digit:]_]*\\b|\\.)"
+				},
+				{
+					"comment": "decimal integer literal",
+					"name": "constant.numeric.decimal.integer.umber",
+					"match": "\\b([[:digit:]][[:digit:]_]*)\\b"
+				}
+			]
+		},
+		"operators": {
+			"patterns": [
+				{
+					"name": "keyword.operator.umber",
+					"match": "[[:punct:]\\p{s}&&[^'\"()\\[\\]{},#_]]+"
+				}
+			]
+		},
+		"functions": {
+			"patterns": [
+				{
+					"comment": "let expression with variable",
+					"match": "\\b(let|let') +((infix[lr]?) +([0-9]+) +)?([[:lower:]_][[:alnum:]'_]*)\\s*(=)\\s",
+					"captures": {
+						"1": {
+							"name": "keyword.other.umber"
+						},
+						"3": {
+							"name": "keyword.other.umber"
+						},
+						"4": {
+							"name": "constant.numeric.decimal.integer.umber"
+						},
+						"5": {
+							"name": "variable.name.lower.umber"
+						},
+						"6": {
+							"name": "keyword.operator.umber"
+						}
+					}
+				},
+				{
+					"comment": "let expression with function",
+					"match": "\\b(let|let') +((infix[lr]?) +([0-9]+) +)?([[:lower:]_][[:alnum:]'_]*)",
+					"captures": {
+						"1": {
+							"name": "keyword.other.umber"
+						},
+						"3": {
+							"name": "keyword.other.umber"
+						},
+						"4": {
+							"name": "constant.numeric.decimal.integer.umber"
+						},
+						"5": {
+							"name": "entity.name.function.umber"
+						}
+					}
+				},
+				{
+					"comment": "val/extern declaration, assume function",
+					"match": "\\b(val|extern) +([[:lower:]_][[:alnum:]'_]*)",
+					"captures": {
+						"1": {
+							"name": "keyword.other.umber"
+						},
+						"2": {
+							"name": "entity.name.function.umber"
+						}
+					}
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.other.umber",
+					"match": "\\b(if|then|else|let|let'|and|in|match|handle|with|as|type|val|extern|infix|infixl|infixr|module|trait|impl|import|effect)\\b"
+				},
+				{
+					"name": "keyword.control.umber",
+					"match": "\\bresume\\b"
+				}
+			]
+		},
+		"names": {
+			"patterns": [
+				{
+					"name": "variable.name.lower.umber",
+					"match": "\\b[[:lower:]_][[:alnum:]'_]*\\b"
+				},
+				{
+					"name": "constant.other.upper.umber",
+					"match": "\\b[[:upper:]_][[:alnum:]'_]*\\b"
+				}
+			]
+		},
+		"characters": {
+			"name": "string.quoted.single.umber",
+			"begin": "'",
+			"end": "'",
+			"patterns": [
+				{
+					"name": "constant.character.escape.umber",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.umber"
+}
