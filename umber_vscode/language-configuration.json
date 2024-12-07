@@ -1,34 +1,3 @@
-/* TODO: tokens to handle:
-
-%token EQUALS
-%token PIPE
-%token AMPERSAND
-%token COLON
-%token COLON_SPACED
-%token COMMA
-%token BACKSLASH
-%token ARROW
-%token L_PAREN
-%token R_PAREN
-%token L_BRACKET
-%token R_BRACKET
-%token L_BRACE
-%token R_BRACE
-%token LESS_THAN
-%token GREATER_THAN
-%token PERIOD
-
-%token <int> N_PERIODS
-%token <int> INT
-%token <float> FLOAT
-%token <Uchar.t> CHAR
-%token <Ustring.t> STRING
-
-%token UNDERSCORE
-%token <Ustring.t> LOWER_NAME
-%token <Ustring.t> UPPER_NAME
-%token <Ustring.t> OPERATOR
-*/
 {
     "comments": {
         "lineComment": "#",

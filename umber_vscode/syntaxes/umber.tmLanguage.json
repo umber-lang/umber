@@ -19,6 +19,9 @@
 		},
 		{
 			"include": "#operators"
+		},
+		{
+			"include": "#names"
 		}
 	],
 	"repository": {
@@ -38,7 +41,7 @@
 				},
 				{
 					"name": "keyword.control.umber",
-					"match": "\\b(resume)\\b"
+					"match": "\\bresume\\b"
 				}
 			]
 		},
@@ -88,6 +91,18 @@
 				{
 					"name": "keyword.operator.umber",
 					"match": "[[:punct:]\\p{s}&&[^'\"()\\[\\]{},#_]]+"
+				}
+			]
+		},
+		"names": {
+			"patterns": [
+				{
+					"name": "variable.name.lower.umber",
+					"match": "\\b[[:lower:]_][[:alnum:]'_]*\\b"
+				},
+				{
+					"name": "constant.other.upper.umber",
+					"match": "\\b[[:upper:]_][[:alnum:]'_]*\\b"
 				}
 			]
 		}
