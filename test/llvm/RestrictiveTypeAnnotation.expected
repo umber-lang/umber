@@ -35,7 +35,7 @@ cond_otherwise:                                   ; preds = %cond
   %block_field_gep2 = getelementptr %umber_block, %umber_block* %RestrictiveTypeAnnotation.xs.1, i32 0, i32 1, i32 0
   %block_field_raw3 = load i64, i64* %block_field_gep2, align 8
   %block_field4 = inttoptr i64 %block_field_raw3 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %RestrictiveTypeAnnotation.f.1, %umber_block* %block_field4)
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %RestrictiveTypeAnnotation.f.1, %umber_block* %block_field4)
   %fun_call5 = tail call tailcc %umber_block* @RestrictiveTypeAnnotation.map(%umber_block* %block_field, %umber_block* %RestrictiveTypeAnnotation.f.1)
   %box = call i64* @umber_gc_alloc(i64 24)
   %box6 = bitcast i64* %box to i16*
@@ -55,7 +55,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   ret %umber_block* %cond_otherwise_merge12
 }
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

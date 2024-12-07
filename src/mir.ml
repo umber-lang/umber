@@ -259,12 +259,15 @@ end = struct
       in
       External { arity = arity_of_type ~names:t.name_bindings (fst scheme) }
     in
-    (* FIXME: How to identify effect operations? *)
     let name_kind : Name_kind.t =
       match extern_name with
       | None ->
         if Module_path.is_prefix path ~prefix:t.module_path
-        then Local
+        then (
+          match Name_bindings.Name_entry.type_source entry with
+          | Effect_operation ->
+            Effect_op (Effect_op_id.create ~effect_operation_name:name)
+          | _ -> Local)
         else fallback_to_external ()
       | Some extern_name ->
         (match Extern_name.to_ustring extern_name |> Ustring.to_string with
@@ -329,8 +332,8 @@ end = struct
 
   let find_value_name_assert_local =
     find_value_name_assert_internal ~expected:"local" ~name_kind_matches:(function
-      | Local | Bool_intrinsic _ -> true
-      | External _ | Effect_op _ -> false)
+      | Local | Bool_intrinsic _ | Effect_op _ -> true
+      | External _ -> false)
   ;;
 
   let find_value_name_assert_external =
@@ -1018,7 +1021,7 @@ module Expr = struct
       | Name name, _ ->
         let name, name_kind = Context.find_value_name ctx name in
         (match name_kind with
-         | Local -> Name name
+         | Local | Effect_op _ -> Name name
          | External { arity } ->
            add_fun_decl { name; arity };
            Name name
@@ -1710,6 +1713,49 @@ let of_typed_module =
           in
           stmt :: stmts)
   in
+  let generate_effect_operation_values
+    ~ctx
+    ~stmts
+    ({ operations; params = _ } : _ Effect.t)
+    =
+    Option.fold operations ~init:stmts ~f:(fun stmts operations ->
+      List.fold operations ~init:stmts ~f:(fun stmts { name; args; result = _ } ->
+        let fun_name, name_kind =
+          Context.find_value_name ctx (Context.current_path ctx, name)
+        in
+        let effect_op =
+          match name_kind with
+          | Effect_op id -> id
+          | _ ->
+            compiler_bug
+              [%message
+                "Unexpected name kind for effect op"
+                  (name : Value_name.t)
+                  (name_kind : Context.Name_kind.t)]
+        in
+        let args =
+          Nonempty.mapi args ~f:(fun i (_ : _ Type_scheme.type_) ->
+            snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
+        in
+        let body : Expr.t =
+          match args with
+          | [ arg ] -> Perform_effect { effect_op; arg = Name arg }
+          | _ :: _ ->
+            let (_ : Context.t), arg =
+              Context.add_value_name ctx Constant_names.lambda_arg
+            in
+            Let
+              ( arg
+              , Make_block
+                  { tag = Cnstr_tag.default
+                  ; fields =
+                      List.map (Nonempty.to_list args) ~f:(fun arg -> Expr.Name arg)
+                  }
+              , Perform_effect { effect_op; arg = Name arg } )
+        in
+        let stmt : Stmt.t = Fun_def { fun_name; args; body } in
+        stmt :: stmts))
+  in
   let rec loop ~ctx ~names ~stmts ~fun_decls (defs : Typed.Module.def Node.t list) =
     List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
       Node.with_value def ~f:(function
@@ -1726,7 +1772,9 @@ let of_typed_module =
           ( ctx
           , Extern_decl { name; extern_name; arity = arity_of_type ~names (fst type_) }
             :: stmts )
-        | Common_def (Effect _ | Import _) -> ctx, stmts))
+        | Common_def (Effect ((_ : Effect_name.t), effect_decl)) ->
+          ctx, generate_effect_operation_values ~ctx ~stmts effect_decl
+        | Common_def (Import _) -> ctx, stmts))
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     let defs = cps_convert_effectful_functions defs in

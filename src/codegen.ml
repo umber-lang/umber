@@ -347,7 +347,7 @@ let rec codegen_expr t expr =
         t
         (codegen_umber_apply_fun t ~n_args)
         (Array.append [| fun_value |] args)
-        ~call_conv:Call_conv.tailcc
+        ~call_conv:Call_conv.cc
     in
     let fun_value = Value_table.find t.values fun_name in
     (match Llvm.classify_value fun_value with

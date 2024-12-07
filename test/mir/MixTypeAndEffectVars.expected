@@ -2,6 +2,13 @@
   ((fun_name MixTypeAndEffectVars.foo)
    (args (MixTypeAndEffectVars.*lambda_arg.1)) (body (Make_block (tag 0)))))
  (Fun_def
+  ((fun_name MixTypeAndEffectVars.operation)
+   (args (MixTypeAndEffectVars.*arg0.1))
+   (body
+    (Perform_effect
+     (effect_op ((name MixTypeAndEffectVars.operation) (hash 210013271)))
+     (arg (Name MixTypeAndEffectVars.*arg0.1))))))
+ (Fun_def
   ((fun_name MixTypeAndEffectVars.*fun.1)
    (args (MixTypeAndEffectVars.*lambda_arg.2)) (body (Make_block (tag 0)))))
  (Value_def MixTypeAndEffectVars.*binding.1

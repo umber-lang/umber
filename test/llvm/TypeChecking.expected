@@ -57,7 +57,7 @@ entry:
 define tailcc %umber_block* @TypeChecking.id_for_chars(%umber_block* %"TypeChecking.*arg0.1") {
 entry:
   %TypeChecking.id_for_chars.1 = load %umber_block*, %umber_block** @TypeChecking.id_for_chars.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %TypeChecking.id_for_chars.1, %umber_block* %"TypeChecking.*arg0.1")
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %TypeChecking.id_for_chars.1, %umber_block* %"TypeChecking.*arg0.1")
   ret %umber_block* %fun_call
 }
 
@@ -69,7 +69,7 @@ entry:
 
 define tailcc %umber_block* @"TypeChecking.|>"(%umber_block* %TypeChecking.x.5, %umber_block* %TypeChecking.f.1) {
 entry:
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %TypeChecking.f.1, %umber_block* %TypeChecking.x.5)
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %TypeChecking.f.1, %umber_block* %TypeChecking.x.5)
   ret %umber_block* %fun_call
 }
 
@@ -84,7 +84,7 @@ entry:
   br label %cond
 
 cond_binding_merge:                               ; preds = %cond_binding
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %block_field, %umber_block* inttoptr (i64 1 to %umber_block*))
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %block_field, %umber_block* inttoptr (i64 1 to %umber_block*))
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
@@ -96,7 +96,7 @@ cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond
-  %fun_call5 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %block_field3, %umber_block* inttoptr (i64 1 to %umber_block*))
+  %fun_call5 = tail call %umber_block* @umber_apply1(%umber_block* %block_field3, %umber_block* inttoptr (i64 1 to %umber_block*))
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
@@ -127,7 +127,7 @@ entry:
   br label %cond
 
 cond_binding_merge:                               ; preds = %cond_binding
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %TypeChecking.then_.3, %umber_block* inttoptr (i64 1 to %umber_block*))
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %TypeChecking.then_.3, %umber_block* inttoptr (i64 1 to %umber_block*))
   br label %cond_otherwise_merge
 
 cond:                                             ; preds = %entry
@@ -139,7 +139,7 @@ cond_binding:                                     ; preds = %cond
   br label %cond_binding_merge
 
 cond_otherwise:                                   ; preds = %cond
-  %fun_call2 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %TypeChecking.else_.3, %umber_block* inttoptr (i64 1 to %umber_block*))
+  %fun_call2 = tail call %umber_block* @umber_apply1(%umber_block* %TypeChecking.else_.3, %umber_block* inttoptr (i64 1 to %umber_block*))
   br label %cond_otherwise_merge
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
@@ -147,7 +147,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
   ret %umber_block* %cond_otherwise_merge3
 }
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

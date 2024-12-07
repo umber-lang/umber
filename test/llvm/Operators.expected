@@ -108,7 +108,7 @@ entry:
 define tailcc %umber_block* @Operators.left_section(%umber_block* %"Operators.*arg0.3") {
 entry:
   %Operators.left_section.1 = load %umber_block*, %umber_block** @Operators.left_section.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.left_section.1, %umber_block* %"Operators.*arg0.3")
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %Operators.left_section.1, %umber_block* %"Operators.*arg0.3")
   ret %umber_block* %fun_call
 }
 
@@ -126,7 +126,7 @@ entry:
 define tailcc %umber_block* @Operators.right_section(%umber_block* %"Operators.*arg0.5") {
 entry:
   %Operators.right_section.1 = load %umber_block*, %umber_block** @Operators.right_section.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.right_section.1, %umber_block* %"Operators.*arg0.5")
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %Operators.right_section.1, %umber_block* %"Operators.*arg0.5")
   ret %umber_block* %fun_call
 }
 
@@ -223,7 +223,7 @@ declare tailcc %umber_block* @Std.Prelude.Int.to_string(%umber_block*)
 
 declare i64* @umber_gc_alloc(i64)
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
