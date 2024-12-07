@@ -10,16 +10,25 @@
     "Programming Languages"
   ],
   "contributes": {
-    "languages": [{
-      "id": "umber",
-      "aliases": ["Umber", "umber"],
-      "extensions": [".um"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "umber",
-      "scopeName": "source.umber",
-      "path": "./syntaxes/umber.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "umber",
+        "aliases": [
+          "Umber",
+          "umber"
+        ],
+        "extensions": [
+          ".um"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "umber",
+        "scopeName": "source.umber",
+        "path": "./syntaxes/umber.tmLanguage.json"
+      }
+    ]
   }
 }

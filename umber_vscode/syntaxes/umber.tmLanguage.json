@@ -6,9 +6,6 @@
 			"include": "#comments"
 		},
 		{
-			"include": "#keywords"
-		},
-		{
 			"include": "#strings"
 		},
 		{
@@ -19,6 +16,12 @@
 		},
 		{
 			"include": "#operators"
+		},
+		{
+			"include": "#bindings"
+		},
+		{
+			"include": "#keywords"
 		},
 		{
 			"include": "#names"
@@ -91,6 +94,37 @@
 				{
 					"name": "keyword.operator.umber",
 					"match": "[[:punct:]\\p{s}&&[^'\"()\\[\\]{},#_]]+"
+				}
+			]
+		},
+		"bindings": {
+			"patterns": [
+				{
+					"comment": "let expression with variable",
+					"match": "\\b(let|let') +([[:lower:]_][[:alnum:]'_]*) *(=)\\s",
+					"captures": {
+						"1": {
+							"name": "keyword.other.umber"
+						},
+						"2": {
+							"name": "variable.name.lower.umber"
+						},
+						"3": {
+							"name": "keyword.operator.umber"
+						}
+					}
+				},
+				{
+					"comment": "let expression with function",
+					"match": "\\b(let|let') +([[:lower:]_][[:alnum:]'_]*)\\b",
+					"captures": {
+						"1": {
+							"name": "keyword.other.umber"
+						},
+						"2": {
+							"name": "entity.name.function.umber"
+						}
+					}
 				}
 			]
 		},
