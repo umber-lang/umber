@@ -9,22 +9,22 @@
 			"include": "#strings"
 		},
 		{
-			"include": "#characters"
-		},
-		{
 			"include": "#literals"
 		},
 		{
 			"include": "#operators"
 		},
 		{
-			"include": "#bindings"
+			"include": "#functions"
 		},
 		{
 			"include": "#keywords"
 		},
 		{
 			"include": "#names"
+		},
+		{
+			"include": "#characters"
 		}
 	],
 	"repository": {
@@ -36,33 +36,10 @@
 				}
 			]
 		},
-		"keywords": {
-			"patterns": [
-				{
-					"name": "keyword.other.umber",
-					"match": "\\b(if|then|else|let|let'|and|in|match|handle|with|as|type|val|extern|infix|infixl|infixr|module|trait|impl|import|effect)\\b"
-				},
-				{
-					"name": "keyword.control.umber",
-					"match": "\\bresume\\b"
-				}
-			]
-		},
 		"strings": {
 			"name": "string.quoted.double.umber",
 			"begin": "\"",
 			"end": "\"",
-			"patterns": [
-				{
-					"name": "constant.character.escape.umber",
-					"match": "\\\\."
-				}
-			]
-		},
-		"characters": {
-			"name": "string.quoted.single.umber",
-			"begin": "'",
-			"end": "'",
 			"patterns": [
 				{
 					"name": "constant.character.escape.umber",
@@ -97,26 +74,50 @@
 				}
 			]
 		},
-		"bindings": {
+		"functions": {
 			"patterns": [
 				{
 					"comment": "let expression with variable",
-					"match": "\\b(let|let') +([[:lower:]_][[:alnum:]'_]*) *(=)\\s",
+					"match": "\\b(let|let') +((infix[lr]?) +([0-9]+) +)?([[:lower:]_][[:alnum:]'_]*)\\s*(=)\\s",
 					"captures": {
 						"1": {
 							"name": "keyword.other.umber"
 						},
-						"2": {
+						"3": {
+							"name": "keyword.other.umber"
+						},
+						"4": {
+							"name": "constant.numeric.decimal.integer.umber"
+						},
+						"5": {
 							"name": "variable.name.lower.umber"
 						},
-						"3": {
+						"6": {
 							"name": "keyword.operator.umber"
 						}
 					}
 				},
 				{
 					"comment": "let expression with function",
-					"match": "\\b(let|let') +([[:lower:]_][[:alnum:]'_]*)\\b",
+					"match": "\\b(let|let') +((infix[lr]?) +([0-9]+) +)?([[:lower:]_][[:alnum:]'_]*)",
+					"captures": {
+						"1": {
+							"name": "keyword.other.umber"
+						},
+						"3": {
+							"name": "keyword.other.umber"
+						},
+						"4": {
+							"name": "constant.numeric.decimal.integer.umber"
+						},
+						"5": {
+							"name": "entity.name.function.umber"
+						}
+					}
+				},
+				{
+					"comment": "val/extern declaration, assume function",
+					"match": "\\b(val|extern) +([[:lower:]_][[:alnum:]'_]*)",
 					"captures": {
 						"1": {
 							"name": "keyword.other.umber"
@@ -125,6 +126,18 @@
 							"name": "entity.name.function.umber"
 						}
 					}
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.other.umber",
+					"match": "\\b(if|then|else|let|let'|and|in|match|handle|with|as|type|val|extern|infix|infixl|infixr|module|trait|impl|import|effect)\\b"
+				},
+				{
+					"name": "keyword.control.umber",
+					"match": "\\bresume\\b"
 				}
 			]
 		},
@@ -137,6 +150,17 @@
 				{
 					"name": "constant.other.upper.umber",
 					"match": "\\b[[:upper:]_][[:alnum:]'_]*\\b"
+				}
+			]
+		},
+		"characters": {
+			"name": "string.quoted.single.umber",
+			"begin": "'",
+			"end": "'",
+			"patterns": [
+				{
+					"name": "constant.character.escape.umber",
+					"match": "\\\\."
 				}
 			]
 		}
