@@ -1094,6 +1094,9 @@ module Expr = struct
       | ( Handle
             { expr = input_expr; expr_type = input_type; value_branch; effect_branches }
         , output_type ) ->
+        (* FIXME: Is this the correct semantics? I think we want effects here to be
+           handled by the handler as well, right? Either way, it needs to be consistent
+           with the typing. *)
         let input_expr =
           (* Desugar the value branch to a let binding. *)
           match value_branch with
@@ -1117,7 +1120,13 @@ module Expr = struct
          | Some effect_branches ->
            let handlers =
              Nonempty.map effect_branches ~f:(fun (effect_pattern, expr) ->
-               Node.with_value2 effect_pattern expr ~f:(fun { operation; args } body ->
+               Node.with_value2
+                 effect_pattern
+                 expr
+                 ~f:(fun
+                      { effect_pattern = { operation; args }; arg_types; resume_type }
+                      body
+                    ->
                  let effect_op = Effect_op_id.create ~effect_operation_name:operation in
                  let handler_fun =
                    (* FIXME: Get a proper span on these args and the expr *)
@@ -1129,7 +1138,15 @@ module Expr = struct
                           [ Node.dummy_span
                               (Typed.Pattern.catch_all (Some Value_name.resume_keyword))
                           ])
-                     ~arg_types:(failwith "need arg types")
+                     ~arg_types:
+                       (Nonempty.map
+                          (Nonempty.append arg_types [ resume_type ])
+                          ~f:(fun (type_, constraints) ->
+                          if not (List.is_empty constraints)
+                          then
+                            compiler_bug
+                              [%message "Type constraints in effect operation args"];
+                          type_))
                      ~body:(Node.dummy_span body)
                      ~body_type:output_type
                      ~just_bound:None

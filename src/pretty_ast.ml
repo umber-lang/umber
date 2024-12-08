@@ -169,7 +169,7 @@ module Typed_to_untyped = struct
     | Handle { expr; expr_type; value_branch; effect_branches } ->
       let branches =
         List.map effect_branches ~f:(fun (effect_pattern, branch) ->
-          ( Node.map effect_pattern ~f:(fun { operation; args } ->
+          ( Node.map effect_pattern ~f:(fun { effect_pattern = { operation; args }; _ } ->
               `Effect
                 { Effect_pattern.operation = relativize_value_name ~names operation
                 ; args = Nonempty.map args ~f:(relativize_pattern ~names)

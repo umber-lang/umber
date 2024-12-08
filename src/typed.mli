@@ -13,6 +13,15 @@ module Effect_pattern : sig
   type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
 end
 
+module Effect_branch : sig
+  type 'typ t =
+    { effect_pattern : Effect_pattern.t
+    ; arg_types : 'typ Nonempty.t
+    ; resume_type : 'typ
+    }
+  [@@deriving sexp]
+end
+
 module Expr : sig
   type 'typ t =
     | Literal of Literal.t
@@ -24,7 +33,7 @@ module Expr : sig
         { expr : 'typ t Node.t
         ; expr_type : 'typ
         ; value_branch : ((Pattern.t * 'typ) Node.t * 'typ t Node.t) option
-        ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
+        ; effect_branches : ('typ Effect_branch.t Node.t * 'typ t Node.t) list
         }
     | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t Node.t list
