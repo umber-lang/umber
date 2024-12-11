@@ -160,7 +160,8 @@ let rec read lexbuf =
   | "<" -> LESS_THAN
   | ">" -> GREATER_THAN
   | "<>" ->
-    (*  This is a hack to stop "<>" from lexing as `OPERATOR "<>"`. *)
+    (* This is a hack to stop "<>" from lexing as `OPERATOR "<>"`. *)
+    (* TODO: We could give this its own token e.g. DIAMOND to allow this operator. *)
     rollback lexbuf;
     ignore (next lexbuf : Uchar.t option);
     LESS_THAN

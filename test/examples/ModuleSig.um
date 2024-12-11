@@ -3,11 +3,15 @@ module Range : {
 
   val between : Int, Int -> Range
   val elem : Int, Range -> Bool
+
+  val (..=) : Int, Int -> Range
 } = {
   type Range = (Int, Int)
 
   let between lo hi = (lo, hi)
   let elem x (lo, hi) = lo <= x && x <= hi
+
+  let (..=) = between
 }
 
 let my_range = Range.between 1 10
