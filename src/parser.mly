@@ -71,6 +71,7 @@ val_operator:
   | LESS_THAN { Ustring.of_uchar (Uchar.of_char '<') }
   | GREATER_THAN { Ustring.of_uchar (Uchar.of_char '>') }
   | LESS_THAN; GREATER_THAN { Ustring.of_string_exn "<>" }
+  | PERIOD { Ustring.of_uchar (Uchar.of_char '.') }
   | n = N_PERIODS { Ustring.make n (Uchar.of_char '.') }
 
 check_operator:

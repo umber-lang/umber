@@ -63,6 +63,15 @@
   ((fun_name Operators.~~~)
    (args (Operators.*lambda_arg.1 Operators.*lambda_arg.2))
    (body (Make_block (tag 0)))))
+ (Fun_decl ((name Std.Prelude.Operators..) (arity 3)))
+ (Value_def Operators...1 (Name Std.Prelude.Operators..))
+ (Fun_def
+  ((fun_name Operators..)
+   (args (Operators.*arg0.6 Operators.*arg1.4 Operators.*arg2.1))
+   (body
+    (Fun_call Operators...1
+     ((Name Operators.*arg0.6) (Name Operators.*arg1.4)
+      (Name Operators.*arg2.1))))))
  (Fun_decl ((name Std.Prelude.List.concat_map) (arity 2)))
  (Fun_decl ((name Std.Prelude.List.map) (arity 2)))
  (Fun_def

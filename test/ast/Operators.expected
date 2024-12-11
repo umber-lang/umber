@@ -41,6 +41,8 @@ let unicode_my_dudes : List (String, String) =
 
 let infix 3 (~~~) : (), () -> () = \() () -> ()
 
+let (.) : (a -> b), (c -> a), c -> b = Std.Prelude.Operators.(.)
+
 let (×) : List a, List b -> List (a, b) =
   \xs ys ->
     List.concat_map

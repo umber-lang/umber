@@ -30,6 +30,8 @@ let unicode_my_dudes = ("damn"::"ok"::Nil) × ("cartesian"::"product"::"maybe?":
 
 let infix 3 (~~~) () () = ()
 
+let (.) = Std.Prelude.(.)
+
 # TODO: There are more vars inferred in the type annotations than necessary here.
 let (×) xs ys = List.concat_map xs (\x -> List.map ys (\y -> (x, y)))
 
