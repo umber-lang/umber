@@ -10,6 +10,8 @@ end
 
 module Effect_op_id : sig
   type t
+
+  val to_int : t -> int
 end
 
 module Expr : sig
@@ -36,6 +38,7 @@ module Expr : sig
     | Perform_effect of
         { effect_op : Effect_op_id.t
         ; arg : t
+        ; resume : t
         }
 
   and cond =

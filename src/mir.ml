@@ -162,6 +162,7 @@ module Effect_op_id : sig
   type t [@@deriving sexp_of]
 
   val create : effect_operation_name:Value_name.Absolute.t -> t
+  val to_int : t -> int
 end = struct
   type t =
     { name : Value_name.Absolute.t
@@ -174,6 +175,8 @@ end = struct
     ; hash = Value_name.Absolute.hash effect_operation_name
     }
   ;;
+
+  let to_int t = t.hash
 end
 
 module Context : sig
@@ -644,6 +647,7 @@ module Expr = struct
     | Perform_effect of
         { effect_op : Effect_op_id.t
         ; arg : t
+        ; resume : t
         }
 
   and cond =
@@ -686,8 +690,8 @@ module Expr = struct
            { handlers = Nonempty.map handlers ~f:(Tuple2.map_snd ~f:(map ~f))
            ; expr = map ~f expr
            }
-       | Perform_effect { effect_op; arg } ->
-         Perform_effect { effect_op; arg = map ~f arg })
+       | Perform_effect { effect_op; arg; resume } ->
+         Perform_effect { effect_op; arg = map ~f arg; resume = map ~f resume })
   ;;
 
   module Fun_def = struct
@@ -1130,6 +1134,8 @@ module Expr = struct
                  let effect_op = Effect_op_id.create ~effect_operation_name:operation in
                  let handler_fun =
                    (* FIXME: Get a proper span on these args and the expr *)
+                   (* FIXME: I think this actually needs to take 1 argument as a tuple,
+                      based on how we're implementing the runtime. *)
                    add_lambda
                      ~ctx
                      ~args:
@@ -1754,9 +1760,10 @@ let of_typed_module =
           Nonempty.mapi args ~f:(fun i (_ : _ Type_scheme.type_) ->
             snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
         in
+        let ctx, resume = Context.add_value_name ctx Value_name.resume_keyword in
         let body : Expr.t =
           match args with
-          | [ arg ] -> Perform_effect { effect_op; arg = Name arg }
+          | [ arg ] -> Perform_effect { effect_op; arg = Name arg; resume = Name resume }
           | _ :: _ ->
             let (_ : Context.t), arg =
               Context.add_value_name ctx Constant_names.lambda_arg
@@ -1768,9 +1775,11 @@ let of_typed_module =
                   ; fields =
                       List.map (Nonempty.to_list args) ~f:(fun arg -> Expr.Name arg)
                   }
-              , Perform_effect { effect_op; arg = Name arg } )
+              , Perform_effect { effect_op; arg = Name arg; resume = Name resume } )
         in
-        let stmt : Stmt.t = Fun_def { fun_name; args; body } in
+        let stmt : Stmt.t =
+          Fun_def { fun_name; args = Nonempty.append args [ resume ]; body }
+        in
         stmt :: stmts))
   in
   let rec loop ~ctx ~names ~stmts ~fun_decls (defs : Typed.Module.def Node.t list) =

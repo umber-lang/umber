@@ -60,28 +60,6 @@ struct EffectHandler {
     handler_fun: BlockPtr,
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn umber_install_handlers(n: u16, mut handlers: ...) {
-    let handlers: Vec<EffectHandler, 10> = (0..n)
-        .map(|_| {
-            let effect_op = handlers.arg();
-            let handler_fun = handlers.arg();
-            EffectHandler {
-                effect_op,
-                handler_fun: mem::transmute::<u64, BlockPtr>(handler_fun),
-            }
-        })
-        .collect();
-    let handler_node = HandlerNode {
-        handlers,
-        parent_node: HANDLER_STATE.current_node,
-    };
-    HANDLER_STATE
-        .handler_tree
-        .push(handler_node)
-        .unwrap_or_else(|_| panic!("Too many effect handler nodes, overflowed"))
-}
-
 unsafe fn iter_handler_node_parents(
     starting_index: Option<NodeIndex>,
 ) -> impl Iterator<Item = (NodeIndex, HandlerNode)> {
@@ -107,12 +85,39 @@ unsafe fn find_matching_handler(effect_op: i64) -> (NodeIndex, EffectHandler) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn umber_perform_effect(effect_op: i64, arg: BlockPtr) {
+pub unsafe extern "C" fn umber_install_handlers(n: u16, mut handlers: ...) {
+    let handlers: Vec<EffectHandler, 10> = (0..n)
+        .map(|_| {
+            let effect_op = handlers.arg();
+            let handler_fun = handlers.arg();
+            EffectHandler {
+                effect_op,
+                handler_fun: mem::transmute::<u64, BlockPtr>(handler_fun),
+            }
+        })
+        .collect();
+    let handler_node = HandlerNode {
+        handlers,
+        parent_node: HANDLER_STATE.current_node,
+    };
+    HANDLER_STATE
+        .handler_tree
+        .push(handler_node)
+        .unwrap_or_else(|_| panic!("Too many effect handler nodes, overflowed"))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn umber_perform_effect(
+    effect_op: i64,
+    arg: BlockPtr,
+    resume: BlockPtr,
+) -> BlockPtr {
     let (handler_node_index, handler) = find_matching_handler(effect_op);
     let prev_node = HANDLER_STATE.current_node;
     HANDLER_STATE.current_node = Some(handler_node_index);
-    umber_apply1(handler.handler_fun, arg);
-    HANDLER_STATE.current_node = prev_node
+    let result = umber_apply2(handler.handler_fun, arg, resume);
+    HANDLER_STATE.current_node = prev_node;
+    result
 }
 
 #[no_mangle]
@@ -133,5 +138,8 @@ pub unsafe extern "C" fn umber_uninstall_handlers() {
 }
 
 extern "C" {
-    fn umber_apply1(fun: BlockPtr, arg: BlockPtr);
+    // FIXME: I think we need apply2 - arg + continuation?
+    fn umber_apply2(fun: BlockPtr, arg1: BlockPtr, arg2: BlockPtr) -> BlockPtr;
 }
+
+// FIXME: Figure out a way (e.g. panic) to prevent multiple resumptions

@@ -243,6 +243,7 @@ let build_call ?(name = "fun_call") t fun_ args ~call_conv =
   call
 ;;
 
+(* FIXME: The runtime now some umber_apply functions to exist - should codegen them up-front. *)
 let codegen_umber_apply_fun t ~n_args =
   let apply_fun_name = [%string "umber_apply%{n_args#Int}"] in
   match Llvm.lookup_function apply_fun_name t.module_ with
@@ -475,8 +476,65 @@ let rec codegen_expr t expr =
         associate_conds (next_cond_and_binding :: rest)
     in
     associate_conds conds
-  | Handle_effects _ -> failwith "TODO: effects in llvm"
-  | Perform_effect _ -> failwith "TODO: effects in llvm"
+  | Handle_effects { handlers; expr } ->
+    let handlers =
+      Nonempty.map handlers ~f:(fun (effect_op_id, expr) ->
+        ( Llvm.const_int
+            (Llvm.integer_type t.context 64)
+            (Mir.Effect_op_id.to_int effect_op_id)
+        , codegen_expr t expr ))
+    in
+    (* FIXME: Sequence things up properly *)
+    let _install_handlers_call =
+      let install_handlers_fun =
+        Llvm.declare_function
+          "umber_install_handlers"
+          (Llvm.var_arg_function_type
+             (Llvm.void_type t.context)
+             [| Llvm.integer_type t.context 16 |])
+          t.module_
+      in
+      build_call
+        t
+        install_handlers_fun
+        (Nonempty.to_array handlers
+         |> Array.concat_map ~f:(fun (effect_op_id, expr) -> [| effect_op_id; expr |]))
+        ~name:"install_handlers"
+        ~call_conv:Call_conv.cc
+    in
+    let expr = codegen_expr t expr in
+    let _uninstall_handlers_call =
+      let uninstall_handlers_fun =
+        Llvm.declare_function
+          "umber_uninstall_handlers"
+          (Llvm.function_type (Llvm.void_type t.context) [||])
+          t.module_
+      in
+      build_call
+        t
+        uninstall_handlers_fun
+        [||]
+        ~name:"uninstall_handlers"
+        ~call_conv:Call_conv.cc
+    in
+    expr
+  | Perform_effect { effect_op; arg; resume } ->
+    let int64 = Llvm.integer_type t.context 64 in
+    let perform_effect_fun =
+      Llvm.declare_function
+        "umber_perform_effect"
+        (Llvm.function_type (Llvm.void_type t.context) [| int64; block_pointer_type t |])
+        t.module_
+    in
+    let arg = codegen_expr t arg in
+    let resume = codegen_expr t resume in
+    (* FIXME: We return void, but then try to use this as a value *)
+    build_call
+      t
+      perform_effect_fun
+      [| Llvm.const_int int64 (Mir.Effect_op_id.to_int effect_op); arg; resume |]
+      ~name:"perform_effect"
+      ~call_conv:Call_conv.cc
 
 and codegen_cond t cond =
   let make_icmp value value' = Llvm.build_icmp Eq value value' "equals" t.builder in
