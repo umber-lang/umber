@@ -773,7 +773,26 @@ module Expr = struct
                 |> List.unzip
               in
               node (Tuple items), Tuple types)
-          | Seq_literal _items -> failwith "TODO: seq"
+          | Seq_literal items ->
+            (* TODO: Come up with a proper sequence abstraction. This should probably be a
+               trait with a method to construct it from a list/array. Alternatively, it
+               would be reasonable to just have e.g. array literals and force other
+               collections to implement `of_array` functions.
+               
+               For now, to make things easy this just desugars to calls to `Cons` and
+               `Nil` constructors, like in OCaml. *)
+            let make_constructor name =
+              Node.dummy_span
+                (Untyped.Expr.Name
+                   (Value_name.Relative.of_ustrings_exn ([], Ustring.of_string_exn name)))
+            in
+            let desugared_expr =
+              List.fold_right items ~init:(make_constructor "Nil") ~f:(fun item expr ->
+                Node.create
+                  (Untyped.Expr.Fun_call (make_constructor "Cons", [ item; expr ]))
+                  (Span.combine (Node.span item) (Node.span expr)))
+            in
+            of_untyped ~names ~types ~f_name desugared_expr
           | Record_literal _fields -> failwith "TODO: record1"
           | Record_update (_expr, _fields) -> failwith "TODO: record2"
           | Record_field_access (_record, _name) -> failwith "TODO: record3"

@@ -8,6 +8,13 @@ module : {
     val append : List a, List a -> List a
     val map : List a, (a -> b) -> List b
     val concat_map : List a, (a -> List b) -> List b
+    val fold : List a, acc, (acc, a -> acc) -> acc
+
+    # Zip two lists together, dropping the suffix of the longer list if their lengths
+    # are not equal.
+    val zip_shortest : List a, List b -> List (a, b)
+
+    val unzip : List (a, b) -> (List a, List b)
   }
 
   import .List.(Nil, Cons)
@@ -180,6 +187,23 @@ module List = {
       | Cons x xs -> loop (rev_append (f x) acc) xs f
     in
     loop Nil xs f
+
+  let fold xs init f =
+    match xs
+    | Nil -> init
+    | Cons x xs -> fold xs (f init x) f
+
+  let zip_shortest xs ys =
+    match (xs, ys)
+    | (Nil, _) | (_, Nil) -> Nil
+    | (Cons x xs, Cons y ys) -> Cons (x, y) (zip_shortest xs ys)
+
+  let unzip xys =
+    match xys
+    | Nil -> (Nil, Nil)
+    | Cons (x, y) xys ->
+      let (xs, ys) = unzip xys in
+      (x :: xs, y :: ys)
 }
 
 module Operators = {

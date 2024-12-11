@@ -712,6 +712,11 @@ module Expr = struct
         let conds =
           List.filter_mapi args ~f:(fun i arg ->
             let arg_index = Block_index.of_int i in
+            (* FIXME: Cnstr info contains the general type of the constructor, but it may
+               have a more concrete type at this application. We either need to:
+               
+               1) Grab the type from the AST (make the previous passes put it there!)
+               2) Instantiate the type ourselves (sounds rough) *)
             let arg_type = Cnstr_info.arg_type cnstr_info cnstr arg_index in
             let arg_expr = Get_block_field (arg_index, input_expr) in
             condition_of_pattern ~ctx ~input_expr:arg_expr ~input_type:arg_type arg)

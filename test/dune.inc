@@ -1,5 +1,14 @@
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/AdventOfCode2024_1.um})
+   (concurrent
+    (diff? tokens/AdventOfCode2024_1.expected tokens/AdventOfCode2024_1.out)
+    (diff? ast/AdventOfCode2024_1.expected ast/AdventOfCode2024_1.out)
+    (diff? mir/AdventOfCode2024_1.expected mir/AdventOfCode2024_1.out)
+    (diff? llvm/AdventOfCode2024_1.expected llvm/AdventOfCode2024_1.out)
+    (diff? output/AdventOfCode2024_1.expected output/AdventOfCode2024_1.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/AsPattern.um})
    (concurrent (diff? tokens/AsPattern.expected tokens/AsPattern.out)
     (diff? ast/AsPattern.expected ast/AsPattern.out)
