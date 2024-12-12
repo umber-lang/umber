@@ -2,24 +2,25 @@ open Import
 open Names
 
 module Pattern : sig
-  (* FIXME: Add type annotations inside here *)
-  type t =
+  type 'typ t =
     | Constant of Literal.t
     | Catch_all of Value_name.t option
-    | As of t * Value_name.t
-    | Cnstr_appl of Cnstr_name.Absolute.t * t list
-    | Tuple of t list
-    | Record of (Value_name.t * t option) Nonempty.t
-    | Union of t * t
+    | As of 'typ t * Value_name.t
+    | Cnstr_appl of Cnstr_name.Absolute.t * ('typ t * 'typ) list
+    | Tuple of ('typ t * 'typ) list
+    | Record of (Value_name.t * 'typ t option) Nonempty.t
+    | Union of 'typ t * 'typ t
   [@@deriving equal, sexp, variants]
 
-  val fold_names : t -> init:'acc -> f:('acc -> Value_name.t -> 'acc) -> 'acc
+  type generalized = Module_path.absolute Type_scheme.t t [@@deriving sexp_of]
+
+  val fold_names : _ t -> init:'acc -> f:('acc -> Value_name.t -> 'acc) -> 'acc
 end
 
 module Effect_pattern : sig
-  type t =
+  type 'typ t =
     { operation : Value_name.Absolute.t
-    ; args : Pattern.t Nonempty.t
+    ; args : 'typ Pattern.t Nonempty.t
     }
   [@@deriving equal, sexp]
 end
@@ -29,15 +30,15 @@ module Expr : sig
     | Literal of Literal.t
     | Name of Value_name.Absolute.t
     | Fun_call of 'typ t Node.t * 'typ * ('typ t Node.t * 'typ) Nonempty.t
-    | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
-    | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
+    | Lambda of 'typ Pattern.t Node.t Nonempty.t * 'typ t Node.t
+    | Match of 'typ t Node.t * 'typ * ('typ Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Handle of
         { expr : 'typ t Node.t
         ; expr_type : 'typ
-        ; value_branch : (Pattern.t Node.t * 'typ t Node.t) option
-        ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
+        ; value_branch : ('typ Pattern.t Node.t * 'typ t Node.t) option
+        ; effect_branches : ('typ Effect_pattern.t Node.t * 'typ t Node.t) list
         }
-    | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
+    | Let of ('typ Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t Node.t list
     | Record_literal of (Value_name.t * 'typ t Node.t option) list
     | Record_update of 'typ t Node.t * (Value_name.t * 'typ t Node.t option) list
@@ -52,10 +53,10 @@ end
 module Module : sig
   include module type of Module
 
-  type nonrec t = (Pattern.t, Expr.generalized, Module_path.absolute) t
+  type nonrec t = (Pattern.generalized, Expr.generalized, Module_path.absolute) t
   [@@deriving sexp_of]
 
-  type nonrec def = (Pattern.t, Expr.generalized, Module_path.absolute) def
+  type nonrec def = (Pattern.generalized, Expr.generalized, Module_path.absolute) def
   [@@deriving sexp_of]
 
   val of_untyped

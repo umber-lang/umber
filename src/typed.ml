@@ -7,21 +7,24 @@ let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 let eprint_s = ignore
 
 module Pattern = struct
-  type t =
+  type 'typ t =
     | Constant of Literal.t
     | Catch_all of Value_name.t option
-    | As of t * Value_name.t
-    | Cnstr_appl of Cnstr_name.Absolute.t * t list
-    | Tuple of t list
-    | Record of (Value_name.t * t option) Nonempty.t
-    | Union of t * t
+    | As of 'typ t * Value_name.t
+    | Cnstr_appl of Cnstr_name.Absolute.t * ('typ t * 'typ) list
+    | Tuple of ('typ t * 'typ) list
+    | Record of (Value_name.t * 'typ t option) Nonempty.t
+    | Union of 'typ t * 'typ t
   [@@deriving equal, sexp, variants]
+
+  type generalized = Module_path.absolute Type_scheme.t t [@@deriving sexp_of]
 
   let fold_names pat ~init ~f =
     let rec loop acc ~f = function
       | Catch_all (Some name) -> f acc name
       | As (pat, name) -> loop (f acc name) ~f pat
-      | Cnstr_appl (_, items) | Tuple items -> List.fold items ~init:acc ~f:(loop ~f)
+      | Cnstr_appl (_, items) | Tuple items ->
+        List.fold items ~init:acc ~f:(fun acc (item, _type) -> loop acc item ~f)
       | Record fields ->
         Nonempty.fold fields ~init:acc ~f:(fun acc -> function
           | name, None -> f acc name
@@ -33,6 +36,42 @@ module Pattern = struct
     in
     loop init ~f pat
   ;;
+
+  let rec map :
+            'a 'b.
+            'a t -> f:('a t -> ('a t, 'b t) Map_action.t) -> f_type:('a -> 'b) -> 'b t
+    =
+   fun pat ~f ~f_type ->
+    match (f pat : _ Map_action.t) with
+    | Halt pat -> pat
+    | Retry pat -> map pat ~f ~f_type
+    | Defer pat ->
+      (match pat with
+       | (Constant _ | Catch_all _) as pat -> pat
+       | As (pat, name) -> As (map pat ~f ~f_type, name)
+       | Cnstr_appl (cnstr, args) ->
+         Cnstr_appl
+           ( cnstr
+           , List.map args ~f:(fun (pat, type_) ->
+               let pat = map pat ~f ~f_type in
+               let type_ = f_type type_ in
+               pat, type_) )
+       | Tuple fields ->
+         Tuple
+           (List.map fields ~f:(fun (pat, type_) ->
+              let pat = map pat ~f ~f_type in
+              let type_ = f_type type_ in
+              pat, type_))
+       | Record fields ->
+         Record
+           (Nonempty.map fields ~f:(Tuple2.map_snd ~f:(Option.map ~f:(map ~f ~f_type))))
+       | Union (pat1, pat2) ->
+         let pat1 = map pat1 ~f ~f_type in
+         let pat2 = map pat2 ~f ~f_type in
+         Union (pat1, pat2))
+ ;;
+
+  let map_types pat ~f = map pat ~f_type:f ~f:Map_action.defer
 
   let check_cnstr_application ~names ~types ~(cnstr_type : Internal_type.t) ~arg_types =
     (* TODO: inferring unqualified name given type information *)
@@ -56,8 +95,11 @@ module Pattern = struct
     | Unequal_lengths -> type_error_msg "Wrong number of arguments in application"
   ;;
 
+  (* FIXME: Putting pattern names inside here is a hack to make the types work - they are
+     unused. We might be able to come up with a better way to smuggle that info through. *)
   let rec of_untyped_with_names ~names ~types ~fixity pat_names
-    : Untyped.Pattern.t -> Pattern_names.t * (t * Internal_type.t)
+    :  Untyped.Pattern.t
+    -> Pattern_names.t * ((Internal_type.t * Pattern_names.t) t * Internal_type.t)
     = function
     | Constant lit ->
       ( pat_names
@@ -90,8 +132,8 @@ module Pattern = struct
         List.fold_map args ~init:pat_names ~f:(fun pat_names arg ->
           of_untyped_with_names ~names ~types pat_names arg ~fixity)
       in
-      let args, arg_types = List.unzip args in
       let effects, result_type =
+        let arg_types = List.map ~f:snd args in
         check_cnstr_application ~names ~types ~cnstr_type ~arg_types
       in
       assert_or_compiler_bug
@@ -100,6 +142,9 @@ module Pattern = struct
          | None -> true
          | Some { effects; effect_var } ->
            Map.is_empty effects && Option.is_none effect_var);
+      let args =
+        List.map args ~f:(fun (arg, arg_type) -> arg, (arg_type, Pattern_names.empty))
+      in
       pat_names, (Cnstr_appl (cnstr, args), result_type)
     | Tuple fields ->
       let pat_names, fields, field_types =
@@ -110,7 +155,9 @@ module Pattern = struct
           let pat_names, (field, field_type) =
             of_untyped_with_names ~names ~types pat_names field ~fixity
           in
-          pat_names, field :: fields, field_type :: field_types)
+          ( pat_names
+          , (field, (field_type, Pattern_names.empty)) :: fields
+          , field_type :: field_types ))
       in
       pat_names, (Tuple fields, Tuple field_types)
     | Record _fields ->
@@ -206,7 +253,7 @@ module Pattern = struct
     names, pat
   ;;
 
-  let generalize ~names ~types pat_names typ ~shadowing_allowed =
+  let generalize pat pat_names typ ~names ~types ~shadowing_allowed =
     eprint_s
       [%message
         "Pattern.generalize"
@@ -222,16 +269,24 @@ module Pattern = struct
         in
         Name_bindings.set_inferred_scheme names name inferred_scheme ~shadowing_allowed)
     in
-    names, Type_bindings.generalize types typ
+    let pat =
+      map_types pat ~f:(fun (type_, (_ : Pattern_names.t)) ->
+        Type_bindings.generalize types type_)
+    in
+    names, pat, Type_bindings.generalize types typ
   ;;
 end
 
 module Effect_pattern = struct
-  type t =
+  type 'typ t =
     { operation : Value_name.Absolute.t
-    ; args : Pattern.t Nonempty.t
+    ; args : 'typ Pattern.t Nonempty.t
     }
   [@@deriving equal, sexp]
+
+  let map_types { operation; args } ~f =
+    { operation; args = Nonempty.map args ~f:(Pattern.map_types ~f) }
+  ;;
 
   let of_untyped_with_names
     ~names
@@ -314,15 +369,15 @@ module Expr = struct
     | Literal of Literal.t
     | Name of Value_name.Absolute.t
     | Fun_call of 'typ t Node.t * 'typ * ('typ t Node.t * 'typ) Nonempty.t
-    | Lambda of Pattern.t Node.t Nonempty.t * 'typ t Node.t
-    | Match of 'typ t Node.t * 'typ * (Pattern.t Node.t * 'typ t Node.t) Nonempty.t
+    | Lambda of 'typ Pattern.t Node.t Nonempty.t * 'typ t Node.t
+    | Match of 'typ t Node.t * 'typ * ('typ Pattern.t Node.t * 'typ t Node.t) Nonempty.t
     | Handle of
         { expr : 'typ t Node.t
         ; expr_type : 'typ
-        ; value_branch : (Pattern.t Node.t * 'typ t Node.t) option [@sexp.option]
-        ; effect_branches : (Effect_pattern.t Node.t * 'typ t Node.t) list
+        ; value_branch : ('typ Pattern.t Node.t * 'typ t Node.t) option [@sexp.option]
+        ; effect_branches : ('typ Effect_pattern.t Node.t * 'typ t Node.t) list
         }
-    | Let of (Pattern.t * 'typ, 'typ t) Let_binding.t
+    | Let of ('typ Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t Node.t list
     | Record_literal of (Value_name.t * 'typ t Node.t option) list
     | Record_update of 'typ t Node.t * (Value_name.t * 'typ t Node.t option) list
@@ -489,7 +544,7 @@ module Expr = struct
                 ~subtype:else_type
                 ~supertype:result_type;
               let branch name expr =
-                Node.create (Cnstr_appl (name, []) : Pattern.t) (Node.span expr), expr
+                Node.create (Cnstr_appl (name, []) : _ Pattern.t) (Node.span expr), expr
               in
               ( node
                   (Match
@@ -640,7 +695,7 @@ module Expr = struct
                     [%message
                       "Multiple value branches in handle expression are not supported"
                         (value_branches
-                          : (Pattern.t Node.t
+                          : (_ Pattern.t Node.t
                             * (Internal_type.t * Pattern_names.t) t Node.t)
                             list)]
             in
@@ -884,7 +939,7 @@ module Expr = struct
           eprint_s
             [%message
               "typed binding"
-                (pat : (Pattern.t * (Internal_type.t * _)) Node.t)
+                (pat : (_ Pattern.t * (Internal_type.t * _)) Node.t)
                 (expr_type : Internal_type.t)
                 (expr_effects : Internal_type.effects)];
           add_effects expr_effects (Node.span expr);
@@ -908,14 +963,15 @@ module Expr = struct
          let bindings =
            Nonempty.map bindings ~f:(fun (pat_and_type, fixity, expr) ->
              let pat_and_type =
-               Node.map pat_and_type ~f:(fun (pat, typ) -> pat, f_type typ)
+               Node.map pat_and_type ~f:(fun (pat, typ) ->
+                 Pattern.map_types pat ~f:f_type, f_type typ)
              in
              let expr = map' expr ~f ~f_type in
              pat_and_type, fixity, expr)
          in
          let body = map' body ~f ~f_type in
          Let { rec_; bindings; body }
-       | (Literal _ | Name (_, _)) as expr -> expr
+       | (Literal _ | Name _) as expr -> expr
        | Fun_call (fun_, fun_type, args) ->
          let fun_ = map' fun_ ~f ~f_type in
          let fun_type = f_type fun_type in
@@ -926,20 +982,34 @@ module Expr = struct
              arg, arg_type)
          in
          Fun_call (fun_, fun_type, args)
-       | Lambda (args, body) -> Lambda (args, map' body ~f ~f_type)
+       | Lambda (args, body) ->
+         let args = Nonempty.map args ~f:(Node.map ~f:(Pattern.map_types ~f:f_type)) in
+         let body = map' body ~f ~f_type in
+         Lambda (args, body)
        | Match (expr, expr_type, branches) ->
          let expr = map' expr ~f ~f_type in
          let expr_type = f_type expr_type in
-         let branches = Nonempty.map branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type)) in
+         let branches =
+           Nonempty.map branches ~f:(fun (pat, expr) ->
+             let pat = Node.map pat ~f:(Pattern.map_types ~f:f_type) in
+             let expr = map' expr ~f ~f_type in
+             pat, expr)
+         in
          Match (expr, expr_type, branches)
        | Handle { expr; expr_type; value_branch; effect_branches } ->
          let expr = map' expr ~f ~f_type in
          let expr_type = f_type expr_type in
          let value_branch =
-           Option.map value_branch ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))
+           Option.map value_branch ~f:(fun (pat, expr) ->
+             let pat = Node.map pat ~f:(Pattern.map_types ~f:f_type) in
+             let expr = map' expr ~f ~f_type in
+             pat, expr)
          in
          let effect_branches =
-           List.map effect_branches ~f:(Tuple2.map_snd ~f:(map' ~f ~f_type))
+           List.map effect_branches ~f:(fun (effect_pattern, expr) ->
+             let pat = Node.map effect_pattern ~f:(Effect_pattern.map_types ~f:f_type) in
+             let expr = map' expr ~f ~f_type in
+             pat, expr)
          in
          Handle { expr; expr_type; value_branch; effect_branches }
        | Tuple fields -> Tuple (List.map fields ~f:(map' ~f ~f_type))
@@ -955,7 +1025,7 @@ module Expr = struct
 
   and map' expr ~f ~f_type = Node.map expr ~f:(map ~f ~f_type)
 
-  let map_types expr ~f = map expr ~f_type:f ~f:(fun expr -> Defer expr)
+  let map_types expr ~f = map expr ~f_type:f ~f:Map_action.defer
 
   (* FIXME: Remove unused *)
   (* let rec fold_until expr ~init:acc ~f ~f_type =
@@ -1054,15 +1124,15 @@ module Expr = struct
           let bindings =
             Nonempty.map bindings ~f:(fun (pattern_etc, fixity, expr) ->
               let pat_span = Node.span pattern_etc in
-              let pat, (names, scheme) =
+              let names, pat, scheme =
                 Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-                  ( pat
-                  , Pattern.generalize
-                      ~names
-                      ~types
-                      pat_names
-                      pat_type
-                      ~shadowing_allowed:true ))
+                  Pattern.generalize
+                    pat
+                    ~names
+                    ~types
+                    pat_names
+                    pat_type
+                    ~shadowing_allowed:true)
               in
               ( Node.create (pat, scheme) pat_span
               , fixity
@@ -1077,10 +1147,10 @@ end
 module Module = struct
   include Module
 
-  type nonrec t = (Pattern.t, Expr.generalized, Module_path.absolute) t
+  type nonrec t = (Pattern.generalized, Expr.generalized, Module_path.absolute) t
   [@@deriving sexp_of]
 
-  type nonrec def = (Pattern.t, Expr.generalized, Module_path.absolute) def
+  type nonrec def = (Pattern.generalized, Expr.generalized, Module_path.absolute) def
   [@@deriving sexp_of]
 
   let rec gather_names ~names ~f_common ?f_sig ?f_def module_name sigs defs =
@@ -1642,11 +1712,15 @@ module Module = struct
     let names, bindings =
       Nonempty.fold_map bindings ~init:names ~f:(fun names (pattern_etc, fixity, expr) ->
         let pat_span = Node.span pattern_etc in
-        let pat, (names, scheme) =
+        let names, pat, scheme =
           Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-            ( pat
-            , Pattern.generalize ~names ~types pat_names pat_type ~shadowing_allowed:false
-            ))
+            Pattern.generalize
+              pat
+              ~names
+              ~types
+              pat_names
+              pat_type
+              ~shadowing_allowed:false)
         in
         (* Generalize local let bindings just after the parent binding *)
         let expr_and_scheme =

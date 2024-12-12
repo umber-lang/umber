@@ -33,6 +33,10 @@ module Cnstr_info : sig
      callsites generally do that, which leads to looking up each constructor separately. *)
 
   val tag : t -> Cnstr.t -> Cnstr_tag.t
+
+  (* FIXME: This API doesn't really work (because it doesn't handle instantiation of type
+     variables). Remmove it. We should make the type-checking phase put the types onto the
+     AST itself and then read them off. *)
   val arg_type : t -> Cnstr.t -> Block_index.t -> Module_path.absolute Type_scheme.type_
   val cnstrs : t -> Cnstr.t list
 
@@ -382,8 +386,8 @@ module Simple_pattern : sig
     | Cnstr_appl of Cnstr.t * t list
   [@@deriving sexp, variants]
 
-  val flatten_typed_pattern : Typed.Pattern.t -> t Nonempty.t
-  val flatten_typed_pattern_no_unions : Typed.Pattern.t -> label:string -> t
+  val flatten_typed_pattern : Typed.Pattern.generalized -> t Nonempty.t
+  val flatten_typed_pattern_no_unions : Typed.Pattern.generalized -> label:string -> t
   val names : t -> Value_name.Set.t
 
   module Coverage : sig
@@ -420,7 +424,7 @@ end = struct
   ;;
 
   let flatten_typed_pattern pattern =
-    let rec loop : Typed.Pattern.t -> t Nonempty.t = function
+    let rec loop : Typed.Pattern.generalized -> t Nonempty.t = function
       | Constant lit -> [ Constant lit ]
       | Catch_all name -> [ Catch_all name ]
       | As (pattern, name) -> Nonempty.map (loop pattern) ~f:(Fn.flip as_ name)
@@ -444,7 +448,7 @@ end = struct
       match Nonempty.of_list args with
       | None -> [ Cnstr_appl (cnstr, []) ]
       | Some args ->
-        Nonempty.map args ~f:loop
+        Nonempty.map args ~f:(fun (arg, _arg_type) -> loop arg)
         |> Nonempty.cartesian_product_all
         |> Nonempty.map ~f:(fun args -> Cnstr_appl (cnstr, Nonempty.to_list args))
     in
@@ -456,7 +460,9 @@ end = struct
     | [ arg ] -> arg
     | _ :: _ :: _ ->
       let msg = [%string "Pattern unions in %{label} are not supported"] in
-      Compilation_error.raise Mir_error ~msg:[%message msg (pattern : Typed.Pattern.t)]
+      Compilation_error.raise
+        Mir_error
+        ~msg:[%message msg (pattern : Typed.Pattern.generalized)]
   ;;
 
   module Coverage = struct
@@ -784,7 +790,7 @@ module Expr = struct
   ;;
 
   let check_rec_binding_pattern pat =
-    match (pat : Typed.Pattern.t) with
+    match (pat : Typed.Pattern.generalized) with
     | Catch_all _ -> ()
     | _ ->
       Compilation_error.raise
@@ -792,7 +798,7 @@ module Expr = struct
         ~msg:
           [%message
             "Only variables are allowed as the left-hand side of recursive let bindings"
-              (pat : Typed.Pattern.t)]
+              (pat : Typed.Pattern.generalized)]
   ;;
 
   let generate_let_bindings
@@ -848,7 +854,7 @@ module Expr = struct
               ~msg:
                 [%message
                   "The pattern in this let binding is not exhaustive"
-                    ~pattern:(pat : Typed.Pattern.t)
+                    ~pattern:(pat : Typed.Pattern.generalized)
                     (missing_cases : Simple_pattern.t list)];
           pat')
       in
@@ -1405,7 +1411,7 @@ let of_typed_module =
     ~rec_
     ~fun_decls
     (bindings :
-      (Typed.Pattern.t Node.t * Fixity.t option * Typed.Expr.generalized Node.t)
+      (Typed.Pattern.generalized Node.t * Fixity.t option * Typed.Expr.generalized Node.t)
       Nonempty.t)
     =
     let process_expr (stmts : Stmt.t list) ~just_bound ~ctx expr typ =

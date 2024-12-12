@@ -47,15 +47,19 @@ module Typed_to_untyped = struct
       ~effect_name:(relativize_effect_name ~names)
   ;;
 
-  let rec relativize_pattern ~names (pattern : Typed.Pattern.t) : Untyped.Pattern.t =
+  let rec relativize_pattern ~names (pattern : Typed.Pattern.generalized)
+    : Untyped.Pattern.t
+    =
     match pattern with
     | Constant lit -> Constant lit
     | Catch_all name -> Catch_all name
     | As (pattern, name) -> As (relativize_pattern ~names pattern, name)
     | Cnstr_appl (cnstr, args) ->
       Cnstr_appl
-        (relativize_cnstr_name ~names cnstr, List.map args ~f:(relativize_pattern ~names))
-    | Tuple fields -> Tuple (List.map fields ~f:(relativize_pattern ~names))
+        ( relativize_cnstr_name ~names cnstr
+        , List.map args ~f:(fun (arg, _type) -> relativize_pattern ~names arg) )
+    | Tuple fields ->
+      Tuple (List.map fields ~f:(fun (field, _type) -> relativize_pattern ~names field))
     | Record fields ->
       Record
         (Nonempty.map
@@ -65,27 +69,25 @@ module Typed_to_untyped = struct
       Union (relativize_pattern ~names left, relativize_pattern ~names right)
   ;;
 
-  let extract_type type_ ~f =
-    match f type_ with
-    | Some value -> value
-    | None -> compiler_bug [%message "Unexpected type" (type_ : _ Type_scheme.type_)]
-  ;;
-
-  let annotated_pattern ~names (pattern : Typed.Pattern.t) (type_ : _ Type_scheme.type_)
+  let annotated_pattern
+    ~names
+    (pattern : Typed.Pattern.generalized)
+    (type_ : Module_path.relative Type_scheme.type_)
     : Untyped.Pattern.t
     =
     match pattern with
     | Tuple fields ->
-      let field_types =
-        extract_type type_ ~f:(function
-          | Tuple field_types -> Some field_types
-          | _ -> None)
-      in
       Tuple
-        (List.map2_exn fields field_types ~f:(fun field field_type ->
+        (List.map fields ~f:(fun (field, field_type) ->
            Untyped.Pattern.Type_annotation
-             (relativize_pattern ~names field, (field_type, []))))
-    | Constant _ | Catch_all _ | As _ | Cnstr_appl _ | Record _ | Union _ ->
+             (relativize_pattern ~names field, relativize_type' ~names field_type)))
+    | Cnstr_appl (cnstr, args) ->
+      Cnstr_appl
+        ( relativize_cnstr_name ~names cnstr
+        , List.map args ~f:(fun (arg, arg_type) ->
+            Untyped.Pattern.Type_annotation
+              (relativize_pattern ~names arg, relativize_type' ~names arg_type)) )
+    | Constant _ | Catch_all _ | As _ | Record _ | Union _ ->
       Type_annotation (relativize_pattern ~names pattern, (type_, []))
   ;;
 

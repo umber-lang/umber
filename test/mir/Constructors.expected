@@ -2,4 +2,13 @@
  (Value_def Constructors.B.Foo (Make_block (tag 0)))
  (Fun_def
   ((fun_name Constructors.B.of_a) (args (Constructors.B.match.1))
-   (body (Name Constructors.B.Foo)))))
+   (body (Name Constructors.B.Foo))))
+ (Fun_def
+  ((fun_name Constructors.Wrap.Wrap) (args (Constructors.Wrap.*arg0.1))
+   (body (Make_block (tag 0) (fields ((Name Constructors.Wrap.*arg0.1)))))))
+ (Fun_def
+  ((fun_name Constructors.Wrap.my_id) (args (Constructors.Wrap.x.1))
+   (body
+    (Let Constructors.Wrap.y.1
+     (Get_block_field 0 (Name Constructors.Wrap.x.1))
+     (Make_block (tag 0) (fields ((Name Constructors.Wrap.y.1)))))))))

@@ -11,3 +11,13 @@ module B = {
     match
     | A.Foo -> Foo
 }
+
+module Wrap = {
+  type Wrap a =
+    | Wrap a
+  
+  let my_id : Wrap a -> Wrap a =
+    \x ->
+      let' Wrap (y : b) = x in
+      Wrap y : Wrap a
+}

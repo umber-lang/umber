@@ -9,3 +9,13 @@ module B = {
   let of_a = match
     | A.Foo -> Foo
 }
+
+module Wrap = {
+  type Wrap a = | Wrap a
+
+  let my_id x =
+    # FIXME: `let'` syntax highlighting doesn't work atm
+    # FIXME: This doesn't work if you use `x` instead of `y`, even though it should
+    let' (Wrap y) = x in
+    Wrap y
+}
