@@ -1,5 +1,6 @@
 include Names
-module Pattern = Pattern
+module Pattern = Untyped.Pattern
+module Effect_pattern = Untyped.Effect_pattern
 module Expr = Untyped.Expr
 module Module = Module
 

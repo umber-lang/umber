@@ -440,7 +440,6 @@ end = struct
         of_cnstr_appl (record_cnstr_name field_names) (List.rev field_patterns)*)
         failwith "TODO: flatten_typed_pattern: record patterns"
       | Union (pat1, pat2) -> Nonempty.(loop pat1 @ loop pat2)
-      | Type_annotation _ -> .
     and of_cnstr_appl cnstr args =
       match Nonempty.of_list args with
       | None -> [ Cnstr_appl (cnstr, []) ]
@@ -907,7 +906,7 @@ module Expr = struct
            Nonempty.mapi args_and_types ~f:(fun i (arg_expr, arg_type) ->
              let name = Constant_names.synthetic_arg i in
              let arg_pat_and_type =
-               Node.dummy_span (Pattern.Catch_all (Some name), arg_type)
+               Node.dummy_span (Typed.Pattern.Catch_all (Some name), arg_type)
              in
              let arg_name = Node.dummy_span (Typed.Expr.Name (current_path, name)) in
              (arg_name, arg_type), (arg_pat_and_type, None, arg_expr))
@@ -915,7 +914,9 @@ module Expr = struct
          in
          let bindings =
            Nonempty.cons
-             (Node.dummy_span (Pattern.Catch_all (Some fun_name), fun_type), None, fun_)
+             ( Node.dummy_span (Typed.Pattern.Catch_all (Some fun_name), fun_type)
+             , None
+             , fun_ )
              bindings
          in
          let n_applied_args = Nonempty.length applied_args in
@@ -923,7 +924,7 @@ module Expr = struct
            Nonempty.mapi unapplied_arg_types ~f:(fun i arg_type ->
              let i = i + n_applied_args in
              let name = Constant_names.synthetic_arg i in
-             let arg_pattern = Node.dummy_span (Pattern.Catch_all (Some name)) in
+             let arg_pattern = Node.dummy_span (Typed.Pattern.Catch_all (Some name)) in
              let arg_name = Node.dummy_span (Typed.Expr.Name (current_path, name)) in
              (* Setting zero constraints on [arg_type] is a bit dodgy, but we don't use
                 the constraints so it's fine. *)
@@ -1052,7 +1053,7 @@ module Expr = struct
             ~f:(fun ctx_for_body ((pat_and_type, _fixity, _expr) as binding) ->
             let ctx_for_body, names_bound =
               Node.with_value pat_and_type ~f:(fun (pattern, _) ->
-                Pattern.Names.fold
+                Typed.Pattern.fold_names
                   pattern
                   ~init:(ctx_for_body, Mir_name.Set.empty)
                   ~f:(fun (ctx_for_body, names_bound) name ->
@@ -1451,7 +1452,7 @@ let of_typed_module =
       Nonempty.map bindings ~f:(fun ((pattern, (_ : Fixity.t option), _) as binding) ->
         let names_bound =
           Node.with_value pattern ~f:(fun pattern ->
-            Pattern.Names.fold
+            Typed.Pattern.fold_names
               pattern
               ~init:Mir_name.Set.empty
               ~f:(fun names_bound name ->

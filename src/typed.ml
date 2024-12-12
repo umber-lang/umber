@@ -7,9 +7,32 @@ let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 let eprint_s = ignore
 
 module Pattern = struct
-  include Pattern
+  type t =
+    | Constant of Literal.t
+    | Catch_all of Value_name.t option
+    | As of t * Value_name.t
+    | Cnstr_appl of Cnstr_name.Absolute.t * t list
+    | Tuple of t list
+    | Record of (Value_name.t * t option) Nonempty.t
+    | Union of t * t
+  [@@deriving equal, sexp, variants]
 
-  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
+  let fold_names pat ~init ~f =
+    let rec loop acc ~f = function
+      | Catch_all (Some name) -> f acc name
+      | As (pat, name) -> loop (f acc name) ~f pat
+      | Cnstr_appl (_, items) | Tuple items -> List.fold items ~init:acc ~f:(loop ~f)
+      | Record fields ->
+        Nonempty.fold fields ~init:acc ~f:(fun acc -> function
+          | name, None -> f acc name
+          | _, Some pat -> loop acc ~f pat)
+      | Union (pat, _) ->
+        (* Both branches bind the same names, so only one need be considered *)
+        loop acc ~f pat
+      | Constant _ | Catch_all None -> acc
+    in
+    loop init ~f pat
+  ;;
 
   let check_cnstr_application ~names ~types ~(cnstr_type : Internal_type.t) ~arg_types =
     (* TODO: inferring unqualified name given type information *)
@@ -34,7 +57,7 @@ module Pattern = struct
   ;;
 
   let rec of_untyped_with_names ~names ~types ~fixity pat_names
-    : Untyped.Pattern.t -> Names.t * (t * Internal_type.t)
+    : Untyped.Pattern.t -> Pattern_names.t * (t * Internal_type.t)
     = function
     | Constant lit ->
       ( pat_names
@@ -44,7 +67,7 @@ module Pattern = struct
       let pat_names, typ =
         match name with
         | Some name ->
-          Pattern.Names.add_fresh_name pat_names name ~type_source:Placeholder ~fixity
+          Pattern_names.add_fresh_name pat_names name ~type_source:Placeholder ~fixity
         | None -> pat_names, Internal_type.fresh_var ()
       in
       eprint_s
@@ -147,7 +170,7 @@ module Pattern = struct
         of_untyped_with_names ~names ~types pat_names pat ~fixity
       in
       let pat_names =
-        Pattern.Names.add_name pat_names name typ ~type_source:Placeholder ~fixity
+        Pattern_names.add_name pat_names name typ ~type_source:Placeholder ~fixity
       in
       pat_names, (As (pat, name), typ)
     | Type_annotation (pat, annotated_type) ->
@@ -174,7 +197,7 @@ module Pattern = struct
 
   let of_untyped_into ~names ~types ~fixity pattern =
     let ((pat_names, _) as pat) =
-      of_untyped_with_names ~names ~types Pattern.Names.empty pattern ~fixity
+      of_untyped_with_names ~names ~types Pattern_names.empty pattern ~fixity
     in
     let names =
       Name_bindings.merge_names names pat_names ~combine:(fun _ _ new_entry -> new_entry)
@@ -187,7 +210,7 @@ module Pattern = struct
     eprint_s
       [%message
         "Pattern.generalize"
-          (pat_names : Pattern.Names.t)
+          (pat_names : Pattern_names.t)
           (typ : Internal_type.t)
           (types : Type_bindings.t)];
     let names =
@@ -204,9 +227,11 @@ module Pattern = struct
 end
 
 module Effect_pattern = struct
-  include Effect_pattern
-
-  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
+  type t =
+    { operation : Value_name.Absolute.t
+    ; args : Pattern.t Nonempty.t
+    }
+  [@@deriving equal, sexp]
 
   let of_untyped_with_names
     ~names
@@ -214,7 +239,7 @@ module Effect_pattern = struct
     ~result_effects
     ~result_type
     pat_names
-    { operation; args }
+    ({ operation; args } : Untyped.Effect_pattern.t)
     =
     let operation = Name_bindings.absolutify_value_name names operation in
     let operation_name_entry = Name_bindings.find_absolute_entry names operation in
@@ -256,7 +281,7 @@ module Effect_pattern = struct
       | Some { effects = _; effect_var = Some _ } | None -> error ()
     in
     let pat_names =
-      Pattern.Names.add_name
+      Pattern_names.add_name
         pat_names
         Value_name.resume_keyword
         (Function ([ operation_result_type ], result_effects, result_type))
@@ -273,7 +298,7 @@ module Effect_pattern = struct
         ~types
         ~result_effects
         ~result_type
-        Pattern.Names.empty
+        Pattern_names.empty
         effect_pattern
     in
     let names =
@@ -323,7 +348,7 @@ module Expr = struct
       expr, typ, effects
     in
     let rec of_untyped ~names ~types ~f_name expr
-      : (Internal_type.t * Pattern.Names.t) t Node.t
+      : (Internal_type.t * Pattern_names.t) t Node.t
         * Internal_type.t
         * Internal_type.effects
       =
@@ -355,7 +380,7 @@ module Expr = struct
                 Nonempty.map args ~f:(fun arg ->
                   let arg, arg_type, arg_effects = of_untyped ~names ~types ~f_name arg in
                   add_effects arg_effects (Node.span arg);
-                  arg, (arg_type, Pattern.Names.empty))
+                  arg, (arg_type, Pattern_names.empty))
               in
               let arg_types = Nonempty.map args ~f:(fun (_, (arg_type, _)) -> arg_type) in
               let result_var = Type_var.create () in
@@ -370,7 +395,7 @@ module Expr = struct
                 ~types
                 ~subtype:fun_type
                 ~supertype:(Partial_function (arg_types, call_effects, result_var));
-              ( node (Fun_call (fun_, (fun_type, Pattern.Names.empty), args))
+              ( node (Fun_call (fun_, (fun_type, Pattern_names.empty), args))
               , Var result_var ))
           | Op_tree tree ->
             of_untyped ~names ~types ~f_name (Op_tree.to_untyped_expr ~names tree)
@@ -421,7 +446,7 @@ module Expr = struct
             let names, args_and_types =
               Nonempty.fold_map args ~init:names ~f:(fun names arg ->
                 let span = Node.span arg in
-                let names, ((_ : Pattern.Names.t), (arg, arg_type)) =
+                let names, ((_ : Pattern_names.t), (arg, arg_type)) =
                   Node.with_value
                     arg
                     ~f:(Pattern.of_untyped_into ~names ~types ~fixity:None)
@@ -469,7 +494,7 @@ module Expr = struct
               ( node
                   (Match
                      ( cond
-                     , (bool_type, Pattern.Names.empty)
+                     , (bool_type, Pattern_names.empty)
                      , [ branch Intrinsics.Bool.true_ then_
                        ; branch Intrinsics.Bool.false_ else_
                        ] ))
@@ -487,7 +512,7 @@ module Expr = struct
               let branches =
                 Nonempty.map branches ~f:(fun (pat, branch) ->
                   let pat_span = Node.span pat in
-                  let names, ((_ : Pattern.Names.t), (pat, pat_type)) =
+                  let names, ((_ : Pattern_names.t), (pat, pat_type)) =
                     Node.with_value
                       pat
                       ~f:(Pattern.of_untyped_into ~names ~types ~fixity:None)
@@ -508,7 +533,7 @@ module Expr = struct
                     ~supertype:result_type;
                   Node.create pat pat_span, branch)
               in
-              node (Match (expr, (expr_type, Pattern.Names.empty), branches)), result_type)
+              node (Match (expr, (expr_type, Pattern_names.empty), branches)), result_type)
           | Match_function branches ->
             let name = Constant_names.match_ in
             of_untyped
@@ -540,7 +565,7 @@ module Expr = struct
                 let pattern_span = Node.span pattern in
                 match Node.with_value pattern ~f:Fn.id with
                 | `Value pattern ->
-                  let names, ((_ : Pattern.Names.t), (pattern, pattern_type)) =
+                  let names, ((_ : Pattern_names.t), (pattern, pattern_type)) =
                     Pattern.of_untyped_into ~names ~types pattern ~fixity:None
                   in
                   Type_bindings.constrain
@@ -560,7 +585,7 @@ module Expr = struct
                   First (Node.create pattern pattern_span, branch_expr)
                 | `Effect effect_pattern ->
                   let ( names
-                      , ( (_ : Pattern.Names.t)
+                      , ( (_ : Pattern_names.t)
                         , (effect_pattern, (effect_name, effect_args)) ) )
                     =
                     Effect_pattern.of_untyped_into
@@ -616,7 +641,7 @@ module Expr = struct
                       "Multiple value branches in handle expression are not supported"
                         (value_branches
                           : (Pattern.t Node.t
-                            * (Internal_type.t * Pattern.Names.t) t Node.t)
+                            * (Internal_type.t * Pattern_names.t) t Node.t)
                             list)]
             in
             let handled_effects =
@@ -672,7 +697,7 @@ module Expr = struct
                 ~types
                 ~subtype:branch_effects
                 ~supertype:result_plus_handled_effects);
-            let expr_type = expr_type, Pattern.Names.empty in
+            let expr_type = expr_type, Pattern_names.empty in
             ( node (Handle { expr; expr_type; value_branch; effect_branches })
             , result_type
             , result_effects )
@@ -697,7 +722,7 @@ module Expr = struct
                             (Pattern.of_untyped_with_names
                                ~names
                                ~types
-                               Pattern.Names.empty
+                               Pattern_names.empty
                                ~fixity)
                       in
                       let names =
@@ -729,7 +754,7 @@ module Expr = struct
                                ~names
                                ~types
                                ~fixity
-                               Pattern.Names.empty)
+                               Pattern_names.empty)
                       in
                       let names =
                         Name_bindings.merge_names
@@ -826,7 +851,7 @@ module Expr = struct
         [%message
           "Expr.of_untyped"
             (result
-              : (Internal_type.t * Pattern.Names.t) t Node.t
+              : (Internal_type.t * Pattern_names.t) t Node.t
                 * Internal_type.t
                 * Internal_type.effects)];
       result
@@ -834,11 +859,11 @@ module Expr = struct
       let all_bound_names =
         Nonempty.fold
           bindings
-          ~init:Pattern.Names.empty
+          ~init:Pattern_names.empty
           ~f:(fun all_bound_names (pattern_etc, (_ : Fixity.t option), _expr) ->
           Node.with_value pattern_etc ~f:(fun (_, (_, pat_names)) ->
             let all_bound_names =
-              Pattern.Names.merge all_bound_names pat_names ~combine:(fun ~key:_ v _ -> v)
+              Pattern_names.merge all_bound_names pat_names ~combine:(fun ~key:_ v _ -> v)
             in
             all_bound_names))
       in
@@ -849,7 +874,7 @@ module Expr = struct
         let path, name = name in
         if Module_path.Absolute.equal path current_path
            && Option.exists
-                (Pattern.Names.find all_bound_names name)
+                (Pattern_names.find all_bound_names name)
                 ~f:(Name_bindings.Name_entry.identical name_entry)
         then used_a_bound_name := true
       in
@@ -1278,7 +1303,11 @@ module Module = struct
               Node.with_value pat ~f:(fun pat ->
                 Name_bindings.merge_names
                   names
-                  (Pattern.Names.gather pat ~type_source:Placeholder ~fixity)
+                  (Pattern_names.gather
+                     pat
+                     ~type_source:Placeholder
+                     ~fixity
+                     ~fold:Untyped.Pattern.fold_names)
                   ~combine:(fun _ _ entry' -> entry')))
           | Module (module_name, sigs, defs) ->
             gather_name_placeholders ~names module_name sigs defs
@@ -1439,7 +1468,7 @@ module Module = struct
      need the set of names up-front to determine dependencies, but only need the types
      later when we type each binding group individually.)*)
   type intermediate_def =
-    (Untyped.Pattern.t * Pattern.Names.t, Untyped.Expr.t, Module_path.absolute) Module.def
+    (Untyped.Pattern.t * Pattern_names.t, Untyped.Expr.t, Module_path.absolute) Module.def
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
@@ -1476,7 +1505,13 @@ module Module = struct
       Nonempty.fold_map ~init:names ~f:(fun names (pat, fixity, expr) ->
         let pat =
           Node.map pat ~f:(fun pat ->
-            let pat_names = Pattern.Names.gather pat ~type_source:Placeholder ~fixity in
+            let pat_names =
+              Pattern_names.gather
+                pat
+                ~type_source:Placeholder
+                ~fixity
+                ~fold:Untyped.Pattern.fold_names
+            in
             pat, pat_names)
         in
         names, (pat, fixity, expr))
@@ -1554,7 +1589,7 @@ module Module = struct
   let type_binding_group
     ~names
     (bindings :
-      ((Untyped.Pattern.t * Pattern.Names.t) Node.t
+      ((Untyped.Pattern.t * Pattern_names.t) Node.t
       * Fixity.t option
       * Untyped.Expr.t Node.t)
       Nonempty.t)
@@ -1578,9 +1613,9 @@ module Module = struct
       Nonempty.fold_map bindings ~init:names ~f:(fun names (pat, fixity, expr) ->
         let pat_span = Node.span pat in
         let pat_names, (pat, pat_type) =
-          Node.with_value pat ~f:(fun (pat, (_ : Pattern.Names.t)) ->
+          Node.with_value pat ~f:(fun (pat, (_ : Pattern_names.t)) ->
             (* TODO: Maybe we could reuse the names from before? *)
-            Pattern.of_untyped_with_names ~fixity ~names ~types Pattern.Names.empty pat)
+            Pattern.of_untyped_with_names ~fixity ~names ~types Pattern_names.empty pat)
         in
         let names =
           (* TODO: I'm not sure why we merge here instead of shadowing. It might be wrong. *)

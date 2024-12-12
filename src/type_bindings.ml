@@ -949,7 +949,7 @@ let instantiate_type_or_scheme
 ;;
 
 let record_context_vars types pat_names =
-  eprint_s [%message "Type_bindings.record_context_vars" (pat_names : Pattern.Names.t)];
+  eprint_s [%message "Type_bindings.record_context_vars" (pat_names : Pattern_names.t)];
   let record_context_var types var ~polarity =
     Hash_set.add (By_polarity.get types.context_vars ~polarity) var
   in

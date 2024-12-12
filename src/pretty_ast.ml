@@ -49,7 +49,8 @@ module Typed_to_untyped = struct
 
   let rec relativize_pattern ~names (pattern : Typed.Pattern.t) : Untyped.Pattern.t =
     match pattern with
-    | (Constant _ | Catch_all _) as pattern -> pattern
+    | Constant lit -> Constant lit
+    | Catch_all name -> Catch_all name
     | As (pattern, name) -> As (relativize_pattern ~names pattern, name)
     | Cnstr_appl (cnstr, args) ->
       Cnstr_appl
@@ -62,7 +63,6 @@ module Typed_to_untyped = struct
            ~f:(Tuple2.map_snd ~f:(Option.map ~f:(relativize_pattern ~names))))
     | Union (left, right) ->
       Union (relativize_pattern ~names left, relativize_pattern ~names right)
-    | Type_annotation _ -> .
   ;;
 
   let extract_type type_ ~f =
@@ -75,7 +75,6 @@ module Typed_to_untyped = struct
     : Untyped.Pattern.t
     =
     match pattern with
-    | Type_annotation _ -> relativize_pattern ~names pattern
     | Tuple fields ->
       let field_types =
         extract_type type_ ~f:(function
@@ -84,7 +83,8 @@ module Typed_to_untyped = struct
       in
       Tuple
         (List.map2_exn fields field_types ~f:(fun field field_type ->
-           Pattern.Type_annotation (relativize_pattern ~names field, (field_type, []))))
+           Untyped.Pattern.Type_annotation
+             (relativize_pattern ~names field, (field_type, []))))
     | Constant _ | Catch_all _ | As _ | Cnstr_appl _ | Record _ | Union _ ->
       Type_annotation (relativize_pattern ~names pattern, (type_, []))
   ;;
@@ -171,7 +171,8 @@ module Typed_to_untyped = struct
         List.map effect_branches ~f:(fun (effect_pattern, branch) ->
           ( Node.map effect_pattern ~f:(fun { operation; args } ->
               `Effect
-                { Effect_pattern.operation = relativize_value_name ~names operation
+                { Untyped.Effect_pattern.operation =
+                    relativize_value_name ~names operation
                 ; args = Nonempty.map args ~f:(relativize_pattern ~names)
                 })
           , Node.map branch ~f:(convert_expr ~names ~type_ ~should_annotate:false) ))
@@ -353,11 +354,14 @@ module Typed_to_untyped = struct
             (Module.Let
                { rec_ = true
                ; bindings =
-                   [ ( node (Pattern.Catch_all (Some (Value_name.of_string_exn "foo")))
+                   [ ( node
+                         (Untyped.Pattern.Catch_all
+                            (Some (Value_name.of_string_exn "foo")))
                      , None
                      , node
                          (Untyped.Expr.Match_function
-                            [ node (Pattern.Catch_all None), node (Untyped.Expr.Tuple [])
+                            [ ( node (Untyped.Pattern.Catch_all None)
+                              , node (Untyped.Expr.Tuple []) )
                             ]) )
                    ]
                })
@@ -734,7 +738,7 @@ let format_to_document
   and format_handle_branches branches =
     format_branches_aux branches ~f:(function
       | `Value pattern -> format_match_branch_pattern pattern
-      | `Effect ({ operation; args } : _ Effect_pattern.t) ->
+      | `Effect ({ operation; args } : Untyped.Effect_pattern.t) ->
         Text "<"
         ^^ format_application
              (format_qualified operation ~f:format_value_name)

@@ -2,16 +2,25 @@ open! Import
 open Names
 
 module Pattern : sig
-  include module type of Pattern
+  type t =
+    | Constant of Literal.t
+    | Catch_all of Value_name.t option
+    | As of t * Value_name.t
+    | Cnstr_appl of Cnstr_name.Relative.t * t list
+    | Tuple of t list
+    | Record of (Value_name.t * t option) Nonempty.t
+    | Union of t * t
+    | Type_annotation of t * Module_path.relative Type_scheme.t
+  [@@deriving equal, sexp, variants]
 
-  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
-  [@@deriving equal, sexp]
+  val fold_names : t -> init:'acc -> f:('acc -> Value_name.t -> 'acc) -> 'acc
 end
 
 module Effect_pattern : sig
-  include module type of Effect_pattern
-
-  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
+  type t =
+    { operation : Value_name.Relative.t
+    ; args : Pattern.t Nonempty.t
+    }
   [@@deriving equal, sexp]
 end
 

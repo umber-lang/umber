@@ -146,29 +146,6 @@
                                (Effect_union ())
                                (Type_app Std.Prelude.List.List ((Var a))))
                               ()))))))
-                        (fold
-                         (Local
-                          ((type_
-                            (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.List.List ((Var a)))
-                                (Var acc)
-                                (Function ((Var acc) (Var a))
-                                 (Effect_union ()) (Var acc)))
-                               (Effect_union ()) (Var acc))
-                              ()))))))
-                        (unzip
-                         (Local
-                          ((type_
-                            (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.List.List
-                                 ((Tuple ((Var a) (Var b))))))
-                               (Effect_union ())
-                               (Tuple
-                                ((Type_app Std.Prelude.List.List ((Var a)))
-                                 (Type_app Std.Prelude.List.List ((Var b))))))
-                              ()))))))
                         (append
                          (Local
                           ((type_
@@ -198,17 +175,6 @@
                                  (Type_app Std.Prelude.List.List ((Var b)))))
                                (Effect_union ())
                                (Type_app Std.Prelude.List.List ((Var b))))
-                              ()))))))
-                        (zip_shortest
-                         (Local
-                          ((type_
-                            (Scheme
-                             ((Function
-                               ((Type_app Std.Prelude.List.List ((Var a)))
-                                (Type_app Std.Prelude.List.List ((Var b))))
-                               (Effect_union ())
-                               (Type_app Std.Prelude.List.List
-                                ((Tuple ((Var a) (Var b))))))
                               ()))))))))
                       (types
                        ((List
@@ -617,31 +583,6 @@
                               (Effect_union ())
                               (Type_app Std.Prelude.List.List ((Var a))))
                              ()))))))
-                       (fold
-                        (Local
-                         ((type_
-                           (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Var j)
-                               (Function ((Var j) (Var a)) (Effect_var e)
-                                (Var j)))
-                              (Effect_var e) (Var j))
-                             ())))
-                          (type_source Let_inferred))))
-                       (unzip
-                        (Local
-                         ((type_
-                           (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.List.List
-                                ((Tuple ((Var a) (Var b))))))
-                              (Effect_union ())
-                              (Tuple
-                               ((Type_app Std.Prelude.List.List ((Var a)))
-                                (Type_app Std.Prelude.List.List ((Var b))))))
-                             ())))
-                          (type_source Let_inferred))))
                        (append
                         (Local
                          ((type_
@@ -684,18 +625,6 @@
                                (Type_app Std.Prelude.List.List ((Var a))))
                               (Effect_union ())
                               (Type_app Std.Prelude.List.List ((Var a))))
-                             ())))
-                          (type_source Let_inferred))))
-                       (zip_shortest
-                        (Local
-                         ((type_
-                           (Scheme
-                            ((Function
-                              ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Type_app Std.Prelude.List.List ((Var b))))
-                              (Effect_union ())
-                              (Type_app Std.Prelude.List.List
-                               ((Tuple ((Var a) (Var b))))))
                              ())))
                           (type_source Let_inferred))))))
                      (types

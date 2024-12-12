@@ -2,15 +2,26 @@ open Import
 open Names
 
 module Pattern : sig
-  include module type of Pattern
+  (* FIXME: Add type annotations inside here *)
+  type t =
+    | Constant of Literal.t
+    | Catch_all of Value_name.t option
+    | As of t * Value_name.t
+    | Cnstr_appl of Cnstr_name.Absolute.t * t list
+    | Tuple of t list
+    | Record of (Value_name.t * t option) Nonempty.t
+    | Union of t * t
+  [@@deriving equal, sexp, variants]
 
-  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
+  val fold_names : t -> init:'acc -> f:('acc -> Value_name.t -> 'acc) -> 'acc
 end
 
 module Effect_pattern : sig
-  include module type of Effect_pattern
-
-  type nonrec t = (Nothing.t, Module_path.absolute) t [@@deriving sexp]
+  type t =
+    { operation : Value_name.Absolute.t
+    ; args : Pattern.t Nonempty.t
+    }
+  [@@deriving equal, sexp]
 end
 
 module Expr : sig

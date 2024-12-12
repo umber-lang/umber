@@ -19,7 +19,7 @@ val instantiate_type_or_scheme
   -> Name_bindings.Name_entry.Type_or_scheme.t
   -> Internal_type.t
 
-val record_context_vars : t -> Pattern.Names.t -> unit
+val record_context_vars : t -> Pattern_names.t -> unit
 
 val constrain
   :  names:Name_bindings.t

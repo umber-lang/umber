@@ -5,16 +5,41 @@ open Names
    comments). This will be helpful for writing an auto-formatter. *)
 
 module Pattern = struct
-  include Pattern
+  type t =
+    | Constant of Literal.t
+    | Catch_all of Value_name.t option
+    | As of t * Value_name.t
+    | Cnstr_appl of Cnstr_name.Relative.t * t list
+    | Tuple of t list
+    | Record of (Value_name.t * t option) Nonempty.t
+    | Union of t * t
+    | Type_annotation of t * Module_path.relative Type_scheme.t
+  [@@deriving equal, sexp, variants]
 
-  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
-  [@@deriving equal, sexp]
+  let fold_names pat ~init ~f =
+    let rec loop acc ~f = function
+      | Catch_all (Some name) -> f acc name
+      | As (pat, name) -> loop (f acc name) ~f pat
+      | Cnstr_appl (_, items) | Tuple items -> List.fold items ~init:acc ~f:(loop ~f)
+      | Record fields ->
+        Nonempty.fold fields ~init:acc ~f:(fun acc -> function
+          | name, None -> f acc name
+          | _, Some pat -> loop acc ~f pat)
+      | Union (pat, _) ->
+        (* Both branches bind the same names, so only one need be considered *)
+        loop acc ~f pat
+      | Type_annotation (pat, _) -> loop acc ~f pat
+      | Constant _ | Catch_all None -> acc
+    in
+    loop init ~f pat
+  ;;
 end
 
 module Effect_pattern = struct
-  include Effect_pattern
-
-  type nonrec t = (Module_path.relative Type_scheme.t, Module_path.relative) t
+  type t =
+    { operation : Value_name.Relative.t
+    ; args : Pattern.t Nonempty.t
+    }
   [@@deriving equal, sexp]
 end
 
@@ -48,7 +73,7 @@ module Expr = struct
   [@@deriving equal, sexp, variants]
 
   let names_used ~names =
-    let add_locals init = Pattern.Names.fold ~init ~f:Set.add in
+    let add_locals init = Pattern.fold_names ~init ~f:Set.add in
     let rec loop ~names used locals = function
       | Literal _ -> used
       | Name ((path, name) as name') ->
