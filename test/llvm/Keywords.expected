@@ -1,0 +1,46 @@
+; ModuleID = 'examples/Keywords.um'
+source_filename = "examples/Keywords.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+
+@Keywords.left = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@Keywords.right = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@Keywords.middle = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+
+define i32 @"umber_main:examples/Keywords.um"() {
+entry:
+  ret i32 0
+}
+
+define tailcc %umber_block* @"Keywords.let's_go"(%umber_block* %"Keywords.*lambda_arg.1") {
+entry:
+  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* bitcast (%umber_block* (%umber_block*)* @"Keywords.let's_go" to %umber_block*), %umber_block* inttoptr (i64 1 to %umber_block*))
+  ret %umber_block* %fun_call
+}
+
+define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+entry:
+  %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
+  br i1 %is_on_heap, label %closure_call, label %regular_call
+
+closure_call:                                     ; preds = %entry
+  %closure_gep = getelementptr %umber_block, %umber_block* %0, i32 0, i32 1, i32 0
+  %closure_gep_raw = load i64, i64* %closure_gep, align 8
+  %closure_fun = inttoptr i64 %closure_gep_raw to %umber_block* (%umber_block*, %umber_block*)*
+  %closure_call1 = tail call tailcc %umber_block* %closure_fun(%umber_block* %0, %umber_block* %1)
+  br label %call_phi
+
+regular_call:                                     ; preds = %entry
+  %calling_fun = bitcast %umber_block* %0 to %umber_block* (%umber_block*)*
+  %regular_call2 = tail call tailcc %umber_block* %calling_fun(%umber_block* %1)
+  br label %call_phi
+
+call_phi:                                         ; preds = %regular_call, %closure_call
+  %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
+  ret %umber_block* %call_phi3
+}
+
+declare i1 @umber_gc_is_on_heap(%umber_block*)
+
