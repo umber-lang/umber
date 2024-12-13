@@ -33,13 +33,9 @@ module Cnstr_info : sig
      callsites generally do that, which leads to looking up each constructor separately. *)
 
   val tag : t -> Cnstr.t -> Cnstr_tag.t
-
-  (* FIXME: This API doesn't really work (because it doesn't handle instantiation of type
-     variables). Remmove it. We should make the type-checking phase put the types onto the
-     AST itself and then read them off. *)
-  val arg_type : t -> Cnstr.t -> Block_index.t -> Module_path.absolute Type_scheme.type_
   val cnstrs : t -> Cnstr.t list
 
+  (* FIXME: Remove types from here, they aren't used and they aren't accurate *)
   val fold
     :  t
     -> init:'acc
@@ -113,10 +109,6 @@ end = struct
   ;;
 
   let tag t cnstr = fst (lookup_cnstr t cnstr)
-
-  let arg_type t cnstr index =
-    List.nth_exn (snd (lookup_cnstr t cnstr)) (Block_index.to_int index)
-  ;;
 end
 
 module Fun_decl = struct
@@ -383,7 +375,7 @@ module Simple_pattern : sig
     | Constant of Literal.t
     | Catch_all of Value_name.t option
     | As of t * Value_name.t
-    | Cnstr_appl of Cnstr.t * t list
+    | Cnstr_appl of Cnstr.t * (t * Module_path.absolute Type_scheme.type_) list
   [@@deriving sexp, variants]
 
   val flatten_typed_pattern : Typed.Pattern.generalized -> t Nonempty.t
@@ -409,7 +401,7 @@ end = struct
     | Constant of Literal.t
     | Catch_all of Value_name.t option
     | As of t * Value_name.t
-    | Cnstr_appl of Cnstr.t * t list
+    | Cnstr_appl of Cnstr.t * (t * Module_path.absolute Type_scheme.type_) list
   [@@deriving sexp, variants]
 
   let names =
@@ -418,7 +410,8 @@ end = struct
       | Constant _ | Catch_all None -> acc
       | Catch_all (Some name) -> Set.add acc name
       | As (t, name) -> loop (Set.add acc name) t
-      | Cnstr_appl (_, ts) -> List.fold ts ~init:acc ~f:loop
+      | Cnstr_appl (_, args) ->
+        List.fold args ~init:acc ~f:(fun acc (arg, _type) -> loop acc arg)
     in
     fun t -> loop Value_name.Set.empty t
   ;;
@@ -448,7 +441,8 @@ end = struct
       match Nonempty.of_list args with
       | None -> [ Cnstr_appl (cnstr, []) ]
       | Some args ->
-        Nonempty.map args ~f:(fun (arg, _arg_type) -> loop arg)
+        Nonempty.map args ~f:(fun (arg, (arg_type, _constraints)) ->
+          Nonempty.map (loop arg) ~f:(fun arg -> arg, arg_type))
         |> Nonempty.cartesian_product_all
         |> Nonempty.map ~f:(fun args -> Cnstr_appl (cnstr, Nonempty.to_list args))
     in
@@ -477,14 +471,17 @@ end = struct
          can probably do something like keep track of the covered ranges. *)
       | Inexhaustive : { largest_seen : Literal.t } -> t
       | Exhaustive
-      | By_cnstr : t list Cnstr.Map.t -> t
+      | By_cnstr : (t * Module_path.absolute Type_scheme.type_) list Cnstr.Map.t -> t
 
     let rec of_pattern : simple_pattern -> t = function
       | Constant lit -> Inexhaustive { largest_seen = lit }
       | Catch_all _ -> Exhaustive
       | As (pat, _) -> of_pattern pat
       | Cnstr_appl (cnstr, args) ->
-        By_cnstr (Cnstr.Map.singleton cnstr (List.map ~f:of_pattern args))
+        By_cnstr
+          (Cnstr.Map.singleton
+             cnstr
+             (List.map args ~f:(fun (arg, arg_type) -> of_pattern arg, arg_type)))
     ;;
 
     let rec combine coverage coverage' =
@@ -511,7 +508,8 @@ end = struct
     and merge_by_cnstr coverage_by_cnstr coverage_by_cnstr' =
       By_cnstr
         (Map.merge_skewed coverage_by_cnstr coverage_by_cnstr' ~combine:(fun ~key:_ ->
-           List.map2_exn ~f:combine))
+           List.map2_exn ~f:(fun (coverage1, type_) (coverage2, _) ->
+             combine coverage1 coverage2, type_)))
     ;;
 
     let add_pattern coverage pattern =
@@ -551,11 +549,12 @@ end = struct
         let cnstr_info = Context.find_cnstr_info ctx input_type in
         let all_cnstrs = Cnstr_info.cnstrs cnstr_info |> Cnstr.Set.of_list in
         let arity = Set.length all_cnstrs in
+        let any_arg_pattern = Catch_all None, Type_scheme.Var Type_param_name.default in
         let missing_cnstrs =
           Set.diff all_cnstrs (Map.key_set coverage_by_cnstr)
           |> Set.to_list
           |> List.map ~f:(fun cnstr ->
-               Cnstr_appl (cnstr, List.init arity ~f:(const (Catch_all None))))
+               Cnstr_appl (cnstr, List.init arity ~f:(const any_arg_pattern)))
         in
         let missing_in_args =
           Map.to_alist coverage_by_cnstr
@@ -564,18 +563,16 @@ end = struct
                | None -> []
                | Some args ->
                  let missing_cases_per_arg =
-                   Nonempty.mapi args ~f:(fun i arg ->
-                     let input_type =
-                       Cnstr_info.arg_type cnstr_info cnstr (Block_index.of_int i)
-                     in
-                     missing_cases ~ctx ~input_type arg)
+                   Nonempty.map args ~f:(fun (arg, input_type) ->
+                     missing_cases ~ctx ~input_type arg
+                     |> List.map ~f:(fun case -> case, input_type))
                  in
                  if Nonempty.for_all ~f:List.is_empty missing_cases_per_arg
                  then []
                  else
                    Nonempty.map missing_cases_per_arg ~f:(function
                      | x :: xs -> Nonempty.(x :: xs)
-                     | [] -> [ Catch_all None ])
+                     | [] -> [ any_arg_pattern ])
                    |> Nonempty.cartesian_product_all
                    |> Nonempty.map ~f:(fun args ->
                         Cnstr_appl (cnstr, Nonempty.to_list args))
@@ -680,11 +677,9 @@ module Expr = struct
         let ctx, name = add_name ctx name in
         let acc = add_let acc name mir_expr in
         loop ~ctx ~add_let ~add_name acc pattern (Name name) type_
-      | Cnstr_appl (cnstr, args) ->
-        let cnstr_info = Context.find_cnstr_info ctx type_ in
-        List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) arg ->
+      | Cnstr_appl (_cnstr, args) ->
+        List.foldi args ~init:(ctx, acc) ~f:(fun i (ctx, acc) (arg, arg_type) ->
           let arg_index = Block_index.of_int i in
-          let arg_type = Cnstr_info.arg_type cnstr_info cnstr arg_index in
           let arg_expr = Get_block_field (arg_index, mir_expr) in
           loop ~ctx ~add_let ~add_name acc arg arg_expr arg_type)
       | Constant _ -> ctx, acc
@@ -715,14 +710,8 @@ module Expr = struct
       else (
         let tag_cond = Non_constant_tag_equals (input_expr, tag) in
         let conds =
-          List.filter_mapi args ~f:(fun i arg ->
+          List.filter_mapi args ~f:(fun i (arg, arg_type) ->
             let arg_index = Block_index.of_int i in
-            (* FIXME: Cnstr info contains the general type of the constructor, but it may
-               have a more concrete type at this application. We either need to:
-               
-               1) Grab the type from the AST (make the previous passes put it there!)
-               2) Instantiate the type ourselves (sounds rough) *)
-            let arg_type = Cnstr_info.arg_type cnstr_info cnstr arg_index in
             let arg_expr = Get_block_field (arg_index, input_expr) in
             condition_of_pattern ~ctx ~input_expr:arg_expr ~input_type:arg_type arg)
         in
