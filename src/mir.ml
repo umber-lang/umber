@@ -35,80 +35,73 @@ module Cnstr_info : sig
   val tag : t -> Cnstr.t -> Cnstr_tag.t
   val cnstrs : t -> Cnstr.t list
 
-  (* FIXME: Remove types from here, they aren't used and they aren't accurate *)
   val fold
     :  t
     -> init:'acc
-    -> f:
-         ('acc
-          -> Cnstr.t
-          -> Cnstr_tag.t
-          -> Module_path.absolute Type_scheme.type_ list
-          -> 'acc)
+    -> f:('acc -> Cnstr.t -> Cnstr_tag.t -> arg_count:int -> 'acc)
     -> 'acc
 
-  val of_variants : (Cnstr_name.t * Module_path.absolute Type_scheme.type_ list) list -> t
-  val of_tuple : Module_path.absolute Type_scheme.type_ list -> t
+  val of_variants : (Cnstr_name.t * int) list -> t
+  val of_tuple : int -> t
 end = struct
   type t =
     | Variants of
         { constant_cnstrs : Cnstr_name.t list
-        ; non_constant_cnstrs :
-            (Cnstr_name.t * Module_path.absolute Type_scheme.type_ list) list
+        ; non_constant_cnstrs : (Cnstr_name.t * int) list
         }
-    | Tuple of Module_path.absolute Type_scheme.type_ list
+    | Tuple of { arg_count : int }
   [@@deriving sexp_of]
 
   let of_variants variants =
     let constant_cnstrs, non_constant_cnstrs =
-      List.partition_map variants ~f:(fun (cnstr_name, args) ->
-        if List.is_empty args then First cnstr_name else Second (cnstr_name, args))
+      List.partition_map variants ~f:(fun (cnstr_name, arg_count) ->
+        if arg_count = 0 then First cnstr_name else Second (cnstr_name, arg_count))
     in
     Variants { constant_cnstrs; non_constant_cnstrs }
   ;;
 
-  let of_tuple args = Tuple args
+  let of_tuple arg_count = Tuple { arg_count }
 
   let fold t ~init:acc ~f =
     match t with
     | Variants { constant_cnstrs; non_constant_cnstrs } ->
       let acc =
         List.foldi constant_cnstrs ~init:acc ~f:(fun i acc cnstr_name ->
-          f acc (Cnstr.Named cnstr_name) (Cnstr_tag.of_int i) [])
+          f acc (Cnstr.Named cnstr_name) (Cnstr_tag.of_int i) ~arg_count:0)
       in
-      List.foldi non_constant_cnstrs ~init:acc ~f:(fun i acc (cnstr_name, args) ->
-        f acc (Named cnstr_name) (Cnstr_tag.of_int i) args)
-    | Tuple args -> f acc Tuple Cnstr_tag.default args
+      List.foldi non_constant_cnstrs ~init:acc ~f:(fun i acc (cnstr_name, arg_count) ->
+        f acc (Named cnstr_name) (Cnstr_tag.of_int i) ~arg_count)
+    | Tuple { arg_count } -> f acc Tuple Cnstr_tag.default ~arg_count
   ;;
 
-  let cnstrs t = List.rev (fold t ~init:[] ~f:(fun acc cnstr _tag _args -> cnstr :: acc))
+  let cnstrs t =
+    List.rev (fold t ~init:[] ~f:(fun acc cnstr _tag ~arg_count:_ -> cnstr :: acc))
+  ;;
 
-  let lookup_cnstr t cnstr =
+  let tag t cnstr =
     match t, (cnstr : Cnstr.t) with
     | Variants { constant_cnstrs; non_constant_cnstrs }, Named cnstr_name ->
       (match
          List.findi constant_cnstrs ~f:(fun (_ : int) -> Cnstr_name.( = ) cnstr_name)
        with
-       | Some (i, (_ : Cnstr_name.t)) -> Cnstr_tag.of_int i, []
+       | Some (i, (_ : Cnstr_name.t)) -> Cnstr_tag.of_int i
        | None ->
          (match
             List.findi non_constant_cnstrs ~f:(fun _ ->
               Cnstr_name.( = ) cnstr_name << fst)
           with
-          | Some (i, (_, args)) -> Cnstr_tag.of_int i, args
+          | Some (i, _) -> Cnstr_tag.of_int i
           | None ->
             compiler_bug
               [%message
                 "Constructor name lookup failed"
                   (cnstr_name : Cnstr_name.t)
                   ~cnstr_info:(t : t)]))
-    | Tuple args, Tuple -> Cnstr_tag.default, args
+    | Tuple _, Tuple -> Cnstr_tag.default
     | Variants _, Tuple | Tuple _, Named _ ->
       compiler_bug
         [%message "Incompatible cnstr info" (cnstr : Cnstr.t) ~cnstr_info:(t : t)]
   ;;
-
-  let tag t cnstr = fst (lookup_cnstr t cnstr)
 end
 
 module Fun_decl = struct
@@ -349,7 +342,7 @@ end = struct
              type_name)
       in
       find_cnstr_info_from_decl t decl ~follow_aliases:true
-    | Tuple args -> Some (Cnstr_info.of_tuple args)
+    | Tuple args -> Some (Cnstr_info.of_tuple (List.length args))
     | Function _ | Var _ -> cnstr_info_lookup_failed type_
     | Union _ | Intersection _ ->
       failwith "TODO: handle cnstr info lookup for union and intersection types"
@@ -357,7 +350,10 @@ end = struct
   and find_cnstr_info_from_decl t decl ~follow_aliases =
     match (decl : _ Type_decl.decl) with
     | Alias alias -> if follow_aliases then find_cnstr_info_internal t alias else None
-    | Variants variants -> Some (Cnstr_info.of_variants variants)
+    | Variants variants ->
+      Some
+        (Cnstr_info.of_variants
+           (List.map variants ~f:(fun (cnstr_name, args) -> cnstr_name, List.length args)))
     | Abstract | Record _ -> None
   ;;
 
@@ -1470,7 +1466,7 @@ let of_typed_module =
     match Context.find_cnstr_info_from_decl ctx decl ~follow_aliases:false with
     | None -> stmts
     | Some cnstr_info ->
-      Cnstr_info.fold cnstr_info ~init:stmts ~f:(fun stmts cnstr tag args ->
+      Cnstr_info.fold cnstr_info ~init:stmts ~f:(fun stmts cnstr tag ~arg_count ->
         match cnstr with
         | Tuple -> stmts
         | Named cnstr_name ->
@@ -1478,7 +1474,6 @@ let of_typed_module =
             Context.find_value_name_assert_local ctx (Value_name.of_cnstr_name cnstr_name)
           in
           let stmt : Stmt.t =
-            let arg_count = List.length args in
             if arg_count = 0
             then Value_def (name, Make_block { tag; fields = [] })
             else (
