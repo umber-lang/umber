@@ -494,6 +494,14 @@
     (diff? output/Imports.expected output/Imports.out)))))
 (rule (alias runtest) (deps (package umber))
  (action
+  (progn (run %{dep:test.exe} %{dep:examples/Keywords.um})
+   (concurrent (diff? tokens/Keywords.expected tokens/Keywords.out)
+    (diff? ast/Keywords.expected ast/Keywords.out)
+    (diff? mir/Keywords.expected mir/Keywords.out)
+    (diff? llvm/Keywords.expected llvm/Keywords.out)
+    (diff? output/Keywords.expected output/Keywords.out)))))
+(rule (alias runtest) (deps (package umber))
+ (action
   (progn (run %{dep:test.exe} %{dep:examples/LetBindingGroups.um})
    (concurrent
     (diff? tokens/LetBindingGroups.expected tokens/LetBindingGroups.out)

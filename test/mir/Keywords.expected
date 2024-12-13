@@ -1,0 +1,8 @@
+((Fun_def
+  ((fun_name Keywords.let's_go) (args (Keywords.*lambda_arg.1))
+   (body
+    (Let Keywords.let's_go.1 (Name Keywords.let's_go)
+     (Fun_call Keywords.let's_go.1 ((Make_block (tag 0))))))))
+ (Value_def Keywords.left (Make_block (tag 0)))
+ (Value_def Keywords.right (Make_block (tag 0)))
+ (Value_def Keywords.middle (Make_block (tag 0))))
