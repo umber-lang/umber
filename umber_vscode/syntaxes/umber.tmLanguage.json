@@ -78,7 +78,7 @@
 			"patterns": [
 				{
 					"comment": "let expression with variable",
-					"match": "\\b(let|let') +((infix[lr]?) +([0-9]+) +)?([[:lower:]_][[:alnum:]'_]*)\\s*(=)\\s",
+					"match": "\\b(let|let')\\s+((infix[lr]?)\\s+([0-9]+)\\s+)?([[:lower:]_][[:alnum:]'_]*)\\s*(=)\\s",
 					"captures": {
 						"1": {
 							"name": "keyword.other.umber"
@@ -99,7 +99,7 @@
 				},
 				{
 					"comment": "let expression with function",
-					"match": "\\b(let|let') +((infix[lr]?) +([0-9]+) +)?([[:lower:]_][[:alnum:]'_]*)",
+					"match": "\\b(let|let')\\s+((infix[lr]?)\\s+([0-9]+)\\s+)?([[:lower:]_][[:alnum:]'_]*)",
 					"captures": {
 						"1": {
 							"name": "keyword.other.umber"
@@ -117,7 +117,7 @@
 				},
 				{
 					"comment": "val/extern declaration, assume function",
-					"match": "\\b(val|extern) +([[:lower:]_][[:alnum:]'_]*)",
+					"match": "\\b(val|extern)\\s+([[:lower:]_][[:alnum:]'_]*)",
 					"captures": {
 						"1": {
 							"name": "keyword.other.umber"
@@ -133,7 +133,11 @@
 			"patterns": [
 				{
 					"name": "keyword.other.umber",
-					"match": "\\b(if|then|else|let|let'|and|in|match|handle|with|as|type|val|extern|infix|infixl|infixr|module|trait|impl|import|effect)\\b"
+					"match": "\\blet'([^[:alnum:]'_]|$)"
+				},
+				{
+					"name": "keyword.other.umber",
+					"match": "\\b(if|then|else|let(?!')|and|in|match|handle|with|as|type|val|extern|infix|infixl|infixr|module|trait|impl|import|effect)\\b"
 				},
 				{
 					"name": "keyword.control.umber",

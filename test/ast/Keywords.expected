@@ -1,0 +1,10 @@
+let let's_go : () -> Never =
+  \() ->
+    let' let's_go : () -> Never = let's_go in
+    let's_go () : Never
+
+let infixl 0 left : () = ()
+
+let infixr 1 right : () = ()
+
+let infix 9 middle : () = ()
