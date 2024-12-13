@@ -1,3 +1,3 @@
 ("Compilation error"
- ((kind Name_error) (msg ("Couldn't find name" List.unzip))
-  (filename AdventOfCode2024_1.um) (span 4:24-4:34)))
+ ((kind Name_error) (msg ("Couldn't find name" List.sort))
+  (filename AdventOfCode2024_1.um) (span 5:15-5:24)))
