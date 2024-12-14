@@ -64,7 +64,7 @@
         ]
     ],
     "indentationRules": {
-        "increaseIndentPattern": "[=(\\[{]\\s*$",
+        "increaseIndentPattern": "([=(\\[{]|->)\\s*$",
         "decreaseIndentPattern": "[)\\]}]",
     }
 }
