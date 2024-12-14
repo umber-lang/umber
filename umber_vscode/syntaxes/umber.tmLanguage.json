@@ -117,12 +117,18 @@
 				},
 				{
 					"comment": "val/extern declaration, assume function",
-					"match": "\\b(val|extern)\\s+([[:lower:]_][[:alnum:]'_]*)",
+					"match": "\\b(val|extern)\\s+((infix[lr]?)\\s+([0-9]+)\\s+)?([[:lower:]_][[:alnum:]'_]*)",
 					"captures": {
 						"1": {
 							"name": "keyword.other.umber"
 						},
-						"2": {
+						"3": {
+							"name": "keyword.other.umber"
+						},
+						"4": {
+							"name": "constant.numeric.decimal.integer.umber"
+						},
+						"5": {
 							"name": "entity.name.function.umber"
 						}
 					}
