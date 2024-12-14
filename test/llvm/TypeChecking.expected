@@ -10,7 +10,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @"TypeChecking.*binding.1" = global %umber_block* null
 @TypeChecking.id_alias = global %umber_block* null
 @TypeChecking.five = global %umber_block* null
-@int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
+@int.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 5] }
 
 define i32 @"umber_main:examples/TypeChecking.um"() {
 entry:

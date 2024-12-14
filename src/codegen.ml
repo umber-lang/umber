@@ -132,12 +132,15 @@ let const_block_header t ~tag ~len =
     |]
 ;;
 
+let singleton_array type_ value = Llvm.const_array type_ [| value |]
+
 let constant_block t ~tag ~len ~type_ ~type_name ~name constant_value =
   let block_header = const_block_header t ~tag ~len in
   let value = Llvm.const_named_struct type_ [| block_header; constant_value |] in
   let global_name = [%string "%{type_name}.%{name}"] in
   let global = Llvm.define_global global_name value t.module_ in
   Llvm.set_global_constant true global;
+  Llvm.set_linkage Link_once_odr global;
   global
 ;;
 
@@ -154,7 +157,7 @@ let codegen_literal t literal =
         ~type_:(block_type t ~len:1)
         ~type_name:"int"
         ~name
-        (Llvm.const_int type_ i)
+        (singleton_array type_ (Llvm.const_int type_ i))
     | Float x ->
       let type_ = Llvm.double_type t.context in
       let name = Float.to_string x in
@@ -165,7 +168,7 @@ let codegen_literal t literal =
         ~type_:(block_type t ~len:1)
         ~type_name:"float"
         ~name
-        (Llvm.const_float type_ x)
+        (singleton_array type_ (Llvm.const_float type_ x))
     | Char c ->
       let type_ = Llvm.i64_type t.context in
       let name = Uchar.to_string c in
@@ -177,7 +180,7 @@ let codegen_literal t literal =
         ~type_:(block_type t ~len:1)
         ~type_name:"char"
         ~name
-        (Llvm.const_int type_ c)
+        (singleton_array type_ (Llvm.const_int type_ c))
     | String s ->
       let s = Ustring.to_string s in
       let n_chars = String.length s in

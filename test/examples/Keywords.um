@@ -6,3 +6,7 @@ let let's_go () =
 let infixl 0 left = ()
 let infixr 1 right = ()
 let infix 9 middle = ()
+
+let infixl 2 (++?) = ()
+let infixr 3 (-->) = ()
+let infix 4 (***) = ()

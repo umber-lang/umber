@@ -11,10 +11,10 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @"WeirdFunCalls.*binding.2" = global %umber_block* null
 @WeirdFunCalls.if_ = global %umber_block* null
 @"WeirdFunCalls.*binding.3" = global %umber_block* null
-@string.465106951 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"plain\00\00\02" }
-@string.812905539 = constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"fun call\00\00\00\00\00\00\00\07" }
-@string.1035704714 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"if\00\00\00\00\00\05" }
-@string.1050473980 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"let\00\00\00\00\04" }
+@string.465106951 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"plain\00\00\02" }
+@string.812905539 = linkonce_odr constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"fun call\00\00\00\00\00\00\00\07" }
+@string.1035704714 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"if\00\00\00\00\00\05" }
+@string.1050473980 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"let\00\00\00\00\04" }
 
 define i32 @"umber_main:examples/WeirdFunCalls.um"() {
 entry:

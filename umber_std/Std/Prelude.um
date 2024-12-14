@@ -8,7 +8,6 @@ module : {
     val append : List a, List a -> List a
     val map : List a, (a -> b) -> List b
     val concat_map : List a, (a -> List b) -> List b
-
     val fold : List a, acc, (acc, a -> acc) -> acc
 
     # Zip two lists together, dropping the suffix of the longer list if their lengths
@@ -16,6 +15,13 @@ module : {
     val zip_shortest : List a, List b -> List (a, b)
 
     val unzip : List (a, b) -> (List a, List b)
+
+    # `split list n` returns a tuple of the first `n` elements of `list`, and the
+    # remaining elements.
+    val split : List a, Int -> (List a, List a)
+
+    # TODO: Add an Ord constraint here
+    val sort : List a -> List a
   }
 
   import .List.(Nil, Cons)
@@ -37,6 +43,8 @@ module : {
   module Int : {
     import Int
 
+    val abs : Int -> Int
+    val neg : Int -> Int
     val to_string : Int -> String
   }
 
@@ -59,7 +67,7 @@ module : {
 
     val infixl 7 (*) : Int, Int -> Int
     #val infixl 7 (/) : Float, Float -> Float
-    #val infixl 7 (//) : Int, Int -> Int  # Same as quot (not div)
+    val infixl 7 (//) : Int, Int -> Int  # Same as quot (not div)
 
     # Remainder
     val infixl 7 (%) : Int, Int -> Int
@@ -150,6 +158,9 @@ module Int = {
   import Int
 
   extern to_string : Int -> String = "umber_int_to_string"
+
+  let neg x = 0 - x
+  let abs x = if x >= 0 then x else neg x
 }
 
 module Float = {
@@ -163,6 +174,14 @@ module Float = {
 }
 
 module List = {
+  let length =
+    let loop acc xs =
+      match xs
+      | Nil -> 0
+      | Cons _ xs -> loop (acc + 1) xs
+    in
+    loop 0
+
   # `rev_append xs ys` reverses `xs` and concatenates it with `ys`
   let rev_append xs ys =
     match xs
@@ -205,6 +224,33 @@ module List = {
     | Cons (x, y) xys ->
       let (xs, ys) = unzip xys in
       (x :: xs, y :: ys)
+
+  let split xs n =
+    let loop left right xs n =
+      match xs
+      | Nil -> (reverse left, reverse right)
+      | Cons x xs ->
+        if n <= 0 then loop left (x :: right) xs n
+        else loop (x :: left) right xs (n - 1)
+    in
+    loop Nil Nil xs n
+
+  let sort xs =
+    let merge xs ys =
+      match (xs, ys)
+      | (Nil, rest) | (rest, Nil) -> rest
+      | (Cons x xs', Cons y ys') ->
+        if x <= y then x :: merge xs' ys
+        else y :: merge xs ys'
+    in
+    let sort_loop len xs =
+      if len <= 1 then xs
+      else 
+        let half_len = len // 2 in
+        let (left, right) = split xs half_len in
+        merge (sort_loop half_len left) (sort_loop (len - half_len) right)
+    in
+    sort_loop (length xs) xs
 }
 
 module Operators = {
@@ -215,6 +261,7 @@ module Operators = {
   extern infixl 6 (+) : Int, Int -> Int = "umber_int_add"
   extern infixl 6 (-) : Int, Int -> Int = "umber_int_sub"
   extern infixl 7 (*) : Int, Int -> Int = "umber_int_mul"
+  extern infixl 7 (//) : Int, Int -> Int = "umber_int_div"
   extern infixl 7 (%) : Int, Int -> Int = "umber_int_rem"
   extern infixl 7 mod : Int, Int -> Int = "umber_int_mod"
   extern infixr 8 (^) : Int, Int -> Int = "umber_int_pow"

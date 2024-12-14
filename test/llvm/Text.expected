@@ -18,15 +18,15 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Text.a = global %umber_block* null
 @Text.b = global %umber_block* null
 @Text._UNICODE_WORKS_TOO = constant %umber_block* bitcast (%umber_block16b* @string.986077178 to %umber_block*)
-@char.a = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 97 }
-@string.774705101 = constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"hello world!\00\00\00\03" }
-@string.398489461 = constant %umber_block24b { %umber_header { i16 -32764, i16 3, i32 0 }, [24 x i8] c"line 1\0D\0A\09 line 2\00\00\00\00\00\00\00\07" }
-@string.229771883 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"!\00\00\00\00\00\00\06" }
-@string.125514899 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"hello\0A\00\01" }
-@string.593386469 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\08world!\00" }
-@string.0 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\00\00\00\00\00\00\00\07" }
-@char.b = constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, i64 98 }
-@string.986077178 = constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA\00" }
+@char.a = linkonce_odr constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, [1 x i64] [i64 97] }
+@string.774705101 = linkonce_odr constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"hello world!\00\00\00\03" }
+@string.398489461 = linkonce_odr constant %umber_block24b { %umber_header { i16 -32764, i16 3, i32 0 }, [24 x i8] c"line 1\0D\0A\09 line 2\00\00\00\00\00\00\00\07" }
+@string.229771883 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"!\00\00\00\00\00\00\06" }
+@string.125514899 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"hello\0A\00\01" }
+@string.593386469 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\08world!\00" }
+@string.0 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\00\00\00\00\00\00\00\07" }
+@char.b = linkonce_odr constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, [1 x i64] [i64 98] }
+@string.986077178 = linkonce_odr constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"\E3\82\B8\E3\82\A7\E3\83\BC\E3\83\A0\E3\82\BA\00" }
 
 define i32 @"umber_main:examples/Text.um"() {
 entry:

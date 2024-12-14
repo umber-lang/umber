@@ -8,10 +8,10 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block1 = type { %umber_header, [1 x i64] }
 
 @"OpSectionRight.*binding.1" = global %umber_block* null
-@string.451727690 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"arg\00\00\00\00\04" }
-@int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
-@string.76039754 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"between\00" }
-@int.6 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 6 }
+@string.451727690 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"arg\00\00\00\00\04" }
+@int.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 5] }
+@string.76039754 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"between\00" }
+@int.6 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 6] }
 
 define i32 @"umber_main:examples/OpSectionRight.um"() {
 entry:

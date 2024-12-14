@@ -32,7 +32,9 @@ type Cool =
   | You_can_define_types_in_between_imports ()
   | Bad_style_though (Option ())
 
-import Std.Prelude.Int._
+import Std.Prelude.List._
+
+import Std.Prelude.Int.(_, abs as _)
 
 import Std.Prelude.Operators.(*)
 

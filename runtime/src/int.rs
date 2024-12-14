@@ -36,6 +36,11 @@ pub extern "C" fn umber_int_mul(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     BlockPtr::new_int(x.as_int() * y.as_int())
 }
 
+#[no_mangle]
+pub extern "C" fn umber_int_div(x: BlockPtr, y: BlockPtr) -> BlockPtr {
+    BlockPtr::new_int(x.as_int() / y.as_int())
+}
+
 // TODO: Handle panics in arithmetic operations by converting them into exceptions
 
 #[no_mangle]

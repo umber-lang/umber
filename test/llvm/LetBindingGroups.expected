@@ -12,18 +12,18 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Std.Prelude.List.Nil = external global %umber_block*
 @LetBindingGroups._.1 = global %umber_block* null
 @LetBindingGroups.bottom.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @LetBindingGroups.bottom_again.1 to %umber_block*)
-@int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
-@int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
-@int.8 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 8 }
-@int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
-@int.6 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 6 }
-@string.721651713 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"a\00\00\00\00\00\00\06" }
-@string.156427255 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"list\00\00\00\03" }
-@string.415265556 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"of\00\00\00\00\00\05" }
-@string.606624195 = constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"words\00\00\02" }
-@int.3 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
-@int.4 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 4 }
-@int.17 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 17 }
+@int.1 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 1] }
+@int.2 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 2] }
+@int.8 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 8] }
+@int.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 5] }
+@int.6 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 6] }
+@string.721651713 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"a\00\00\00\00\00\00\06" }
+@string.156427255 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"list\00\00\00\03" }
+@string.415265556 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"of\00\00\00\00\00\05" }
+@string.606624195 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"words\00\00\02" }
+@int.3 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 3] }
+@int.4 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 4] }
+@int.17 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 17] }
 
 define i32 @"umber_main:examples/LetBindingGroups.um"() {
 entry:

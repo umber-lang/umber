@@ -37,6 +37,7 @@
                   (++ (Imported Std.Prelude.Operators.++))
                   (+. (Imported Std.Prelude.Operators.+.))
                   (-. (Imported Std.Prelude.Operators.-.))
+                  (// (Imported Std.Prelude.Operators.//))
                   (:: (Imported Std.Prelude.Operators.::))
                   (<= (Imported Std.Prelude.Operators.<=))
                   (== (Imported Std.Prelude.Operators.==))
@@ -94,7 +95,21 @@
                    (Local
                     (()
                      ((names
-                       ((to_string
+                       ((abs
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app Int ())) (Effect_union ())
+                               (Type_app Int ()))
+                              ()))))))
+                        (neg
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app Int ())) (Effect_union ())
+                               (Type_app Int ()))
+                              ()))))))
+                        (to_string
                          (Local
                           ((type_
                             (Scheme
@@ -156,6 +171,27 @@
                                 (Function ((Var acc) (Var a))
                                  (Effect_union ()) (Var acc)))
                                (Effect_union ()) (Var acc))
+                              ()))))))
+                        (sort
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a))))
+                               (Effect_union ())
+                               (Type_app Std.Prelude.List.List ((Var a))))
+                              ()))))))
+                        (split
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Type_app Int ()))
+                               (Effect_union ())
+                               (Tuple
+                                ((Type_app Std.Prelude.List.List ((Var a)))
+                                 (Type_app Std.Prelude.List.List ((Var a))))))
                               ()))))))
                         (unzip
                          (Local
@@ -417,6 +453,14 @@
                                (Effect_union ()) (Type_app Float ()))
                               ())))
                            (fixity (Left 6)))))
+                        (//
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app Int ()) (Type_app Int ()))
+                               (Effect_union ()) (Type_app Int ()))
+                              ())))
+                           (fixity (Left 7)))))
                         (::
                          (Local
                           ((type_
@@ -504,6 +548,7 @@
                  (++ (Imported Std.Prelude.Operators.++))
                  (+. (Imported Std.Prelude.Operators.+.))
                  (-. (Imported Std.Prelude.Operators.-.))
+                 (// (Imported Std.Prelude.Operators.//))
                  (:: (Imported Std.Prelude.Operators.::))
                  (<= (Imported Std.Prelude.Operators.<=))
                  (== (Imported Std.Prelude.Operators.==))
@@ -562,7 +607,23 @@
                   (Local
                    (()
                     ((names
-                      ((to_string
+                      ((abs
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Int ())) (Effect_union ())
+                              (Type_app Int ()))
+                             ())))
+                          (type_source Let_inferred))))
+                       (neg
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Int ())) (Effect_union ())
+                              (Type_app Int ()))
+                             ())))
+                          (type_source Let_inferred))))
+                       (to_string
                         (Local
                          ((type_
                            (Scheme
@@ -623,10 +684,33 @@
                            (Scheme
                             ((Function
                               ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Var j)
-                               (Function ((Var j) (Var a)) (Effect_var e)
-                                (Var j)))
-                              (Effect_var e) (Var j))
+                               (Var k)
+                               (Function ((Var k) (Var a)) (Effect_var e)
+                                (Var k)))
+                              (Effect_var e) (Var k))
+                             ())))
+                          (type_source Let_inferred))))
+                       (sort
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var a))))
+                              (Effect_union ())
+                              (Type_app Std.Prelude.List.List ((Var a))))
+                             ())))
+                          (type_source Let_inferred))))
+                       (split
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var u)))
+                               (Type_app Int ()))
+                              (Effect_union ())
+                              (Tuple
+                               ((Type_app Std.Prelude.List.List ((Var u)))
+                                (Type_app Std.Prelude.List.List ((Var u))))))
                              ())))
                           (type_source Let_inferred))))
                        (unzip
@@ -651,6 +735,15 @@
                                (Type_app Std.Prelude.List.List ((Var a))))
                               (Effect_union ())
                               (Type_app Std.Prelude.List.List ((Var a))))
+                             ())))
+                          (type_source Let_inferred))))
+                       (length
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var j))))
+                              (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Let_inferred))))
                        (reverse
@@ -925,6 +1018,15 @@
                              ())))
                           (type_source Extern_declared) (fixity (Left 6))
                           (extern_name umber_float_sub))))
+                       (//
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Int ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Int ()))
+                             ())))
+                          (type_source Extern_declared) (fixity (Left 7))
+                          (extern_name umber_int_div))))
                        (::
                         (Local
                          ((type_

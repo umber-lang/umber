@@ -8,6 +8,9 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Keywords.left = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Keywords.right = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @Keywords.middle = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@"Keywords.++?" = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@"Keywords.-->" = constant %umber_block* inttoptr (i64 1 to %umber_block*)
+@"Keywords.***" = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 
 define i32 @"umber_main:examples/Keywords.um"() {
 entry:

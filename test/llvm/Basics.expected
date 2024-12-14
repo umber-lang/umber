@@ -15,11 +15,11 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @Basics.Yellow = constant %umber_block* inttoptr (i64 3 to %umber_block*)
 @Basics.Purple = constant %umber_block* inttoptr (i64 5 to %umber_block*)
 @Basics.xyz = global %umber_block* null
-@float.1. = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 1.000000e+00 }
-@float.2.5 = constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, double 2.500000e+00 }
-@int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
-@int.2 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 2 }
-@int.3 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 3 }
+@float.1. = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] [double 1.000000e+00] }
+@float.2.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] [double 2.500000e+00] }
+@int.1 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 1] }
+@int.2 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 2] }
+@int.3 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 3] }
 
 define i32 @"umber_main:examples/Basics.um"() {
 entry:

@@ -11,10 +11,10 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @MutualRecursion.Leaf = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @"MutualRecursion.*binding.1" = global %umber_block* null
 @MutualRecursion.number = global %umber_block* null
-@int.0 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 0 }
-@int.1 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 1 }
-@int.17 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 17 }
-@int.5 = constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, i64 5 }
+@int.0 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] zeroinitializer }
+@int.1 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 1] }
+@int.17 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 17] }
+@int.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 5] }
 
 define i32 @"umber_main:examples/MutualRecursion.um"() {
 entry:

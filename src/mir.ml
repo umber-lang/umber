@@ -229,6 +229,9 @@ end = struct
     let extern_info : Extern_info.t =
       match extern_name with
       | None ->
+        (* TODO: The thing we actually care about is "is this defined in the same file?"
+           If we allow submodules to be defined in different files, this won't work.
+           Also, being defined in the same file, and being `extern`, seem orthogonal. *)
         if Module_path.is_prefix path ~prefix:t.module_path
         then Local
         else fallback_to_external ()
@@ -1389,6 +1392,27 @@ end
 type t = Stmt.t list [@@deriving sexp_of]
 
 let of_typed_module =
+  (* To prevent declaring `extern` functions used in this file, add them to `fun_decls`
+     up-front. This is kind of a hack - ideally we'd be able to tell at lookup time that
+     these are defined in the same file and therefore don't need declaring. *)
+  let rec mark_extern_functions_as_declared
+    ~ctx
+    ~fun_decls
+    (defs : Typed.Module.def Node.t list)
+    =
+    List.iter defs ~f:(fun def ->
+      Node.with_value def ~f:(function
+        | Common_def (Extern (value_name, _, _, _)) ->
+          let name = Context.find_value_name_assert_external ctx value_name in
+          Hash_set.add fun_decls name
+        | Module (module_name, _sigs, defs) ->
+          let (_ : Context.t), () =
+            Context.with_module ctx module_name ~f:(fun ctx ->
+              ctx, mark_extern_functions_as_declared ~ctx ~fun_decls defs)
+          in
+          ()
+        | _ -> ()))
+  in
   let handle_let_bindings
     ~ctx
     ~names
@@ -1513,6 +1537,7 @@ let of_typed_module =
     let names = Name_bindings.into_module names module_name ~place:`Def in
     let ctx = Context.create ~names ~name_table:(Mir_name.Name_table.create ()) in
     let fun_decls = Mir_name.Hash_set.create () in
+    mark_extern_functions_as_declared ~ctx ~fun_decls defs;
     Compilation_error.try_with' (fun () ->
       let (_ : Context.t), stmts = loop ~ctx ~names ~stmts:[] ~fun_decls defs in
       List.rev stmts)
