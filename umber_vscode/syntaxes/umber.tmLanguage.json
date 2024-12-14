@@ -149,11 +149,11 @@
 			"patterns": [
 				{
 					"name": "variable.name.lower.umber",
-					"match": "\\b[[:lower:]_][[:alnum:]'_]*\\b"
+					"match": "\\b[[:lower:]_][[:alnum:]'_]*('|\\b)"
 				},
 				{
 					"name": "constant.other.upper.umber",
-					"match": "\\b[[:upper:]_][[:alnum:]'_]*\\b"
+					"match": "\\b[[:upper:]_][[:alnum:]'_]*('|\\b)"
 				}
 			]
 		},
