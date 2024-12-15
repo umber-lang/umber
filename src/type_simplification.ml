@@ -6,7 +6,7 @@ open! Names
    - The Simple Essence of Algebraic Subtyping https://dl.acm.org/doi/pdf/10.1145/3409006 *)
 
 (* FIXME: cleanup *)
-let eprint_s = ignore
+let eprint_s (_ : Sexp.t Lazy.t) = ()
 
 (* TODO: Consider upstreaming these in Type_scheme *)
 
@@ -159,6 +159,7 @@ let get_positive_and_negative_vars outer_type ~context_vars =
   fold_type_with_polarity
     outer_type
     ~init:
+      (* FIXME: We need to move this logic outside so we can filter by polarity. *)
       ((* Context vars are treated as "inputs" to an expression, so flip their polarity. *)
        By_polarity.flip context_vars
        |> By_polarity.map ~f:(Type_param.Map.of_key_set ~f:(const 1)))
@@ -236,7 +237,7 @@ let remove_polar_vars type_ ~context_vars =
     get_positive_and_negative_vars type_ ~context_vars
   in
   eprint_s
-    [%message
+    [%lazy_message
       "vars after simplifying var sandwiches and subbing in unions/intersections"
         (type_ : _ Type_scheme.type_)
         (negative_vars : int Type_param.Map.t)
@@ -341,7 +342,8 @@ let replace_co_occurring_vars type_ =
     |> Fold_action.id
   in
   eprint_s
-    [%message (co_occurences_by_var : Type_param.Set.t Type_param.Map.t By_polarity.t)];
+    [%lazy_message
+      (co_occurences_by_var : Type_param.Set.t Type_param.Map.t By_polarity.t)];
   let replacements = Type_param.Table.create () in
   By_polarity.iter co_occurences_by_var ~f:(fun co_occurences_by_var ~polarity:_ ->
     Map.iteri co_occurences_by_var ~f:(fun ~key:var ~data:co_occuring_vars ->
@@ -379,7 +381,7 @@ let replace_co_occurring_vars type_ =
 
 let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   eprint_s
-    [%message
+    [%lazy_message
       "simplify_type"
         (type_, constraints : _ Type_scheme.t)
         (context_vars : Type_param.Set.t By_polarity.t)];
@@ -393,11 +395,11 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
       |> Type_param.Map.of_alist_fold ~init:Type_param.Set.empty ~f:Set.add
     in
     let type_ = simplify_var_sandwiches type_ ~lower_bounds ~upper_bounds in
-    eprint_s [%message "after simplifying sandwiches" (type_ : _ Type_scheme.type_)];
+    eprint_s [%lazy_message "after simplifying sandwiches" (type_ : _ Type_scheme.type_)];
     replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper_bounds
   in
   let type_ = remove_polar_vars type_ ~context_vars in
-  eprint_s [%message "after removing polar vars" (type_ : _ Type_scheme.type_)];
+  eprint_s [%lazy_message "after removing polar vars" (type_ : _ Type_scheme.type_)];
   let type_ = replace_co_occurring_vars type_ in
   (* TODO: We don't know whether variables are used elsewhere in the expression without
      some notion of type variable scope. This means replacing vars only used once in a
@@ -430,7 +432,7 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
   eprint_s
-    [%message
+    [%lazy_message
       "after replacing co-occuring vars and renaming" (type_ : _ Type_scheme.type_)];
   type_, []
 ;;

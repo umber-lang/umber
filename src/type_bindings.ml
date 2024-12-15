@@ -2,7 +2,7 @@ open! Import
 open! Names
 
 (* FIXME: cleanup *)
-let eprint_s = ignore
+let eprint_s (_ : Sexp.t Lazy.t) = ()
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -76,9 +76,10 @@ module Constraints : sig
   val mark_effects_as_not_included : t -> Type_var.t -> Effect_name.Absolute.Set.t -> unit
   val find_effects_not_included : t -> Type_var.t -> Effect_name.Absolute.Set.t
 
-  val to_constraint_list
+  val get_relevant_constraints
     :  t
     -> params:Type_param.Env_of_vars.t
+    -> vars_by_polarity:_ Type_param.Map.t By_polarity.t
     -> Type_scheme.constraint_ list
 
   val print : t -> unit
@@ -158,25 +159,41 @@ end = struct
       | Some effects' -> Set.union effects effects')
   ;;
 
-  let to_constraint_list t ~params =
+  let get_relevant_constraints t ~params ~(vars_by_polarity : _ By_polarity.t) =
     Hashtbl.to_alist t.upper_bounds
     |> List.concat_map ~f:(fun (subtype, supertypes) ->
          (* FIXME: We were using this to check if the subtype was mentioned in the type,
             but now it's only if the var has been generalized. Maybe fine/good? We also
             add the vars here... I think generalized vars just needs to keep track of any
             vars we might have generalized, so should be fine *)
-         let subtype_relevant = Type_param.Env_of_vars.mem params subtype in
-         let subtype = Type_param.Env_of_vars.find_or_add params subtype in
-         Hash_set.to_list supertypes
-         |> List.filter_map ~f:(fun supertype : Type_scheme.constraint_ option ->
-              let supertype_relevant = Type_param.Env_of_vars.mem params supertype in
-              if subtype_relevant || supertype_relevant
-              then (
-                let supertype = Type_param.Env_of_vars.find_or_add params supertype in
-                if Type_param_name.equal subtype supertype
-                then None
-                else Some { subtype; supertype })
-              else None))
+         (* FIXME: So, I was including constraints if *either* the subtype or supertype
+            were relevant. That seems like it might be needed due to intermediate
+            variables with no polarity relating variables with a real polarity. But! That
+            shouldn't happen if the constraints are closed under logical implication (the
+            constraints between the indirectly linked variables should also be present.)
+            
+            Maybe something's going wrong with [generalized_vars] - we only include vars
+            that have been "generalized", but our relevant vars might not have been
+            generalized yet, maybe? (No? Context vars are there, and so are newly
+            generalized vars)
+            
+            I suspect there is a bug somewhere else that was getting covered up by the
+            logic here. *)
+         match Type_param.Env_of_vars.find params subtype with
+         | None -> []
+         | Some subtype ->
+           if not (Map.mem vars_by_polarity.negative subtype)
+           then []
+           else
+             Hash_set.to_list supertypes
+             |> List.filter_map ~f:(fun supertype : Type_scheme.constraint_ option ->
+                  match Type_param.Env_of_vars.find params supertype with
+                  | None -> None
+                  | Some supertype ->
+                    if Type_param_name.equal subtype supertype
+                       || not (Map.mem vars_by_polarity.positive supertype)
+                    then None
+                    else Some { subtype; supertype }))
   ;;
 
   let print t =
@@ -399,7 +416,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
     | type_ -> type_
   in
   eprint_s
-    [%message
+    [%lazy_message
       "Type_bindings.constrain_internal (pre-substitution)"
         (subtype : Internal_type.t)
         (supertype : Internal_type.t)
@@ -414,7 +431,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_types (subtype, supertype))
   then (
     eprint_s
-      [%message
+      [%lazy_message
         "Type_bindings.constrain (post-substitution)"
           (subtype : Internal_type.t)
           (supertype : Internal_type.t)];
@@ -447,6 +464,7 @@ let rec constrain ~names ~types ~subtype ~supertype =
       let type_entry2 = lookup_type names name2 args2 in
       if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
       then type_error "Type application mismatch" ~subtype ~supertype;
+      (* FIXME: Let's not do this and just assume covariance to make life easier. *)
       (* TODO: We don't know what the variance of the type parameters to the type
          are, so we conservatively assume they are invariant. Implement inference
          and manual specification of type parameter variance, similar to what OCaml
@@ -564,7 +582,7 @@ and check_var_vs_type ~names ~types ~var ~type_ ~var_side =
     substitution
   in
   eprint_s
-    [%message
+    [%lazy_message
       "check_var_vs_type"
         (var : Type_var.t)
         (var_side : [ `Left | `Right ])
@@ -584,7 +602,7 @@ and check_var_vs_type ~names ~types ~var ~type_ ~var_side =
 
 and constrain_effects ~names ~types ~subtype ~supertype =
   eprint_s
-    [%message
+    [%lazy_message
       "Type_bindings.constrain_effects (pre-substitution)"
         (subtype : Internal_type.effects)
         (supertype : Internal_type.effects)
@@ -595,7 +613,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
   if not (Hash_set.mem types.constrained_effects (subtype, supertype))
   then (
     eprint_s
-      [%message
+      [%lazy_message
         "Type_bindings.constrain_effects (post-substitution)"
           (subtype : Internal_type.effects)
           (supertype : Internal_type.effects)];
@@ -633,7 +651,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
     if not ([%equal: _ Effect_name.Absolute.Map.t] supertype_effects supertype_effects')
     then
       eprint_s
-        [%message
+        [%lazy_message
           "Removed some effects"
             (supertype_effects : _ Effect_name.Absolute.Map.t)
             (supertype_effects' : _ Effect_name.Absolute.Map.t)];
@@ -728,7 +746,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
           ~all_mentioned_effects
       in
       eprint_s
-        [%message
+        [%lazy_message
           "constraining effects"
             (subtype_var : Type_var.t option)
             (new_subtype_var : Type_var.t option)
@@ -949,13 +967,16 @@ let instantiate_type_or_scheme
 ;;
 
 let record_context_vars types pat_names =
-  eprint_s [%message "Type_bindings.record_context_vars" (pat_names : Pattern_names.t)];
+  eprint_s
+    [%lazy_message "Type_bindings.record_context_vars" (pat_names : Pattern_names.t)];
   let record_context_var types var ~polarity =
     Hash_set.add (By_polarity.get types.context_vars ~polarity) var
   in
   Map.iteri pat_names ~f:(fun ~key:name ~data:name_entry ->
     match Name_bindings.Name_entry.type_ name_entry with
     | Type type_ ->
+      (* TODO: Singling out `resume` is a bit of a hack. Is there a better, more general
+         way of handling this? *)
       (* The `resume` keyword works differently to other pattern-bound names. The type
          variables in its type are guaranteed to come from within the same expression,
          not as an input. So, it's safe to not consider its type to include context
@@ -975,7 +996,6 @@ let constrain' ~names ~types ~subtype ~supertype =
     ~supertype:(instantiate_type_or_scheme ~names ~types supertype)
 ;;
 
-(* FIXME: Use generalized_vars mapping *)
 (* TODO: We should probably have a notion of type variable scope so that the type
    variables we introduce can be shared between multiple type expressions in the same
    expresion/statement. *)
@@ -1025,69 +1045,77 @@ let generalize types outer_type =
     Type_scheme.effect_union_list (Option.to_list effects_from_effect_var @ effects)
   in
   eprint_s
-    [%message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
+    [%lazy_message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
   (* FIXME: We give different names to the params in different places in the same
      statement. We should have 1 type-bindings per statement, and probably just one param
      name generator for that. *)
   let substituted_type = Substitution.apply_to_type types.substitution outer_type in
   let scheme = generalize_internal types substituted_type ~polarity:Positive in
+  (* FIXME: We could filter the constraints just used to simplify this expression at this
+     point - that should reduce a lot of problems, right? We don't need to worry about
+     removing constraints if we just do it temporarily. Might work ok .*)
+  let context_vars =
+    (* FIXME: I think we also need to extend this with the substitution - anything we'd
+       substitute in place of context vars should count as "from the context". e.g. if
+       we have a function as an argument, it starts out with just one var as the known
+       type. We'll later get some constraints on that. Hopefully just looking at the
+       substitution is good enough?
+       
+       How can we efficiently keep the context vars updated? They can change whenever we
+       change the substitution? Maybe keep them as part of the substitution? Or just
+       apply the substitution here every time?
+       
+       Actually I'm not 100% sure we need this, hmmm.
+       This seems expensive, can we amortize the cost by doing it each time we edit the
+       substitution or add a context var? (instead of each time we generalize anything,
+       which should be more often)
+       
+       I think this is most likely needed, it makes sense.
+
+       One problem: when typing a recursive definition, the context vars include the var
+       itself, which is weird. Maybe those should be exempted? We could add them as
+       context vars after typing the body. They aren't really "inputs" in the same
+       sense, I think? Yeah, they never appeared in negative position, or something
+       equivalent. (It's kinda similar to instantiated vars though?) *)
+    eprint_s
+      [%lazy_message
+        "context vars before checking substitutions"
+          (types.context_vars : Type_var.Hash_set.t By_polarity.t)];
+    By_polarity.iter types.context_vars ~f:(fun context_vars ~polarity ->
+      Array.iter (Hash_set.to_array context_vars) ~f:(fun var ->
+        Substitution.iter_reachable_vars
+          types.substitution
+          var
+          ~polarity
+          ~f:(fun var ~polarity ->
+          eprint_s [%lazy_message "iter var" (var : Type_var.t) (polarity : Polarity.t)];
+          Hash_set.add (By_polarity.get types.context_vars ~polarity) var)));
+    By_polarity.map types.context_vars ~f:(fun vars ->
+      Hash_set.to_list vars
+      |> List.map ~f:(Type_param.Env_of_vars.find_or_add types.generalized_vars)
+      |> Type_param.Set.of_list)
+  in
+  eprint_s
+    [%lazy_message
+      "context vars after checking substitutions"
+        (types.context_vars : Type_var.Hash_set.t By_polarity.t)
+        (context_vars : Type_param.Set.t By_polarity.t)];
+  (* FIXME: Get the sets of positive and negative vars here *)
   let constraints =
-    Constraints.to_constraint_list types.constraints ~params:types.generalized_vars
+    let vars_by_polarity =
+      Type_simplification.get_positive_and_negative_vars scheme ~context_vars
+    in
+    Constraints.get_relevant_constraints
+      types.constraints
+      ~params:types.generalized_vars
+      ~vars_by_polarity
   in
   let pre_simplified_type = scheme, constraints in
   let simplified_type =
-    let context_vars =
-      (* FIXME: I think we also need to extend this with the substitution - anything we'd
-         substitute in place of context vars should count as "from the context". e.g. if
-         we have a function as an argument, it starts out with just one var as the known
-         type. We'll later get some constraints on that. Hopefully just looking at the
-         substitution is good enough?
-         
-         How can we efficiently keep the context vars updated? They can change whenever we
-         change the substitution? Maybe keep them as part of the substitution? Or just
-         apply the substitution here every time?
-         
-         Actually I'm not 100% sure we need this, hmmm.
-         This seems expensive, can we amortize the cost by doing it each time we edit the
-         substitution or add a context var? (instead of each time we generalize anything,
-         which should be more often)
-         
-         I think this is most likely needed, it makes sense.
-
-         One problem: when typing a recursive definition, the context vars include the var
-         itself, which is weird. Maybe those should be exempted? We could add them as
-         context vars after typing the body. They aren't really "inputs" in the same
-         sense, I think? Yeah, they never appeared in negative position, or something
-         equivalent. (It's kinda similar to instantiated vars though?)
-         *)
-      eprint_s
-        [%message
-          "context vars before checking substitutions"
-            (types.context_vars : Type_var.Hash_set.t By_polarity.t)];
-      By_polarity.iter types.context_vars ~f:(fun context_vars ~polarity ->
-        Hash_set.to_list context_vars
-        |> List.iter ~f:(fun var ->
-             Substitution.iter_reachable_vars
-               types.substitution
-               var
-               ~polarity
-               ~f:(fun var ~polarity ->
-               eprint_s [%message "iter var" (var : Type_var.t) (polarity : Polarity.t)];
-               Hash_set.add (By_polarity.get types.context_vars ~polarity) var)));
-      By_polarity.map types.context_vars ~f:(fun vars ->
-        Hash_set.to_list vars
-        |> List.map ~f:(Type_param.Env_of_vars.find_or_add types.generalized_vars)
-        |> Type_param.Set.of_list)
-    in
-    eprint_s
-      [%message
-        "context vars after checking substitutions"
-          (types.context_vars : Type_var.Hash_set.t By_polarity.t)
-          (context_vars : Type_param.Set.t By_polarity.t)];
     Type_simplification.simplify_type (scheme, constraints) ~context_vars
   in
   eprint_s
-    [%message
+    [%lazy_message
       "generalize result"
         (outer_type : Internal_type.t)
         (substituted_type : Internal_type.t)

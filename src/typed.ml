@@ -4,7 +4,7 @@ open Names
 let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
 
 (* FIXME: cleanup *)
-let eprint_s = ignore
+let eprint_s (_ : Sexp.t Lazy.t) = ()
 
 module Pattern = struct
   type 'typ t =
@@ -113,7 +113,7 @@ module Pattern = struct
         | None -> pat_names, Internal_type.fresh_var ()
       in
       eprint_s
-        [%message
+        [%lazy_message
           "pattern bound variable" (name : Value_name.t option) (typ : Internal_type.t)];
       pat_names, (Catch_all name, typ)
     | Cnstr_appl (cnstr, args) ->
@@ -255,7 +255,7 @@ module Pattern = struct
 
   let generalize pat pat_names typ ~names ~types ~shadowing_allowed =
     eprint_s
-      [%message
+      [%lazy_message
         "Pattern.generalize"
           (pat_names : Pattern_names.t)
           (typ : Internal_type.t)
@@ -510,7 +510,7 @@ module Expr = struct
             in
             let args, arg_types = Nonempty.unzip args_and_types in
             let body, body_type, body_effects = of_untyped ~names ~types ~f_name body in
-            eprint_s [%message (body_type : Internal_type.t)];
+            eprint_s [%lazy_message (body_type : Internal_type.t)];
             ( node (Lambda (args, body))
             , Function (arg_types, body_effects, body_type)
             , Internal_type.no_effects )
@@ -560,7 +560,7 @@ module Expr = struct
               add_effects expr_effects (Node.span expr);
               let result_type = Internal_type.fresh_var () in
               eprint_s
-                [%message
+                [%lazy_message
                   "typing match"
                     (result_type : Internal_type.t)
                     (expr_type : Internal_type.t)];
@@ -740,7 +740,7 @@ module Expr = struct
             let result_plus_handled_effects : Internal_type.effects =
               { effects = handled_effects; effect_var = Some result_effect_var }
             in
-            eprint_s [%message (result_plus_handled_effects : Internal_type.effects)];
+            eprint_s [%lazy_message (result_plus_handled_effects : Internal_type.effects)];
             Type_bindings.constrain_effects
               ~names
               ~types
@@ -892,7 +892,7 @@ module Expr = struct
               of_untyped ~names ~types ~f_name expr
             in
             eprint_s
-              [%message
+              [%lazy_message
                 "type annotation constraint"
                   (inferred_type : Internal_type.t)
                   (annotated_type : Internal_type.t)];
@@ -904,7 +904,7 @@ module Expr = struct
             expr, annotated_type, expr_effects)
       in
       eprint_s
-        [%message
+        [%lazy_message
           "Expr.of_untyped"
             (result
               : (Internal_type.t * Pattern_names.t) t Node.t
@@ -938,7 +938,7 @@ module Expr = struct
         Nonempty.map bindings ~f:(fun (pat, fixity, expr) ->
           let expr, expr_type, expr_effects = of_untyped expr ~f_name ~names ~types in
           eprint_s
-            [%message
+            [%lazy_message
               "typed binding"
                 (pat : (_ Pattern.t * (Internal_type.t * _)) Node.t)
                 (expr_type : Internal_type.t)
@@ -1807,7 +1807,7 @@ module Module = struct
       let names = gather_type_decls ~names module_name sigs defs in
       let names, defs = handle_value_bindings ~names module_name sigs defs in
       let names, defs = type_defs ~names module_name defs in
-      eprint_s [%message "Finished type-checking. Checking sig-def compatbility."];
+      eprint_s [%lazy_message "Finished type-checking. Checking sig-def compatbility."];
       Sig_def_diff.check ~names module_name;
       Ok (names, (module_name, sigs, defs))
     with
