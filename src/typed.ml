@@ -864,7 +864,8 @@ module Expr = struct
             let make_constructor name =
               Node.dummy_span
                 (Untyped.Expr.Name
-                   (Value_name.Relative.of_ustrings_exn ([], Ustring.of_string_exn name)))
+                   (Value_name.Relative.of_ustrings_unchecked
+                      ([], Ustring.of_string_exn name)))
             in
             let desugared_expr =
               List.fold_right items ~init:(make_constructor "Nil") ~f:(fun item expr ->
