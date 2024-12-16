@@ -4,6 +4,7 @@ module : {
       | Nil
       | Cons a (List a)
 
+    val length : List Any -> Int
     val reverse : List a -> List a
     val append : List a, List a -> List a
     val map : List a, (a -> b) -> List b

@@ -3,6 +3,7 @@ open! Names
 
 (* FIXME: cleanup *)
 let eprint_s (_ : Sexp.t Lazy.t) = ()
+(* let eprint_s = eprint_s << force *)
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)
@@ -390,10 +391,18 @@ let iter2_types xs ys ~subtype ~supertype ~f =
   | Unequal_lengths -> type_error "Type item length mismatch" ~subtype ~supertype
 ;;
 
-let refresh_type type_ =
+let refresh_type type_ ~subtyping_dir =
   let vars = Type_var.Table.create () in
   let refresh_var = Hashtbl.find_or_add vars ~default:Type_var.create in
   Internal_type.map_vars type_ ~f:refresh_var
+  |> Internal_type.map ~f:(fun type_ ->
+       (* It's ok to special-case Any and Never here because we use this after expanding
+          all type aliases. The special-casing is to represent that e.g. $1 <: List Any
+          shouldn't generate a substitution like $1 := List Any. It should use a type
+          variable like $1 := List $2. *)
+       match type_, subtyping_dir with
+       | Any, `Supertype | Never, `Subtype -> Halt (Internal_type.fresh_var ())
+       | _, (`Subtype | `Supertype) -> Defer type_)
 ;;
 
 let rec constrain ~names ~types ~subtype ~supertype =
@@ -403,17 +412,26 @@ let rec constrain ~names ~types ~subtype ~supertype =
     then type_entry
     else type_error "Partially applied type constructor" ~subtype ~supertype
   in
-  let rec expand_aliases (type_ : Internal_type.t) =
-    match type_ with
-    | Type_app (name, args) ->
-      let type_entry = lookup_type names name args in
-      (* FIXME: Need to substitute the arguments into the alias expansion.
-         Otherwise for e.g. `type Pair a = (a, a)`, `Pair Int` is treated as `(a, a)`. *)
-      (match Name_bindings.Type_entry.decl type_entry with
-       | _params, Alias alias ->
-         expand_aliases (instantiate_type_scheme ~names ~types (alias, []))
-       | _ -> type_)
-    | type_ -> type_
+  let rec expand_aliases type_ =
+    Internal_type.map type_ ~f:(fun type_ ->
+      match type_ with
+      | Type_app (name, args) ->
+        let type_entry = lookup_type names name args in
+        (match Name_bindings.Type_entry.decl type_entry with
+         | params, Alias alias ->
+           let args = List.map args ~f:expand_aliases in
+           let params_to_vars = Type_param.Env_to_vars.create () in
+           let instantiated_alias =
+             instantiate_type_scheme ~names ~types ~params:params_to_vars (alias, [])
+           in
+           let arg_substitution = Substitution.create () in
+           List.zip_exn (params :> Type_param_name.t list) args
+           |> List.iter ~f:(fun (param, arg) ->
+                let var = Type_param.Env_to_vars.find_or_add params_to_vars param in
+                Substitution.set_type arg_substitution var arg);
+           Retry (Substitution.apply_to_type arg_substitution instantiated_alias)
+         | _ -> Defer type_)
+      | _ -> Defer type_)
   in
   eprint_s
     [%lazy_message
@@ -438,6 +456,11 @@ let rec constrain ~names ~types ~subtype ~supertype =
     Hash_set.add types.constrained_types (subtype, supertype);
     let subtype = expand_aliases subtype in
     let supertype = expand_aliases supertype in
+    eprint_s
+      [%lazy_message
+        "Type_bindings.constrain (after alias expansion)"
+          (subtype : Internal_type.t)
+          (supertype : Internal_type.t)];
     match subtype, supertype with
     | _, Any | Never, _ -> ()
     | Any, Never
@@ -464,12 +487,9 @@ let rec constrain ~names ~types ~subtype ~supertype =
       let type_entry2 = lookup_type names name2 args2 in
       if not (Name_bindings.Type_entry.identical type_entry1 type_entry2)
       then type_error "Type application mismatch" ~subtype ~supertype;
-      (* FIXME: Let's not do this and just assume covariance to make life easier. *)
-      (* TODO: We don't know what the variance of the type parameters to the type
-         are, so we conservatively assume they are invariant. Implement inference
-         and manual specification of type parameter variance, similar to what OCaml
-         does. *)
-      (* FIXME: Actually, I'm assuming they're covariant, which isn't sound. *)
+      (* TODO: This effectively assumes the arguments are covariant, which isn't sound.
+         Implement inference and manual specification of type parameter variance, similar
+         to what OCaml does. *)
       iter2_types args1 args2 ~subtype ~supertype ~f:(fun arg1 arg2 ->
         constrain ~names ~types ~subtype:arg1 ~supertype:arg2)
     | Type_app (name, args), (Tuple _ | Function _ | Partial_function _) ->
@@ -578,7 +598,12 @@ and check_var_vs_type ~names ~types ~var ~type_ ~var_side =
   let new_var_substitution =
     let substitution = Substitution.create () in
     Set.iter vars_with_same_shape ~f:(fun var ->
-      Substitution.set_type substitution var (refresh_type type_));
+      let subtyping_dir =
+        match var_side with
+        | `Left -> `Supertype
+        | `Right -> `Subtype
+      in
+      Substitution.set_type substitution var (refresh_type type_ ~subtyping_dir));
     substitution
   in
   eprint_s
@@ -670,7 +695,8 @@ and constrain_effects ~names ~types ~subtype ~supertype =
             subtype_only, Map.add_exn supertype_only ~key:effect_name ~data:args
           | `Unequal (args1, args2) ->
             (match
-               (* TODO: Handle type parameter variance for effects. *)
+               (* TODO: Handle type parameter variance for effects. This conservatively
+                  assumes invariance. *)
                List.iter2 args1 args2 ~f:(fun arg1 arg2 ->
                  constrain ~names ~types ~subtype:arg1 ~supertype:arg2;
                  constrain ~names ~types ~subtype:arg2 ~supertype:arg1)
@@ -698,8 +724,8 @@ and constrain_effects ~names ~types ~subtype ~supertype =
             let effects =
               Map.map effects ~f:(fun args ->
                 List.map args ~f:(fun arg ->
-                  let arg' = refresh_type arg in
                   (* FIXME: Is the subtyping direction right here? Maybe it's backwards? *)
+                  let arg' = refresh_type arg ~subtyping_dir:effects_subtyping_dir in
                   (match effects_subtyping_dir with
                    | `Subtype -> constrain ~names ~types ~subtype:arg ~supertype:arg'
                    | `Supertype -> constrain ~names ~types ~subtype:arg' ~supertype:arg);

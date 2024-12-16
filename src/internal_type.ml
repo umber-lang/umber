@@ -36,7 +36,7 @@ let rec map typ ~f =
   | Defer typ ->
     (match typ with
      | Var _ | Never | Any -> typ
-     | Type_app (name, fields) -> Type_app (name, List.map fields ~f:(map ~f))
+     | Type_app (name, args) -> Type_app (name, List.map args ~f:(map ~f))
      | Tuple fields -> Tuple (List.map fields ~f:(map ~f))
      | Function (args, effects, body) ->
        let args = Nonempty.map args ~f:(map ~f) in

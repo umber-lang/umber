@@ -215,6 +215,15 @@
                                (Effect_union ())
                                (Type_app Std.Prelude.List.List ((Var a))))
                               ()))))))
+                        (length
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List
+                                 ((Type_app Any ()))))
+                               (Effect_union ()) (Type_app Int ()))
+                              ()))))))
                         (reverse
                          (Local
                           ((type_
@@ -684,10 +693,10 @@
                            (Scheme
                             ((Function
                               ((Type_app Std.Prelude.List.List ((Var a)))
-                               (Var k)
-                               (Function ((Var k) (Var a)) (Effect_var e)
-                                (Var k)))
-                              (Effect_var e) (Var k))
+                               (Var b)
+                               (Function ((Var b) (Var a)) (Effect_var e)
+                                (Var b)))
+                              (Effect_var e) (Var b))
                              ())))
                           (type_source Let_inferred))))
                        (sort
@@ -705,12 +714,12 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var u)))
+                              ((Type_app Std.Prelude.List.List ((Var g)))
                                (Type_app Int ()))
                               (Effect_union ())
                               (Tuple
-                               ((Type_app Std.Prelude.List.List ((Var u)))
-                                (Type_app Std.Prelude.List.List ((Var u))))))
+                               ((Type_app Std.Prelude.List.List ((Var g)))
+                                (Type_app Std.Prelude.List.List ((Var g))))))
                              ())))
                           (type_source Let_inferred))))
                        (unzip
@@ -742,7 +751,8 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var j))))
+                              ((Type_app Std.Prelude.List.List
+                                ((Intersection ()))))
                               (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Let_inferred))))
