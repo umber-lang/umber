@@ -1,0 +1,8 @@
+("Compilation error"
+ ((kind Mir_error)
+  (msg
+   ("Recursive let bindings can only be used to define functions"
+    (expr
+     (Fun_call (Name Std.Prelude.List.sort) _
+      (((Name AdventOfCode2024_1.nums1) _))))))
+  (filename AdventOfCode2024_1.um) (span 6:15-6:30)))
