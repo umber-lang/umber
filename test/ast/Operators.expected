@@ -47,9 +47,9 @@ let (×) : List a, List b -> List (a, b) =
   \xs ys ->
     List.concat_map
       xs
-      ((\(x : g) ->
-        List.map ys ((\(y : d) -> (x, y)) : d -> (g, d)) : List (g, d))
-        : g -> List (g, d))
+      ((\(x : c) ->
+        List.map ys ((\(y : h) -> (x, y)) : h -> (i, h)) : List (c, d))
+        : c -> List (c, d))
       : List (a, b)
 
 import Std.Prelude.((;), print, (++), Int, Bool)
