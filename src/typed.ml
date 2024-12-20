@@ -1747,6 +1747,31 @@ module Module = struct
     (binding_groups : (def Node.t * Module_path.Absolute.t) list)
     : def Node.t list
     =
+    (* FIXME: The ordering of toplevel bindings is not supposed to matter. So, we should
+       respect the order of the binding groups when we create the new AST. Ah, but that's
+       problematic - there can be dependencies across modules which means the ordering
+       can't be expressed properly. :(
+       
+       e.g. 
+       ```
+       let first = ()
+
+       module Sub = {
+         let second = first
+         let fourth = third
+       }
+
+       let third = Sub.second
+       ```
+
+       Some ideas on how to solve this:
+       - (Radical change) Make the typed AST flattened - seems pretty sad
+       - Have MIR figure out the dependencies itself - a little sad to repeat work
+       - Have the typed AST stamp the bindings with something to say their ordering e.g.
+         the list of bindings they depend on, or an integer they should be sorted by
+         - An integer they should be sorted by seems easiest - stamp it on there and MIR
+           can take all the bindings out
+       *)
     (* NOTE: As we disallow cross-module mutual recursion, binding groups will always be
        contained within a single module and can just be put back into the AST *)
     let binding_table = Module_path.Absolute.Table.create () in
