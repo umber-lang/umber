@@ -7,6 +7,7 @@ open! Names
 
 (* FIXME: cleanup *)
 let eprint_s (_ : Sexp.t Lazy.t) = ()
+(* let eprint_s = eprint_s << force *)
 
 (* TODO: Consider upstreaming these in Type_scheme *)
 
@@ -74,11 +75,6 @@ let map_type_with_polarity =
            , List.map args ~f:(loop ~polarity ~f ~f_effects ~type_name ~effect_name) )
        | Effect_union effects ->
          Type_scheme.effect_union
-           (Non_single_list.map
-              effects
-              ~f:(loop_effects ~polarity ~f ~f_effects ~type_name ~effect_name))
-       | Effect_intersection effects ->
-         Type_scheme.effect_intersection
            (Non_single_list.map
               effects
               ~f:(loop_effects ~polarity ~f ~f_effects ~type_name ~effect_name)))
@@ -159,7 +155,8 @@ let get_positive_and_negative_vars outer_type ~context_vars =
   fold_type_with_polarity
     outer_type
     ~init:
-      (* FIXME: We need to move this logic outside so we can filter by polarity. *)
+      (* TODO: It might make more sense to just start the polarity as negative instead of
+         positive when recording it instead of flipping it here. *)
       ((* Context vars are treated as "inputs" to an expression, so flip their polarity. *)
        By_polarity.flip context_vars
        |> By_polarity.map ~f:(Type_param.Map.of_key_set ~f:(const 1)))
@@ -189,6 +186,8 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
     let bounds = Map.find bounds_map var |> Option.value ~default:Type_param.Set.empty in
     (* FIXME: Review this logic. Maybe we should just leave this top/bottom handling to
        later. *)
+    (* FIXME: [on_unconstrained = `Use_union_or_intersection] isn't sound to use if the
+       var is unconstrained but still used more than once. *)
     match Set.to_list bounds, on_unconstrained with
     | [], `Keep_var -> make_var var
     | [], `Use_union_or_intersection -> combine Non_single_list.[]
@@ -223,8 +222,9 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
              ~polarity
              ~make_var:Type_scheme.effect_var
              ~union:Type_scheme.effect_union
-             ~intersection:Type_scheme.effect_intersection
-             ~on_unconstrained:`Use_union_or_intersection)
+             ~intersection:Type_scheme.effect_union
+               (* FIXME: Seems sus to just use union instead of intersectino *)
+             ~on_unconstrained:`Keep_var)
       | effects -> Defer effects)
 ;;
 
@@ -251,7 +251,10 @@ let remove_polar_vars type_ ~context_vars =
     | Negative ->
       if Map.mem positive_vars var || Map.find_exn negative_vars var > 1
       then make_var var
-      else top
+      else (
+        match top with
+        | Some top -> top
+        | None -> make_var var)
   in
   map_type_with_polarity
     type_
@@ -266,7 +269,7 @@ let remove_polar_vars type_ ~context_vars =
              ~polarity
              ~make_var:Type_scheme.var
              ~bottom:(Union [])
-             ~top:(Intersection []))
+             ~top:(Some (Intersection [])))
       | type_ -> Defer type_)
     ~f_effects:(fun ~polarity effects ->
       match effects with
@@ -277,7 +280,7 @@ let remove_polar_vars type_ ~context_vars =
              ~polarity
              ~make_var:Type_scheme.effect_var
              ~bottom:(Effect_union [])
-             ~top:(Effect_intersection []))
+             ~top:None)
       | effects -> Defer effects)
 ;;
 
@@ -325,12 +328,12 @@ let replace_co_occurring_vars type_ =
         | Type_app _ | Tuple _ | Function _ -> Continue (`Defer co_occurences_by_var))
       ~f_effects:(fun ~polarity co_occurences_by_var effects ->
         match effects with
-        | Effect_union effects | Effect_intersection effects ->
+        | Effect_union effects ->
           let vars =
             Non_single_list.to_list effects
             |> List.filter_map ~f:(function
                  | Effect_var v -> Some v
-                 | Effect _ | Effect_union _ | Effect_intersection _ -> None)
+                 | Effect _ | Effect_union _ -> None)
             |> Type_param.Set.of_list
           in
           Continue (`Halt (update ~co_occurences_by_var ~polarity vars))
@@ -379,6 +382,11 @@ let replace_co_occurring_vars type_ =
     Hashtbl.find replacements var |> Option.value_map ~f:Union_find.get ~default:var)
 ;;
 
+(* FIXME: The context vars we pass here are imprecise. We gather context vars as we do
+   inference, but then we generalize at the end, so when considering each type, we
+   consider every type variable in the entire expression to be part of the context. This
+   is particularly egregious for the types toplevel bindings, which shouldn't depend on
+   anything. *)
 let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   eprint_s
     [%lazy_message
@@ -400,6 +408,7 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   in
   let type_ = remove_polar_vars type_ ~context_vars in
   eprint_s [%lazy_message "after removing polar vars" (type_ : _ Type_scheme.type_)];
+  (* FIXME: Maybe replacing co-occuring vars could also consider context vars for polarity? *)
   let type_ = replace_co_occurring_vars type_ in
   (* TODO: We don't know whether variables are used elsewhere in the expression without
      some notion of type variable scope. This means replacing vars only used once in a
@@ -432,8 +441,7 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   (* All of the constraints are made moot by replacing vars with the union of their
      relevant bounds, so there will be none left. *)
   eprint_s
-    [%lazy_message
-      "after replacing co-occuring vars and renaming" (type_ : _ Type_scheme.type_)];
+    [%lazy_message "after replacing co-occuring vars" (type_ : _ Type_scheme.type_)];
   type_, []
 ;;
 

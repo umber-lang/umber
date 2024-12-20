@@ -2,25 +2,8 @@
 source_filename = "examples/MixTypeAndEffectVars.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
-%umber_block = type { %umber_header, [0 x i64] }
-%umber_header = type { i16, i16, i32 }
-
-@"MixTypeAndEffectVars.*binding.1" = global %umber_block* null
-
 define i32 @"umber_main:examples/MixTypeAndEffectVars.um"() {
 entry:
-  %fun_call = tail call tailcc %umber_block* @MixTypeAndEffectVars.foo(%umber_block* bitcast (%umber_block* (%umber_block*)* @"MixTypeAndEffectVars.*fun.1" to %umber_block*))
-  store %umber_block* %fun_call, %umber_block** @"MixTypeAndEffectVars.*binding.1", align 8
   ret i32 0
-}
-
-define tailcc %umber_block* @MixTypeAndEffectVars.foo(%umber_block* %"MixTypeAndEffectVars.*lambda_arg.1") {
-entry:
-  ret %umber_block* inttoptr (i64 1 to %umber_block*)
-}
-
-define tailcc %umber_block* @"MixTypeAndEffectVars.*fun.1"(%umber_block* %"MixTypeAndEffectVars.*lambda_arg.2") {
-entry:
-  ret %umber_block* inttoptr (i64 1 to %umber_block*)
 }
 

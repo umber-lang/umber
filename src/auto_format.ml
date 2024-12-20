@@ -101,6 +101,8 @@ let format doc ~max_line_length =
     (* TODO: Extra spaces on a blank line should be removed. Maybe we could "buffer" the
        spaces and then output them later (once it's confirmed that non-space characters
        will appear before a newline)? *)
+    (* TODO: Consider maxing out the indentation once it's at a certain level (relative to
+       the max line length). Or we could have a configurable [max_indent]. *)
     Sequence.append
       (Sequence.singleton ("\n" ^ String.make indent ' '))
       (format fragments ~used_length:indent)

@@ -17,7 +17,6 @@ and 'n effects =
   | Effect of 'n Effect_name.Qualified.t * 'n type_ list
   | Effect_var of Type_param_name.t
   | Effect_union of 'n effects Non_single_list.t
-  | Effect_intersection of 'n effects Non_single_list.t
 [@@deriving hash, compare, equal, sexp]
 
 type constraint_ =
@@ -59,24 +58,12 @@ let intersection ts = intersection_list (Non_single_list.to_list ts)
 let effect_union_list ts =
   List.concat_map ts ~f:(function
     | Effect_union ts -> Non_single_list.to_list ts
-    | (Effect _ | Effect_var _ | Effect_intersection _) as e -> [ e ])
+    | (Effect _ | Effect_var _) as e -> [ e ])
   |> List.dedup_and_sort ~compare:[%compare: _ effects]
   |> Non_single_list.of_list_convert ~make:(fun ts -> Effect_union ts) ~singleton:Fn.id
 ;;
 
 let effect_union ts = effect_union_list (Non_single_list.to_list ts)
-
-let effect_intersection_list ts =
-  List.concat_map ts ~f:(function
-    | Effect_intersection ts -> Non_single_list.to_list ts
-    | (Effect _ | Effect_var _ | Effect_union _) as e -> [ e ])
-  |> List.dedup_and_sort ~compare:[%compare: _ effects]
-  |> Non_single_list.of_list_convert
-       ~make:(fun ts -> Effect_intersection ts)
-       ~singleton:Fn.id
-;;
-
-let effect_intersection ts = effect_intersection_list (Non_single_list.to_list ts)
 let effect_var v = Effect_var v
 
 let rec map
@@ -127,11 +114,6 @@ and map_effects
        effect_union
          (Non_single_list.map
             effects
-            ~f:(map_effects ~f ~f_effects ~type_name ~effect_name))
-     | Effect_intersection effects ->
-       effect_intersection
-         (Non_single_list.map
-            effects
             ~f:(map_effects ~f ~f_effects ~type_name ~effect_name)))
 ;;
 
@@ -146,7 +128,7 @@ let map_vars type_ ~f =
         Defer type_)
     ~f_effects:(function
       | Effect_var v -> Halt (Effect_var (f v))
-      | (Effect _ | Effect_union _ | Effect_intersection _) as effects -> Defer effects)
+      | (Effect _ | Effect_union _) as effects -> Defer effects)
 ;;
 
 let map' ?f ?f_effects ((type_, constraints) : _ t) ~type_name ~effect_name =
@@ -184,7 +166,7 @@ and fold_effects_until effects ~init ~f ~f_effects =
      | Effect_var _ -> Continue init
      | Effect (_, args) ->
        List.fold_until args ~init ~f:(fun init -> fold_until ~init ~f ~f_effects)
-     | Effect_union effects | Effect_intersection effects ->
+     | Effect_union effects ->
        Non_single_list.fold_until effects ~init ~f:(fun init effects ->
          fold_effects_until effects ~init ~f ~f_effects))
 ;;

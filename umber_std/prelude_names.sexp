@@ -714,12 +714,12 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var g)))
+                              ((Type_app Std.Prelude.List.List ((Var e)))
                                (Type_app Int ()))
                               (Effect_union ())
                               (Tuple
-                               ((Type_app Std.Prelude.List.List ((Var g)))
-                                (Type_app Std.Prelude.List.List ((Var g))))))
+                               ((Type_app Std.Prelude.List.List ((Var e)))
+                                (Type_app Std.Prelude.List.List ((Var e))))))
                              ())))
                           (type_source Let_inferred))))
                        (unzip

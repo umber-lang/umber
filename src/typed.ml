@@ -253,27 +253,40 @@ module Pattern = struct
     names, pat
   ;;
 
-  let generalize pat pat_names typ ~names ~types ~shadowing_allowed =
+  let generalize pat pat_names typ ~names ~types ~toplevel =
     eprint_s
       [%lazy_message
         "Pattern.generalize"
           (pat_names : Pattern_names.t)
           (typ : Internal_type.t)
           (types : Type_bindings.t)];
+    let shadowing_allowed = not toplevel in
+    let generalize_memoized =
+      Memo.general ~hashable:Internal_type.hashable (fun type_ ->
+        let scheme = Type_bindings.generalize types type_ in
+        (* TODO: This is a weird hack. There's surely a better way of doing this. *)
+        (* Do an extra type simplification pass on toplevel patterns only. This lets us
+           further simplify types with the knowledge that there are no context variables. *)
+        if toplevel
+        then
+          Type_simplification.simplify_type
+            scheme
+            ~context_vars:(By_polarity.init (const Type_param.Set.empty))
+        else scheme)
+    in
     let names =
       Map.fold pat_names ~init:names ~f:(fun ~key:name ~data:entry names ->
         let inferred_scheme =
           match Name_bindings.Name_entry.type_ entry with
           | Scheme scheme -> scheme
-          | Type type_ -> Type_bindings.generalize types type_
+          | Type type_ -> generalize_memoized type_
         in
         Name_bindings.set_inferred_scheme names name inferred_scheme ~shadowing_allowed)
     in
     let pat =
-      map_types pat ~f:(fun (type_, (_ : Pattern_names.t)) ->
-        Type_bindings.generalize types type_)
+      map_types pat ~f:(fun (type_, (_ : Pattern_names.t)) -> generalize_memoized type_)
     in
-    names, pat, Type_bindings.generalize types typ
+    names, pat, generalize_memoized typ
   ;;
 end
 
@@ -1127,13 +1140,7 @@ module Expr = struct
               let pat_span = Node.span pattern_etc in
               let names, pat, scheme =
                 Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-                  Pattern.generalize
-                    pat
-                    ~names
-                    ~types
-                    pat_names
-                    pat_type
-                    ~shadowing_allowed:true)
+                  Pattern.generalize pat ~names ~types pat_names pat_type ~toplevel:false)
               in
               ( Node.create (pat, scheme) pat_span
               , fixity
@@ -1526,7 +1533,7 @@ module Module = struct
       match effects with
       | Effect ((_ : Effect_name.Absolute.t), args) ->
         List.iter args ~f:(loop ~names ~aliases_seen)
-      | Effect_union effects | Effect_intersection effects ->
+      | Effect_union effects ->
         Non_single_list.iter effects ~f:(loop_effects ~names ~aliases_seen)
       | Effect_var _ -> ()
     in
@@ -1715,13 +1722,7 @@ module Module = struct
         let pat_span = Node.span pattern_etc in
         let names, pat, scheme =
           Node.with_value pattern_etc ~f:(fun (pat, (pat_type, pat_names)) ->
-            Pattern.generalize
-              pat
-              ~names
-              ~types
-              pat_names
-              pat_type
-              ~shadowing_allowed:false)
+            Pattern.generalize pat ~names ~types pat_names pat_type ~toplevel:true)
         in
         (* Generalize local let bindings just after the parent binding *)
         let expr_and_scheme =
@@ -1731,6 +1732,7 @@ module Module = struct
         in
         names, (Node.create pat pat_span, fixity, expr_and_scheme))
     in
+    (* TODO: This renames the vars in the AST but _not_ in the [Name_bindings]. *)
     let bindings = rename_type_vars_in_bindings bindings in
     names, Node.create (Let { rec_; bindings }) representative_span
   ;;

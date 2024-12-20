@@ -11,7 +11,7 @@ module Range : {
   
   let between : a, b -> (a, b) = \lo hi -> (lo, hi)
   
-  let elem : (a & b), (a, b) -> Bool =
+  let elem : (a & b), (b, a) -> Bool =
     \x (lo, hi) -> (lo <= x : Bool) && (x <= hi : Bool) : Bool
   
   let (..=) : a, b -> (a, b) = between

@@ -2,11 +2,4 @@
 # supposed to be types or effects
 # This type doesn't make sense - what would it mean for the effect to match the type?
 # This seems to cause weird behavior in the type checker
-let foo : (() -> <a> a) -> () = \_ -> ()
-
-effect Effect = {
-  val operation : () -> ()
-}
-
-#let () = foo (\() -> operation ())
-let () = foo (\() -> ())
+#let foo : (() -> <a> a) -> () = \_ -> ()

@@ -6,7 +6,7 @@ let still_zero_wow : Float = id zero
 
 let sqr : Int -> Int = \x -> x * x : Int
 
-let lots_of_args : a, b, c, d, e -> () = \a b c d e -> ()
+let lots_of_args : Any, Any, Any, Any, Any -> () = \a b c d e -> ()
 
 let () = lots_of_args 5 10000000000000. -89 "huh" 'c'
 

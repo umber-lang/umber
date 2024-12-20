@@ -188,6 +188,8 @@ type t =
 and sigs = Nothing.t bindings
 and defs = sigs bindings
 
+(* TODO: Imports shouldn't automatically be exported. We should introduce some other
+   keyword, like `include` or something, which does that. *)
 and 'a bindings =
   { names : (Name_entry.t, Value_name.Absolute.t) Or_imported.t Value_name.Map.t
   ; types : (Type_entry.t, Type_name.Absolute.t) Or_imported.t option Type_name.Map.t

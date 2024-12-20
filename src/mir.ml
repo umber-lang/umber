@@ -236,6 +236,9 @@ end = struct
         then Local
         else fallback_to_external ()
       | Some extern_name ->
+        (* TODO: I don't think there's any good reason we need to special-case Bool in MIR
+           It needs some special-case handling when type-checking `if` expressions, but
+           other than that it's just a normal variant type. *)
         (match Extern_name.to_ustring extern_name |> Ustring.to_string with
          | "%false" -> Bool_intrinsic { tag = Cnstr_tag.of_int 0 }
          | "%true" -> Bool_intrinsic { tag = Cnstr_tag.of_int 1 }

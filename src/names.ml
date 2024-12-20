@@ -434,7 +434,7 @@ end = struct
   let of_cnstr_name = of_ustring_unchecked << Cnstr_name.to_ustring
   let to_cnstr_name = Cnstr_name.of_ustring << to_ustring
   let is_cnstr_name = Or_error.is_ok << to_cnstr_name
-  let resume_keyword = of_string_exn "resume"
+  let resume_keyword = of_string_unchecked "resume"
 
   module Qualified = struct
     include Qualified

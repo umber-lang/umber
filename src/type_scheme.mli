@@ -15,7 +15,6 @@ and 'n effects =
   | Effect of 'n Effect_name.Qualified.t * 'n type_ list
   | Effect_var of Type_param_name.t
   | Effect_union of 'n effects Non_single_list.t
-  | Effect_intersection of 'n effects Non_single_list.t
 [@@deriving hash, compare, equal, sexp]
 
 type constraint_ =
@@ -34,7 +33,6 @@ val intersection : 'n type_ Non_single_list.t -> 'n type_
 val effect_var : Type_param_name.t -> 'n effects
 val effect_union : 'n effects Non_single_list.t -> 'n effects
 val effect_union_list : 'n effects list -> 'n effects
-val effect_intersection : 'n effects Non_single_list.t -> 'n effects
 
 val map
   :  ?f:('n1 type_ -> ('n1 type_, 'n2 type_) Map_action.t)

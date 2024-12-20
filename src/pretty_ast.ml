@@ -383,7 +383,7 @@ module Typed_to_untyped = struct
        ((Let (rec_ false)
          (bindings
           (((Type_annotation (Catch_all (foo))
-             ((Function ((Var a)) (Effect_union ()) (Tuple ())) ()))
+             ((Function ((Intersection ())) (Effect_union ()) (Tuple ())) ()))
             () (Match_function (((Catch_all ()) (Tuple ())))))))))) |}]
   ;;
 end
@@ -510,13 +510,13 @@ let format_to_document
         format_application
           (Text (Effect_name.Relative.to_string effect_name))
           (List.map args ~f:format_type)
-      | Effect_union effects | Effect_intersection effects ->
+      | Effect_union effects ->
         let format_part (effects : _ Type_scheme.effects) =
           match effects with
           | Effect_var _ | Effect _ -> format_effects_internal effects
-          | Effect_union _ | Effect_intersection _ ->
+          | Effect_union _ ->
             (* TODO: Decide what to do with this *)
-            failwith "TODO: Nested effect union/intersection"
+            failwith "TODO: Nested effect union"
         in
         comma_separated (List.map (Non_single_list.to_list effects) ~f:format_part)
     in

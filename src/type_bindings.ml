@@ -161,6 +161,24 @@ end = struct
   ;;
 
   let get_relevant_constraints t ~params ~(vars_by_polarity : _ By_polarity.t) =
+    (* FIXME: Vars which aren't generalized or don't appear in the expression might still
+       partipate in some relevant constraints e.g.
+
+       ```
+       let elem x (lo, hi) = lo <= x && x <= hi
+       ```
+
+       x: $3, hi: $4, lo: $5
+       
+       $3 (-) <: $8 >: $5 (-) (???)
+
+       Hmmm, so $3 and $5 are just negative. But they do appear positively in types like
+       their name uses. Don't we generalize those? (Oh, wait, we generalize out -> in?)
+
+       Oh, here's the thing: we probably need (<=)'s vars to be context vars - they come
+       from elsewhere - and they'd be positive. That'd lead to e.g. $3 <: <:$8 getting
+       included.
+    *)
     Hashtbl.to_alist t.upper_bounds
     |> List.concat_map ~f:(fun (subtype, supertypes) ->
          (* FIXME: We were using this to check if the subtype was mentioned in the type,
@@ -389,6 +407,10 @@ let iter2_types xs ys ~subtype ~supertype ~f =
   match List.iter2 ~f xs ys with
   | Ok () -> ()
   | Unequal_lengths -> type_error "Type item length mismatch" ~subtype ~supertype
+;;
+
+let record_context_var types var ~polarity =
+  Hash_set.add (By_polarity.get types.context_vars ~polarity) var
 ;;
 
 let refresh_type type_ ~subtyping_dir =
@@ -823,7 +845,7 @@ and constrain_effects_to_be_total ~names ~types effects =
 and instantiate_type_scheme =
   (* FIXME: Actually, I think it should be fine to restrict the instantiated variables of
      other functions we use. *)
-  let record_context_var _ _ ~polarity:_ = () in
+  (* let record_context_var _ _ ~polarity:_ = () in *)
   let rec instantiate_type_scheme
     ~names
     ~types
@@ -881,9 +903,7 @@ and instantiate_type_scheme =
         constrain ~names ~types ~subtype:var ~supertype);
       var
   and instantiate_effect_type_scheme ~names ~types ~params ~polarity effects =
-    let collect_effects
-      (effects : _ Type_scheme.effects Non_single_list.t)
-      ~union_or_intersection
+    let collect_effects (effects : _ Type_scheme.effects Non_single_list.t)
       : Internal_type.effects
       =
       let concrete_effects, effect_vars =
@@ -907,14 +927,14 @@ and instantiate_type_scheme =
             let var = Type_param.Env_to_vars.find_or_add params param in
             record_context_var types var ~polarity;
             concrete_effects, var :: effect_vars
-          | Effect_union [] | Effect_intersection [] ->
+          | Effect_union [] ->
             (* FIXME: how are these empty unions/intersections even getting around? I
                think we might need them as vars for correctness. Just converting them to
                vars solve the problem for now, but isn't very principled. *)
             let var = Type_var.create () in
             record_context_var types var ~polarity;
             concrete_effects, var :: effect_vars
-          | Effect_union (_ :: _) | Effect_intersection (_ :: _) ->
+          | Effect_union (_ :: _) ->
             (* TODO: Decide if this should be allowed, or statically prevent it from
                happening by changing the type. I think the syntax doesn't currently allow
                it, and we won't generate it. *)
@@ -928,11 +948,7 @@ and instantiate_type_scheme =
           let effect_var = Type_var.create () in
           record_context_var types effect_var ~polarity;
           List.iter effect_vars ~f:(fun other_var ->
-            match union_or_intersection with
-            | `Union ->
-              Constraints.add types.constraints ~subtype:other_var ~supertype:effect_var
-            | `Intersection ->
-              Constraints.add types.constraints ~subtype:effect_var ~supertype:other_var);
+            Constraints.add types.constraints ~subtype:other_var ~supertype:effect_var);
           Some effect_var)
       in
       { effects = concrete_effects; effect_var }
@@ -949,24 +965,7 @@ and instantiate_type_scheme =
       let var = Type_param.Env_to_vars.find_or_add params param in
       record_context_var types var ~polarity;
       { effects = Effect_name.Absolute.Map.empty; effect_var = Some var }
-    | Effect_union args -> collect_effects args ~union_or_intersection:`Union
-    | Effect_intersection args ->
-      (* FIXME: This doesn't quite make sense for effects. We model them as a row,
-         which is like a union. e.g. what does it mean to be `<Foo & Bar>`? Isn't that
-         uninhabited?
-         
-         For [Effect_union []]] and [Effect_intersection []], the empty union means
-         "no effects" and the intersection means "any/all effects". So it has a clear and
-         different meaning:
-         
-         - In positive positive, no effects means total and any effects means it could do
-           anything (We have no lower bound on the effects, like an unbound var).
-         - In negative position, no effects means the function passed in must be total,
-           and any effects means it could perform any effect.
-
-          Can we avoid the empty intersections and just have vars maybe? 
-          You could maybe still get an intersection of a union. *)
-      collect_effects args ~union_or_intersection:`Intersection
+    | Effect_union args -> collect_effects args
   in
   fun ?(params = Type_param.Env_to_vars.create ())
       ~names
@@ -995,14 +994,12 @@ let instantiate_type_or_scheme
 let record_context_vars types pat_names =
   eprint_s
     [%lazy_message "Type_bindings.record_context_vars" (pat_names : Pattern_names.t)];
-  let record_context_var types var ~polarity =
-    Hash_set.add (By_polarity.get types.context_vars ~polarity) var
-  in
   Map.iteri pat_names ~f:(fun ~key:name ~data:name_entry ->
     match Name_bindings.Name_entry.type_ name_entry with
     | Type type_ ->
       (* TODO: Singling out `resume` is a bit of a hack. Is there a better, more general
-         way of handling this? *)
+         way of handling this? I suspect `resume` really is kinda special though, since
+         it's inherently recursive. It should work similarly to recursive bound variables. *)
       (* The `resume` keyword works differently to other pattern-bound names. The type
          variables in its type are guaranteed to come from within the same expression,
          not as an input. So, it's safe to not consider its type to include context
@@ -1126,11 +1123,14 @@ let generalize types outer_type =
       "context vars after checking substitutions"
         (types.context_vars : Type_var.Hash_set.t By_polarity.t)
         (context_vars : Type_param.Set.t By_polarity.t)];
-  (* FIXME: Get the sets of positive and negative vars here *)
   let constraints =
     let vars_by_polarity =
       Type_simplification.get_positive_and_negative_vars scheme ~context_vars
     in
+    eprint_s
+      [%lazy_message
+        "Getting relevant constraints"
+          (vars_by_polarity : int Type_param.Map.t By_polarity.t)];
     Constraints.get_relevant_constraints
       types.constraints
       ~params:types.generalized_vars

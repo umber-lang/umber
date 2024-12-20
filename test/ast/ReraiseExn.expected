@@ -37,7 +37,7 @@ let _ : () =
         | True -> raise "My exception"
         | False -> 42)
           : Int)
-        : () -> <Exn> Int)
+        : () -> <Exn, b> Int)
       : Int
   | value -> print_int value
   | <raise exn> -> print ("Unhandled exception: " ++ exn : String)
@@ -46,9 +46,9 @@ let catch : (() -> <Exn, a> b), (String -> <a> b) -> <a> b =
   \f exn_handler ->
     (match
       (handle f () : d
-      | x -> Ok x : Result d String
+      | x -> Ok x : Result e String
       | <raise exn> -> Error exn)
-        : Result d String
+        : Result e String
     | Ok x -> x
     | Error exn -> exn_handler exn)
       : b
@@ -60,5 +60,5 @@ let this_should_not_raise : () -> () = \() -> catch fail ((\(_ : Exn) -> ()) : E
 let this_should_raise : () -> <Exn> Never =
   \() ->
     catch
-      fail ((\(_ : Exn) -> raise "outer exception" : Never) : Exn -> <Exn> Never)
+      fail ((\(_ : Exn) -> raise "outer exception" : Never) : Exn -> <Exn, c> Never)
       : Never

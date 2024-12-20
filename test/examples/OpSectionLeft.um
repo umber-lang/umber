@@ -6,3 +6,28 @@ let () =
   let g = apply (:/) in
   print "between";
   g "penne"
+
+# FIXME: Not sure how we'd be able to get this to infer no effects for `g`
+# The problem is that the effect var is legitimately from the context, and subbing in a
+# pure function gives <> <: <e> which is untinteresting. e then becomes effectively a free
+# var, but is's hard to notice that early - what if some constraints got added later?
+#
+# Maybe we could do some extra pass to eliminate the effect var? I guess we should be able
+# to notice that it only appears once in the final type of the toplevel binding
+# - Actually, no, because it appears in both +/- positions in `apply` it's stuck.
+#
+# Conceptually, once we create `apply (:/)`, I think that the negative position appearance
+# has effectively been removed. But it's hard to notice this - the fact that no
+# constraints were added. So conceptually, the type has no lower bound and always appears
+# in positive positions.
+#
+# Important difference: When `apply` is by itself, it's not sound to eliminate the effect
+# variable. After the application to `(:/)`, the type variable is effectively not
+# reachable anymore. Whichever approach we pick should be amenable to variable extraction
+# e.g. `let foo = apply in let bar = apply (:/) in bar "penne"`
+# How do we tell that the context variable negative appearance has disappeared? And can
+# we formalize that notion?
+#
+# Another idea is to have this work for toplevel bindings' types by simplifying their type
+# using an empty context. A little hard to think about though. Could cross-reference
+# context vars with the name bindings to see if things are in scope (?).

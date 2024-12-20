@@ -9,6 +9,6 @@ let apply : (String, a -> <b> c) -> (a -> <b> c) =
       :f:)
 
 let () =
-  let' g : String -> () = apply (:/) in
+  let' g : String -> <a> () = apply (:/) in
   print "between";
   g "penne"

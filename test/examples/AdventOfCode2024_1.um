@@ -3,8 +3,8 @@ let sum xs = List.fold xs 0 (+)
 let solve input =
   let (nums1, nums2) = List.unzip input in
   # FIXME: Make these bindings nonrecursive
-  let' nums1 = List.sort nums1 in
-  let' nums2 = List.sort nums2 in
+  let nums1 = List.sort nums1 in
+  let nums2 = List.sort nums2 in
   let distances = List.map (List.zip_shortest nums1 nums2) (\(x, y) -> Int.abs (x - y)) in
   sum distances
 
