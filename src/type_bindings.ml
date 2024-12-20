@@ -161,43 +161,8 @@ end = struct
   ;;
 
   let get_relevant_constraints t ~params ~(vars_by_polarity : _ By_polarity.t) =
-    (* FIXME: Vars which aren't generalized or don't appear in the expression might still
-       partipate in some relevant constraints e.g.
-
-       ```
-       let elem x (lo, hi) = lo <= x && x <= hi
-       ```
-
-       x: $3, hi: $4, lo: $5
-       
-       $3 (-) <: $8 >: $5 (-) (???)
-
-       Hmmm, so $3 and $5 are just negative. But they do appear positively in types like
-       their name uses. Don't we generalize those? (Oh, wait, we generalize out -> in?)
-
-       Oh, here's the thing: we probably need (<=)'s vars to be context vars - they come
-       from elsewhere - and they'd be positive. That'd lead to e.g. $3 <: <:$8 getting
-       included.
-    *)
     Hashtbl.to_alist t.upper_bounds
     |> List.concat_map ~f:(fun (subtype, supertypes) ->
-         (* FIXME: We were using this to check if the subtype was mentioned in the type,
-            but now it's only if the var has been generalized. Maybe fine/good? We also
-            add the vars here... I think generalized vars just needs to keep track of any
-            vars we might have generalized, so should be fine *)
-         (* FIXME: So, I was including constraints if *either* the subtype or supertype
-            were relevant. That seems like it might be needed due to intermediate
-            variables with no polarity relating variables with a real polarity. But! That
-            shouldn't happen if the constraints are closed under logical implication (the
-            constraints between the indirectly linked variables should also be present.)
-            
-            Maybe something's going wrong with [generalized_vars] - we only include vars
-            that have been "generalized", but our relevant vars might not have been
-            generalized yet, maybe? (No? Context vars are there, and so are newly
-            generalized vars)
-            
-            I suspect there is a bug somewhere else that was getting covered up by the
-            logic here. *)
          match Type_param.Env_of_vars.find params subtype with
          | None -> []
          | Some subtype ->
@@ -1114,15 +1079,15 @@ let generalize types outer_type =
           eprint_s [%lazy_message "iter var" (var : Type_var.t) (polarity : Polarity.t)];
           Hash_set.add (By_polarity.get types.context_vars ~polarity) var)));
     By_polarity.map types.context_vars ~f:(fun vars ->
-      Hash_set.to_list vars
-      |> List.map ~f:(Type_param.Env_of_vars.find_or_add types.generalized_vars)
-      |> Type_param.Set.of_list)
+      Hash_set.fold vars ~init:Type_param.Map.empty ~f:(fun acc var ->
+        let var = Type_param.Env_of_vars.find_or_add types.generalized_vars var in
+        Map.set acc ~key:var ~data:1))
   in
   eprint_s
     [%lazy_message
       "context vars after checking substitutions"
         (types.context_vars : Type_var.Hash_set.t By_polarity.t)
-        (context_vars : Type_param.Set.t By_polarity.t)];
+        (context_vars : int Type_param.Map.t By_polarity.t)];
   let constraints =
     let vars_by_polarity =
       Type_simplification.get_positive_and_negative_vars scheme ~context_vars

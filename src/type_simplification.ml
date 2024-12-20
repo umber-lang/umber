@@ -157,9 +157,8 @@ let get_positive_and_negative_vars outer_type ~context_vars =
     ~init:
       (* TODO: It might make more sense to just start the polarity as negative instead of
          positive when recording it instead of flipping it here. *)
-      ((* Context vars are treated as "inputs" to an expression, so flip their polarity. *)
-       By_polarity.flip context_vars
-       |> By_polarity.map ~f:(Type_param.Map.of_key_set ~f:(const 1)))
+      (* Context vars are treated as "inputs" to an expression, so flip their polarity. *)
+      (By_polarity.flip context_vars)
     ~f:(fun ~polarity vars -> function
          | Var var -> Continue (`Halt (add_var vars ~polarity var))
          | _ -> Continue (`Defer vars))
@@ -392,7 +391,7 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
     [%lazy_message
       "simplify_type"
         (type_, constraints : _ Type_scheme.t)
-        (context_vars : Type_param.Set.t By_polarity.t)];
+        (context_vars : int Type_param.Map.t By_polarity.t)];
   let type_ =
     let lower_bounds =
       List.map constraints ~f:(fun { subtype; supertype } -> supertype, subtype)
@@ -457,7 +456,7 @@ let%test_module _ =
 
     let bool = fst Intrinsics.Bool.typ
     let list arg = Type_scheme.Type_app (Type_name.Absolute.of_string "List", [ arg ])
-    let empty_context_vars = By_polarity.init (const Type_param.Set.empty)
+    let empty_context_vars = By_polarity.init (const Type_param.Map.empty)
 
     let run_test original_type ~context_vars =
       print_s

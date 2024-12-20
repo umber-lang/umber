@@ -10,6 +10,11 @@ let solve input =
 
 let () = print_int (solve input)
 
+# FIXME: Using this to test perf of this file with no-std. Clean it up
+# type List a =
+#   | Nil
+#   | Cons a (List a)
+
 let input = [
   (17113, 23229),
   (55260, 78804),

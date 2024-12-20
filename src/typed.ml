@@ -266,12 +266,14 @@ module Pattern = struct
         let scheme = Type_bindings.generalize types type_ in
         (* TODO: This is a weird hack. There's surely a better way of doing this. *)
         (* Do an extra type simplification pass on toplevel patterns only. This lets us
-           further simplify types with the knowledge that there are no context variables. *)
+           further simplify types with the knowledge that there are no context variables,
+           allowing some useless variables to be removed e.g. effect variables in return
+           position. *)
         if toplevel
         then
           Type_simplification.simplify_type
             scheme
-            ~context_vars:(By_polarity.init (const Type_param.Set.empty))
+            ~context_vars:(By_polarity.init (const Type_param.Map.empty))
         else scheme)
     in
     let names =
