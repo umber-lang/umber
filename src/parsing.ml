@@ -143,7 +143,9 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_stmt_sig_ : Parser_scope.Module_path.relative Module.sig_ nonterminal
   | N_stmt_common : Parser_scope.Module_path.relative Module.common nonterminal
   | N_stmt_
-      : (Untyped.Pattern.t, Untyped.Expr.t, Parser_scope.Module_path.relative) Module.def
+      : ( (Untyped.Pattern.t Node.t * Fixity.t option * Untyped.Expr.t Node.t) Nonempty.t
+        , Parser_scope.Module_path.relative )
+        Module.def
         nonterminal
   | N_separated_nonempty_list_PIPE_type_non_fun_
       : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
@@ -213,7 +215,9 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_loption_preceded_FILE_MODULE_braces_list_stmt_sig____
       : Parser_scope.Module_path.relative Module.sig_ Node.t list nonterminal
   | N_loption_equals_defs_
-      : (Untyped.Pattern.t, Untyped.Expr.t, Parser_scope.Module_path.relative) Module.def
+      : ( (Untyped.Pattern.t Node.t * Fixity.t option * Untyped.Expr.t Node.t) Nonempty.t
+        , Parser_scope.Module_path.relative )
+        Module.def
         Node.t
         list
         nonterminal
@@ -225,7 +229,9 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_list_stmt_sig_
       : Parser_scope.Module_path.relative Module.sig_ Node.t list nonterminal
   | N_list_stmt_
-      : (Untyped.Pattern.t, Untyped.Expr.t, Parser_scope.Module_path.relative) Module.def
+      : ( (Untyped.Pattern.t Node.t * Fixity.t option * Untyped.Expr.t Node.t) Nonempty.t
+        , Parser_scope.Module_path.relative )
+        Module.def
         Node.t
         list
         nonterminal

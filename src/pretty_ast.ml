@@ -296,20 +296,17 @@ module Typed_to_untyped = struct
         Module_sig (module_name, List.map sigs ~f:(Node.map ~f:(convert_sig ~names)))
     and convert_def ~names : Typed.Module.def -> Untyped.Module.def = function
       | Common_def common -> Common_def (convert_common ~names common)
-      | Let { rec_; bindings } ->
+      | Let { rec_ = _; bindings; index = _ } ->
         Let
-          { rec_
-          ; bindings =
-              Nonempty.map bindings ~f:(fun (pattern, fixity, expr_and_type) ->
-                let expr, type_ = Node.with_value expr_and_type ~f:Fn.id in
-                let type_ = relativize_type' ~names type_ in
-                ( Node.map pattern ~f:(fun pattern ->
-                    annotated_pattern ~names pattern (fst type_))
-                , fixity
-                , Node.create
-                    (convert_expr expr ~names ~type_ ~should_annotate:false)
-                    (Node.span expr_and_type) ))
-          }
+          (Nonempty.map bindings ~f:(fun (pattern, fixity, expr_and_type) ->
+             let expr, type_ = Node.with_value expr_and_type ~f:Fn.id in
+             let type_ = relativize_type' ~names type_ in
+             ( Node.map pattern ~f:(fun pattern ->
+                 annotated_pattern ~names pattern (fst type_))
+             , fixity
+             , Node.create
+                 (convert_expr expr ~names ~type_ ~should_annotate:false)
+                 (Node.span expr_and_type) )))
       | Module (module_name, sigs, defs) ->
         let names = Name_bindings.into_module names module_name ~place:`Def in
         Module
@@ -350,24 +347,17 @@ module Typed_to_untyped = struct
   let%expect_test "match function" =
     let node = Node.dummy_span in
     let untyped : Untyped.Module.t =
-      ( Module_name.of_string_exn "MatchFunction"
-      , []
-      , [ node
-            (Module.Let
-               { rec_ = true
-               ; bindings =
-                   [ ( node
-                         (Untyped.Pattern.Catch_all
-                            (Some (Value_name.of_string_exn "foo")))
-                     , None
-                     , node
-                         (Untyped.Expr.Match_function
-                            [ ( node (Untyped.Pattern.Catch_all None)
-                              , node (Untyped.Expr.Tuple []) )
-                            ]) )
-                   ]
-               })
-        ] )
+      let def : Untyped.Module.def =
+        Let
+          [ ( node (Untyped.Pattern.Catch_all (Some (Value_name.of_string_exn "foo")))
+            , None
+            , node
+                (Untyped.Expr.Match_function
+                   [ node (Untyped.Pattern.Catch_all None), node (Untyped.Expr.Tuple []) ])
+            )
+          ]
+      in
+      Module_name.of_string_exn "MatchFunction", [], [ node def ]
     in
     let typed =
       match
@@ -879,7 +869,7 @@ let format_to_document
         ~on_empty:(Text "{}")
   and format_def : _ Module.def -> t = function
     | Common_def common -> format_common common
-    | Let { rec_ = _; bindings } -> format_let_binding ~rec_:true ~bindings
+    | Let bindings -> format_let_binding ~rec_:true ~bindings
     | Module (module_name, sigs, defs) ->
       format_sigs_and_defs
         (Text "module" ^| Text (Module_name.to_string module_name))

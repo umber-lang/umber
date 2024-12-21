@@ -1157,11 +1157,29 @@ end
 module Module = struct
   include Module
 
-  type nonrec t = (Pattern.generalized, Expr.generalized, Module_path.absolute) t
-  [@@deriving sexp_of]
+  module Let_binding_group = struct
+    module Index : sig
+      type t [@@deriving compare, sexp_of]
 
-  type nonrec def = (Pattern.generalized, Expr.generalized, Module_path.absolute) def
-  [@@deriving sexp_of]
+      val of_int : int -> t
+    end = struct
+      type t = int [@@deriving compare, sexp_of]
+
+      let of_int = Fn.id
+    end
+
+    type t =
+      { rec_ : bool
+      ; bindings :
+          (Pattern.generalized Node.t * Fixity.t option * Expr.generalized Node.t)
+          Nonempty.t
+      ; index : Index.t
+      }
+    [@@deriving sexp_of]
+  end
+
+  type nonrec t = (Let_binding_group.t, Module_path.absolute) t [@@deriving sexp_of]
+  type nonrec def = (Let_binding_group.t, Module_path.absolute) def [@@deriving sexp_of]
 
   let rec gather_names ~names ~f_common ?f_sig ?f_def module_name sigs defs =
     let f_sig =
@@ -1377,8 +1395,7 @@ module Module = struct
             gather_name_placeholders ~names module_name sigs []))
       ~f_def:(fun names def ->
         Node.with_value def ~f:(function
-          | Let { bindings; rec_ } ->
-            assert_or_compiler_bug ~here:[%here] rec_;
+          | Let bindings ->
             Nonempty.fold bindings ~init:names ~f:(fun names (pat, fixity, _expr) ->
               Node.with_value pat ~f:(fun pat ->
                 Name_bindings.merge_names
@@ -1542,19 +1559,32 @@ module Module = struct
     loop ~names ~aliases_seen:Name_bindings.Type_entry.Id.Set.empty alias
   ;;
 
-  (* TODO: We should make this a record type, it would a lot of this code way easier to
-     read. It is also kind of hacky to include the type bindings here. We could just 
-     compute the set of names in each pattern more than once, it should be very cheap. (We
-     need the set of names up-front to determine dependencies, but only need the types
-     later when we type each binding group individually.)*)
-  type intermediate_def =
-    (Untyped.Pattern.t * Pattern_names.t, Untyped.Expr.t, Module_path.absolute) Module.def
+  (** Types for intermediate stages of type-checking, after resolving names, but before
+      inferring types. *)
+  module Intermediate = struct
+    type binding =
+      (Untyped.Pattern.t * Pattern_names.t) Node.t
+      * Fixity.t option
+      * Untyped.Expr.t Node.t
+
+    type let_binding_group =
+      { rec_ : bool
+      ; bindings : binding Nonempty.t
+      }
+
+    type def = (let_binding_group, Module_path.absolute) Module.def
+  end
 
   (** Handle all `val` and `let` statements (value bindings/type annotations).
       Also type the patterns in each let binding and assign the names fresh type
       variables. *)
-  let rec handle_value_bindings ~names module_name sigs defs
-    : Name_bindings.t * intermediate_def Node.t list
+  let rec handle_value_bindings
+    ~names
+    module_name
+    sigs
+    (defs :
+      (Untyped.Module.Let_binding_group.t, Module_path.absolute) Module.def Node.t list)
+    : Name_bindings.t * Intermediate.def Node.t list
     =
     let handle_common ~names = function
       | Extern (name, fixity, typ, extern_name) ->
@@ -1599,9 +1629,10 @@ module Module = struct
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
       List.fold_map defs ~init:names ~f:(fun def ->
         Node.fold_map def ~f:(fun names -> function
-          | Let { rec_; bindings } ->
+          | Let bindings ->
             handle_bindings ~names bindings
-            |> Tuple2.map_snd ~f:(fun bindings -> Let { rec_; bindings })
+            |> Tuple2.map_snd ~f:(fun bindings ->
+                 Let { Intermediate.rec_ = true; bindings })
           | Module (module_name, sigs, defs) ->
             let names, defs = handle_value_bindings ~names module_name sigs defs in
             names, Module (module_name, sigs, defs)
@@ -1613,10 +1644,10 @@ module Module = struct
       recursive, and the groups are given in an order appropriate for generalization.
       This is done by topologically sorting the strongly-connected components of the call
       graph (dependencies between bindings). *)
-  let extract_binding_groups ~names (defs : intermediate_def Node.t list) =
+  let extract_binding_groups ~names (defs : Intermediate.def Node.t list) =
     let rec gather_bindings_in_defs ~names defs acc =
       List.fold_right defs ~init:acc ~f:(gather_bindings ~names)
-    and gather_bindings ~names (def : intermediate_def Node.t) (other_defs, bindings) =
+    and gather_bindings ~names (def : Intermediate.def Node.t) (other_defs, bindings) =
       Node.with_value def ~f:(function
         | Let { bindings = bindings'; rec_ } ->
           (* All toplevel bindings are initially considered to be recursive. If found to
@@ -1666,17 +1697,7 @@ module Module = struct
           expr, scheme) ))
   ;;
 
-  let type_binding_group
-    ~names
-    (bindings :
-      ((Untyped.Pattern.t * Pattern_names.t) Node.t
-      * Fixity.t option
-      * Untyped.Expr.t Node.t)
-      Nonempty.t)
-    =
-    (* TODO: The spans should be kept as consistent with the original source as possible
-       in order to report accurate errors. It's better that they match the original source
-       location of the code than they actually make sense for the AST itself. *)
+  let type_binding_group ~names ~index (bindings : Intermediate.binding Nonempty.t) =
     (* Order bindings in the group by span, then take the first span to represent the
        whole group. This is done to get a consistent ordering among bindings. *)
     let get_spans (pat, (_ : Fixity.t option), expr) = Node.span pat, Node.span expr in
@@ -1736,7 +1757,7 @@ module Module = struct
     in
     (* TODO: This renames the vars in the AST but _not_ in the [Name_bindings]. *)
     let bindings = rename_type_vars_in_bindings bindings in
-    names, Node.create (Let { rec_; bindings }) representative_span
+    names, Node.create (Let { rec_; bindings; index } : def) representative_span
   ;;
 
   (** Reintegrate the re-ordered binding groups from [extract_binding_groups] back into
@@ -1800,15 +1821,17 @@ module Module = struct
       Performs let-generalization on free variables in let statement bindings.
       (Let-generalization is not currently done for local let bindings within expressions.)
       This is the final step in the type checking process. *)
-  let type_defs ~names module_name (defs : intermediate_def Node.t list)
+  let type_defs ~names module_name (defs : Intermediate.def Node.t list)
     : Name_bindings.t * def Node.t list
     =
     Name_bindings.with_submodule' ~place:`Def names module_name ~f:(fun names ->
       let other_defs, binding_groups = extract_binding_groups ~names defs in
       let names, binding_groups =
-        List.fold_map binding_groups ~init:names ~f:(fun names (bindings, path) ->
+        List.fold_mapi binding_groups ~init:names ~f:(fun i names (bindings, path) ->
           Name_bindings.with_path_into_defs names path ~f:(fun names ->
-            let names, def = type_binding_group ~names bindings in
+            let names, def =
+              type_binding_group ~names ~index:(Let_binding_group.Index.of_int i) bindings
+            in
             names, (def, path)))
       in
       let path = Name_bindings.current_path names in

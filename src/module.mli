@@ -29,8 +29,8 @@ module Import : sig
   [@@deriving sexp_of]
 end
 
-type ('pat, 'expr, 'name) t =
-  Module_name.t * 'name sig_ Node.t list * ('pat, 'expr, 'name) def Node.t list
+type ('let_, 'name) t =
+  Module_name.t * 'name sig_ Node.t list * ('let_, 'name) def Node.t list
 
 and 'name common =
   | Extern of Value_name.t * Fixity.t option * 'name Type_scheme.t * Extern_name.t
@@ -44,24 +44,21 @@ and 'name sig_ =
   | Trait_sig of Trait_name.t * Type_param_name.t Nonempty.t * 'name sig_ Node.t list
   | Module_sig of Module_name.t * 'name sig_ Node.t list
 
-and ('pat, 'expr, 'name) def =
+and ('let_, 'name) def =
   | Common_def of 'name common
-  | Module of ('pat, 'expr, 'name) t
-  | Let of
-      { rec_ : bool
-      ; bindings : ('pat Node.t * Fixity.t option * 'expr Node.t) Nonempty.t
-      }
+  | Module of ('let_, 'name) t
+  | Let of 'let_
   | Trait of
       Trait_name.t
       * Type_param_name.t Nonempty.t
       * 'name sig_ Node.t list
-      * ('pat, 'expr, 'name) def Node.t list
+      * ('let_, 'name) def Node.t list
   | Impl of
       Trait_bound.t
       * Trait_name.t
       * 'name Type_scheme.type_ Nonempty.t
-      * ('pat, 'expr, 'name) def Node.t list
+      * ('let_, 'name) def Node.t list
 [@@deriving sexp_of]
 
-val with_filename : ('pat, 'expr, 'name) t -> string -> ('pat, 'expr, 'name) t
+val with_filename : ('let_, 'name) t -> string -> ('let_, 'name) t
 val module_name : _ t -> Module_name.t

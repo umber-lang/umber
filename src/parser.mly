@@ -371,7 +371,7 @@ stmt_:
     defs = loption(equals_defs)
     { Module.Trait (Trait_name.of_ustring_unchecked name, params, sigs, defs) }
   | LET; bindings = separated_nonempty(AND, let_binding)
-    { Module.Let { rec_ = true ; bindings } }
+    { Module.Let bindings }
   | MODULE; name = UPPER_NAME; sigs = loption(colon_sigs); defs = equals_defs 
     { Module.Module (Module_name.of_ustring_unchecked name, sigs, defs) }
   | IMPL; trait = UPPER_NAME; args = nonempty(type_term);
