@@ -206,13 +206,13 @@ let create_effect params sigs : _ Effect.t =
   { params; operations }
 ;;
 
+module Let_binding_group = struct
+  type t = (Pattern.t Node.t * Fixity.t option * Expr.t Node.t) Nonempty.t
+  [@@deriving sexp_of]
+end
+
 module Module = struct
   include Module
-
-  module Let_binding_group = struct
-    type t = (Pattern.t Node.t * Fixity.t option * Expr.t Node.t) Nonempty.t
-    [@@deriving sexp_of]
-  end
 
   type nonrec t = (Let_binding_group.t, Module_path.relative) t [@@deriving sexp_of]
   type nonrec sig_ = Module_path.relative sig_ [@@deriving sexp_of]

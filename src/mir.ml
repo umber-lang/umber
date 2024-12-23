@@ -171,6 +171,7 @@ module Context : sig
 
   val with_find_override : t -> f:find_override -> t
   val with_module : t -> Module_name.t -> f:(t -> t * 'a) -> t * 'a
+  val with_path_into_defs : t -> Module_path.Absolute.t -> f:(t -> t * 'a) -> t * 'a
   val current_path : t -> Module_path.Absolute.t
   val find_cnstr_info : t -> Module_path.absolute Type_scheme.type_ -> Cnstr_info.t
 
@@ -205,6 +206,15 @@ end = struct
     in
     let t, x = f { t with name_bindings } in
     { t with name_bindings = Name_bindings.into_parent name_bindings }, x
+  ;;
+
+  let with_path_into_defs t path ~f =
+    let name_bindings, result =
+      Name_bindings.with_path_into_defs t.name_bindings path ~f:(fun name_bindings ->
+        let t, result = f { t with name_bindings } in
+        t.name_bindings, result)
+    in
+    { t with name_bindings }, result
   ;;
 
   let current_path t = Name_bindings.current_path t.name_bindings
@@ -1522,25 +1532,26 @@ let generate_variant_constructor_values ~ctx ~stmts decl =
 
 let of_typed_module =
   let rec loop ~ctx ~names ~stmts ~fun_decls (defs : Typed.Module.def Node.t list) =
-    List.fold defs ~init:(ctx, stmts) ~f:(fun (ctx, stmts) def ->
-      Node.with_value def ~f:(function
-        | Let { rec_; bindings; index } ->
-          (* FIXME: Sort the bindings by the index first - independent of submodules!
-             The flattening process can probably just happen first? Can use
-             Name_bindings.with_path_into_defs like how type-checking does *)
-          handle_let_bindings ~ctx ~names ~stmts ~rec_ ~fun_decls bindings
-        | Module (module_name, _sigs, defs) ->
-          Context.with_module ctx module_name ~f:(fun ctx ->
-            loop ~ctx ~names ~stmts ~fun_decls defs)
-        | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
-        | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type_decl.t))) ->
-          ctx, generate_variant_constructor_values ~ctx ~stmts decl
-        | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
-          let name = Context.find_value_name_assert_external ctx value_name in
-          ( ctx
-          , Extern_decl { name; extern_name; arity = arity_of_type ~names (fst type_) }
-            :: stmts )
-        | Common_def (Effect _ | Import _) -> ctx, stmts))
+    List.fold
+      defs
+      ~init:(ctx, (stmts, []))
+      ~f:(fun (ctx, (stmts, let_bindings)) def ->
+        Node.with_value def ~f:(function
+          | Let let_binding_group ->
+            ctx, (stmts, (let_binding_group, Context.current_path ctx) :: let_bindings)
+          | Module (module_name, _sigs, defs) ->
+            Context.with_module ctx module_name ~f:(fun ctx ->
+              loop ~ctx ~names ~stmts ~fun_decls defs)
+          | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
+          | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type_decl.t))) ->
+            ctx, (generate_variant_constructor_values ~ctx ~stmts decl, let_bindings)
+          | Common_def (Extern (value_name, (_ : Fixity.t option), type_, extern_name)) ->
+            let name = Context.find_value_name_assert_external ctx value_name in
+            ( ctx
+            , ( Extern_decl { name; extern_name; arity = arity_of_type ~names (fst type_) }
+                :: stmts
+              , let_bindings ) )
+          | Common_def (Effect _ | Import _) -> ctx, (stmts, let_bindings)))
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     let names = Name_bindings.into_module names module_name ~place:`Def in
@@ -1548,6 +1559,19 @@ let of_typed_module =
     let fun_decls = Mir_name.Hash_set.create () in
     mark_extern_functions_as_declared ~ctx ~fun_decls defs;
     Compilation_error.try_with' (fun () ->
-      let (_ : Context.t), stmts = loop ~ctx ~names ~stmts:[] ~fun_decls defs in
+      let ctx, (stmts, let_bindings) = loop ~ctx ~names ~stmts:[] ~fun_decls defs in
+      let (_ : Context.t), stmts =
+        List.sort
+          let_bindings
+          ~compare:
+            (Comparable.lift
+               ~f:(Typed.Let_binding_group.index << fst)
+               [%compare: Typed.Let_binding_group.Index.t])
+        |> List.fold
+             ~init:(ctx, stmts)
+             ~f:(fun (ctx, stmts) ({ rec_; bindings; index = _ }, path) ->
+             Context.with_path_into_defs ctx path ~f:(fun ctx ->
+               handle_let_bindings ~ctx ~names ~stmts ~rec_ ~fun_decls bindings))
+      in
       List.rev stmts)
 ;;

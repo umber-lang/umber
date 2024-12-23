@@ -50,26 +50,26 @@ module Expr : sig
   [@@deriving sexp_of]
 end
 
-module Module : sig
-  include module type of Module
-
-  module Let_binding_group : sig
-    module Index : sig
-      (** Specifies the order of a group of bindings relative to other bindings in the same
+module Let_binding_group : sig
+  module Index : sig
+    (** Specifies the order of a group of bindings relative to other bindings in the same
         file. This is a topological ordering of the bindings based on the dependencies
         between them. *)
-      type t [@@deriving compare, sexp_of]
-    end
-
-    type t =
-      { rec_ : bool
-      ; bindings :
-          (Pattern.generalized Node.t * Fixity.t option * Expr.generalized Node.t)
-          Nonempty.t
-      ; index : Index.t
-      }
-    [@@deriving sexp_of]
+    type t [@@deriving compare, sexp_of]
   end
+
+  type t =
+    { rec_ : bool
+    ; bindings :
+        (Pattern.generalized Node.t * Fixity.t option * Expr.generalized Node.t)
+        Nonempty.t
+    ; index : Index.t
+    }
+  [@@deriving sexp_of, fields]
+end
+
+module Module : sig
+  include module type of Module
 
   type nonrec t = (Let_binding_group.t, Module_path.absolute) t [@@deriving sexp_of]
   type nonrec def = (Let_binding_group.t, Module_path.absolute) def [@@deriving sexp_of]

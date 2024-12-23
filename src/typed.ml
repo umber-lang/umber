@@ -1154,29 +1154,29 @@ module Expr = struct
   ;;
 end
 
+module Let_binding_group = struct
+  module Index : sig
+    type t [@@deriving compare, sexp_of]
+
+    val of_int : int -> t
+  end = struct
+    type t = int [@@deriving compare, sexp_of]
+
+    let of_int = Fn.id
+  end
+
+  type t =
+    { rec_ : bool
+    ; bindings :
+        (Pattern.generalized Node.t * Fixity.t option * Expr.generalized Node.t)
+        Nonempty.t
+    ; index : Index.t
+    }
+  [@@deriving sexp_of, fields]
+end
+
 module Module = struct
   include Module
-
-  module Let_binding_group = struct
-    module Index : sig
-      type t [@@deriving compare, sexp_of]
-
-      val of_int : int -> t
-    end = struct
-      type t = int [@@deriving compare, sexp_of]
-
-      let of_int = Fn.id
-    end
-
-    type t =
-      { rec_ : bool
-      ; bindings :
-          (Pattern.generalized Node.t * Fixity.t option * Expr.generalized Node.t)
-          Nonempty.t
-      ; index : Index.t
-      }
-    [@@deriving sexp_of]
-  end
 
   type nonrec t = (Let_binding_group.t, Module_path.absolute) t [@@deriving sexp_of]
   type nonrec def = (Let_binding_group.t, Module_path.absolute) def [@@deriving sexp_of]
@@ -1582,8 +1582,7 @@ module Module = struct
     ~names
     module_name
     sigs
-    (defs :
-      (Untyped.Module.Let_binding_group.t, Module_path.absolute) Module.def Node.t list)
+    (defs : (Untyped.Let_binding_group.t, Module_path.absolute) Module.def Node.t list)
     : Name_bindings.t * Intermediate.def Node.t list
     =
     let handle_common ~names = function

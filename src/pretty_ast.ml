@@ -370,11 +370,10 @@ module Typed_to_untyped = struct
     [%expect
       {|
       (MatchFunction ()
-       ((Let (rec_ false)
-         (bindings
-          (((Type_annotation (Catch_all (foo))
-             ((Function ((Intersection ())) (Effect_union ()) (Tuple ())) ()))
-            () (Match_function (((Catch_all ()) (Tuple ())))))))))) |}]
+       ((Let
+         (((Type_annotation (Catch_all (foo))
+            ((Function ((Intersection ())) (Effect_union ()) (Tuple ())) ()))
+           () (Match_function (((Catch_all ()) (Tuple ()))))))))) |}]
   ;;
 end
 
