@@ -9,11 +9,11 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 @TypeModuleNamePunning.int = constant %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*)
 @"TypeModuleNamePunning.int'" = constant %umber_block* bitcast (%umber_block1* @int.5 to %umber_block*)
-@TypeModuleNamePunning.float = constant %umber_block* bitcast (%umber_block1* @float.5. to %umber_block*)
 @TypeModuleNamePunning.string = constant %umber_block* bitcast (%umber_block8b* @string.563089956 to %umber_block*)
+@TypeModuleNamePunning.float = constant %umber_block* bitcast (%umber_block1* @float.5. to %umber_block*)
 @int.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 5] }
-@float.5. = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] [double 5.000000e+00] }
 @string.563089956 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"5\00\00\00\00\00\00\06" }
+@float.5. = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] [double 5.000000e+00] }
 
 define i32 @"umber_main:examples/TypeModuleNamePunning.um"() {
 entry:

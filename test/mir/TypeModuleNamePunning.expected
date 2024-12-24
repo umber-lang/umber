@@ -1,4 +1,4 @@
 ((Value_def TypeModuleNamePunning.int (Primitive (Int 5)))
  (Value_def TypeModuleNamePunning.int' (Primitive (Int 5)))
- (Value_def TypeModuleNamePunning.float (Primitive (Float 5)))
- (Value_def TypeModuleNamePunning.string (Primitive (String 5))))
+ (Value_def TypeModuleNamePunning.string (Primitive (String 5)))
+ (Value_def TypeModuleNamePunning.float (Primitive (Float 5))))

@@ -1,16 +1,4 @@
 ((Fun_def
-  ((fun_name Functions.id) (args (Functions.x.1))
-   (body (Name Functions.x.1))))
- (Value_def Functions.zero (Primitive (Float 0)))
- (Value_def Functions.still_zero_wow
-  (Fun_call Functions.id ((Name Functions.zero))))
- (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
- (Fun_def
-  ((fun_name Functions.sqr) (args (Functions.x.2))
-   (body
-    (Fun_call Std.Prelude.Operators.*
-     ((Name Functions.x.2) (Name Functions.x.2))))))
- (Fun_def
   ((fun_name Functions.lots_of_args)
    (args
     (Functions.a.1 Functions.b.1 Functions.c.1 Functions.d.1 Functions.e.1))
@@ -19,6 +7,12 @@
   (Fun_call Functions.lots_of_args
    ((Primitive (Int 5)) (Primitive (Float 10000000000000))
     (Primitive (Int -89)) (Primitive (String huh)) (Primitive (Char c)))))
+ (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
+ (Fun_def
+  ((fun_name Functions.sqr) (args (Functions.x.1))
+   (body
+    (Fun_call Std.Prelude.Operators.*
+     ((Name Functions.x.1) (Name Functions.x.1))))))
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_def
   ((fun_name Functions.*fun.1)
@@ -30,4 +24,10 @@
  (Value_def Functions._trailing_lambda
   (Fun_call Functions.lots_of_args
    ((Primitive (Int 1)) (Primitive (Int 2)) (Primitive (Int 3))
-    (Primitive (Int 4)) (Name Functions.*fun.1)))))
+    (Primitive (Int 4)) (Name Functions.*fun.1))))
+ (Fun_def
+  ((fun_name Functions.id) (args (Functions.x.2))
+   (body (Name Functions.x.2))))
+ (Value_def Functions.zero (Primitive (Float 0)))
+ (Value_def Functions.still_zero_wow
+  (Fun_call Functions.id ((Name Functions.zero)))))

@@ -6,8 +6,8 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 %umber_block32b = type { %umber_header, [32 x i8] }
 
-@CrossModuleUsage.source = constant %umber_block* bitcast (%umber_block32b* @string.619126749 to %umber_block*)
 @CrossModuleUsage.A.print.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @Std.Prelude.print to %umber_block*)
+@CrossModuleUsage.source = constant %umber_block* bitcast (%umber_block32b* @string.619126749 to %umber_block*)
 @Std.Prelude.List.Nil = external global %umber_block*
 @CrossModuleUsage.empty = global %umber_block* null
 @string.619126749 = linkonce_odr constant %umber_block32b { %umber_header { i16 -32764, i16 4, i32 0 }, [32 x i8] c"everything depends on me\00\00\00\00\00\00\00\07" }
@@ -19,18 +19,6 @@ entry:
   ret i32 0
 }
 
-define tailcc %umber_block* @CrossModuleUsage.A.a(%umber_block* %"CrossModuleUsage.A.*lambda_arg.1") {
-entry:
-  %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.b(%umber_block* inttoptr (i64 1 to %umber_block*))
-  ret %umber_block* %fun_call
-}
-
-define tailcc %umber_block* @CrossModuleUsage.A.b(%umber_block* %"CrossModuleUsage.A.*lambda_arg.2") {
-entry:
-  %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.a(%umber_block* inttoptr (i64 1 to %umber_block*))
-  ret %umber_block* %fun_call
-}
-
 declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
 define tailcc %umber_block* @CrossModuleUsage.A.print(%umber_block* %"CrossModuleUsage.A.*arg0.1") {
@@ -40,7 +28,7 @@ entry:
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @CrossModuleUsage.A.print_source(%umber_block* %"CrossModuleUsage.A.*lambda_arg.3") {
+define tailcc %umber_block* @CrossModuleUsage.A.print_source(%umber_block* %"CrossModuleUsage.A.*lambda_arg.1") {
 entry:
   %CrossModuleUsage.source = load %umber_block*, %umber_block** @CrossModuleUsage.source, align 8
   %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.print(%umber_block* %CrossModuleUsage.source)
@@ -56,6 +44,18 @@ entry:
   %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %CrossModuleUsage.source)
   %fun_call2 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call, %umber_block* %fun_call1)
   ret %umber_block* %fun_call2
+}
+
+define tailcc %umber_block* @CrossModuleUsage.A.a(%umber_block* %"CrossModuleUsage.A.*lambda_arg.2") {
+entry:
+  %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.b(%umber_block* inttoptr (i64 1 to %umber_block*))
+  ret %umber_block* %fun_call
+}
+
+define tailcc %umber_block* @CrossModuleUsage.A.b(%umber_block* %"CrossModuleUsage.A.*lambda_arg.3") {
+entry:
+  %fun_call = tail call tailcc %umber_block* @CrossModuleUsage.A.a(%umber_block* inttoptr (i64 1 to %umber_block*))
+  ret %umber_block* %fun_call
 }
 
 define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {

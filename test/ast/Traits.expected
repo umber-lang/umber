@@ -7,36 +7,29 @@
   (Common_def
    (Type_decl Person
     (() (Record ((name (Type_app String ())) (dob (Type_app Date ())))))))
-  (Let (rec_ true)
-   (bindings
-    (((Type_annotation (Catch_all (p)) ((Type_app Person ()) ())) ()
-      (Record_literal
-       ((name ((Literal (String Bob))))
-        (dob
-         ((Fun_call (Name Date.of_string) ((Literal (String 2020-10-11))))))))))))
+  (Let
+   (((Type_annotation (Catch_all (p)) ((Type_app Person ()) ())) ()
+     (Record_literal
+      ((name ((Literal (String Bob))))
+       (dob
+        ((Fun_call (Name Date.of_string) ((Literal (String 2020-10-11)))))))))))
   (Impl () Eq ((Type_app Person ()))
-   ((Let (rec_ true)
-     (bindings
-      (((Catch_all (==)) ()
-        (Lambda ((Catch_all (p1)) (Catch_all (p2)))
-         (Op_tree
-          (==
-           ((&&
-             ((==
-               (((Record_field_access (Name p1) name))
-                ((Record_field_access (Name p2) name))))
-              ((Record_field_access (Name p1) dob))))
-            ((Record_field_access (Name p2) dob))))))))))))
-  (Let (rec_ true)
-   (bindings
-    (((Catch_all (_x)) () (Tuple ((Literal (Int 1)) (Literal (Int 2))))))))
-  (Let (rec_ true)
-   (bindings
-    (((Catch_all (_y)) () (Tuple ((Literal (Int 1)) (Literal (Int 2))))))))
-  (Let (rec_ true)
-   (bindings
-    (((Tuple ()) ()
-      (Fun_call (Name assert)
-       ((Op_tree
+   ((Let
+     (((Catch_all (==)) ()
+       (Lambda ((Catch_all (p1)) (Catch_all (p2)))
+        (Op_tree
          (==
-          (((Tuple ((Name _x) (Name _x)))) ((Tuple ((Name _y) (Name _y)))))))))))))))
+          ((&&
+            ((==
+              (((Record_field_access (Name p1) name))
+               ((Record_field_access (Name p2) name))))
+             ((Record_field_access (Name p1) dob))))
+           ((Record_field_access (Name p2) dob)))))))))))
+  (Let (((Catch_all (_x)) () (Tuple ((Literal (Int 1)) (Literal (Int 2)))))))
+  (Let (((Catch_all (_y)) () (Tuple ((Literal (Int 1)) (Literal (Int 2)))))))
+  (Let
+   (((Tuple ()) ()
+     (Fun_call (Name assert)
+      ((Op_tree
+        (==
+         (((Tuple ((Name _x) (Name _x)))) ((Tuple ((Name _y) (Name _y))))))))))))))

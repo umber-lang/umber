@@ -1531,17 +1531,24 @@ let generate_variant_constructor_values ~ctx ~stmts decl =
 ;;
 
 let of_typed_module =
-  let rec loop ~ctx ~names ~stmts ~fun_decls (defs : Typed.Module.def Node.t list) =
+  let rec loop
+    ~ctx
+    ~names
+    ~stmts
+    ~let_bindings
+    ~fun_decls
+    (defs : Typed.Module.def Node.t list)
+    =
     List.fold
       defs
-      ~init:(ctx, (stmts, []))
+      ~init:(ctx, (stmts, let_bindings))
       ~f:(fun (ctx, (stmts, let_bindings)) def ->
         Node.with_value def ~f:(function
           | Let let_binding_group ->
             ctx, (stmts, (let_binding_group, Context.current_path ctx) :: let_bindings)
           | Module (module_name, _sigs, defs) ->
             Context.with_module ctx module_name ~f:(fun ctx ->
-              loop ~ctx ~names ~stmts ~fun_decls defs)
+              loop ~ctx ~names ~stmts ~let_bindings ~fun_decls defs)
           | Trait _ | Impl _ -> failwith "TODO: MIR traits/impls"
           | Common_def (Type_decl ((_ : Type_name.t), ((_, decl) : _ Type_decl.t))) ->
             ctx, (generate_variant_constructor_values ~ctx ~stmts decl, let_bindings)
@@ -1559,7 +1566,9 @@ let of_typed_module =
     let fun_decls = Mir_name.Hash_set.create () in
     mark_extern_functions_as_declared ~ctx ~fun_decls defs;
     Compilation_error.try_with' (fun () ->
-      let ctx, (stmts, let_bindings) = loop ~ctx ~names ~stmts:[] ~fun_decls defs in
+      let ctx, (stmts, let_bindings) =
+        loop ~ctx ~names ~stmts:[] ~let_bindings:[] ~fun_decls defs
+      in
       let (_ : Context.t), stmts =
         List.sort
           let_bindings

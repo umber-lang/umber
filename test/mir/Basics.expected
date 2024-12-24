@@ -1,10 +1,4 @@
-((Value_def Basics.false (Make_block (tag 0)))
- (Value_def Basics.true (Make_block (tag 1)))
- (Value_def Basics._.1
-  (Cond_assign (conds (((Constant_tag_equals (Name Basics.false) 1) ())))
-   (body (Primitive (Float 1)))
-   (if_none_matched (Otherwise (Primitive (Float 2.5))))))
- (Value_def Basics.Red (Make_block (tag 0)))
+((Value_def Basics.Red (Make_block (tag 0)))
  (Value_def Basics.Blue (Make_block (tag 1)))
  (Value_def Basics.Green (Make_block (tag 0)))
  (Value_def Basics.Yellow (Make_block (tag 1)))
@@ -22,6 +16,12 @@
     (Make_block (tag 0)
      (fields
       ((Name Basics.*arg0.3) (Name Basics.*arg1.1) (Name Basics.*arg2.1)))))))
+ (Value_def Basics.false (Make_block (tag 0)))
+ (Value_def Basics.true (Make_block (tag 1)))
  (Value_def Basics.xyz
   (Make_block (tag 0)
-   (fields ((Primitive (Int 1)) (Primitive (Int 2)) (Primitive (Int 3)))))))
+   (fields ((Primitive (Int 1)) (Primitive (Int 2)) (Primitive (Int 3))))))
+ (Value_def Basics._.1
+  (Cond_assign (conds (((Constant_tag_equals (Name Basics.false) 1) ())))
+   (body (Primitive (Float 1)))
+   (if_none_matched (Otherwise (Primitive (Float 2.5)))))))

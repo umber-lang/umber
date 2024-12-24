@@ -1,17 +1,17 @@
-((Value_def Text.c (Primitive (Char a)))
- (Value_def Text.hello (Primitive (String "hello world!")))
- (Value_def Text.spacing (Primitive (String  "line 1\r\
-                                            \n\t line 2")))
- (Value_def Text.dec_code_exclam (Primitive (String !)))
- (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
- (Value_def Text._.1
-  (Fun_call Std.Prelude.Operators.++
-   ((Primitive (String "hello\n")) (Primitive (String "\bworld!")))))
- (Value_def Text.*binding.1
+((Value_def Text.*binding.1
   (Let Text.empty.1 (Primitive (String ""))
    (Make_block (tag 0) (fields ((Primitive (Char a)) (Primitive (Char b)))))))
  (Value_def Text.a (Get_block_field 0 (Name Text.*binding.1)))
  (Value_def Text.b (Get_block_field 1 (Name Text.*binding.1)))
  (Value_def Text._UNICODE_WORKS_TOO
   (Primitive
-   (String "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186"))))
+   (String "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186")))
+ (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
+ (Value_def Text._.1
+  (Fun_call Std.Prelude.Operators.++
+   ((Primitive (String "hello\n")) (Primitive (String "\bworld!")))))
+ (Value_def Text.c (Primitive (Char a)))
+ (Value_def Text.hello (Primitive (String "hello world!")))
+ (Value_def Text.dec_code_exclam (Primitive (String !)))
+ (Value_def Text.spacing (Primitive (String  "line 1\r\
+                                            \n\t line 2"))))

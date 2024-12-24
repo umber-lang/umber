@@ -7,10 +7,10 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block1 = type { %umber_header, [1 x i64] }
 %umber_block8b = type { %umber_header, [8 x i8] }
 
-@"ModuleSig.Range...=.1" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @ModuleSig.Range.between to %umber_block*)
 @ModuleSig.my_range = global %umber_block* null
 @ModuleSig.is_10_in_range = global %umber_block* null
 @"ModuleSig.*binding.1" = global %umber_block* null
+@"ModuleSig.Range...=.1" = constant %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @ModuleSig.Range.between to %umber_block*)
 @int.1 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 1] }
 @int.10 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 10] }
 @string.0 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"\00\00\00\00\00\00\00\07" }
@@ -64,18 +64,18 @@ entry:
   ret %umber_block* %fun_call5
 }
 
+declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.print_bool(%umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
+
 define tailcc %umber_block* @"ModuleSig.Range...="(%umber_block* %"ModuleSig.Range.*arg0.1", %umber_block* %"ModuleSig.Range.*arg1.1") {
 entry:
   %"ModuleSig.Range...=.1" = load %umber_block*, %umber_block** @"ModuleSig.Range...=.1", align 8
   %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %"ModuleSig.Range...=.1", %umber_block* %"ModuleSig.Range.*arg0.1", %umber_block* %"ModuleSig.Range.*arg1.1")
   ret %umber_block* %fun_call
 }
-
-declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_block*)
-
-declare tailcc %umber_block* @Std.Prelude.print_bool(%umber_block*)
-
-declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
 declare i64* @umber_gc_alloc(i64)
 

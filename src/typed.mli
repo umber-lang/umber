@@ -52,6 +52,10 @@ end
 
 module Let_binding_group : sig
   module Index : sig
+    (* TODO: It might be nice if we could sort bindings in dependency order but have that
+       sort be stable according to the original source ordering - that would make MIR test
+       output easier to read. As it stands we are getting the topological sort from a
+       graph library though, so it's hard to make this happen. *)
     (** Specifies the order of a group of bindings relative to other bindings in the same
         file. This is a topological ordering of the bindings based on the dependencies
         between them. *)
