@@ -15,7 +15,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @string.76039754 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"between\00" }
 @string.483149063 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"penne\00\00\02" }
 
-define i32 @"umber_main:examples/OpSectionLeft.um"() {
+define i32 @"umber_main:OpSectionLeft"() {
 entry:
   %fun_call = tail call tailcc %umber_block* @OpSectionLeft.apply(%umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"OpSectionLeft.:/" to %umber_block*))
   %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.76039754 to %umber_block*))

@@ -15,7 +15,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @string.563089956 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"5\00\00\00\00\00\00\06" }
 @float.5. = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] [double 5.000000e+00] }
 
-define i32 @"umber_main:examples/TypeModuleNamePunning.um"() {
+define i32 @"umber_main:TypeModuleNamePunning"() {
 entry:
   ret i32 0
 }

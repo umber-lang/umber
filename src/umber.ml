@@ -6,6 +6,7 @@ module Lexer = Lexer
 module Linking = Linking
 module Mir = Mir
 module Name_bindings = Name_bindings
+module Names = Names
 module Parsing = Parsing
 module Pretty_ast = Pretty_ast
 module Type_bindings = Type_bindings

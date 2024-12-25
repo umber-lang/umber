@@ -28,7 +28,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @string.229771883 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"!\00\00\00\00\00\00\06" }
 @string.398489461 = linkonce_odr constant %umber_block24b { %umber_header { i16 -32764, i16 3, i32 0 }, [24 x i8] c"line 1\0D\0A\09 line 2\00\00\00\00\00\00\00\07" }
 
-define i32 @"umber_main:examples/Text.um"() {
+define i32 @"umber_main:Text"() {
 entry:
   %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*

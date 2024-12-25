@@ -21,7 +21,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @float.1. = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] [double 1.000000e+00] }
 @float.2.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] [double 2.500000e+00] }
 
-define i32 @"umber_main:examples/Basics.um"() {
+define i32 @"umber_main:Basics"() {
 entry:
   %box = call i64* @umber_gc_alloc(i64 32)
   %box1 = bitcast i64* %box to i16*

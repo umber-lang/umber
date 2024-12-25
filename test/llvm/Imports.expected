@@ -5,7 +5,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block = type { %umber_header, [0 x i64] }
 %umber_header = type { i16, i16, i32 }
 
-define i32 @"umber_main:examples/Imports.um"() {
+define i32 @"umber_main:Imports"() {
 entry:
   ret i32 0
 }

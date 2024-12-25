@@ -25,7 +25,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.4 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 4] }
 @int.6 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 6] }
 
-define i32 @"umber_main:examples/LetBindingGroups.um"() {
+define i32 @"umber_main:LetBindingGroups"() {
 entry:
   %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
   %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.606624195 to %umber_block*), %umber_block* %Std.Prelude.List.Nil)

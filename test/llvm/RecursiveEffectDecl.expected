@@ -2,7 +2,7 @@
 source_filename = "examples/RecursiveEffectDecl.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
-define i32 @"umber_main:examples/RecursiveEffectDecl.um"() {
+define i32 @"umber_main:RecursiveEffectDecl"() {
 entry:
   ret i32 0
 }

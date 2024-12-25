@@ -7,7 +7,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 @Std.Prelude.List.Nil = external global %umber_block*
 
-define i32 @"umber_main:examples/NeverAndAny.um"() {
+define i32 @"umber_main:NeverAndAny"() {
 entry:
   ret i32 0
 }

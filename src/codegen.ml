@@ -644,21 +644,24 @@ let codegen_stmt t stmt =
   | Fun_decl _ | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
 ;;
 
-let main_function_name ~source_filename = [%string "umber_main:%{source_filename}"]
+let main_function_name ~(module_path : Module_path.Absolute.t) =
+  [%string "umber_main:%{module_path#Module_path}"]
+;;
+
 let main_function_type context = Llvm.function_type (Llvm.i32_type context) [||]
 
 let build_main_ret context builder =
   ignore_value (Llvm.build_ret (Llvm.const_int (Llvm.i32_type context) 0) builder)
 ;;
 
-let create ~source_filename =
+let create ~module_path ~source_filename =
   let context = Llvm.create_context () in
   let module_ = Llvm.create_module context source_filename in
   Llvm.set_data_layout data_layout_string module_;
   let main_function_builder = Llvm.builder context in
   let main_function =
     Llvm.define_function
-      (main_function_name ~source_filename)
+      (main_function_name ~module_path)
       (main_function_type context)
       module_
   in
@@ -672,8 +675,8 @@ let create ~source_filename =
   }
 ;;
 
-let of_mir_exn ~source_filename mir =
-  let t = create ~source_filename in
+let of_mir_exn ~module_path ~source_filename mir =
+  let t = create ~module_path ~source_filename in
   List.iter mir ~f:(preprocess_stmt t);
   List.iter mir ~f:(codegen_stmt t);
   build_main_ret t.context t.main_function_builder;
@@ -685,12 +688,12 @@ let of_mir_exn ~source_filename mir =
         "Llvm_analysis found invalid module" (error : string) ~module_:(to_string t)]
 ;;
 
-let of_mir ~source_filename mir =
+let of_mir ~module_path ~source_filename mir =
   Compilation_error.try_with
     ~filename:source_filename
     Codegen_error
     ~msg:[%message "LLVM codegen failed"]
-    (fun () -> of_mir_exn ~source_filename mir)
+    (fun () -> of_mir_exn ~module_path ~source_filename mir)
 ;;
 
 let compile_to_object_and_dispose_internal module_ context ~output_file =
@@ -703,7 +706,7 @@ let compile_to_object_and_dispose t ~output_file =
   compile_to_object_and_dispose_internal t.module_ t.context ~output_file
 ;;
 
-let compile_entry_module ~source_filenames ~entry_file =
+let compile_entry_module ~module_paths ~entry_file =
   let context = Llvm.create_context () in
   let module_ = Llvm.create_module context entry_file in
   let builder = Llvm.builder context in
@@ -717,10 +720,8 @@ let compile_entry_module ~source_filenames ~entry_file =
       module_
   in
   ignore_value (Llvm.build_call gc_init_fun [||] "" builder);
-  List.iter source_filenames ~f:(fun source_filename ->
-    let fun_ =
-      Llvm.declare_function (main_function_name ~source_filename) fun_type module_
-    in
+  List.iter module_paths ~f:(fun module_path ->
+    let fun_ = Llvm.declare_function (main_function_name ~module_path) fun_type module_ in
     ignore_value (Llvm.build_call fun_ [||] "" builder));
   build_main_ret context builder;
   compile_to_object_and_dispose_internal module_ context ~output_file:entry_file

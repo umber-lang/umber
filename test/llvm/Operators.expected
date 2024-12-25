@@ -32,7 +32,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @string.992557751 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"four = \00" }
 @string.932615357 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"true = \00" }
 
-define i32 @"umber_main:examples/Operators.um"() {
+define i32 @"umber_main:Operators"() {
 entry:
   %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
   %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* bitcast (%umber_block8b* @string.266074759 to %umber_block*), %umber_block* %Std.Prelude.List.Nil)

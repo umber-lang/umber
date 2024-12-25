@@ -1,12 +1,18 @@
 open Import
+open Names
 
 type t
 
-val of_mir : source_filename:Filename.t -> Mir.t -> (t, Compilation_error.t) result
+val of_mir
+  :  module_path:Module_path.Absolute.t
+  -> source_filename:Filename.t
+  -> Mir.t
+  -> (t, Compilation_error.t) result
+
 val compile_to_object_and_dispose : t -> output_file:Filename.t -> unit
 
 val compile_entry_module
-  :  source_filenames:Filename.t list
+  :  module_paths:Module_path.Absolute.t list
   -> entry_file:Filename.t
   -> unit
 

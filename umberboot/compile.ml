@@ -179,8 +179,6 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
              Parsing.fprint_s [%sexp (ast : Ast.Untyped.Module.t)] ~out);
            ast))
       ~type_checking:
-        (* TODO: Type-checking should be able to pretty-print the typed AST. This would
-           make reading test output way easier. *)
         (run_stage ~f:(fun untyped_ast ->
            let type_check untyped_ast =
              let names =
@@ -233,15 +231,21 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
         (run_stage ~f:(fun (ast, names) ->
            let%map.Result mir = Mir.of_typed_module ~names ast in
            maybe_output Mir ~f:(fun out -> Parsing.fprint_s [%sexp (mir : Mir.t)] ~out);
-           Ast.Module.module_name ast, mir))
+           let module_path =
+             Ast.Module_path.of_module_names_unchecked
+               (Option.to_list parent @ [ Ast.Module.module_name ast ])
+           in
+           module_path, mir))
       ~generating_llvm:
-        (run_stage ~f:(fun (module_name, mir) ->
-           let%map.Result codegen = Codegen.of_mir ~source_filename:filename mir in
+        (run_stage ~f:(fun (module_path, mir) ->
+           let%map.Result codegen =
+             Codegen.of_mir ~module_path ~source_filename:filename mir
+           in
            maybe_output Llvm ~f:(fun out ->
              fprintf out "%s\n" (Codegen.to_string codegen));
-           module_name, codegen))
+           module_path, codegen))
       ~linking:
-        (run_stage ~f:(fun (module_name, codegen) ->
+        (run_stage ~f:(fun (module_path, codegen) ->
            match Output.find_target output Exe with
            | None -> Ok ()
            | Some Stdout ->
@@ -252,15 +256,25 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
                   Other)
            | Some (File output_exe) ->
              let module_name =
-               Ast.Module_name.to_ustring module_name |> Ustring.to_string
+               Ast.Module_path.last_exn module_path
+               |> Ast.Module_name.to_ustring
+               |> Ustring.to_string
              in
              with_tmpdir (fun tmpdir ->
                let object_file = tmpdir ^/ module_name ^ ".o" in
                let entry_file = tmpdir ^/ "_entry.o" in
                Codegen.compile_to_object_and_dispose codegen ~output_file:object_file;
-               (* TODO: I think the entry module will have to consider main functions for
-                  the stdlib as well. *)
-               Codegen.compile_entry_module ~source_filenames:[ filename ] ~entry_file;
+               (* TODO: Hard-coding the Prelude module path here is a bit janky. We should
+                  come up with something better when implementing linking arbitrary files. *)
+               let prelude_module_path =
+                 Ast.Module_path.of_module_names_unchecked
+                   [ Ast.Module_name.of_string_unchecked "Std"
+                   ; Ast.Module_name.of_string_unchecked "Prelude"
+                   ]
+               in
+               Codegen.compile_entry_module
+                 ~module_paths:[ prelude_module_path; module_path ]
+                 ~entry_file;
                Linking.link_with_std_and_runtime
                  ~object_files:[ object_file; entry_file ]
                  ~output_exe)))

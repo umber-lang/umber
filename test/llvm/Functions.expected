@@ -23,7 +23,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @int.4 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 4] }
 @float.0. = linkonce_odr constant %umber_block1 { %umber_header { i16 -32765, i16 1, i32 0 }, [1 x double] zeroinitializer }
 
-define i32 @"umber_main:examples/Functions.um"() {
+define i32 @"umber_main:Functions"() {
 entry:
   %fun_call = tail call tailcc %umber_block* @Functions.lots_of_args(%umber_block* bitcast (%umber_block1* @int.5 to %umber_block*), %umber_block* bitcast (%umber_block1* @float.10000000000000. to %umber_block*), %umber_block* bitcast (%umber_block1* @int.-89 to %umber_block*), %umber_block* bitcast (%umber_block8b* @string.1948248 to %umber_block*), %umber_block* bitcast (%umber_block1* @char.c to %umber_block*))
   store %umber_block* %fun_call, %umber_block** @"Functions.*binding.1", align 8

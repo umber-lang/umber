@@ -2,7 +2,7 @@
 source_filename = "examples/MixTypeAndEffectVars.um"
 target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
-define i32 @"umber_main:examples/MixTypeAndEffectVars.um"() {
+define i32 @"umber_main:MixTypeAndEffectVars"() {
 entry:
   ret i32 0
 }

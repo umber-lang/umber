@@ -12,7 +12,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @CrossModuleUsage.empty = global %umber_block* null
 @string.619126749 = linkonce_odr constant %umber_block32b { %umber_header { i16 -32764, i16 4, i32 0 }, [32 x i8] c"everything depends on me\00\00\00\00\00\00\00\07" }
 
-define i32 @"umber_main:examples/CrossModuleUsage.um"() {
+define i32 @"umber_main:CrossModuleUsage"() {
 entry:
   %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
   store %umber_block* %Std.Prelude.List.Nil, %umber_block** @CrossModuleUsage.empty, align 8

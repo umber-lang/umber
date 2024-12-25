@@ -12,7 +12,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @TypeChecking.id_for_chars.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @TypeChecking.id to %umber_block*)
 @int.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 5] }
 
-define i32 @"umber_main:examples/TypeChecking.um"() {
+define i32 @"umber_main:TypeChecking"() {
 entry:
   %box = call i64* @umber_gc_alloc(i64 24)
   %box1 = bitcast i64* %box to i16*
