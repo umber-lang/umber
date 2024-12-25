@@ -1,7 +1,10 @@
 use core::ffi::c_void;
 use core::{panic, ptr};
 
-const DEFAULT_HEAP_SIZE: usize = 256 * 1000;
+// TODO: This just allocates a huge heap so we don't have to think about running out of
+// memory while the GC is not implemented. A more reasonable value might be something like
+// 256k - that's what OCaml uses.
+const DEFAULT_HEAP_SIZE: usize = 256 * 1000 * 1000;
 
 pub struct Gc {
     next_free: usize,
