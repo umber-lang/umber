@@ -3,8 +3,8 @@ let sum : List Int -> Int = \xs -> List.fold xs 0 (+) : Int
 let solve : List (Any, Any) -> Int =
   \input ->
     let' ((nums1 : List a), (nums2 : List b)) = List.unzip input in
-    let nums1 : List Int = List.sort nums1 in
-    let nums2 : List Int = List.sort nums2 in
+    let' nums1 : List Int = List.sort nums1 in
+    let' nums2 : List Int = List.sort nums2 in
     let' distances : List Int =
       List.map
         (List.zip_shortest
@@ -15,3 +15,8 @@ let solve : List (Any, Any) -> Int =
           : (Int, Int) -> Int)
     in
     sum distances : Int
+
+let () = print_int (solve input : Int)
+
+let input : List (Int, Int) =
+  Cons (1, 7) (Cons (2, 8) (Cons (3, 4) Nil : List (Int, Int)) : List (Int, Int))

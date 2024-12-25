@@ -1,0 +1,152 @@
+; ModuleID = 'examples/AdventOfCode2024_1.um'
+source_filename = "examples/AdventOfCode2024_1.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+%umber_block1 = type { %umber_header, [1 x i64] }
+
+@Std.Prelude.List.Nil = external global %umber_block*
+@AdventOfCode2024_1.input = global %umber_block* null
+@"AdventOfCode2024_1.*binding.2" = global %umber_block* null
+@int.0 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] zeroinitializer }
+@int.1 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 1] }
+@int.7 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 7] }
+@int.2 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 2] }
+@int.8 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 8] }
+@int.3 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 3] }
+@int.4 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 4] }
+
+define i32 @"umber_main:AdventOfCode2024_1"() {
+entry:
+  %box = call i64* @umber_gc_alloc(i64 24)
+  %box1 = bitcast i64* %box to i16*
+  store i16 0, i16* %box1, align 2
+  %box2 = getelementptr i16, i16* %box1, i32 1
+  store i16 2, i16* %box2, align 2
+  %box3 = bitcast i64* %box to %umber_block**
+  %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
+  store %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*), %umber_block** %box4, align 8
+  %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
+  store %umber_block* bitcast (%umber_block1* @int.7 to %umber_block*), %umber_block** %box5, align 8
+  %box6 = bitcast %umber_block** %box3 to %umber_block*
+  %box7 = call i64* @umber_gc_alloc(i64 24)
+  %box8 = bitcast i64* %box7 to i16*
+  store i16 0, i16* %box8, align 2
+  %box9 = getelementptr i16, i16* %box8, i32 1
+  store i16 2, i16* %box9, align 2
+  %box10 = bitcast i64* %box7 to %umber_block**
+  %box11 = getelementptr %umber_block*, %umber_block** %box10, i32 1
+  store %umber_block* bitcast (%umber_block1* @int.2 to %umber_block*), %umber_block** %box11, align 8
+  %box12 = getelementptr %umber_block*, %umber_block** %box10, i32 2
+  store %umber_block* bitcast (%umber_block1* @int.8 to %umber_block*), %umber_block** %box12, align 8
+  %box13 = bitcast %umber_block** %box10 to %umber_block*
+  %box14 = call i64* @umber_gc_alloc(i64 24)
+  %box15 = bitcast i64* %box14 to i16*
+  store i16 0, i16* %box15, align 2
+  %box16 = getelementptr i16, i16* %box15, i32 1
+  store i16 2, i16* %box16, align 2
+  %box17 = bitcast i64* %box14 to %umber_block**
+  %box18 = getelementptr %umber_block*, %umber_block** %box17, i32 1
+  store %umber_block* bitcast (%umber_block1* @int.3 to %umber_block*), %umber_block** %box18, align 8
+  %box19 = getelementptr %umber_block*, %umber_block** %box17, i32 2
+  store %umber_block* bitcast (%umber_block1* @int.4 to %umber_block*), %umber_block** %box19, align 8
+  %box20 = bitcast %umber_block** %box17 to %umber_block*
+  %Std.Prelude.List.Nil = load %umber_block*, %umber_block** @Std.Prelude.List.Nil, align 8
+  %box21 = call i64* @umber_gc_alloc(i64 24)
+  %box22 = bitcast i64* %box21 to i16*
+  store i16 0, i16* %box22, align 2
+  %box23 = getelementptr i16, i16* %box22, i32 1
+  store i16 2, i16* %box23, align 2
+  %box24 = bitcast i64* %box21 to %umber_block**
+  %box25 = getelementptr %umber_block*, %umber_block** %box24, i32 1
+  store %umber_block* %box20, %umber_block** %box25, align 8
+  %box26 = getelementptr %umber_block*, %umber_block** %box24, i32 2
+  store %umber_block* %Std.Prelude.List.Nil, %umber_block** %box26, align 8
+  %box27 = bitcast %umber_block** %box24 to %umber_block*
+  %box28 = call i64* @umber_gc_alloc(i64 24)
+  %box29 = bitcast i64* %box28 to i16*
+  store i16 0, i16* %box29, align 2
+  %box30 = getelementptr i16, i16* %box29, i32 1
+  store i16 2, i16* %box30, align 2
+  %box31 = bitcast i64* %box28 to %umber_block**
+  %box32 = getelementptr %umber_block*, %umber_block** %box31, i32 1
+  store %umber_block* %box13, %umber_block** %box32, align 8
+  %box33 = getelementptr %umber_block*, %umber_block** %box31, i32 2
+  store %umber_block* %box27, %umber_block** %box33, align 8
+  %box34 = bitcast %umber_block** %box31 to %umber_block*
+  %box35 = call i64* @umber_gc_alloc(i64 24)
+  %box36 = bitcast i64* %box35 to i16*
+  store i16 0, i16* %box36, align 2
+  %box37 = getelementptr i16, i16* %box36, i32 1
+  store i16 2, i16* %box37, align 2
+  %box38 = bitcast i64* %box35 to %umber_block**
+  %box39 = getelementptr %umber_block*, %umber_block** %box38, i32 1
+  store %umber_block* %box6, %umber_block** %box39, align 8
+  %box40 = getelementptr %umber_block*, %umber_block** %box38, i32 2
+  store %umber_block* %box34, %umber_block** %box40, align 8
+  %box41 = bitcast %umber_block** %box38 to %umber_block*
+  store %umber_block* %box41, %umber_block** @AdventOfCode2024_1.input, align 8
+  %AdventOfCode2024_1.input = load %umber_block*, %umber_block** @AdventOfCode2024_1.input, align 8
+  %fun_call = tail call tailcc %umber_block* @AdventOfCode2024_1.solve(%umber_block* %AdventOfCode2024_1.input)
+  %fun_call42 = tail call tailcc %umber_block* @Std.Prelude.print_int(%umber_block* %fun_call)
+  store %umber_block* %fun_call42, %umber_block** @"AdventOfCode2024_1.*binding.2", align 8
+  ret i32 0
+}
+
+declare tailcc %umber_block* @Std.Prelude.List.fold(%umber_block*, %umber_block*, %umber_block*)
+
+declare tailcc %umber_block* @"Std.Prelude.Operators.+"(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @AdventOfCode2024_1.sum(%umber_block* %AdventOfCode2024_1.xs.1) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.fold(%umber_block* %AdventOfCode2024_1.xs.1, %umber_block* bitcast (%umber_block1* @int.0 to %umber_block*), %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"Std.Prelude.Operators.+" to %umber_block*))
+  ret %umber_block* %fun_call
+}
+
+declare tailcc %umber_block* @Std.Prelude.List.unzip(%umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.List.sort(%umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.List.map(%umber_block*, %umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.List.zip_shortest(%umber_block*, %umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.Int.abs(%umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block*, %umber_block*)
+
+define tailcc %umber_block* @"AdventOfCode2024_1.*fun.1"(%umber_block* %"AdventOfCode2024_1.*lambda_arg.1") {
+entry:
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.*lambda_arg.1", i32 0, i32 1, i32 0
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.*lambda_arg.1", i32 0, i32 1, i32 1
+  %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
+  %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %block_field, %umber_block* %block_field3)
+  %fun_call4 = tail call tailcc %umber_block* @Std.Prelude.Int.abs(%umber_block* %fun_call)
+  ret %umber_block* %fun_call4
+}
+
+define tailcc %umber_block* @AdventOfCode2024_1.solve(%umber_block* %AdventOfCode2024_1.input.1) {
+entry:
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.List.unzip(%umber_block* %AdventOfCode2024_1.input.1)
+  %block_field_gep = getelementptr %umber_block, %umber_block* %fun_call, i32 0, i32 1, i32 0
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %fun_call, i32 0, i32 1, i32 1
+  %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
+  %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
+  %fun_call4 = tail call tailcc %umber_block* @Std.Prelude.List.sort(%umber_block* %block_field)
+  %fun_call5 = tail call tailcc %umber_block* @Std.Prelude.List.sort(%umber_block* %block_field3)
+  %fun_call6 = tail call tailcc %umber_block* @Std.Prelude.List.zip_shortest(%umber_block* %fun_call4, %umber_block* %fun_call5)
+  %fun_call7 = tail call tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %fun_call6, %umber_block* bitcast (%umber_block* (%umber_block*)* @"AdventOfCode2024_1.*fun.1" to %umber_block*))
+  %fun_call8 = tail call tailcc %umber_block* @AdventOfCode2024_1.sum(%umber_block* %fun_call7)
+  ret %umber_block* %fun_call8
+}
+
+declare tailcc %umber_block* @Std.Prelude.print_int(%umber_block*)
+
+declare i64* @umber_gc_alloc(i64)
+

@@ -1,8 +1,64 @@
-("Compilation error"
- ((kind Mir_error)
-  (msg
-   ("Recursive let bindings can only be used to define functions"
-    (expr
-     (Fun_call (Name Std.Prelude.List.sort) _
-      (((Name AdventOfCode2024_1.nums1) _))))))
-  (filename AdventOfCode2024_1.um) (span 6:15-6:30)))
+((Fun_decl ((name Std.Prelude.List.fold) (arity 3)))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_def
+  ((fun_name AdventOfCode2024_1.sum) (args (AdventOfCode2024_1.xs.1))
+   (body
+    (Fun_call Std.Prelude.List.fold
+     ((Name AdventOfCode2024_1.xs.1) (Primitive (Int 0))
+      (Name Std.Prelude.Operators.+))))))
+ (Fun_decl ((name Std.Prelude.List.unzip) (arity 1)))
+ (Fun_decl ((name Std.Prelude.List.sort) (arity 1)))
+ (Fun_decl ((name Std.Prelude.List.map) (arity 2)))
+ (Fun_decl ((name Std.Prelude.List.zip_shortest) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Int.abs) (arity 1)))
+ (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
+ (Fun_def
+  ((fun_name AdventOfCode2024_1.*fun.1)
+   (args (AdventOfCode2024_1.*lambda_arg.1))
+   (body
+    (Let AdventOfCode2024_1.x.1
+     (Get_block_field 0 (Name AdventOfCode2024_1.*lambda_arg.1))
+     (Let AdventOfCode2024_1.y.1
+      (Get_block_field 1 (Name AdventOfCode2024_1.*lambda_arg.1))
+      (Fun_call Std.Prelude.Int.abs
+       ((Fun_call Std.Prelude.Operators.-
+         ((Name AdventOfCode2024_1.x.1) (Name AdventOfCode2024_1.y.1))))))))))
+ (Fun_def
+  ((fun_name AdventOfCode2024_1.solve) (args (AdventOfCode2024_1.input.1))
+   (body
+    (Let AdventOfCode2024_1.*binding.1
+     (Fun_call Std.Prelude.List.unzip ((Name AdventOfCode2024_1.input.1)))
+     (Let AdventOfCode2024_1.nums1.1
+      (Get_block_field 0 (Name AdventOfCode2024_1.*binding.1))
+      (Let AdventOfCode2024_1.nums2.1
+       (Get_block_field 1 (Name AdventOfCode2024_1.*binding.1))
+       (Let AdventOfCode2024_1.nums1.2
+        (Fun_call Std.Prelude.List.sort ((Name AdventOfCode2024_1.nums1.1)))
+        (Let AdventOfCode2024_1.nums2.2
+         (Fun_call Std.Prelude.List.sort ((Name AdventOfCode2024_1.nums2.1)))
+         (Let AdventOfCode2024_1.distances.1
+          (Fun_call Std.Prelude.List.map
+           ((Fun_call Std.Prelude.List.zip_shortest
+             ((Name AdventOfCode2024_1.nums1.2)
+              (Name AdventOfCode2024_1.nums2.2)))
+            (Name AdventOfCode2024_1.*fun.1)))
+          (Fun_call AdventOfCode2024_1.sum
+           ((Name AdventOfCode2024_1.distances.1))))))))))))
+ (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
+ (Value_def AdventOfCode2024_1.input
+  (Make_block (tag 0)
+   (fields
+    ((Make_block (tag 0) (fields ((Primitive (Int 1)) (Primitive (Int 7)))))
+     (Make_block (tag 0)
+      (fields
+       ((Make_block (tag 0)
+         (fields ((Primitive (Int 2)) (Primitive (Int 8)))))
+        (Make_block (tag 0)
+         (fields
+          ((Make_block (tag 0)
+            (fields ((Primitive (Int 3)) (Primitive (Int 4)))))
+           (Name Std.Prelude.List.Nil)))))))))))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Value_def AdventOfCode2024_1.*binding.2
+  (Fun_call Std.Prelude.print_int
+   ((Fun_call AdventOfCode2024_1.solve ((Name AdventOfCode2024_1.input)))))))
