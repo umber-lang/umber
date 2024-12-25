@@ -11,7 +11,7 @@ L_PAREN
 (OPERATOR +)
 R_PAREN
 LET
-(LOWER_NAME solve)
+(LOWER_NAME solve_part_1)
 (LOWER_NAME input)
 EQUALS
 LET
@@ -76,12 +76,64 @@ IN
 (LOWER_NAME sum)
 (LOWER_NAME distances)
 LET
+(LOWER_NAME solve_part_2)
+(LOWER_NAME input)
+EQUALS
+LET
+L_PAREN
+(LOWER_NAME left_nums)
+COMMA
+(LOWER_NAME right_nums)
+R_PAREN
+EQUALS
+(UPPER_NAME List)
+PERIOD
+(LOWER_NAME unzip)
+(LOWER_NAME input)
+IN
+(UPPER_NAME List)
+PERIOD
+(LOWER_NAME fold)
+(LOWER_NAME left_nums)
+(INT 0)
+L_PAREN
+BACKSLASH
+(LOWER_NAME acc)
+(LOWER_NAME x)
+ARROW
+(LOWER_NAME acc)
+(OPERATOR +)
+(LOWER_NAME x)
+(OPERATOR *)
+(UPPER_NAME List)
+PERIOD
+(LOWER_NAME count)
+(LOWER_NAME right_nums)
+L_PAREN
+(OPERATOR ==)
+(LOWER_NAME x)
+R_PAREN
+R_PAREN
+LET
 L_PAREN
 R_PAREN
 EQUALS
+(LOWER_NAME print_string)
+(STRING "Part 1: ")
+(OPERATOR ";")
 (LOWER_NAME print_int)
 L_PAREN
-(LOWER_NAME solve)
+(LOWER_NAME solve_part_1)
+(LOWER_NAME input)
+R_PAREN
+(OPERATOR ";")
+(LOWER_NAME print_string)
+(STRING  "\
+        \nPart 2: ")
+(OPERATOR ";")
+(LOWER_NAME print_int)
+L_PAREN
+(LOWER_NAME solve_part_2)
 (LOWER_NAME input)
 R_PAREN
 (OPERATOR ";")

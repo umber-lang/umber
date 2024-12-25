@@ -10,6 +10,7 @@ module : {
     val map : List a, (a -> b) -> List b
     val concat_map : List a, (a -> List b) -> List b
     val fold : List a, acc, (acc, a -> acc) -> acc
+    val count : List a, (a -> Bool) -> Int
 
     # Zip two lists together, dropping the suffix of the longer list if their lengths
     # are not equal.
@@ -114,6 +115,7 @@ module : {
   val ignore : a -> ()
 
   extern print : String -> () = "umber_print_endline"  # TODO: effects
+  extern print_string : String -> () = "umber_print_string"
   extern print_int : Int -> () = "umber_print_int"
   extern print_bool : Bool -> () = "umber_print_bool"
 }
@@ -214,6 +216,8 @@ module List = {
     | Nil -> init
     | Cons x xs -> fold xs (f init x) f
 
+  let count xs f = fold xs 0 (\acc x -> if f x then acc + 1 else acc)
+
   let zip_shortest xs ys =
     match (xs, ys)
     | (Nil, _) | (_, Nil) -> Nil
@@ -296,5 +300,6 @@ let ignore _ = ()
 
 extern sqrt : Float -> Float = "umber_float_sqrt"
 extern print : String -> () = "umber_print_endline"
+extern print_string : String -> () = "umber_print_string"
 extern print_int : Int -> () = "umber_print_int"
 extern print_bool : Bool -> () = "umber_print_bool"

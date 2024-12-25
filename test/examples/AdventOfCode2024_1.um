@@ -1,14 +1,22 @@
 let sum xs = List.fold xs 0 (+)
 
-let solve input = 
+let solve_part_1 input = 
   let (nums1, nums2) = List.unzip input in
   let' nums1 = List.sort nums1 in
   let' nums2 = List.sort nums2 in
   let distances = List.map (List.zip_shortest nums1 nums2) (\(x, y) -> Int.abs (x - y)) in
   sum distances
 
+# Just do a quadratic solution because implementing datastructures is hard
+let solve_part_2 input =
+  let (left_nums, right_nums) = List.unzip input in
+  List.fold left_nums 0 (\acc x -> acc + x * List.count right_nums (== x))
+
 let () =
-  print_int (solve input);
+  print_string "Part 1: ";
+  print_int (solve_part_1 input);
+  print_string "\nPart 2: ";
+  print_int (solve_part_2 input);
   print ""
 
 # TODO: This test takes ~6s to type-check because of this huge list literal. Can try to

@@ -88,7 +88,16 @@
                          (Tuple ()))
                         ())))
                      (type_source Extern_declared)
-                     (extern_name umber_print_bool))))))
+                     (extern_name umber_print_bool))))
+                  (print_string
+                   (Local
+                    ((type_
+                      (Scheme
+                       ((Function ((Type_app String ())) (Effect_union ())
+                         (Tuple ()))
+                        ())))
+                     (type_source Extern_declared)
+                     (extern_name umber_print_string))))))
                 (types ()) (effects ())
                 (modules
                  ((Int
@@ -180,6 +189,16 @@
                                ((Type_app Std.Prelude.List.List ((Var a))))
                                (Effect_union ())
                                (Type_app Std.Prelude.List.List ((Var a))))
+                              ()))))))
+                        (count
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Function ((Var a)) (Effect_union ())
+                                 (Type_app Bool ())))
+                               (Effect_union ()) (Type_app Int ()))
                               ()))))))
                         (split
                          (Local
@@ -609,7 +628,16 @@
                         (Tuple ()))
                        ())))
                     (type_source Extern_declared)
-                    (extern_name umber_print_bool))))))
+                    (extern_name umber_print_bool))))
+                 (print_string
+                  (Local
+                   ((type_
+                     (Scheme
+                      ((Function ((Type_app String ())) (Effect_union ())
+                        (Tuple ()))
+                       ())))
+                    (type_source Extern_declared)
+                    (extern_name umber_print_string))))))
                (types ()) (effects ())
                (modules
                 ((Int
@@ -709,17 +737,28 @@
                               (Type_app Std.Prelude.List.List ((Var a))))
                              ())))
                           (type_source Let_inferred))))
+                       (count
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var a)))
+                               (Function ((Var a)) (Effect_var c)
+                                (Type_app Bool ())))
+                              (Effect_var c) (Type_app Int ()))
+                             ())))
+                          (type_source Let_inferred))))
                        (split
                         (Local
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var h)))
+                              ((Type_app Std.Prelude.List.List ((Var f)))
                                (Type_app Int ()))
                               (Effect_union ())
                               (Tuple
-                               ((Type_app Std.Prelude.List.List ((Var h)))
-                                (Type_app Std.Prelude.List.List ((Var h))))))
+                               ((Type_app Std.Prelude.List.List ((Var f)))
+                                (Type_app Std.Prelude.List.List ((Var f))))))
                              ())))
                           (type_source Let_inferred))))
                        (unzip
