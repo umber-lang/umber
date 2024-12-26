@@ -1,0 +1,47 @@
+; ModuleID = 'examples/Cat.um'
+source_filename = "examples/Cat.um"
+target datalayout = "i32:64-i64:64-p:64:64-f64:64"
+
+%umber_block = type { %umber_header, [0 x i64] }
+%umber_header = type { i16, i16, i32 }
+%umber_block8b = type { %umber_header, [8 x i8] }
+
+@"Cat.*binding.1" = global %umber_block* null
+@string.169738453 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"EOF\00\00\00\00\04" }
+
+define i32 @"umber_main:Cat"() {
+entry:
+  %fun_call = tail call tailcc %umber_block* @Std.Prelude.read_line(%umber_block* inttoptr (i64 1 to %umber_block*))
+  br label %cond
+
+cond_binding_merge:                               ; preds = %cond_binding
+  %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.169738453 to %umber_block*))
+  br label %cond_otherwise_merge
+
+cond:                                             ; preds = %entry
+  %fun_call2 = ptrtoint %umber_block* %fun_call to i64
+  %equals = icmp eq i64 %fun_call2, 1
+  br i1 %equals, label %cond_binding, label %cond_otherwise
+
+cond_binding:                                     ; preds = %cond
+  br label %cond_binding_merge
+
+cond_otherwise:                                   ; preds = %cond
+  %block_field_gep = getelementptr %umber_block, %umber_block* %fun_call, i32 0, i32 1, i32 0
+  %block_field_raw = load i64, i64* %block_field_gep, align 8
+  %block_field = inttoptr i64 %block_field_raw to %umber_block*
+  %fun_call3 = tail call tailcc %umber_block* @Std.Prelude.print_string(%umber_block* %block_field)
+  br label %cond_otherwise_merge
+
+cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
+  %cond_otherwise_merge4 = phi %umber_block* [ %fun_call1, %cond_binding_merge ], [ %fun_call3, %cond_otherwise ]
+  store %umber_block* %cond_otherwise_merge4, %umber_block** @"Cat.*binding.1", align 8
+  ret i32 0
+}
+
+declare tailcc %umber_block* @Std.Prelude.read_line(%umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
+
+declare tailcc %umber_block* @Std.Prelude.print_string(%umber_block*)
+

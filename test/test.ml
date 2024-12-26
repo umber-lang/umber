@@ -62,6 +62,7 @@ let test ~in_file =
   let mir_file = concat_current "mir" out_filename in
   let llvm_file = concat_current "llvm" out_filename in
   let output_file = concat_current "output" out_filename in
+  let input_file = concat_current "input" (bare_filename ^ ".txt") in
   let tmp_exe_file = Filename_unix.temp_file ("umber_test." ^ filename) "" in
   List.iter [ tokens_file; ast_file; mir_file; llvm_file; output_file ] ~f:(fun file ->
     (* Touch each file so that we always end up with at least an empty file for every
@@ -99,7 +100,11 @@ let test ~in_file =
     Out_channel.with_file file ~f:(fun out ->
       print_compilation_error error ~out ~filename));
   if (not !encountered_error) && should_make_exe bare_filename
-  then Shell.sh "%s > %s 2>&1" tmp_exe_file output_file
+  then (
+    let redirected_stdin =
+      if Sys_unix.file_exists_exn input_file then " < " ^ input_file else ""
+    in
+    Shell.sh "%s > %s 2>&1%s" tmp_exe_file output_file redirected_stdin)
 ;;
 
 let command =

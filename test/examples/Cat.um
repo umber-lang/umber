@@ -1,0 +1,4 @@
+let () =
+  (match read_line ()
+  | None -> print "EOF"
+  | Some line -> print_string line)

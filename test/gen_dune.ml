@@ -9,13 +9,15 @@ let test_dirs = [ "tokens"; "ast"; "mir"; "llvm"; "output" ]
 (* TODO: This will stop at the first error instead of propagating them, bad. Maybe try
    "concurrent" or generate separate rules. *)
 
+let apply name args : Sexp.t = List (Atom name :: args)
+let dep s = [%sexp ("%{dep:" ^ s ^ "}" : string)]
+
 let gen_rule ~test_file =
   let test_name = Filename.chop_extension test_file in
   let action : Sexp.t =
-    List
-      [ Atom "progn"
-      ; [%sexp
-          "run", "%{dep:test.exe}", ("%{dep:" ^ "examples" ^/ test_file ^ "}" : string)]
+    apply
+      "progn"
+      [ apply "run" [ dep "test.exe"; dep ("examples" ^/ test_file) ]
       ; List
           (Atom "concurrent"
            :: List.map test_dirs ~f:(fun dir ->
@@ -28,7 +30,9 @@ let gen_rule ~test_file =
   [%sexp
     "rule"
     , ("alias", "runtest")
-    , ("deps", ("package", "umber"))
+    , ( "deps"
+      , ("package", "umber")
+      , ("glob_files", ("input" ^/ test_name ^ ".txt" : string)) )
     , ("action", (action : Sexp.t))]
 ;;
 

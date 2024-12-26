@@ -1,0 +1,11 @@
+((Fun_decl ((name Std.Prelude.read_line) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print_string) (arity 1)))
+ (Value_def Cat.*binding.1
+  (Let Cat.match.1 (Fun_call Std.Prelude.read_line ((Make_block (tag 0))))
+   (Cond_assign (conds (((Constant_tag_equals (Name Cat.match.1) 0) ())))
+    (body (Fun_call Std.Prelude.print ((Primitive (String EOF)))))
+    (if_none_matched
+     (Otherwise
+      (Let Cat.line.1 (Get_block_field 0 (Name Cat.match.1))
+       (Fun_call Std.Prelude.print_string ((Name Cat.line.1))))))))))
