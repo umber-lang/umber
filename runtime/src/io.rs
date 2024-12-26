@@ -2,7 +2,7 @@ use core::{ptr, slice};
 
 use libc_print::std_name::print;
 
-use crate::{block::BlockPtr, option};
+use crate::block::BlockPtr;
 
 #[no_mangle]
 pub extern "C" fn umber_print_int(x: BlockPtr) {
@@ -35,9 +35,9 @@ pub extern "C" fn umber_read_line() -> BlockPtr {
     let mut buffer = ptr::null_mut();
     let mut size = 0;
     let bytes_read = unsafe { libc::getline(&raw mut buffer, &raw mut size, stdin) };
-    if bytes_read == -1 {
+    let result: Option<BlockPtr> = if bytes_read == -1 {
         // TODO: Assuming this means EOF - should check for errors in errno
-        option::NONE
+        None
     } else {
         let bytes = unsafe { slice::from_raw_parts(buffer as *mut u8, bytes_read as usize) };
         // TODO: This should be a proper error (exception), not a runtime panic
@@ -47,8 +47,9 @@ pub extern "C" fn umber_read_line() -> BlockPtr {
             .unwrap_or(s)
             .strip_suffix("\n\r")
             .unwrap_or(s);
-        option::some(BlockPtr::new_string(s))
-    }
+        Some(BlockPtr::new_string(s))
+    };
+    result.into()
 }
 
 extern "C" {

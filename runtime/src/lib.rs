@@ -20,10 +20,12 @@ mod no_std_setup {
 
 mod block;
 mod bool;
+mod char;
+mod closure;
 mod float;
 mod gc;
 mod int;
 mod io;
-mod option;
 mod poly;
+mod stdlib;
 mod string;

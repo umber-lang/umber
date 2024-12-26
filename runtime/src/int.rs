@@ -1,7 +1,9 @@
-use crate::block::{Block, BlockPtr, KnownTag};
 use core::fmt::Write;
 use core::mem;
+
 use heapless::String;
+
+use crate::block::{Block, BlockPtr, KnownTag};
 
 impl Block {
     pub fn as_int(self) -> i64 {

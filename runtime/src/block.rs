@@ -25,6 +25,7 @@ impl BlockPtr {
             unsafe {
                 match KnownTag::try_from(self.block.header().tag) {
                     Ok(KnownTag::Int) => Value::Int(self.block.as_int()),
+                    Ok(KnownTag::Char) => Value::Char(self.block.as_char()),
                     Ok(KnownTag::Float) => Value::Float(self.block.as_float()),
                     Ok(KnownTag::String) => Value::String(self.block.as_str()),
                     Err(()) => Value::OtherBlock(self.block),
@@ -90,7 +91,7 @@ impl BlockPtr {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum KnownTag {
     Int = 0x8001,
-    // Char = 0x8002,
+    Char = 0x8002,
     Float = 0x8003,
     String = 0x8004,
 }
@@ -111,6 +112,7 @@ impl TryFrom<u16> for KnownTag {
 #[derive(Debug)]
 pub enum Value<'a> {
     Int(i64),
+    Char(char),
     Float(f64),
     String(&'a str),
     ConstantCnstr(ConstantCnstr),

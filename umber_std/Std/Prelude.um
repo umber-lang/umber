@@ -10,7 +10,9 @@ module : {
     val map : List a, (a -> b) -> List b
     val concat_map : List a, (a -> List b) -> List b
     val fold : List a, acc, (acc, a -> acc) -> acc
+    val fold_until : List a, acc, (acc, a -> ControlFlow acc final), (acc -> final) -> final
     val count : List a, (a -> Bool) -> Int
+    val for_all : List a, (a -> Bool) -> Bool
 
     # Zip two lists together, dropping the suffix of the longer list if their lengths
     # are not equal.
@@ -27,6 +29,12 @@ module : {
   }
 
   import .List.(Nil, Cons)
+
+  module ControlFlow : {
+    type ControlFlow acc final =
+      | Continue acc
+      | Stop final
+  }
 
   module Option : {
     type Option a =
@@ -58,6 +66,15 @@ module : {
     val sin : Float, Float -> Float
     val cos : Float, Float -> Float
     val pi : Float
+  }
+
+  module String : {
+    import String
+
+    val make : Int, Char -> String
+    val of_char : Char -> String
+    val fold : String, acc, (acc, Char -> acc) -> acc
+    val split : String, Char -> List String
   }
 
   module Operators : {
@@ -94,6 +111,7 @@ module : {
     val infix 4 (<=) : a, a -> Bool
     val infix 4 (>) : a, a -> Bool
     val infix 4 (>=) : a, a -> Bool
+    val compare : a, a -> Ordering
 
     val infixl 3 (&&) : Bool, Bool -> Bool
     
@@ -109,6 +127,13 @@ module : {
   }
 
   import .Operators._
+
+  module Ordering : {
+    type Ordering =
+      | Less
+      | Equal
+      | Greater
+  }
 
   val sqrt : Float -> Float
 
@@ -177,6 +202,24 @@ module Float = {
   extern pi : Float = "umber_float_pi"
 }
 
+module String = {
+  import String
+
+  extern make : Int, Char -> String = "umber_string_make"
+  extern fold : String, acc, (acc, Char -> acc) -> acc = "umber_string_fold"
+
+  let of_char c = make 1 c
+
+  let split str sep =
+    # TODO: The performance of this is going to be bad, with all the quadratic appending
+    fold str [] (\chunks c ->
+      if c == sep then "" :: chunks
+      else match chunks
+        | Nil -> [ of_char c ]
+        | Cons current_chunk chunks -> (current_chunk ++ of_char c) :: chunks)
+    |> List.reverse
+}
+
 module List = {
   let length =
     let loop acc xs =
@@ -217,7 +260,22 @@ module List = {
     | Nil -> init
     | Cons x xs -> fold xs (f init x) f
 
+  let fold_until xs init f finish =
+    match xs
+    | Nil -> finish init
+    | Cons x xs ->
+      match f init x
+      | ControlFlow.Stop done -> done
+      | ControlFlow.Continue acc -> fold_until xs acc f finish
+
   let count xs f = fold xs 0 (\acc x -> if f x then acc + 1 else acc)
+
+  let for_all xs f =
+    fold_until
+      xs
+      ()
+      (\() x -> if f x then ControlFlow.Continue () else ControlFlow.Stop False)
+      (\() -> True)
 
   let zip_shortest xs ys =
     match (xs, ys)
@@ -259,6 +317,8 @@ module List = {
     sort_loop (length xs) xs
 }
 
+import .List.(Nil, Cons)
+
 module Operators = {
   # TODO: Consider removing these fixity declarations and copying them from the sig
   # This requires a way to specify fixity in a let binding.
@@ -286,7 +346,8 @@ module Operators = {
   extern infix 4 (<=) : a, a -> Bool = "umber_lte"
   extern infix 4 (>) : a, a -> Bool = "umber_gt"
   extern infix 4 (>=) : a, a -> Bool = "umber_gte"
-
+  extern compare : a, a -> Ordering = "umber_compare"
+  
   let infixl 3 (&&) a b = if a then b else False
   let infixl 2 (||) a b = if a then True else b
   let infixl 0 (|>) x f = f x

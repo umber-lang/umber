@@ -1,6 +1,9 @@
-use crate::block::{Block, BlockPtr, KnownTag};
+use core::ffi::c_void;
 use core::ptr::copy_nonoverlapping;
 use core::{slice, str};
+
+use crate::block::{Block, BlockPtr, KnownTag};
+use crate::closure::Closure;
 
 impl Block {
     fn string_len(self) -> usize {
@@ -49,6 +52,17 @@ impl BlockPtr {
 }
 
 #[no_mangle]
+pub extern "C" fn umber_string_make(n: BlockPtr, c: BlockPtr) -> BlockPtr {
+    let n = n.as_int() as usize;
+    let c = c.as_char();
+    unsafe {
+        BlockPtr::new_string_with_initializer(n, |fields| {
+            libc::memset(fields as *mut c_void, c as i32, n);
+        })
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     let (x, y) = (x.as_str(), y.as_str());
     unsafe {
@@ -57,6 +71,13 @@ pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
             copy_nonoverlapping(y.as_ptr(), fields.add(x.len()), y.len());
         })
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn umber_string_fold(s: BlockPtr, init: BlockPtr, fun: Closure) -> BlockPtr {
+    s.as_str()
+        .chars()
+        .fold(init, |acc, c| fun.apply2(acc, BlockPtr::new_char(c)))
 }
 
 #[cfg(test)]

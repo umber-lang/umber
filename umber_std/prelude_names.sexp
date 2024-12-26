@@ -71,6 +71,7 @@
                     ((type_
                       (Scheme
                        ((Function ((Var a)) (Effect_union ()) (Tuple ())) ()))))))
+                  (compare (Imported Std.Prelude.Operators.compare))
                   (print_int
                    (Local
                     ((type_
@@ -253,6 +254,16 @@
                                  ((Type_app Any ()))))
                                (Effect_union ()) (Type_app Int ()))
                               ()))))))
+                        (for_all
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Function ((Var a)) (Effect_union ())
+                                 (Type_app Bool ())))
+                               (Effect_union ()) (Type_app Bool ()))
+                              ()))))))
                         (reverse
                          (Local
                           ((type_
@@ -272,6 +283,22 @@
                                  (Type_app Std.Prelude.List.List ((Var b)))))
                                (Effect_union ())
                                (Type_app Std.Prelude.List.List ((Var b))))
+                              ()))))))
+                        (fold_until
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Var acc)
+                                (Function ((Var acc) (Var a))
+                                 (Effect_union ())
+                                 (Type_app
+                                  Std.Prelude.ControlFlow.ControlFlow
+                                  ((Var acc) (Var final))))
+                                (Function ((Var acc)) (Effect_union ())
+                                 (Var final)))
+                               (Effect_union ()) (Var final))
                               ()))))))
                         (zip_shortest
                          (Local
@@ -356,6 +383,72 @@
                        ((Option
                          ((Local
                            ((a) (Variants ((None ()) (Some ((Var a)))))))))))
+                      (effects ()) (modules ())))))
+                  (String
+                   (Local
+                    (()
+                     ((names
+                       ((fold
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app String ()) (Var acc)
+                                (Function ((Var acc) (Type_app Char ()))
+                                 (Effect_union ()) (Var acc)))
+                               (Effect_union ()) (Var acc))
+                              ()))))))
+                        (make
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Int ()) (Type_app Char ()))
+                               (Effect_union ()) (Type_app String ()))
+                              ()))))))
+                        (split
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app String ()) (Type_app Char ()))
+                               (Effect_union ())
+                               (Type_app Std.Prelude.List.List
+                                ((Type_app String ()))))
+                              ()))))))
+                        (of_char
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app Char ()))
+                               (Effect_union ()) (Type_app String ()))
+                              ()))))))))
+                      (types ((String ((Imported String))))) (effects ())
+                      (modules ())))))
+                  (Ordering
+                   (Local
+                    (()
+                     ((names
+                       ((Less
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Type_app Std.Prelude.Ordering.Ordering ()) ()))))))
+                        (Equal
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Type_app Std.Prelude.Ordering.Ordering ()) ()))))))
+                        (Greater
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Type_app Std.Prelude.Ordering.Ordering ()) ()))))))))
+                      (types
+                       ((Ordering
+                         ((Local
+                           (()
+                            (Variants ((Less ()) (Equal ()) (Greater ())))))))))
                       (effects ()) (modules ())))))
                   (Operators
                    (Local
@@ -568,8 +661,42 @@
                             (Scheme
                              ((Function ((Type_app Bool ()))
                                (Effect_union ()) (Type_app Bool ()))
+                              ()))))))
+                        (compare
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Var a) (Var a)) (Effect_union ())
+                               (Type_app Std.Prelude.Ordering.Ordering ()))
                               ()))))))))
-                      (types ()) (effects ()) (modules ())))))))))
+                      (types ()) (effects ()) (modules ())))))
+                  (ControlFlow
+                   (Local
+                    (()
+                     ((names
+                       ((Stop
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Var final)) (Effect_union ())
+                               (Type_app Std.Prelude.ControlFlow.ControlFlow
+                                ((Var acc) (Var final))))
+                              ()))))))
+                        (Continue
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Var acc)) (Effect_union ())
+                               (Type_app Std.Prelude.ControlFlow.ControlFlow
+                                ((Var acc) (Var final))))
+                              ()))))))))
+                      (types
+                       ((ControlFlow
+                         ((Local
+                           ((acc final)
+                            (Variants
+                             ((Continue ((Var acc))) (Stop ((Var final)))))))))))
+                      (effects ()) (modules ())))))))))
               ((names
                 ((% (Imported Std.Prelude.Operators.%))
                  (* (Imported Std.Prelude.Operators.*))
@@ -593,8 +720,10 @@
                  (>= (Imported Std.Prelude.Operators.>=))
                  (|> (Imported Std.Prelude.Operators.|>))
                  (|| (Imported Std.Prelude.Operators.||))
+                 (Nil (Imported Std.Prelude.List.Nil))
                  (mod (Imported Std.Prelude.Operators.mod))
                  (not (Imported Std.Prelude.Operators.not))
+                 (Cons (Imported Std.Prelude.List.Cons))
                  (sqrt
                   (Local
                    ((type_
@@ -621,6 +750,7 @@
                         (Tuple ()))
                        ())))
                     (type_source Let_inferred))))
+                 (compare (Imported Std.Prelude.Operators.compare))
                  (print_int
                   (Local
                    ((type_
@@ -815,6 +945,17 @@
                               (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Let_inferred))))
+                       (for_all
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var a)))
+                               (Function ((Var a)) (Effect_var c)
+                                (Type_app Bool ())))
+                              (Effect_var c) (Type_app Bool ()))
+                             ())))
+                          (type_source Let_inferred))))
                        (reverse
                         (Local
                          ((type_
@@ -835,6 +976,20 @@
                                 (Type_app Std.Prelude.List.List ((Var d)))))
                               (Effect_var c)
                               (Type_app Std.Prelude.List.List ((Var d))))
+                             ())))
+                          (type_source Let_inferred))))
+                       (fold_until
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var a)))
+                               (Var b)
+                               (Function ((Var b) (Var a)) (Effect_var e)
+                                (Type_app Std.Prelude.ControlFlow.ControlFlow
+                                 ((Var b) (Var g))))
+                               (Function ((Var b)) (Effect_var e) (Var g)))
+                              (Effect_var e) (Var g))
                              ())))
                           (type_source Let_inferred))))
                        (rev_append
@@ -942,6 +1097,76 @@
                       ((Option
                         ((Local
                           ((a) (Variants ((None ()) (Some ((Var a)))))))))))
+                     (effects ()) (modules ())))))
+                 (String
+                  (Local
+                   (()
+                    ((names
+                      ((fold
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app String ()) (Var acc)
+                               (Function ((Var acc) (Type_app Char ()))
+                                (Effect_union ()) (Var acc)))
+                              (Effect_union ()) (Var acc))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_string_fold))))
+                       (make
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Int ()) (Type_app Char ()))
+                              (Effect_union ()) (Type_app String ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_string_make))))
+                       (split
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app String ()) (Type_app Char ()))
+                              (Effect_union ())
+                              (Type_app Std.Prelude.List.List
+                               ((Type_app String ()))))
+                             ())))
+                          (type_source Let_inferred))))
+                       (of_char
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Char ())) (Effect_union ())
+                              (Type_app String ()))
+                             ())))
+                          (type_source Let_inferred))))))
+                     (types ((String ((Imported String))))) (effects ())
+                     (modules ())))))
+                 (Ordering
+                  (Local
+                   (()
+                    ((names
+                      ((Less
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Type_app Std.Prelude.Ordering.Ordering ()) ()))))))
+                       (Equal
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Type_app Std.Prelude.Ordering.Ordering ()) ()))))))
+                       (Greater
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Type_app Std.Prelude.Ordering.Ordering ()) ()))))))))
+                     (types
+                      ((Ordering
+                        ((Local
+                          (() (Variants ((Less ()) (Equal ()) (Greater ())))))))))
                      (effects ()) (modules ())))))
                  (Operators
                   (Local
@@ -1169,5 +1394,41 @@
                             ((Function ((Type_app Bool ())) (Effect_union ())
                               (Type_app Bool ()))
                              ())))
-                          (type_source Let_inferred))))))
-                     (types ()) (effects ()) (modules ()))))))))))))))))))))))
+                          (type_source Let_inferred))))
+                       (compare
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Var a) (Var a)) (Effect_union ())
+                              (Type_app Std.Prelude.Ordering.Ordering ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_compare))))))
+                     (types ()) (effects ()) (modules ())))))
+                 (ControlFlow
+                  (Local
+                   (()
+                    ((names
+                      ((Stop
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Var final)) (Effect_union ())
+                              (Type_app Std.Prelude.ControlFlow.ControlFlow
+                               ((Var acc) (Var final))))
+                             ()))))))
+                       (Continue
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Var acc)) (Effect_union ())
+                              (Type_app Std.Prelude.ControlFlow.ControlFlow
+                               ((Var acc) (Var final))))
+                             ()))))))))
+                     (types
+                      ((ControlFlow
+                        ((Local
+                          ((acc final)
+                           (Variants
+                            ((Continue ((Var acc))) (Stop ((Var final)))))))))))
+                     (effects ()) (modules ()))))))))))))))))))))))
