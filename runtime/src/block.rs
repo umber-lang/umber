@@ -61,7 +61,7 @@ impl BlockPtr {
         }
     }
 
-    pub fn new<const N: usize>(tag: KnownTag, fields: [BlockPtr; N]) -> BlockPtr {
+    pub fn new<const N: usize>(tag: u16, fields: [BlockPtr; N]) -> BlockPtr {
         let len: u16 = fields.len().try_into().unwrap();
         unsafe {
             Self::new_with_initializer(tag, len, |block| {
@@ -71,13 +71,13 @@ impl BlockPtr {
     }
 
     pub unsafe fn new_with_initializer(
-        tag: KnownTag,
+        tag: u16,
         len: u16,
         initialize: impl FnOnce(Block),
     ) -> BlockPtr {
         let n_bytes = 8 * (len + 1) as usize;
         let header = gc::alloc(gc::get(), n_bytes) as *mut BlockHeader;
-        (*header).tag = tag as u16;
+        (*header).tag = tag;
         (*header).len = len;
         let block = Block(NonNull::new_unchecked(header as *mut BlockPtr));
         initialize(block);
@@ -164,7 +164,7 @@ impl Block {
 pub struct ConstantCnstr(u64);
 
 impl ConstantCnstr {
-    pub fn new(tag: u64) -> Self {
+    pub const fn new(tag: u64) -> Self {
         Self((tag << 1) | BLOCK_PTR_MASK)
     }
 

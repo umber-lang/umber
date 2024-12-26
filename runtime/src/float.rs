@@ -15,7 +15,7 @@ impl BlockPtr {
 
     pub fn new_float(x: f64) -> BlockPtr {
         let x: BlockPtr = unsafe { mem::transmute(x) };
-        Self::new(KnownTag::Float, [x])
+        Self::new(KnownTag::Float as u16, [x])
     }
 }
 

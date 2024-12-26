@@ -118,6 +118,7 @@ module : {
   extern print_string : String -> () = "umber_print_string"
   extern print_int : Int -> () = "umber_print_int"
   extern print_bool : Bool -> () = "umber_print_bool"
+  extern read_line : () -> Option String = "umber_read_line" 
 }
 
 # TODO: need some kind of syntax for re-exporting things easily
@@ -303,3 +304,4 @@ extern print : String -> () = "umber_print_endline"
 extern print_string : String -> () = "umber_print_string"
 extern print_int : Int -> () = "umber_print_int"
 extern print_bool : Bool -> () = "umber_print_bool"
+extern read_line : () -> Option String = "umber_read_line" 

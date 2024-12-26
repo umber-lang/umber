@@ -24,5 +24,6 @@ mod float;
 mod gc;
 mod int;
 mod io;
+mod option;
 mod poly;
 mod string;

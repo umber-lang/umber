@@ -80,6 +80,16 @@
                         ())))
                      (type_source Extern_declared)
                      (extern_name umber_print_int))))
+                  (read_line
+                   (Local
+                    ((type_
+                      (Scheme
+                       ((Function ((Tuple ())) (Effect_union ())
+                         (Type_app Std.Prelude.Option.Option
+                          ((Type_app String ()))))
+                        ())))
+                     (type_source Extern_declared)
+                     (extern_name umber_read_line))))
                   (print_bool
                    (Local
                     ((type_
@@ -620,6 +630,16 @@
                        ())))
                     (type_source Extern_declared)
                     (extern_name umber_print_int))))
+                 (read_line
+                  (Local
+                   ((type_
+                     (Scheme
+                      ((Function ((Tuple ())) (Effect_union ())
+                        (Type_app Std.Prelude.Option.Option
+                         ((Type_app String ()))))
+                       ())))
+                    (type_source Extern_declared)
+                    (extern_name umber_read_line))))
                  (print_bool
                   (Local
                    ((type_
@@ -753,12 +773,12 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var f)))
+                              ((Type_app Std.Prelude.List.List ((Var e)))
                                (Type_app Int ()))
                               (Effect_union ())
                               (Tuple
-                               ((Type_app Std.Prelude.List.List ((Var f)))
-                                (Type_app Std.Prelude.List.List ((Var f))))))
+                               ((Type_app Std.Prelude.List.List ((Var e)))
+                                (Type_app Std.Prelude.List.List ((Var e))))))
                              ())))
                           (type_source Let_inferred))))
                        (unzip
