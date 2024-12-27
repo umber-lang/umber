@@ -248,7 +248,7 @@ let codegen_umber_apply_fun t ~n_args =
   match Llvm.lookup_function apply_fun_name t.module_ with
   | Some fun_ -> fun_
   | None ->
-    let original_block = Llvm.insertion_block t.builder in
+    let original_block = Option.try_with (fun () -> Llvm.insertion_block t.builder) in
     let apply_fun_type = block_function_type t ~n_args:(n_args + 1) in
     let apply_fun_value = Llvm.define_function apply_fun_name apply_fun_type t.module_ in
     Llvm.set_function_call_conv tailcc apply_fun_value;
@@ -321,7 +321,8 @@ let codegen_umber_apply_fun t ~n_args =
         t.builder
     in
     ignore_value (Llvm.build_ret phi t.builder);
-    Llvm.position_at_end original_block t.builder;
+    Option.iter original_block ~f:(fun original_block ->
+      Llvm.position_at_end original_block t.builder);
     apply_fun_value
 ;;
 
@@ -675,11 +676,17 @@ let create ~module_path ~source_filename =
   }
 ;;
 
+let codegen_runtime_required_functions t =
+  (* Ensure that functions the runtime needs are codegened. See closure.rs in the runtime. *)
+  ignore_value (codegen_umber_apply_fun t ~n_args:2)
+;;
+
 let of_mir_exn ~module_path ~source_filename mir =
   let t = create ~module_path ~source_filename in
   List.iter mir ~f:(preprocess_stmt t);
   List.iter mir ~f:(codegen_stmt t);
   build_main_ret t.context t.main_function_builder;
+  codegen_runtime_required_functions t;
   match Llvm_analysis.verify_module t.module_ with
   | None -> t
   | Some error ->

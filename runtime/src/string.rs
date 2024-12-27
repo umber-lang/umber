@@ -3,7 +3,7 @@ use core::ptr::copy_nonoverlapping;
 use core::{slice, str};
 
 use crate::block::{Block, BlockPtr, KnownTag};
-use crate::closure::Closure;
+use crate::closure::{umber_apply2, Closure};
 
 impl Block {
     fn string_len(self) -> usize {
@@ -77,7 +77,7 @@ pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
 pub unsafe extern "C" fn umber_string_fold(s: BlockPtr, init: BlockPtr, fun: Closure) -> BlockPtr {
     s.as_str()
         .chars()
-        .fold(init, |acc, c| fun.apply2(acc, BlockPtr::new_char(c)))
+        .fold(init, |acc, c| umber_apply2(fun, acc, BlockPtr::new_char(c)))
 }
 
 #[cfg(test)]
