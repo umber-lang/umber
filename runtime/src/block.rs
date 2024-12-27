@@ -28,7 +28,7 @@ impl BlockPtr {
                     Ok(KnownTag::Char) => Value::Char(self.block.as_char()),
                     Ok(KnownTag::Float) => Value::Float(self.block.as_float()),
                     Ok(KnownTag::String) => Value::String(self.block.as_str()),
-                    Err(()) => Value::OtherBlock(self.block),
+                    Err(Unknown) => Value::OtherBlock(self.block),
                 }
             }
         } else {
@@ -96,15 +96,19 @@ pub enum KnownTag {
     String = 0x8004,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Unknown;
+
 impl TryFrom<u16> for KnownTag {
-    type Error = ();
+    type Error = Unknown;
 
     fn try_from(tag: u16) -> Result<Self, Self::Error> {
         match tag {
             0x8001 => Ok(KnownTag::Int),
+            0x8002 => Ok(KnownTag::Char),
             0x8003 => Ok(KnownTag::Float),
             0x8004 => Ok(KnownTag::String),
-            _ => Err(()),
+            _ => Err(Unknown),
         }
     }
 }
@@ -151,11 +155,13 @@ impl Block {
     // code, but is helpful for debugging the compiler.
     // TODO: Put this stuff behind some kind of debug cfg
     pub fn expect_tag(self, tag: KnownTag) {
-        if self.header().tag.try_into() != Ok(tag) {
+        let got_tag: Result<KnownTag, _> = self.header().tag.try_into();
+        if got_tag != Ok(tag) {
             panic!(
-                "Expected block with tag {:?} but got tag {:?}",
+                "Expected block with tag {:?} but got tag {:?} ({:?})",
                 tag,
-                self.header().tag
+                self.header().tag,
+                got_tag
             )
         }
     }

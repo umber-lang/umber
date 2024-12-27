@@ -1,11 +1,12 @@
 open Import
 open Names
 
-(* See https://llvm.org/doxygen/namespacellvm_1_1CallingConv.html *)
+(** See https://llvm.org/doxygen/namespacellvm_1_1CallingConv.html *)
 let tailcc = 18
 
-(* See https://llvm.org/docs/LangRef.html#data-layout *)
+(** See https://llvm.org/docs/LangRef.html#data-layout *)
 let data_layout_string = "i32:64-i64:64-p:64:64-f64:64"
+
 let ignore_value (_ : Llvm.llvalue) = ()
 
 module Value_table : sig
@@ -170,6 +171,7 @@ let codegen_literal t literal =
         ~name
         (singleton_array type_ (Llvm.const_float type_ x))
     | Char c ->
+      (* TODO: We could just store Chars as immediate values, they are guaranteed to fit *)
       let type_ = Llvm.i64_type t.context in
       let name = Uchar.to_string c in
       let c = Uchar.to_int c in

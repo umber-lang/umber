@@ -1,6 +1,7 @@
-use core::ffi::c_void;
 use core::ptr::copy_nonoverlapping;
 use core::{slice, str};
+
+use heapless::String;
 
 use crate::block::{Block, BlockPtr, KnownTag};
 use crate::closure::{umber_apply2, Closure};
@@ -27,18 +28,18 @@ impl BlockPtr {
     }
 
     unsafe fn new_string_with_initializer(
-        str_len: usize,
+        str_len_bytes: usize,
         initialize: impl FnOnce(*mut u8),
     ) -> Self {
-        let n_words: u16 = ((str_len / 8) + 1).try_into().unwrap();
+        let n_words: u16 = ((str_len_bytes / 8) + 1).try_into().unwrap();
         let n_bytes = 8 * (n_words as usize);
         Self::new_with_initializer(KnownTag::String as u16, n_words, |block| {
             let fields = block.as_ptr().add(1) as *mut u8;
             initialize(fields);
-            for i in str_len..(n_bytes - 1) {
+            for i in str_len_bytes..(n_bytes - 1) {
                 *fields.add(i) = 0
             }
-            *fields.add(n_bytes - 1) = 7 - (str_len % 8) as u8;
+            *fields.add(n_bytes - 1) = 7 - (str_len_bytes % 8) as u8;
         })
     }
 
@@ -52,12 +53,18 @@ impl BlockPtr {
 }
 
 #[no_mangle]
-pub extern "C" fn umber_string_make(n: BlockPtr, c: BlockPtr) -> BlockPtr {
-    let n = n.as_int() as usize;
+pub extern "C" fn umber_string_make(n_chars: BlockPtr, c: BlockPtr) -> BlockPtr {
+    let n_chars = n_chars.as_int() as usize;
     let c = c.as_char();
+    let c_len = c.len_utf8();
+    let n_bytes = c_len * n_chars;
+    let mut char_bytes: String<4> = String::new();
+    char_bytes.push(c).unwrap();
     unsafe {
-        BlockPtr::new_string_with_initializer(n, |fields| {
-            libc::memset(fields as *mut c_void, c as i32, n);
+        BlockPtr::new_string_with_initializer(n_bytes, |fields| {
+            for offset in (0..n_bytes).step_by(c_len) {
+                copy_nonoverlapping(char_bytes.as_ptr(), fields.add(offset), c_len);
+            }
         })
     }
 }
@@ -82,9 +89,8 @@ pub unsafe extern "C" fn umber_string_fold(s: BlockPtr, init: BlockPtr, fun: Clo
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{block::BlockPtr, gc::umber_gc_init};
-
-    use super::umber_string_append;
 
     #[test]
     fn string_creation() {
@@ -94,7 +100,33 @@ mod test {
     }
 
     #[test]
+    fn string_make() {
+        unsafe { umber_gc_init() };
+        assert_eq!(
+            umber_string_make(BlockPtr::new_int(3), BlockPtr::new_char('a')).as_str(),
+            "aaa"
+        );
+        assert_eq!(
+            umber_string_make(BlockPtr::new_int(0), BlockPtr::new_char('w')).as_str(),
+            ""
+        );
+        assert_eq!(
+            umber_string_make(BlockPtr::new_int(2), BlockPtr::new_char('看')).as_str(),
+            "看看"
+        );
+    }
+
+    #[test]
     fn string_appending() {
+        unsafe { umber_gc_init() };
+        assert_eq!(
+            umber_string_append(BlockPtr::new_string("foo"), BlockPtr::new_string("bar")).as_str(),
+            "foobar"
+        )
+    }
+
+    #[test]
+    fn string_fold() {
         unsafe { umber_gc_init() };
         assert_eq!(
             umber_string_append(BlockPtr::new_string("foo"), BlockPtr::new_string("bar")).as_str(),
