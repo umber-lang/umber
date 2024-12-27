@@ -1,0 +1,58 @@
+module Report = {
+  type Report = List Int
+  
+  type Dir =
+    | Increasing
+    | Decreasing
+  
+  let is_safe : List Int -> Bool =
+    \reports ->
+      (match pairs reports : List (Int, Int)
+      | Nil -> True
+      | Cons (a, b) _ as report_pairs ->
+        let' check : Dir -> Bool =
+          \dir ->
+            List.for_all
+              report_pairs
+              ((\((a : Int), (b : Int)) ->
+                let' positive_diff : Int =
+                  match dir
+                  | Increasing -> b - a
+                  | Decreasing -> a - b
+                in
+                (positive_diff >= 1 : Bool) && (positive_diff <= 3 : Bool) : Bool)
+                : (Int, Int) -> Bool)
+              : Bool
+        in
+        (match compare a b : Ordering
+        | Ordering.Equal -> False
+        | Ordering.Less -> check Increasing
+        | Ordering.Greater -> check Decreasing)
+          : Bool)
+        : Bool
+  
+  let pairs : List a -> List (a, a) =
+    \xs ->
+      (match xs
+      | Nil | Cons _ Nil -> Nil
+      | Cons a (Cons b _ as rest) -> (a, b) :: (pairs rest : List ((b | d), (b | e))))
+        : List (a, a)
+  
+  let parse : String -> List Int =
+    \str -> List.map (String.split str ' ' : List String) Int.of_string : List Int
+}
+
+let () =
+  let loop : Int -> Int =
+    \count ->
+      (match read_line () : Option String
+      | None -> count
+      | Some line ->
+        match Report.is_safe (Report.parse line : List Int) : Bool
+        | True -> loop (count + 1 : Int)
+        | False -> loop count)
+        : Int
+  in
+  let' count : Int = loop 0 in
+  print_int count;
+  print ""

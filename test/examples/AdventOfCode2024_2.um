@@ -1,0 +1,44 @@
+module Report = {
+  type Report = List Int
+
+  type Dir =
+    | Increasing
+    | Decreasing
+
+  let is_safe reports =
+    match pairs reports
+    | Nil -> True
+    | Cons (a, b) _ as report_pairs ->
+      let check dir =
+        List.for_all report_pairs (\(a, b) ->
+          let positive_diff = 
+            match dir
+            | Increasing -> b - a
+            | Decreasing -> a - b 
+          in
+          positive_diff >= 1 && positive_diff <= 3)
+      in
+      match compare a b
+      | Ordering.Equal -> False
+      | Ordering.Less -> check Increasing
+      | Ordering.Greater -> check Decreasing
+
+  let pairs xs =
+    match xs 
+    | Nil | Cons _ Nil -> []
+    | Cons a (Cons b _ as rest) -> (a, b) :: pairs rest
+
+  let parse str = List.map (String.split str ' ') Int.of_string
+}
+
+let () =
+  let loop count =
+    match read_line ()
+    | None -> count
+    | Some line ->
+      if Report.is_safe (Report.parse line) then loop (count + 1) else loop count
+  in
+  let count = loop 0 in
+  print_int count;
+  print ""
+  

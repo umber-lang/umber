@@ -80,6 +80,11 @@ pub extern "C" fn umber_int_to_string(x: BlockPtr) -> BlockPtr {
     BlockPtr::new_string(&buf)
 }
 
+#[no_mangle]
+pub extern "C" fn umber_int_of_string(s: BlockPtr) -> BlockPtr {
+    BlockPtr::new_int(s.as_str().parse().expect("failed to parse int"))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -117,7 +122,7 @@ mod test {
     }
 
     #[test]
-    fn string_conversion() {
+    fn to_string() {
         unsafe { umber_gc_init() };
         assert_eq!(umber_int_to_string(BlockPtr::new_int(0)).as_str(), "0");
         assert_eq!(umber_int_to_string(BlockPtr::new_int(-1)).as_str(), "-1");
@@ -129,6 +134,22 @@ mod test {
         assert_eq!(
             umber_int_to_string(BlockPtr::new_int(i64::MAX)).as_str(),
             "9223372036854775807"
+        );
+    }
+
+    #[test]
+    fn of_string() {
+        unsafe { umber_gc_init() };
+        assert_eq!(umber_int_of_string(BlockPtr::new_string("0")).as_int(), 0);
+        assert_eq!(umber_int_of_string(BlockPtr::new_string("-1")).as_int(), -1);
+        assert_eq!(umber_int_of_string(BlockPtr::new_string("10")).as_int(), 10);
+        assert_eq!(
+            umber_int_of_string(BlockPtr::new_string("-9223372036854775808")).as_int(),
+            i64::MIN
+        );
+        assert_eq!(
+            umber_int_of_string(BlockPtr::new_string("9223372036854775807")).as_int(),
+            i64::MAX
         );
     }
 }

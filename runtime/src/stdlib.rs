@@ -16,10 +16,13 @@ impl From<Option<BlockPtr>> for BlockPtr {
 
 impl From<Ordering> for BlockPtr {
     fn from(ordering: Ordering) -> Self {
-        // Rust's Ordering type is the same as ours: `Less | Equal | Greater`, so we can
-        // directly take the enum value as the tag.
+        let tag = match ordering {
+            Ordering::Less => 0,
+            Ordering::Equal => 1,
+            Ordering::Greater => 2,
+        };
         Self {
-            constant_cnstr: ConstantCnstr::new(ordering as u64),
+            constant_cnstr: ConstantCnstr::new(tag),
         }
     }
 }

@@ -56,6 +56,9 @@ module : {
     val abs : Int -> Int
     val neg : Int -> Int
     val to_string : Int -> String
+
+    # TODO: Proper error handling. The runtime will currently panic on parse failure
+    val of_string : String -> Int
   }
 
   module Float : {
@@ -187,6 +190,7 @@ module Int = {
   import Int
 
   extern to_string : Int -> String = "umber_int_to_string"
+  extern of_string : String -> Int = "umber_int_of_string"
 
   let neg x = 0 - x
   let abs x = if x >= 0 then x else neg x

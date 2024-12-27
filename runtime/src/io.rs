@@ -42,11 +42,7 @@ pub extern "C" fn umber_read_line() -> BlockPtr {
         let bytes = unsafe { slice::from_raw_parts(buffer as *mut u8, bytes_read as usize) };
         // TODO: This should be a proper error (exception), not a runtime panic
         let s = core::str::from_utf8(bytes).expect("umber_read_line: invalid utf8");
-        let s = s
-            .strip_suffix('\n')
-            .unwrap_or(s)
-            .strip_suffix("\n\r")
-            .unwrap_or(s);
+        let s = s.trim_end_matches(['\n', '\r']);
         Some(BlockPtr::new_string(s))
     };
     result.into()

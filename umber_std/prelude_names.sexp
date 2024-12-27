@@ -129,6 +129,13 @@
                              ((Function ((Type_app Int ())) (Effect_union ())
                                (Type_app Int ()))
                               ()))))))
+                        (of_string
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app String ()))
+                               (Effect_union ()) (Type_app Int ()))
+                              ()))))))
                         (to_string
                          (Local
                           ((type_
@@ -810,6 +817,15 @@
                               (Type_app Int ()))
                              ())))
                           (type_source Let_inferred))))
+                       (of_string
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app String ()))
+                              (Effect_union ()) (Type_app Int ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_int_of_string))))
                        (to_string
                         (Local
                          ((type_
