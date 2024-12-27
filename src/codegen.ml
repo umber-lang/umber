@@ -2,7 +2,10 @@ open Import
 open Names
 
 (** See https://llvm.org/doxygen/namespacellvm_1_1CallingConv.html *)
-let tailcc = 18
+module Call_conv = struct
+  let cc = 0
+  let tailcc = 18
+end
 
 (** See https://llvm.org/docs/LangRef.html#data-layout *)
 let data_layout_string = "i32:64-i64:64-p:64:64-f64:64"
@@ -253,7 +256,9 @@ let codegen_umber_apply_fun t ~n_args =
     let original_block = Option.try_with (fun () -> Llvm.insertion_block t.builder) in
     let apply_fun_type = block_function_type t ~n_args:(n_args + 1) in
     let apply_fun_value = Llvm.define_function apply_fun_name apply_fun_type t.module_ in
-    Llvm.set_function_call_conv tailcc apply_fun_value;
+    (* We need to use the C calling convention so the Rust runtime can call these
+       functions. *)
+    Llvm.set_function_call_conv Call_conv.cc apply_fun_value;
     Llvm.set_linkage Link_once_odr apply_fun_value;
     let params = Llvm.params apply_fun_value in
     let calling_fun = params.(0) in
@@ -300,7 +305,7 @@ let codegen_umber_apply_fun t ~n_args =
         calling_fun
         (Array.append [| closure_env |] arg_values)
         ~name:"closure_call"
-        ~call_conv:tailcc
+        ~call_conv:Call_conv.tailcc
     in
     ignore_value (Llvm.build_br phi_block t.builder);
     Llvm.position_at_end regular_call_block t.builder;
@@ -312,7 +317,7 @@ let codegen_umber_apply_fun t ~n_args =
           "calling_fun"
           t.builder
       in
-      build_call t fun_value arg_values ~name:"regular_call" ~call_conv:tailcc
+      build_call t fun_value arg_values ~name:"regular_call" ~call_conv:Call_conv.tailcc
     in
     ignore_value (Llvm.build_br phi_block t.builder);
     Llvm.position_at_end phi_block t.builder;
@@ -350,7 +355,7 @@ let rec codegen_expr t expr =
         t
         (codegen_umber_apply_fun t ~n_args)
         (Array.append [| fun_value |] args)
-        ~call_conv:tailcc
+        ~call_conv:Call_conv.cc
     in
     let fun_value = Value_table.find t.values fun_name in
     (match Llvm.classify_value fun_value with
@@ -596,7 +601,7 @@ let preprocess_stmt t stmt =
             ignore_value (Llvm.build_ret call t.builder);
             fun_
         in
-        Llvm.set_function_call_conv tailcc fun_;
+        Llvm.set_function_call_conv Call_conv.tailcc fun_;
         fun_)
     in
     Value_table.add t.values name value
@@ -613,7 +618,7 @@ let preprocess_stmt t stmt =
   | Fun_def { fun_name; args; body = _ } ->
     let fun_type = block_function_type t ~n_args:(Nonempty.length args) in
     let fun_ = Llvm.define_function (Mir_name.to_string fun_name) fun_type t.module_ in
-    Llvm.set_function_call_conv tailcc fun_;
+    Llvm.set_function_call_conv Call_conv.tailcc fun_;
     Value_table.add t.values fun_name fun_
   | Fun_decl { name; arity } -> process_decl ~name ~arity ~extern_name:None
   | Extern_decl { name; extern_name; arity } ->

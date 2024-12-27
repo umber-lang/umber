@@ -131,7 +131,7 @@ cond_otherwise:                                   ; preds = %cond2
   %block_field_gep19 = getelementptr %umber_block, %umber_block* %AsPattern.lst.1, i32 0, i32 1, i32 0
   %block_field_raw20 = load i64, i64* %block_field_gep19, align 8
   %block_field21 = inttoptr i64 %block_field_raw20 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply2(%umber_block* %AsPattern.f.1, %umber_block* %block_field21, %umber_block* %block_field18)
+  %fun_call = tail call %umber_block* @umber_apply2(%umber_block* %AsPattern.f.1, %umber_block* %block_field21, %umber_block* %block_field18)
   %fun_call22 = tail call tailcc %umber_block* @"Std.Prelude.Operators.::"(%umber_block* %block_field18, %umber_block* %block_field12)
   %fun_call23 = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* %AsPattern.f.1, %umber_block* %fun_call22)
   %fun_call24 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call, %umber_block* %fun_call23)
@@ -155,7 +155,7 @@ entry:
 
 declare i64* @umber_gc_alloc(i64)
 
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

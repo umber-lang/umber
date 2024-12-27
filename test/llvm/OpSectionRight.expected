@@ -29,7 +29,7 @@ entry:
   store %umber_block* %fun_call1, %umber_block** %box6, align 8
   %box7 = bitcast %umber_block** %box4 to %umber_block*
   %fun_call8 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.76039754 to %umber_block*))
-  %fun_call9 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %box7, %umber_block* bitcast (%umber_block1* @int.6 to %umber_block*))
+  %fun_call9 = tail call %umber_block* @umber_apply1(%umber_block* %box7, %umber_block* bitcast (%umber_block1* @int.6 to %umber_block*))
   %fun_call10 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call8, %umber_block* %fun_call9)
   store %umber_block* %fun_call10, %umber_block** @"OpSectionRight.*binding.1", align 8
   ret i32 0
@@ -61,7 +61,7 @@ entry:
 
 declare i64* @umber_gc_alloc(i64)
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
@@ -85,7 +85,7 @@ call_phi:                                         ; preds = %regular_call, %clos
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
 
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

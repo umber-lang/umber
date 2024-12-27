@@ -117,7 +117,7 @@ declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
 declare tailcc %umber_block* @Std.Prelude.print_int(%umber_block*)
 
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

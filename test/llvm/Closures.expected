@@ -70,7 +70,7 @@ entry:
   %box6 = getelementptr %umber_block*, %umber_block** %box3, i32 3
   store %umber_block* %Closures.end_after.1, %umber_block** %box6, align 8
   %box7 = bitcast %umber_block** %box3 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %box7, %umber_block* %Closures.start_at.1)
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %box7, %umber_block* %Closures.start_at.1)
   ret %umber_block* %fun_call
 }
 
@@ -78,7 +78,7 @@ declare tailcc %umber_block* @Std.Prelude.print_int(%umber_block*)
 
 declare i64* @umber_gc_alloc(i64)
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
@@ -102,7 +102,7 @@ call_phi:                                         ; preds = %regular_call, %clos
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
 
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

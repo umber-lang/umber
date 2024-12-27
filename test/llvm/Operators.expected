@@ -190,7 +190,7 @@ entry:
 define tailcc %umber_block* @Operators.right_section(%umber_block* %"Operators.*arg0.2") {
 entry:
   %Operators.right_section.1 = load %umber_block*, %umber_block** @Operators.right_section.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.right_section.1, %umber_block* %"Operators.*arg0.2")
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %Operators.right_section.1, %umber_block* %"Operators.*arg0.2")
   ret %umber_block* %fun_call
 }
 
@@ -216,7 +216,7 @@ entry:
 define tailcc %umber_block* @Operators.left_section(%umber_block* %"Operators.*arg0.5") {
 entry:
   %Operators.left_section.1 = load %umber_block*, %umber_block** @Operators.left_section.1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* %Operators.left_section.1, %umber_block* %"Operators.*arg0.5")
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %Operators.left_section.1, %umber_block* %"Operators.*arg0.5")
   ret %umber_block* %fun_call
 }
 
@@ -225,7 +225,7 @@ declare tailcc %umber_block* @Std.Prelude.Operators..(%umber_block*, %umber_bloc
 define tailcc %umber_block* @Operators..(%umber_block* %"Operators.*arg0.6", %umber_block* %"Operators.*arg1.4", %umber_block* %"Operators.*arg2.1") {
 entry:
   %Operators...1 = load %umber_block*, %umber_block** @Operators...1, align 8
-  %fun_call = tail call tailcc %umber_block* @umber_apply3(%umber_block* %Operators...1, %umber_block* %"Operators.*arg0.6", %umber_block* %"Operators.*arg1.4", %umber_block* %"Operators.*arg2.1")
+  %fun_call = tail call %umber_block* @umber_apply3(%umber_block* %Operators...1, %umber_block* %"Operators.*arg0.6", %umber_block* %"Operators.*arg1.4", %umber_block* %"Operators.*arg2.1")
   ret %umber_block* %fun_call
 }
 
@@ -233,7 +233,7 @@ declare tailcc %umber_block* @Std.Prelude.Bool.to_string(%umber_block*)
 
 declare i64* @umber_gc_alloc(i64)
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
@@ -257,7 +257,7 @@ call_phi:                                         ; preds = %regular_call, %clos
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
 
-define linkonce_odr tailcc %umber_block* @umber_apply3(%umber_block* %0, %umber_block* %1, %umber_block* %2, %umber_block* %3) {
+define linkonce_odr %umber_block* @umber_apply3(%umber_block* %0, %umber_block* %1, %umber_block* %2, %umber_block* %3) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
@@ -279,7 +279,7 @@ call_phi:                                         ; preds = %regular_call, %clos
   ret %umber_block* %call_phi3
 }
 
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

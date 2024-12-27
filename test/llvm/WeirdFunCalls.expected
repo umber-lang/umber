@@ -36,12 +36,12 @@ cond_otherwise:                                   ; preds = %cond
 
 cond_otherwise_merge:                             ; preds = %cond_otherwise, %cond_binding_merge
   %cond_otherwise_merge1 = phi %umber_block* [ bitcast (%umber_block* (%umber_block*)* @WeirdFunCalls.print_twice to %umber_block*), %cond_binding_merge ], [ bitcast (%umber_block* (%umber_block*)* @Std.Prelude.print to %umber_block*), %cond_otherwise ]
-  %fun_call2 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %cond_otherwise_merge1, %umber_block* bitcast (%umber_block8b* @string.1035704714 to %umber_block*))
+  %fun_call2 = tail call %umber_block* @umber_apply1(%umber_block* %cond_otherwise_merge1, %umber_block* bitcast (%umber_block8b* @string.1035704714 to %umber_block*))
   store %umber_block* %fun_call2, %umber_block** @WeirdFunCalls.if_, align 8
   %fun_call3 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.465106951 to %umber_block*))
   store %umber_block* %fun_call3, %umber_block** @"WeirdFunCalls.*binding.2", align 8
   %fun_call4 = tail call tailcc %umber_block* @WeirdFunCalls.fun_call(%umber_block* inttoptr (i64 1 to %umber_block*))
-  %fun_call5 = tail call tailcc %umber_block* @umber_apply1(%umber_block* %fun_call4, %umber_block* inttoptr (i64 1 to %umber_block*))
+  %fun_call5 = tail call %umber_block* @umber_apply1(%umber_block* %fun_call4, %umber_block* inttoptr (i64 1 to %umber_block*))
   store %umber_block* %fun_call5, %umber_block** @"WeirdFunCalls.*binding.3", align 8
   ret i32 0
 }
@@ -69,7 +69,7 @@ entry:
   ret %umber_block* bitcast (%umber_block* (%umber_block*)* @"WeirdFunCalls.*fun.2" to %umber_block*)
 }
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
@@ -93,7 +93,7 @@ call_phi:                                         ; preds = %regular_call, %clos
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
 
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call

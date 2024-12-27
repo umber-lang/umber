@@ -19,11 +19,11 @@ entry:
 
 define tailcc %umber_block* @"Keywords.let's_go"(%umber_block* %"Keywords.*lambda_arg.1") {
 entry:
-  %fun_call = tail call tailcc %umber_block* @umber_apply1(%umber_block* bitcast (%umber_block* (%umber_block*)* @"Keywords.let's_go" to %umber_block*), %umber_block* inttoptr (i64 1 to %umber_block*))
+  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* bitcast (%umber_block* (%umber_block*)* @"Keywords.let's_go" to %umber_block*), %umber_block* inttoptr (i64 1 to %umber_block*))
   ret %umber_block* %fun_call
 }
 
-define linkonce_odr tailcc %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
+define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
@@ -47,7 +47,7 @@ call_phi:                                         ; preds = %regular_call, %clos
 
 declare i1 @umber_gc_is_on_heap(%umber_block*)
 
-define linkonce_odr tailcc %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
+define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
   br i1 %is_on_heap, label %closure_call, label %regular_call
