@@ -24,3 +24,12 @@ let bottom : Any -> Never =
       go_left 17 : Never
   in
   bottom_again
+
+let _ : () =
+  let' foo : Int = 5 in
+  let' foo : Int = foo * 2
+  and bar : Int = foo * 3
+  in
+  print_int foo;
+  print "";
+  print_int bar

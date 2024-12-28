@@ -1,4 +1,21 @@
-((Fun_def
+((Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Value_def LetBindingGroups._.1
+  (Let LetBindingGroups.foo.1 (Primitive (Int 5))
+   (Let LetBindingGroups.foo.2
+    (Fun_call Std.Prelude.Operators.*
+     ((Name LetBindingGroups.foo.1) (Primitive (Int 2))))
+    (Let LetBindingGroups.bar.1
+     (Fun_call Std.Prelude.Operators.*
+      ((Name LetBindingGroups.foo.1) (Primitive (Int 3))))
+     (Fun_call "Std.Prelude.Operators.;"
+      ((Fun_call "Std.Prelude.Operators.;"
+        ((Fun_call Std.Prelude.print_int ((Name LetBindingGroups.foo.2)))
+         (Fun_call Std.Prelude.print ((Primitive (String ""))))))
+       (Fun_call Std.Prelude.print_int ((Name LetBindingGroups.bar.1)))))))))
+ (Fun_def
   ((fun_name LetBindingGroups.go_left.1) (args (LetBindingGroups.x.1))
    (body
     (Fun_call LetBindingGroups.go_right.1 ((Name LetBindingGroups.x.1))))))
@@ -18,7 +35,6 @@
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.^) (arity 2)))
- (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_def
   ((fun_name LetBindingGroups.fun) (args (LetBindingGroups.n.1))
    (body
@@ -39,7 +55,7 @@
  (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
  (Fun_decl ((name Std.Prelude.Operators.||) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
- (Value_def LetBindingGroups._.1
+ (Value_def LetBindingGroups._.2
   (Let LetBindingGroups.list.1
    (Fun_call Std.Prelude.Operators.::
     ((Primitive (String a))

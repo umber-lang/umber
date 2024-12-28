@@ -19,3 +19,13 @@ let bottom =
 		go_left 17
 	in
 	bottom_again
+
+# Nonrecursive let binding groups don't see each other's bindings
+let _ =
+	let foo = 5 in
+	let' foo = foo * 2
+	and bar = foo * 3
+	in
+	print_int foo;
+	print "";
+	print_int bar
