@@ -18,6 +18,6 @@ module Wrap = {
   
   let my_id : Wrap a -> Wrap a =
     \x ->
-      let' Wrap (y : b) = x in
-      Wrap y : Wrap a
+      let' Wrap (x : b) = x in
+      Wrap x : Wrap a
 }

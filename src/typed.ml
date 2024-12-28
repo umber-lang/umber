@@ -807,43 +807,17 @@ module Expr = struct
                 else (
                   (* FIXME: For parallel nonrec bindings, they are not supposed to be in
                      each other's scopes (or their own scope!). Write a test. *)
-                  (* Process bindings in order without any recursion *)
+                  (* Process non-recursive bindings in order without any recursion.
+                     Importantly, each one in the group is processed "in parallel",
+                     meaning they each get passed the original scope. To make this less
+                     error-prone, ban using the "names" variable here. *)
                   let names, bindings =
-                    Nonempty.fold_map
+                    type_non_recursive_let_bindings
+                      ~names
+                      ~types
+                      ~f_name
+                      ~add_effects
                       bindings
-                      ~init:names
-                      ~f:(fun names (pat, fixity, expr) ->
-                      let pat_span = Node.span pat in
-                      let pat_names, (pat, pat_type) =
-                        Node.with_value
-                          pat
-                          ~f:
-                            (Pattern.of_untyped_with_names
-                               ~names
-                               ~types
-                               ~fixity
-                               Pattern_names.empty)
-                      in
-                      let names =
-                        Name_bindings.merge_names
-                          names
-                          pat_names
-                          ~combine:(fun _ _ entry -> entry)
-                      in
-                      (* FIXME: pretty sure we need this*)
-                      (* Type_bindings.record_context_vars types bound_names; *)
-                      let expr, expr_type, expr_effects =
-                        of_untyped ~names ~types ~f_name expr
-                      in
-                      add_effects expr_effects (Node.span expr);
-                      Type_bindings.constrain
-                        ~names
-                        ~types
-                        ~subtype:expr_type
-                        ~supertype:pat_type;
-                      ( names
-                      , (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr)
-                      ))
                   in
                   names, false, bindings)
               in
@@ -963,6 +937,43 @@ module Expr = struct
       in
       let rec_ = !used_a_bound_name in
       names, rec_, bindings
+    and type_non_recursive_let_bindings
+      ~names:original_names
+      ~types
+      ~f_name
+      ~add_effects
+      bindings
+      =
+      Nonempty.fold_map
+        bindings
+        ~init:original_names
+        ~f:(fun new_names (pat, fixity, expr) ->
+        let pat_span = Node.span pat in
+        let pat_names, (pat, pat_type) =
+          Node.with_value
+            pat
+            ~f:
+              (Pattern.of_untyped_with_names
+                 ~names:original_names
+                 ~types
+                 ~fixity
+                 Pattern_names.empty)
+        in
+        let new_names =
+          Name_bindings.merge_names new_names pat_names ~combine:(fun _ _ entry -> entry)
+        in
+        (* FIXME: pretty sure we need this*)
+        (* Type_bindings.record_context_vars types bound_names; *)
+        let expr, expr_type, expr_effects =
+          of_untyped ~names:original_names ~types ~f_name expr
+        in
+        add_effects expr_effects (Node.span expr);
+        Type_bindings.constrain
+          ~names:original_names
+          ~types
+          ~subtype:expr_type
+          ~supertype:pat_type;
+        new_names, (Node.create (pat, (pat_type, pat_names)) pat_span, fixity, expr))
     in
     type_recursive_let_bindings ~f_name:(fun _ _ -> ())
   ;;
