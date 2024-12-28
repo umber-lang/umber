@@ -1,0 +1,49 @@
+# FIXME: I thought this might make a good example to put in the README, but it has several
+# problems:
+#
+# - It's really awkward to write "map"-style combinators that re-raise/re-perform the same
+#   effects using deep handlers. You need to pass values out to perform the effect. Either
+#   shallow handlers or a way to mask effects is surely needed (maybe both). If installing
+#   handlers is going to be expensive, doing it once per iteration seems really bad, so
+#   maybe masks are the way to go (assuming masks aren't expensive).
+# - It's unclear whether we want lazy or eager iterators. Using either one, we currently
+#   can't easily allow iteration to produce any other effects, because we can't refer to
+#   effect variables in the `Iter` type.
+# - We might need a lighter-weight syntax for creating thunks than `(\() -> ...)`. That
+#   looks pretty noisy. Maybe `'(...)` could be good.
+
+effect Yield a = {
+  val yield : a -> ()
+}
+
+type Iter a = () -> <Yield a> ()
+
+# let map : Iter a -> (a -> b) -> Iter b =
+#   \iter f ->
+#     \() ->
+#       handle iter ()
+#       | <yield x> ->
+#         yield (f x);
+#         resume ()
+
+# Above doesn't work, you have to write something like this instead:
+# Actually, since it requires returning `resume`, is this even possible? It's tripping the
+# occurs check when we try to return `resume`.
+# let map : Iter a, (a -> b) -> Iter b =
+#   \iter f ->
+#     \() ->
+#       let loop () =
+#         let (x, k) =
+#           handle iter ()
+#           | <yield x> -> (x, resume)
+#         in
+#         yield (f x);
+#         loop ()
+#       in
+#       loop ()
+
+let repeat x =
+  yield x;
+  repeat x
+
+# let twos = map (\() -> repeat 1) (+ 1)

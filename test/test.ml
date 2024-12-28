@@ -19,6 +19,7 @@ let type_only_tests =
   ; "Effects" (* effects *)
   ; "ReraiseExn" (* effects *)
   ; "State" (* effects *)
+  ; "Iter" (* effects *)
   ]
 ;;
 

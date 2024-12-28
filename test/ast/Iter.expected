@@ -1,0 +1,11 @@
+effect Yield a = {
+  val yield : a -> ()
+}
+
+type Iter a = () -> <Yield a> ()
+
+let repeat : a -> <Yield a> Never =
+  \x ->
+    yield x;
+    (repeat x : b)
+      : Never

@@ -557,6 +557,14 @@
     (diff? mir/Imports.expected mir/Imports.out)
     (diff? llvm/Imports.expected llvm/Imports.out)
     (diff? output/Imports.expected output/Imports.out)))))
+(rule (alias runtest) (deps (package umber) (glob_files input/Iter.txt))
+ (action
+  (progn (run %{dep:test.exe} %{dep:examples/Iter.um})
+   (concurrent (diff? tokens/Iter.expected tokens/Iter.out)
+    (diff? ast/Iter.expected ast/Iter.out)
+    (diff? mir/Iter.expected mir/Iter.out)
+    (diff? llvm/Iter.expected llvm/Iter.out)
+    (diff? output/Iter.expected output/Iter.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Keywords.txt))
  (action
   (progn (run %{dep:test.exe} %{dep:examples/Keywords.um})
