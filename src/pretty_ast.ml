@@ -473,8 +473,8 @@ let format_to_document
       ^| format_effects effects
       ^| format_fun_part result_type
     | Union types ->
-      (* FIXME: Don't just write "Never" or "Any", it could be shadowed. Maybe turn into a
-         new type varable or something. *)
+      (* TODO: Don't just write "Never" or "Any", it could be shadowed. Maybe turn into a
+         new type varable or something. Or this could be a pre-processing step. *)
       let types =
         Non_single_list.to_list (Non_single_list.map types ~f:format_type_term)
       in

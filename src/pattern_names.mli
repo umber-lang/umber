@@ -1,23 +1,6 @@
 open! Import
 open Names
 
-(* FIXME: Cleanup *)
-(* val map
-  :  ('typ, 'name) t
-  -> f:(('typ, 'name) t -> (('typ, 'name) t, ('typ, 'name) t) Map_action.t)
-  -> ('typ, 'name) t
-
-val fold_until
-  :  ('typ, 'name) t
-  -> init:'acc
-  -> f:
-       ('acc
-        -> ('typ, 'name) t
-        -> ([< `Defer of 'acc | `Halt of 'acc ], 'final) Fold_action.t)
-  -> ('acc, 'final) Fold_action.t
-
-val fold_types : ('typ, 'name) t -> init:'acc -> f:('acc -> 'typ -> 'acc) -> 'acc *)
-
 (* TODO: consider abstracting this. It would help out with the verbosity of type errors
    for some of the complex types in typed.ml. *)
 type t = Name_bindings.Name_entry.t Value_name.Map.t [@@deriving sexp]

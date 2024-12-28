@@ -803,12 +803,7 @@ and constrain_effects ~names ~types ~subtype ~supertype =
 and constrain_effects_to_be_total ~names ~types effects =
   constrain_effects ~names ~types ~subtype:effects ~supertype:Internal_type.no_effects
 
-(* FIXME: Every time a new variable is minted, we need to record its polarity *)
-
 and instantiate_type_scheme =
-  (* FIXME: Actually, I think it should be fine to restrict the instantiated variables of
-     other functions we use. *)
-  (* let record_context_var _ _ ~polarity:_ = () in *)
   let rec instantiate_type_scheme
     ~names
     ~types
@@ -823,7 +818,7 @@ and instantiate_type_scheme =
       record_context_var types var ~polarity;
       Var var
     | Type_app (type_name, args) ->
-      (* FIXME: Handle contravariant type parameters in type application *)
+      (* TODO: Handle contravariant type parameters in type application *)
       Type_app
         ( type_name
         , List.map args ~f:(instantiate_type_scheme ~names ~types ~params ~polarity) )
@@ -890,17 +885,11 @@ and instantiate_type_scheme =
             let var = Type_param.Env_to_vars.find_or_add params param in
             record_context_var types var ~polarity;
             concrete_effects, var :: effect_vars
-          | Effect_union [] ->
-            (* FIXME: how are these empty unions/intersections even getting around? I
-               think we might need them as vars for correctness. Just converting them to
-               vars solve the problem for now, but isn't very principled. *)
-            let var = Type_var.create () in
-            record_context_var types var ~polarity;
-            concrete_effects, var :: effect_vars
-          | Effect_union (_ :: _) ->
+          | Effect_union _ ->
             (* TODO: Decide if this should be allowed, or statically prevent it from
                happening by changing the type. I think the syntax doesn't currently allow
-               it, and we won't generate it. *)
+               it, and we won't generate it. Changing the type seems easy now that there
+               are no more intersections. *)
             compiler_bug
               [%message "Nested complex effects" (new_effects : _ Type_scheme.effects)])
       in
@@ -1032,37 +1021,9 @@ let generalize types outer_type =
   in
   eprint_s
     [%lazy_message "Type_bindings.generalize" (outer_type : Internal_type.t) (types : t)];
-  (* FIXME: We give different names to the params in different places in the same
-     statement. We should have 1 type-bindings per statement, and probably just one param
-     name generator for that. *)
   let substituted_type = Substitution.apply_to_type types.substitution outer_type in
   let scheme = generalize_internal types substituted_type ~polarity:Positive in
-  (* FIXME: We could filter the constraints just used to simplify this expression at this
-     point - that should reduce a lot of problems, right? We don't need to worry about
-     removing constraints if we just do it temporarily. Might work ok .*)
   let context_vars =
-    (* FIXME: I think we also need to extend this with the substitution - anything we'd
-       substitute in place of context vars should count as "from the context". e.g. if
-       we have a function as an argument, it starts out with just one var as the known
-       type. We'll later get some constraints on that. Hopefully just looking at the
-       substitution is good enough?
-       
-       How can we efficiently keep the context vars updated? They can change whenever we
-       change the substitution? Maybe keep them as part of the substitution? Or just
-       apply the substitution here every time?
-       
-       Actually I'm not 100% sure we need this, hmmm.
-       This seems expensive, can we amortize the cost by doing it each time we edit the
-       substitution or add a context var? (instead of each time we generalize anything,
-       which should be more often)
-       
-       I think this is most likely needed, it makes sense.
-
-       One problem: when typing a recursive definition, the context vars include the var
-       itself, which is weird. Maybe those should be exempted? We could add them as
-       context vars after typing the body. They aren't really "inputs" in the same
-       sense, I think? Yeah, they never appeared in negative position, or something
-       equivalent. (It's kinda similar to instantiated vars though?) *)
     eprint_s
       [%lazy_message
         "context vars before checking substitutions"

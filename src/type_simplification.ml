@@ -167,28 +167,16 @@ let get_positive_and_negative_vars outer_type ~context_vars =
 ;;
 
 let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper_bounds =
-  let replace_var
-    var
-    ~(polarity : Polarity.t)
-    ~make_var
-    ~union
-    ~intersection
-    ~on_unconstrained
-    =
+  let replace_var var ~(polarity : Polarity.t) ~make_var ~union ~intersection =
     let bounds_map, combine =
       match polarity with
       | Positive -> lower_bounds, union
       | Negative -> upper_bounds, intersection
     in
     let bounds = Map.find bounds_map var |> Option.value ~default:Type_param.Set.empty in
-    (* FIXME: Review this logic. Maybe we should just leave this top/bottom handling to
-       later. *)
-    (* FIXME: [on_unconstrained = `Use_union_or_intersection] isn't sound to use if the
-       var is unconstrained but still used more than once. *)
-    match Set.to_list bounds, on_unconstrained with
-    | [], `Keep_var -> make_var var
-    | [], `Use_union_or_intersection -> combine Non_single_list.[]
-    | vars, (`Use_union_or_intersection | `Keep_var) ->
+    match Set.to_list bounds with
+    | [] -> make_var var
+    | vars ->
       List.map (var :: vars) ~f:make_var
       |> Non_single_list.of_list_convert ~make:combine ~singleton:Fn.id
   in
@@ -205,12 +193,9 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
              ~polarity
              ~make_var:Type_scheme.var
              ~intersection:Type_scheme.intersection
-             ~union:Type_scheme.union
-             ~on_unconstrained:`Keep_var)
+             ~union:Type_scheme.union)
       | type_ -> Defer type_)
     ~f_effects:(fun ~polarity effects ->
-      (* FIXME: Review the keep_var vs union or intersection choice. This might just be
-         redundant due to later passes. *)
       match effects with
       | Effect_var var ->
         Halt
@@ -219,9 +204,7 @@ let replace_constraints_with_unions_and_intersections type_ ~lower_bounds ~upper
              ~polarity
              ~make_var:Type_scheme.effect_var
              ~union:Type_scheme.effect_union
-             ~intersection:Type_scheme.effect_union
-               (* FIXME: Seems sus to just use union instead of intersectino *)
-             ~on_unconstrained:`Keep_var)
+             ~intersection:Type_scheme.effect_union)
       | effects -> Defer effects)
 ;;
 
@@ -379,7 +362,7 @@ let replace_co_occurring_vars type_ =
     Hashtbl.find replacements var |> Option.value_map ~f:Union_find.get ~default:var)
 ;;
 
-(* FIXME: The context vars we pass here are imprecise. We gather context vars as we do
+(* TODO: The context vars we pass here are imprecise. We gather context vars as we do
    inference, but then we generalize at the end, so when considering each type, we
    consider every type variable in the entire expression to be part of the context. This
    is particularly egregious for the types toplevel bindings, which shouldn't depend on
@@ -405,7 +388,6 @@ let simplify_type ((type_, constraints) : _ Type_scheme.t) ~context_vars =
   in
   let type_ = remove_polar_vars type_ ~context_vars in
   eprint_s [%lazy_message "after removing polar vars" (type_ : _ Type_scheme.type_)];
-  (* FIXME: Maybe replacing co-occuring vars could also consider context vars for polarity? *)
   let type_ = replace_co_occurring_vars type_ in
   (* TODO: We don't know whether variables are used elsewhere in the expression without
      some notion of type variable scope. This means replacing vars only used once in a

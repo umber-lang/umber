@@ -113,7 +113,7 @@ let rec fold_until typ ~init ~f ~f_effects ~polarity =
     (match typ with
      | Var _ | Never | Any -> Continue init
      | Type_app (_, fields) | Tuple fields ->
-       (* FIXME: Handle contravariant type parameters in type applications *)
+       (* TODO: Handle contravariant type parameters in type applications *)
        List.fold_until fields ~init ~f:(fun init ->
          fold_until ~init ~f ~f_effects ~polarity)
      | Function (args, effects, body) ->

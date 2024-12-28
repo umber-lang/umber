@@ -45,9 +45,9 @@ You can see code examples used for testing under `test/examples`. Currently only
 - [x] Parsing
 - [x] Name resolution
 - [x] Basic type inference and checking
+- [x] Code generation to LLVM
 - [ ] Record types
 - [ ] Traits
-- [ ] Effects
-- [ ] (In progress) Code generation to LLVM
+- [ ] (In progress) Effects
 - [ ] Garbage collection
 - [ ] Self-hosting
