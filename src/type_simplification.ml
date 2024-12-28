@@ -5,9 +5,7 @@ open! Names
    - Inferring Algebraic Effects https://arxiv.org/pdf/1312.2334.pdf
    - The Simple Essence of Algebraic Subtyping https://dl.acm.org/doi/pdf/10.1145/3409006 *)
 
-(* FIXME: cleanup *)
-let eprint_s (_ : Sexp.t Lazy.t) = ()
-(* let eprint_s = eprint_s << force *)
+let eprint_s = eprint_s [%here]
 
 (* TODO: Consider upstreaming these in Type_scheme *)
 

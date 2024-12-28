@@ -1,9 +1,7 @@
 open! Import
 open! Names
 
-(* FIXME: cleanup *)
-let eprint_s (_ : Sexp.t Lazy.t) = ()
-(* let eprint_s = eprint_s << force *)
+let eprint_s = eprint_s [%here]
 
 (* TODO: Trait constraints, subtyping, (functional dependencies or associated types),
    GADTs (local type equality/type narrowing)

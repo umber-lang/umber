@@ -2,9 +2,7 @@ open Import
 open Names
 
 let type_error_msg msg = Compilation_error.raise Type_error ~msg:[%message msg]
-
-(* FIXME: cleanup *)
-let eprint_s (_ : Sexp.t Lazy.t) = ()
+let eprint_s = eprint_s [%here]
 
 module Pattern = struct
   type 'typ t =
@@ -1043,7 +1041,7 @@ module Expr = struct
 
   let map_types expr ~f = map expr ~f_type:f ~f:Map_action.defer
 
-  (* FIXME: Remove unused *)
+  (* TODO: Use this or remove it *)
   (* let rec fold_until expr ~init:acc ~f ~f_type =
     match (f acc expr : _ Fold_action.t) with
     | Stop _ as stop -> stop
@@ -1118,20 +1116,16 @@ module Expr = struct
          Node.with_value record ~f:(fold_until ~init:acc ~f ~f_type))
   ;; *)
 
-  (* FIXME: Remove unused *)
+  (* TODO: Use this or remove it *)
   (* let fold_types t ~init ~f =
     fold_until t ~init ~f_type:f ~f:(fun init (_ : _ t) -> Continue (`Defer init))
     |> Fold_action.id
   ;; *)
 
-  (* FIXME: Is this supposed to be generalizing local let bindings in expressions? If so,
-     it doesn't seem to work, according to the Generalization.um test.
-     
-     Also, why special-case let bindings and not generalize all patterns with
-     Pattern.generalize? Does this make any sense? Maybe all we need to do is "generalize"
-     (bad terminology) all the types. This involves type simplification. I suspect the
-     special treatment for let bindings is not needed, or is maybe only needed at toplevel
-     to set the inferred schemes. *)
+  (* TODO: This is poorly named - it doesn't reflect the way generalization usually works
+     in HM type inference. What it actually does it infer all the types up-front, then
+     go back and "generalize" all the inferred types in one go. "Generalize" means to
+     convert it from `Internal_type.t` to `Type_scheme.t` and do type simplification. *)
   let rec generalize_let_bindings ~names ~types =
     map
       ~f_type:(fun (typ, _) -> Type_bindings.generalize types typ)
@@ -1767,31 +1761,6 @@ module Module = struct
     (binding_groups : (def Node.t * Module_path.Absolute.t) list)
     : def Node.t list
     =
-    (* FIXME: The ordering of toplevel bindings is not supposed to matter. So, we should
-       respect the order of the binding groups when we create the new AST. Ah, but that's
-       problematic - there can be dependencies across modules which means the ordering
-       can't be expressed properly. :(
-       
-       e.g. 
-       ```
-       let first = ()
-
-       module Sub = {
-         let second = first
-         let fourth = third
-       }
-
-       let third = Sub.second
-       ```
-
-       Some ideas on how to solve this:
-       - (Radical change) Make the typed AST flattened - seems pretty sad
-       - Have MIR figure out the dependencies itself - a little sad to repeat work
-       - Have the typed AST stamp the bindings with something to say their ordering e.g.
-         the list of bindings they depend on, or an integer they should be sorted by
-         - An integer they should be sorted by seems easiest - stamp it on there and MIR
-           can take all the bindings out
-       *)
     (* NOTE: As we disallow cross-module mutual recursion, binding groups will always be
        contained within a single module and can just be put back into the AST *)
     let binding_table = Module_path.Absolute.Table.create () in
