@@ -1,0 +1,11 @@
+effect State a = {
+  val get : () -> a
+  val set : a -> ()
+}
+
+let handle_state init f =
+  (handle f ()
+  | x -> (\s -> (s, x))
+  | <get ()> -> (\s -> (resume s) s)
+  | <set s> -> (\_ -> (resume ()) s))
+  init

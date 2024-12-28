@@ -58,7 +58,3 @@ let this_should_not_raise () =
 
 let this_should_raise () =
   catch fail (\(_ : Exn) -> raise "outer exception")
-
-# FIXME: Write a test to see what happens if you mix one var between types and effects
-# - might need some notion of variable kind which is tracked properly
-# (Also, what happens if you try to use a type param in a decl as an effect var?)

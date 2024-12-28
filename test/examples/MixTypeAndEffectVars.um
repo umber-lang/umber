@@ -1,4 +1,4 @@
-# FIXME: There should be some kind system for type variables so we can tell if they're
+# TODO: There should be some kind system for type variables so we can tell if they're
 # supposed to be types or effects
 # This type doesn't make sense - what would it mean for the effect to match the type?
 # This seems to cause weird behavior in the type checker

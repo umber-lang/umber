@@ -18,6 +18,7 @@ let type_only_tests =
   [ "LetPattern" (* unions in toplevel let bindings *)
   ; "Effects" (* effects *)
   ; "ReraiseExn" (* effects *)
+  ; "State" (* effects *)
   ]
 ;;
 

@@ -743,6 +743,14 @@
      llvm/SelfReferentialImport.out)
     (diff? output/SelfReferentialImport.expected
      output/SelfReferentialImport.out)))))
+(rule (alias runtest) (deps (package umber) (glob_files input/State.txt))
+ (action
+  (progn (run %{dep:test.exe} %{dep:examples/State.um})
+   (concurrent (diff? tokens/State.expected tokens/State.out)
+    (diff? ast/State.expected ast/State.out)
+    (diff? mir/State.expected mir/State.out)
+    (diff? llvm/State.expected llvm/State.out)
+    (diff? output/State.expected output/State.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Text.txt))
  (action
   (progn (run %{dep:test.exe} %{dep:examples/Text.um})
