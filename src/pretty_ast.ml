@@ -711,12 +711,17 @@ let format_to_document
         : 'a. ('a Node.t * Untyped.Expr.t Node.t) Nonempty.t -> f:('a -> t) -> t
     =
    fun branches ~f ->
+    let format_branch (pattern, expr) ~is_last_branch =
+      Force_break
+      ^^ Group
+           (Group (Text "|" ^| Node.with_value pattern ~f ^| Text "->")
+            ^^ format_branch_expr expr ~is_last_branch)
+    in
+    let (last :: rest) = Nonempty.rev branches in
     concat_all
-      (List.map (Nonempty.to_list branches) ~f:(fun (pattern, expr) ->
-         Force_break
-         ^^ Group
-              (Group (Text "|" ^| Node.with_value pattern ~f ^| Text "->")
-               ^^ indent_expr expr)))
+      (List.rev
+         (format_branch last ~is_last_branch:true
+          :: List.map rest ~f:(format_branch ~is_last_branch:false)))
   and format_match_branch_pattern (pattern : Untyped.Pattern.t) =
     match pattern with
     | Type_annotation _ ->
@@ -724,6 +729,11 @@ let format_to_document
          function type due to the following arrow, so force parentheses to be added. *)
       format_pattern_term pattern
     | _ -> format_pattern pattern
+  and format_branch_expr (expr : Untyped.Expr.t Node.t) ~is_last_branch =
+    Node.with_value expr ~f:(function
+      | (Match _ | Match_function _) as expr when not is_last_branch ->
+        indent (parens (format_expr expr))
+      | _ -> indent_expr expr)
   and format_match_branches branches =
     format_branches_aux branches ~f:format_match_branch_pattern
   and format_handle_branches branches =
