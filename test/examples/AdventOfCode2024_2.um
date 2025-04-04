@@ -1,27 +1,54 @@
-module Report = {
+module Report : {
+  type Report
+
+  type Tolerance =
+    | MustBeAllSafe
+    | AllowOneUnsafe
+
+  val parse : String -> Report
+  val is_safe : Report, Tolerance -> Bool
+} = {
   type Report = List Int
 
   type Dir =
     | Increasing
     | Decreasing
 
-  let is_safe reports =
-    match pairs reports
-    | Nil -> True
-    | Cons (a, b) _ as report_pairs ->
-      let check dir =
-        List.for_all report_pairs (\(a, b) ->
-          let positive_diff = 
-            match dir
-            | Increasing -> b - a
-            | Decreasing -> a - b 
-          in
-          positive_diff >= 1 && positive_diff <= 3)
-      in
-      match compare a b
-      | Ordering.Equal -> False
-      | Ordering.Less -> check Increasing
-      | Ordering.Greater -> check Decreasing
+  let level_pair_is_safe (a, b) dir =
+    let positive_diff = 
+      match dir
+      | Increasing -> b - a
+      | Decreasing -> a - b 
+    in
+    positive_diff >= 1 && positive_diff <= 3
+
+  let is_safe =
+    let check_loop dir tolerance prev a b rest =
+      if level_pair_is_safe (a, b) dir then 
+        match rest
+        | Nil -> True
+        | Cons next rest -> check_loop dir tolerance (Some a) b next rest
+      else
+        match tolerance
+        | MustBeAllSafe -> False
+        | AllowOneUnsafe -> 
+          match rest
+          | Nil -> True
+          | Cons next rest' ->
+            # Try with `b` removed
+            check_loop dir MustBeAllSafe prev a next rest'
+            # Or with `a` removed 
+            ||
+            (match prev
+            | Some prev -> check_loop dir MustBeAllSafe None prev b rest
+            | None -> check_loop dir MustBeAllSafe None b next rest')
+    in
+    \reports tolerance ->
+      match reports
+      | Nil | Cons _ Nil -> True
+      | Cons a (Cons b rest) ->
+        check_loop Increasing tolerance None a b rest
+        || check_loop Decreasing tolerance None a b rest
 
   let pairs xs =
     match xs 
@@ -32,13 +59,22 @@ module Report = {
 }
 
 let () =
-  let loop count =
+  let loop count1 count2 =
     match read_line ()
-    | None -> count
+    | None -> (count1, count2)
     | Some line ->
-      if Report.is_safe (Report.parse line) then loop (count + 1) else loop count
+      let report = Report.parse line in
+      let' count1 =
+        if Report.is_safe report Report.MustBeAllSafe then count1 + 1 else count1
+      and count2 =
+        if Report.is_safe report Report.AllowOneUnsafe then count2 + 1 else count2
+      in
+      loop count1 count2
   in
-  let count = loop 0 in
-  print_int count;
+  let (count1, count2) = loop 0 0 in
+  print_string "Part 1: ";
+  print_int count1;
+  print "";
+  print_string "Part 2: ";
+  print_int count2;
   print ""
-  

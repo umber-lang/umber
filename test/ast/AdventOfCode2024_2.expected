@@ -1,35 +1,64 @@
-module Report = {
+module Report : {
+  type Report
+  
+  type Tolerance =
+    | MustBeAllSafe
+    | AllowOneUnsafe
+  
+  val parse : String -> Report
+  
+  val is_safe : Report, Tolerance -> Bool
+} = {
+  type Tolerance =
+    | MustBeAllSafe
+    | AllowOneUnsafe
+  
   type Report = List Int
   
   type Dir =
     | Increasing
     | Decreasing
   
-  let is_safe : List Int -> Bool =
-    \reports ->
-      (match pairs reports : List (Int, Int)
-      | Nil -> True
-      | Cons (a, b) _ as report_pairs ->
-        let' check : Dir -> Bool =
-          \dir ->
-            List.for_all
-              report_pairs
-              ((\((a : Int), (b : Int)) ->
-                let' positive_diff : Int =
-                  match dir
-                  | Increasing -> b - a
-                  | Decreasing -> a - b
-                in
-                (positive_diff >= 1 : Bool) && (positive_diff <= 3 : Bool) : Bool)
-                : (Int, Int) -> Bool)
-              : Bool
-        in
-        (match compare a b : Ordering
-        | Ordering.Equal -> False
-        | Ordering.Less -> check Increasing
-        | Ordering.Greater -> check Decreasing)
-          : Bool)
-        : Bool
+  let level_pair_is_safe : (Int, Int), Dir -> Bool =
+    \(a, b) dir ->
+      let' positive_diff : Int =
+        match dir
+        | Increasing -> b - a
+        | Decreasing -> a - b
+      in
+      (positive_diff >= 1 : Bool) && (positive_diff <= 3 : Bool) : Bool
+  
+  let is_safe : List Int, Tolerance -> Bool =
+    let check_loop : Dir, Tolerance, Option Int, Int, Int, List Int -> Bool =
+      \dir tolerance prev a b rest ->
+        (match level_pair_is_safe (a, b) dir : Bool
+        | True ->
+          (match rest
+          | Nil -> True
+          | Cons next rest -> check_loop dir tolerance (Some a : Option Int) b next rest)
+        | False ->
+          match tolerance
+          | MustBeAllSafe -> False
+          | AllowOneUnsafe ->
+            match rest
+            | Nil -> True
+            | Cons next rest' ->
+              (check_loop dir MustBeAllSafe prev a next rest' : Bool)
+              ||
+              ((match prev
+              | Some prev -> check_loop dir MustBeAllSafe None prev b rest
+              | None -> check_loop dir MustBeAllSafe None b next rest')
+                : Bool))
+          : Bool
+    in
+    (\(reports : List Int) (tolerance : Tolerance) ->
+      (match reports
+      | Nil | Cons _ Nil -> True
+      | Cons a (Cons b rest) ->
+        (check_loop Increasing tolerance None a b rest : Bool)
+        || (check_loop Decreasing tolerance None a b rest : Bool))
+        : Bool)
+      : List Int, Tolerance -> Bool
   
   let pairs : List a -> List (a, a) =
     \xs ->
@@ -43,16 +72,28 @@ module Report = {
 }
 
 let () =
-  let loop : Int -> Int =
-    \count ->
+  let loop : Int, Int -> (Int, Int) =
+    \count1 count2 ->
       (match read_line () : Option String
-      | None -> count
+      | None -> (count1, count2)
       | Some line ->
-        match Report.is_safe (Report.parse line : List Int) : Bool
-        | True -> loop (count + 1 : Int)
-        | False -> loop count)
-        : Int
+        let' report : Report = Report.parse line in
+        let' count1 : Int =
+          match Report.is_safe report Report.MustBeAllSafe : Bool
+          | True -> count1 + 1
+          | False -> count1
+        and count2 : Int =
+          match Report.is_safe report Report.AllowOneUnsafe : Bool
+          | True -> count2 + 1
+          | False -> count2
+        in
+        loop count1 count2 : (Int, Int))
+        : (Int, Int)
   in
-  let' count : Int = loop 0 in
-  print_int count;
+  let' ((count1 : Int), (count2 : Int)) = loop 0 0 in
+  print_string "Part 1: ";
+  print_int count1;
+  print "";
+  print_string "Part 2: ";
+  print_int count2;
   print ""

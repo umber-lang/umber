@@ -1,5 +1,264 @@
-((Value_def AdventOfCode2024_2.Report.Increasing (Make_block (tag 0)))
+((Value_def AdventOfCode2024_2.Report.MustBeAllSafe (Make_block (tag 0)))
+ (Value_def AdventOfCode2024_2.Report.AllowOneUnsafe (Make_block (tag 1)))
+ (Value_def AdventOfCode2024_2.Report.Increasing (Make_block (tag 0)))
  (Value_def AdventOfCode2024_2.Report.Decreasing (Make_block (tag 1)))
+ (Fun_decl ((name Std.Prelude.List.map) (arity 2)))
+ (Fun_decl ((name Std.Prelude.String.split) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Int.of_string) (arity 1)))
+ (Fun_def
+  ((fun_name AdventOfCode2024_2.Report.parse)
+   (args (AdventOfCode2024_2.Report.str.1))
+   (body
+    (Fun_call Std.Prelude.List.map
+     ((Fun_call Std.Prelude.String.split
+       ((Name AdventOfCode2024_2.Report.str.1) (Primitive (Char " "))))
+      (Name Std.Prelude.Int.of_string))))))
+ (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.&&) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.>=) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Operators.<=) (arity 2)))
+ (Fun_def
+  ((fun_name AdventOfCode2024_2.Report.level_pair_is_safe)
+   (args
+    (AdventOfCode2024_2.Report.*lambda_arg.1 AdventOfCode2024_2.Report.dir.1))
+   (body
+    (Let AdventOfCode2024_2.Report.a.1
+     (Get_block_field 0 (Name AdventOfCode2024_2.Report.*lambda_arg.1))
+     (Let AdventOfCode2024_2.Report.b.1
+      (Get_block_field 1 (Name AdventOfCode2024_2.Report.*lambda_arg.1))
+      (Let AdventOfCode2024_2.Report.positive_diff.1
+       (Cond_assign
+        (conds
+         (((Constant_tag_equals (Name AdventOfCode2024_2.Report.dir.1) 0) ())))
+        (body
+         (Fun_call Std.Prelude.Operators.-
+          ((Name AdventOfCode2024_2.Report.b.1)
+           (Name AdventOfCode2024_2.Report.a.1))))
+        (if_none_matched
+         (Otherwise
+          (Fun_call Std.Prelude.Operators.-
+           ((Name AdventOfCode2024_2.Report.a.1)
+            (Name AdventOfCode2024_2.Report.b.1))))))
+       (Fun_call Std.Prelude.Operators.&&
+        ((Fun_call Std.Prelude.Operators.>=
+          ((Name AdventOfCode2024_2.Report.positive_diff.1)
+           (Primitive (Int 1))))
+         (Fun_call Std.Prelude.Operators.<=
+          ((Name AdventOfCode2024_2.Report.positive_diff.1)
+           (Primitive (Int 3))))))))))))
+ (Fun_decl ((name Std.Prelude.Operators.||) (arity 2)))
+ (Fun_decl ((name Std.Prelude.Option.None) (arity 0)))
+ (Fun_def
+  ((fun_name AdventOfCode2024_2.Report.check_loop.1)
+   (args
+    (AdventOfCode2024_2.Report.dir.2 AdventOfCode2024_2.Report.tolerance.1
+     AdventOfCode2024_2.Report.prev.1 AdventOfCode2024_2.Report.a.2
+     AdventOfCode2024_2.Report.b.2 AdventOfCode2024_2.Report.rest.1))
+   (body
+    (Let AdventOfCode2024_2.Report.match.1
+     (Fun_call AdventOfCode2024_2.Report.level_pair_is_safe
+      ((Make_block (tag 0)
+        (fields
+         ((Name AdventOfCode2024_2.Report.a.2)
+          (Name AdventOfCode2024_2.Report.b.2))))
+       (Name AdventOfCode2024_2.Report.dir.2)))
+     (Cond_assign
+      (conds
+       (((Constant_tag_equals (Name AdventOfCode2024_2.Report.match.1) 1) ())))
+      (body
+       (Cond_assign
+        (conds
+         (((Constant_tag_equals (Name AdventOfCode2024_2.Report.rest.1) 0)
+           ())))
+        (body (Make_block (tag 1)))
+        (if_none_matched
+         (Otherwise
+          (Let AdventOfCode2024_2.Report.rest.2
+           (Get_block_field 1 (Name AdventOfCode2024_2.Report.rest.1))
+           (Let AdventOfCode2024_2.Report.next.1
+            (Get_block_field 0 (Name AdventOfCode2024_2.Report.rest.1))
+            (Fun_call AdventOfCode2024_2.Report.check_loop.1
+             ((Name AdventOfCode2024_2.Report.dir.2)
+              (Name AdventOfCode2024_2.Report.tolerance.1)
+              (Make_block (tag 0)
+               (fields ((Name AdventOfCode2024_2.Report.a.2))))
+              (Name AdventOfCode2024_2.Report.b.2)
+              (Name AdventOfCode2024_2.Report.next.1)
+              (Name AdventOfCode2024_2.Report.rest.2)))))))))
+      (if_none_matched
+       (Otherwise
+        (Cond_assign
+         (conds
+          (((Constant_tag_equals (Name AdventOfCode2024_2.Report.tolerance.1)
+             0)
+            ())))
+         (body (Make_block (tag 0)))
+         (if_none_matched
+          (Otherwise
+           (Cond_assign
+            (conds
+             (((Constant_tag_equals (Name AdventOfCode2024_2.Report.rest.1)
+                0)
+               ())))
+            (body (Make_block (tag 1)))
+            (if_none_matched
+             (Otherwise
+              (Let AdventOfCode2024_2.Report.rest'.1
+               (Get_block_field 1 (Name AdventOfCode2024_2.Report.rest.1))
+               (Let AdventOfCode2024_2.Report.next.2
+                (Get_block_field 0 (Name AdventOfCode2024_2.Report.rest.1))
+                (Fun_call Std.Prelude.Operators.||
+                 ((Fun_call AdventOfCode2024_2.Report.check_loop.1
+                   ((Name AdventOfCode2024_2.Report.dir.2)
+                    (Name AdventOfCode2024_2.Report.MustBeAllSafe)
+                    (Name AdventOfCode2024_2.Report.prev.1)
+                    (Name AdventOfCode2024_2.Report.a.2)
+                    (Name AdventOfCode2024_2.Report.next.2)
+                    (Name AdventOfCode2024_2.Report.rest'.1)))
+                  (Cond_assign (vars (AdventOfCode2024_2.Report.prev.2))
+                   (conds
+                    (((Non_constant_tag_equals
+                       (Name AdventOfCode2024_2.Report.prev.1) 0)
+                      ((Get_block_field 0
+                        (Name AdventOfCode2024_2.Report.prev.1))))))
+                   (body
+                    (Fun_call AdventOfCode2024_2.Report.check_loop.1
+                     ((Name AdventOfCode2024_2.Report.dir.2)
+                      (Name AdventOfCode2024_2.Report.MustBeAllSafe)
+                      (Name Std.Prelude.Option.None)
+                      (Name AdventOfCode2024_2.Report.prev.2)
+                      (Name AdventOfCode2024_2.Report.b.2)
+                      (Name AdventOfCode2024_2.Report.rest.1))))
+                   (if_none_matched
+                    (Otherwise
+                     (Fun_call AdventOfCode2024_2.Report.check_loop.1
+                      ((Name AdventOfCode2024_2.Report.dir.2)
+                       (Name AdventOfCode2024_2.Report.MustBeAllSafe)
+                       (Name Std.Prelude.Option.None)
+                       (Name AdventOfCode2024_2.Report.b.2)
+                       (Name AdventOfCode2024_2.Report.next.2)
+                       (Name AdventOfCode2024_2.Report.rest'.1)))))))))))))))))))))))
+ (Fun_def
+  ((fun_name AdventOfCode2024_2.Report.is_safe)
+   (args
+    (AdventOfCode2024_2.Report.reports.1
+     AdventOfCode2024_2.Report.tolerance.2))
+   (body
+    (Cond_assign
+     (conds
+      (((Constant_tag_equals (Name AdventOfCode2024_2.Report.reports.1) 0)
+        ())
+       ((And
+         (Non_constant_tag_equals (Name AdventOfCode2024_2.Report.reports.1)
+          0)
+         (Constant_tag_equals
+          (Get_block_field 1 (Name AdventOfCode2024_2.Report.reports.1)) 0))
+        ())))
+     (body (Make_block (tag 1)))
+     (if_none_matched
+      (Otherwise
+       (Let AdventOfCode2024_2.Report.rest.3
+        (Get_block_field 1
+         (Get_block_field 1 (Name AdventOfCode2024_2.Report.reports.1)))
+        (Let AdventOfCode2024_2.Report.b.3
+         (Get_block_field 0
+          (Get_block_field 1 (Name AdventOfCode2024_2.Report.reports.1)))
+         (Let AdventOfCode2024_2.Report.a.3
+          (Get_block_field 0 (Name AdventOfCode2024_2.Report.reports.1))
+          (Fun_call Std.Prelude.Operators.||
+           ((Fun_call AdventOfCode2024_2.Report.check_loop.1
+             ((Name AdventOfCode2024_2.Report.Increasing)
+              (Name AdventOfCode2024_2.Report.tolerance.2)
+              (Name Std.Prelude.Option.None)
+              (Name AdventOfCode2024_2.Report.a.3)
+              (Name AdventOfCode2024_2.Report.b.3)
+              (Name AdventOfCode2024_2.Report.rest.3)))
+            (Fun_call AdventOfCode2024_2.Report.check_loop.1
+             ((Name AdventOfCode2024_2.Report.Decreasing)
+              (Name AdventOfCode2024_2.Report.tolerance.2)
+              (Name Std.Prelude.Option.None)
+              (Name AdventOfCode2024_2.Report.a.3)
+              (Name AdventOfCode2024_2.Report.b.3)
+              (Name AdventOfCode2024_2.Report.rest.3))))))))))))))
+ (Fun_decl ((name Std.Prelude.read_line) (arity 1)))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_def
+  ((fun_name AdventOfCode2024_2.loop.1)
+   (args (AdventOfCode2024_2.count1.1 AdventOfCode2024_2.count2.1))
+   (body
+    (Let AdventOfCode2024_2.match.1
+     (Fun_call Std.Prelude.read_line ((Make_block (tag 0))))
+     (Cond_assign
+      (conds
+       (((Constant_tag_equals (Name AdventOfCode2024_2.match.1) 0) ())))
+      (body
+       (Make_block (tag 0)
+        (fields
+         ((Name AdventOfCode2024_2.count1.1)
+          (Name AdventOfCode2024_2.count2.1)))))
+      (if_none_matched
+       (Otherwise
+        (Let AdventOfCode2024_2.line.1
+         (Get_block_field 0 (Name AdventOfCode2024_2.match.1))
+         (Let AdventOfCode2024_2.report.1
+          (Fun_call AdventOfCode2024_2.Report.parse
+           ((Name AdventOfCode2024_2.line.1)))
+          (Let AdventOfCode2024_2.count1.2
+           (Let AdventOfCode2024_2.match.2
+            (Fun_call AdventOfCode2024_2.Report.is_safe
+             ((Name AdventOfCode2024_2.report.1)
+              (Name AdventOfCode2024_2.Report.MustBeAllSafe)))
+            (Cond_assign
+             (conds
+              (((Constant_tag_equals (Name AdventOfCode2024_2.match.2) 1) ())))
+             (body
+              (Fun_call Std.Prelude.Operators.+
+               ((Name AdventOfCode2024_2.count1.1) (Primitive (Int 1)))))
+             (if_none_matched (Otherwise (Name AdventOfCode2024_2.count1.1)))))
+           (Let AdventOfCode2024_2.count2.2
+            (Let AdventOfCode2024_2.match.3
+             (Fun_call AdventOfCode2024_2.Report.is_safe
+              ((Name AdventOfCode2024_2.report.1)
+               (Name AdventOfCode2024_2.Report.AllowOneUnsafe)))
+             (Cond_assign
+              (conds
+               (((Constant_tag_equals (Name AdventOfCode2024_2.match.3) 1)
+                 ())))
+              (body
+               (Fun_call Std.Prelude.Operators.+
+                ((Name AdventOfCode2024_2.count2.1) (Primitive (Int 1)))))
+              (if_none_matched
+               (Otherwise (Name AdventOfCode2024_2.count2.1)))))
+            (Fun_call AdventOfCode2024_2.loop.1
+             ((Name AdventOfCode2024_2.count1.2)
+              (Name AdventOfCode2024_2.count2.2))))))))))))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print_string) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Value_def AdventOfCode2024_2.*binding.2
+  (Let AdventOfCode2024_2.*binding.1
+   (Fun_call AdventOfCode2024_2.loop.1
+    ((Primitive (Int 0)) (Primitive (Int 0))))
+   (Let AdventOfCode2024_2.count1.3
+    (Get_block_field 0 (Name AdventOfCode2024_2.*binding.1))
+    (Let AdventOfCode2024_2.count2.3
+     (Get_block_field 1 (Name AdventOfCode2024_2.*binding.1))
+     (Fun_call "Std.Prelude.Operators.;"
+      ((Fun_call "Std.Prelude.Operators.;"
+        ((Fun_call "Std.Prelude.Operators.;"
+          ((Fun_call "Std.Prelude.Operators.;"
+            ((Fun_call "Std.Prelude.Operators.;"
+              ((Fun_call Std.Prelude.print_string
+                ((Primitive (String "Part 1: "))))
+               (Fun_call Std.Prelude.print_int
+                ((Name AdventOfCode2024_2.count1.3)))))
+             (Fun_call Std.Prelude.print ((Primitive (String ""))))))
+           (Fun_call Std.Prelude.print_string
+            ((Primitive (String "Part 2: "))))))
+         (Fun_call Std.Prelude.print_int
+          ((Name AdventOfCode2024_2.count2.3)))))
+       (Fun_call Std.Prelude.print ((Primitive (String ""))))))))))
  (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
  (Fun_decl ((name Std.Prelude.Operators.::) (arity 2)))
  (Fun_def
@@ -17,171 +276,16 @@
      (body (Name Std.Prelude.List.Nil))
      (if_none_matched
       (Otherwise
-       (Let AdventOfCode2024_2.Report.rest.1
+       (Let AdventOfCode2024_2.Report.rest.4
         (Get_block_field 1 (Name AdventOfCode2024_2.Report.xs.1))
-        (Let AdventOfCode2024_2.Report.b.1
-         (Get_block_field 0 (Name AdventOfCode2024_2.Report.rest.1))
-         (Let AdventOfCode2024_2.Report.a.1
+        (Let AdventOfCode2024_2.Report.b.4
+         (Get_block_field 0 (Name AdventOfCode2024_2.Report.rest.4))
+         (Let AdventOfCode2024_2.Report.a.4
           (Get_block_field 0 (Name AdventOfCode2024_2.Report.xs.1))
           (Fun_call Std.Prelude.Operators.::
            ((Make_block (tag 0)
              (fields
-              ((Name AdventOfCode2024_2.Report.a.1)
-               (Name AdventOfCode2024_2.Report.b.1))))
+              ((Name AdventOfCode2024_2.Report.a.4)
+               (Name AdventOfCode2024_2.Report.b.4))))
             (Fun_call AdventOfCode2024_2.Report.pairs
-             ((Name AdventOfCode2024_2.Report.rest.1))))))))))))))
- (Fun_decl ((name Std.Prelude.List.for_all) (arity 2)))
- (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
- (Fun_decl ((name Std.Prelude.Operators.&&) (arity 2)))
- (Fun_decl ((name Std.Prelude.Operators.>=) (arity 2)))
- (Fun_decl ((name Std.Prelude.Operators.<=) (arity 2)))
- (Fun_def
-  ((fun_name AdventOfCode2024_2.Report.*fun.1)
-   (args
-    (AdventOfCode2024_2.Report.*closure_env.1
-     AdventOfCode2024_2.Report.*lambda_arg.1))
-   (body
-    (Let AdventOfCode2024_2.Report.dir.2
-     (Get_block_field 1 (Name AdventOfCode2024_2.Report.*closure_env.1))
-     (Let AdventOfCode2024_2.Report.a.3
-      (Get_block_field 0 (Name AdventOfCode2024_2.Report.*lambda_arg.1))
-      (Let AdventOfCode2024_2.Report.b.3
-       (Get_block_field 1 (Name AdventOfCode2024_2.Report.*lambda_arg.1))
-       (Let AdventOfCode2024_2.Report.positive_diff.1
-        (Cond_assign
-         (conds
-          (((Constant_tag_equals (Name AdventOfCode2024_2.Report.dir.2) 0)
-            ())))
-         (body
-          (Fun_call Std.Prelude.Operators.-
-           ((Name AdventOfCode2024_2.Report.b.3)
-            (Name AdventOfCode2024_2.Report.a.3))))
-         (if_none_matched
-          (Otherwise
-           (Fun_call Std.Prelude.Operators.-
-            ((Name AdventOfCode2024_2.Report.a.3)
-             (Name AdventOfCode2024_2.Report.b.3))))))
-        (Fun_call Std.Prelude.Operators.&&
-         ((Fun_call Std.Prelude.Operators.>=
-           ((Name AdventOfCode2024_2.Report.positive_diff.1)
-            (Primitive (Int 1))))
-          (Fun_call Std.Prelude.Operators.<=
-           ((Name AdventOfCode2024_2.Report.positive_diff.1)
-            (Primitive (Int 3)))))))))))))
- (Fun_def
-  ((fun_name AdventOfCode2024_2.Report.check.2)
-   (args
-    (AdventOfCode2024_2.Report.*closure_env.2
-     AdventOfCode2024_2.Report.dir.1))
-   (body
-    (Let AdventOfCode2024_2.Report.report_pairs.2
-     (Get_block_field 1 (Name AdventOfCode2024_2.Report.*closure_env.2))
-     (Fun_call Std.Prelude.List.for_all
-      ((Name AdventOfCode2024_2.Report.report_pairs.2)
-       (Make_block (tag 12289)
-        (fields
-         ((Name AdventOfCode2024_2.Report.*fun.1)
-          (Name AdventOfCode2024_2.Report.dir.1))))))))))
- (Fun_decl ((name Std.Prelude.Operators.compare) (arity 2)))
- (Fun_def
-  ((fun_name AdventOfCode2024_2.Report.is_safe)
-   (args (AdventOfCode2024_2.Report.reports.1))
-   (body
-    (Let AdventOfCode2024_2.Report.match.1
-     (Fun_call AdventOfCode2024_2.Report.pairs
-      ((Name AdventOfCode2024_2.Report.reports.1)))
-     (Cond_assign
-      (conds
-       (((Constant_tag_equals (Name AdventOfCode2024_2.Report.match.1) 0) ())))
-      (body (Make_block (tag 1)))
-      (if_none_matched
-       (Otherwise
-        (Let AdventOfCode2024_2.Report.report_pairs.1
-         (Name AdventOfCode2024_2.Report.match.1)
-         (Let AdventOfCode2024_2.Report.b.2
-          (Get_block_field 1
-           (Get_block_field 0
-            (Name AdventOfCode2024_2.Report.report_pairs.1)))
-          (Let AdventOfCode2024_2.Report.a.2
-           (Get_block_field 0
-            (Get_block_field 0
-             (Name AdventOfCode2024_2.Report.report_pairs.1)))
-           (Let AdventOfCode2024_2.Report.check.1
-            (Make_block (tag 12289)
-             (fields
-              ((Name AdventOfCode2024_2.Report.check.2)
-               (Name AdventOfCode2024_2.Report.report_pairs.1))))
-            (Let AdventOfCode2024_2.Report.match.2
-             (Fun_call Std.Prelude.Operators.compare
-              ((Name AdventOfCode2024_2.Report.a.2)
-               (Name AdventOfCode2024_2.Report.b.2)))
-             (Cond_assign
-              (conds
-               (((Constant_tag_equals
-                  (Name AdventOfCode2024_2.Report.match.2) 1)
-                 ())))
-              (body (Make_block (tag 0)))
-              (if_none_matched
-               (Otherwise
-                (Cond_assign
-                 (conds
-                  (((Constant_tag_equals
-                     (Name AdventOfCode2024_2.Report.match.2) 0)
-                    ())))
-                 (body
-                  (Fun_call AdventOfCode2024_2.Report.check.1
-                   ((Name AdventOfCode2024_2.Report.Increasing))))
-                 (if_none_matched
-                  (Otherwise
-                   (Fun_call AdventOfCode2024_2.Report.check.1
-                    ((Name AdventOfCode2024_2.Report.Decreasing)))))))))))))))))))))
- (Fun_decl ((name Std.Prelude.List.map) (arity 2)))
- (Fun_decl ((name Std.Prelude.String.split) (arity 2)))
- (Fun_decl ((name Std.Prelude.Int.of_string) (arity 1)))
- (Fun_def
-  ((fun_name AdventOfCode2024_2.Report.parse)
-   (args (AdventOfCode2024_2.Report.str.1))
-   (body
-    (Fun_call Std.Prelude.List.map
-     ((Fun_call Std.Prelude.String.split
-       ((Name AdventOfCode2024_2.Report.str.1) (Primitive (Char " "))))
-      (Name Std.Prelude.Int.of_string))))))
- (Fun_decl ((name Std.Prelude.read_line) (arity 1)))
- (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
- (Fun_def
-  ((fun_name AdventOfCode2024_2.loop.1) (args (AdventOfCode2024_2.count.1))
-   (body
-    (Let AdventOfCode2024_2.match.1
-     (Fun_call Std.Prelude.read_line ((Make_block (tag 0))))
-     (Cond_assign
-      (conds
-       (((Constant_tag_equals (Name AdventOfCode2024_2.match.1) 0) ())))
-      (body (Name AdventOfCode2024_2.count.1))
-      (if_none_matched
-       (Otherwise
-        (Let AdventOfCode2024_2.line.1
-         (Get_block_field 0 (Name AdventOfCode2024_2.match.1))
-         (Let AdventOfCode2024_2.match.2
-          (Fun_call AdventOfCode2024_2.Report.is_safe
-           ((Fun_call AdventOfCode2024_2.Report.parse
-             ((Name AdventOfCode2024_2.line.1)))))
-          (Cond_assign
-           (conds
-            (((Constant_tag_equals (Name AdventOfCode2024_2.match.2) 1) ())))
-           (body
-            (Fun_call AdventOfCode2024_2.loop.1
-             ((Fun_call Std.Prelude.Operators.+
-               ((Name AdventOfCode2024_2.count.1) (Primitive (Int 1)))))))
-           (if_none_matched
-            (Otherwise
-             (Fun_call AdventOfCode2024_2.loop.1
-              ((Name AdventOfCode2024_2.count.1)))))))))))))))
- (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
- (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
- (Fun_decl ((name Std.Prelude.print) (arity 1)))
- (Value_def AdventOfCode2024_2.*binding.1
-  (Let AdventOfCode2024_2.count.2
-   (Fun_call AdventOfCode2024_2.loop.1 ((Primitive (Int 0))))
-   (Fun_call "Std.Prelude.Operators.;"
-    ((Fun_call Std.Prelude.print_int ((Name AdventOfCode2024_2.count.2)))
-     (Fun_call Std.Prelude.print ((Primitive (String "")))))))))
+             ((Name AdventOfCode2024_2.Report.rest.4)))))))))))))))
