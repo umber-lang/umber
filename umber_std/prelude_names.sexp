@@ -45,8 +45,22 @@
                   (|> (Imported Std.Prelude.Operators.|>))
                   (|| (Imported Std.Prelude.Operators.||))
                   (Nil (Imported Std.Prelude.List.Nil))
+                  (fst
+                   (Local
+                    ((type_
+                      (Scheme
+                       ((Function ((Tuple ((Var a) (Var b))))
+                         (Effect_union ()) (Var a))
+                        ()))))))
                   (mod (Imported Std.Prelude.Operators.mod))
                   (not (Imported Std.Prelude.Operators.not))
+                  (snd
+                   (Local
+                    ((type_
+                      (Scheme
+                       ((Function ((Tuple ((Var a) (Var b))))
+                         (Effect_union ()) (Var b))
+                        ()))))))
                   (Cons (Imported Std.Prelude.List.Cons))
                   (None (Imported Std.Prelude.Option.None))
                   (Some (Imported Std.Prelude.Option.Some))
@@ -199,6 +213,15 @@
                                  (Effect_union ()) (Var acc)))
                                (Effect_union ()) (Var acc))
                               ()))))))
+                        (head
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a))))
+                               (Effect_union ())
+                               (Type_app Std.Prelude.Option.Option ((Var a))))
+                              ()))))))
                         (sort
                          (Local
                           ((type_
@@ -207,6 +230,16 @@
                                ((Type_app Std.Prelude.List.List ((Var a))))
                                (Effect_union ())
                                (Type_app Std.Prelude.List.List ((Var a))))
+                              ()))))))
+                        (tail
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a))))
+                               (Effect_union ())
+                               (Type_app Std.Prelude.Option.Option
+                                ((Type_app Std.Prelude.List.List ((Var a))))))
                               ()))))))
                         (count
                          (Local
@@ -728,9 +761,27 @@
                  (|> (Imported Std.Prelude.Operators.|>))
                  (|| (Imported Std.Prelude.Operators.||))
                  (Nil (Imported Std.Prelude.List.Nil))
+                 (fst
+                  (Local
+                   ((type_
+                     (Scheme
+                      ((Function ((Tuple ((Var a) (Intersection ()))))
+                        (Effect_union ()) (Var a))
+                       ())))
+                    (type_source Let_inferred))))
                  (mod (Imported Std.Prelude.Operators.mod))
                  (not (Imported Std.Prelude.Operators.not))
+                 (snd
+                  (Local
+                   ((type_
+                     (Scheme
+                      ((Function ((Tuple ((Intersection ()) (Var b))))
+                        (Effect_union ()) (Var b))
+                       ())))
+                    (type_source Let_inferred))))
                  (Cons (Imported Std.Prelude.List.Cons))
+                 (None (Imported Std.Prelude.Option.None))
+                 (Some (Imported Std.Prelude.Option.Some))
                  (sqrt
                   (Local
                    ((type_
@@ -893,6 +944,16 @@
                               (Effect_var e) (Var b))
                              ())))
                           (type_source Let_inferred))))
+                       (head
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var a))))
+                              (Effect_union ())
+                              (Type_app Std.Prelude.Option.Option ((Var a))))
+                             ())))
+                          (type_source Let_inferred))))
                        (sort
                         (Local
                          ((type_
@@ -901,6 +962,17 @@
                               ((Type_app Std.Prelude.List.List ((Var a))))
                               (Effect_union ())
                               (Type_app Std.Prelude.List.List ((Var a))))
+                             ())))
+                          (type_source Let_inferred))))
+                       (tail
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var a))))
+                              (Effect_union ())
+                              (Type_app Std.Prelude.Option.Option
+                               ((Type_app Std.Prelude.List.List ((Var a))))))
                              ())))
                           (type_source Let_inferred))))
                        (count
@@ -919,12 +991,12 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var e)))
+                              ((Type_app Std.Prelude.List.List ((Var g)))
                                (Type_app Int ()))
                               (Effect_union ())
                               (Tuple
-                               ((Type_app Std.Prelude.List.List ((Var e)))
-                                (Type_app Std.Prelude.List.List ((Var e))))))
+                               ((Type_app Std.Prelude.List.List ((Var g)))
+                                (Type_app Std.Prelude.List.List ((Var g))))))
                              ())))
                           (type_source Let_inferred))))
                        (unzip

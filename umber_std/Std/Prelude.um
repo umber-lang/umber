@@ -5,12 +5,17 @@ module : {
       | Cons a (List a)
 
     val length : List Any -> Int
+    val head : List a -> Option a
+    val tail : List a -> Option (List a)
     val reverse : List a -> List a
     val append : List a, List a -> List a
     val map : List a, (a -> b) -> List b
     val concat_map : List a, (a -> List b) -> List b
     val fold : List a, acc, (acc, a -> acc) -> acc
-    val fold_until : List a, acc, (acc, a -> ControlFlow acc final), (acc -> final) -> final
+
+    val fold_until :
+      List a, acc, (acc, a -> ControlFlow acc final), (acc -> final) -> final
+
     val count : List a, (a -> Bool) -> Int
     val for_all : List a, (a -> Bool) -> Bool
 
@@ -141,6 +146,8 @@ module : {
   val sqrt : Float -> Float
 
   val ignore : a -> ()
+  val fst : (a, b) -> a
+  val snd : (a, b) -> b
 
   extern print : String -> () = "umber_print_endline"  # TODO: effects
   extern print_string : String -> () = "umber_print_string"
@@ -224,7 +231,17 @@ module String = {
     |> List.reverse
 }
 
+import .Option.(None, Some)
+
 module List = {
+  let head = match
+    | Nil -> None
+    | Cons x _ -> Some x
+
+  let tail = match
+    | Nil -> None
+    | Cons _ xs -> Some xs
+
   let length =
     let loop acc xs =
       match xs
@@ -363,6 +380,8 @@ module Operators = {
 import .Operators._
 
 let ignore _ = ()
+let fst (a, _) = a
+let snd (_, b) = b
 
 extern sqrt : Float -> Float = "umber_float_sqrt"
 extern print : String -> () = "umber_print_endline"
