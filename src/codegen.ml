@@ -213,6 +213,25 @@ let codegen_literal t literal =
         value)
 ;;
 
+let ptr_to_int t value =
+  Llvm.build_ptrtoint value (Llvm.i64_type t.context) (Llvm.value_name value) t.builder
+;;
+
+let check_value_is_block t value =
+  (* Check if this value is a pointer to a block. Pointers always have bottom bit 0.
+     This is done by checking (in C syntax) `(value & 1) == 0`. *)
+  let i64 = Llvm.i64_type t.context in
+  let masked_to_bottom_bit =
+    Llvm.build_and (ptr_to_int t value) (Llvm.const_int i64 1) "bottom_bit" t.builder
+  in
+  Llvm.build_icmp
+    Eq
+    masked_to_bottom_bit
+    (Llvm.const_int i64 0)
+    "bottom_bit_set"
+    t.builder
+;;
+
 let get_block_tag t value =
   (* The tag is at index 0 in the block header. *)
   let gep =
@@ -224,10 +243,6 @@ let get_block_tag t value =
       t.builder
   in
   Llvm.build_load gep "tag" t.builder
-;;
-
-let ptr_to_int t value =
-  Llvm.build_ptrtoint value (Llvm.i64_type t.context) (Llvm.value_name value) t.builder
 ;;
 
 let block_indexes_for_gep t ~field_index =
@@ -512,7 +527,17 @@ and codegen_cond t cond =
   | Constant_tag_equals (expr, tag) ->
     make_icmp (ptr_to_int t (codegen_expr t expr)) (int_constant_tag t tag)
   | Non_constant_tag_equals (expr, tag) ->
-    make_icmp (get_block_tag t (codegen_expr t expr)) (int_non_constant_tag t tag)
+    let value = codegen_expr t expr in
+    let is_block = check_value_is_block t value in
+    let check_block_tag =
+      make_icmp (get_block_tag t value) (int_non_constant_tag t tag)
+    in
+    Llvm.build_select
+      is_block
+      check_block_tag
+      (Llvm.const_int (Llvm.i1_type t.context) 0)
+      "non_constant_tag_equals"
+      t.builder
   | And (cond1, cond2) ->
     Llvm.build_and (codegen_cond t cond1) (codegen_cond t cond2) "cond_and" t.builder
 
