@@ -18,6 +18,16 @@
     (diff? mir/AdventOfCode2024_2.expected mir/AdventOfCode2024_2.out)
     (diff? llvm/AdventOfCode2024_2.expected llvm/AdventOfCode2024_2.out)
     (diff? output/AdventOfCode2024_2.expected output/AdventOfCode2024_2.out)))))
+(rule (alias runtest)
+ (deps (package umber) (glob_files input/AdventOfCode2024_3.txt))
+ (action
+  (progn (run %{dep:test.exe} %{dep:examples/AdventOfCode2024_3.um})
+   (concurrent
+    (diff? tokens/AdventOfCode2024_3.expected tokens/AdventOfCode2024_3.out)
+    (diff? ast/AdventOfCode2024_3.expected ast/AdventOfCode2024_3.out)
+    (diff? mir/AdventOfCode2024_3.expected mir/AdventOfCode2024_3.out)
+    (diff? llvm/AdventOfCode2024_3.expected llvm/AdventOfCode2024_3.out)
+    (diff? output/AdventOfCode2024_3.expected output/AdventOfCode2024_3.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/AsPattern.txt))
  (action
   (progn (run %{dep:test.exe} %{dep:examples/AsPattern.um})
