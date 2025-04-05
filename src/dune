@@ -4,14 +4,14 @@
   core
   core_unix.sys_unix
   dune-site
-  sedlex
-  menhirLib
-  ocamlgraph
   llvm
   llvm.all_backends
   llvm.analysis
   llvm.irreader
   llvm.target
+  menhirLib
+  ocamlgraph
+  sedlex
   shell)
  (preprocess
   (pps sedlex.ppx ppx_jane))
