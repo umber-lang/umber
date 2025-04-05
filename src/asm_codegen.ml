@@ -94,12 +94,15 @@ module Arg = struct
       pp_memory fmt mem;
       Format.pp_print_string fmt "]"
     | Global name ->
+      (* TODO: I think this might only work for procedures, not other things *)
       (* "wrt ..plt" is needed for PIE (Position Independent Executables). *)
       Format.fprintf fmt "%s wrt ..plt" name
 
   and pp_memory fmt mem =
     match mem with
-    | Rel_label name -> Format.fprintf fmt "rel %s" name
+    | Rel_label name ->
+      (* TODO: We could set default rel globally instead of having to do it every time. *)
+      Format.fprintf fmt "rel %s" name
   ;;
 end
 
@@ -173,9 +176,24 @@ module Bss_decl = struct
   ;;
 end
 
+module Global_decl = struct
+  type t =
+    { name : string
+    ; strength : [ `Weak | `Strong ]
+        (** [strength] determines whether this global will be deduplicated with globals from
+        other files. [`Strong] is the default. We use [`Weak] for literal constants. *)
+    }
+
+  let pp fmt { name; strength } =
+    match strength with
+    | `Strong -> Format.pp_print_string fmt name
+    | `Weak -> Format.fprintf fmt "%s:weak" name
+  ;;
+end
+
 module Program = struct
   type t =
-    { globals : string list
+    { globals : Global_decl.t list
     ; externs : string list
     ; text_section : Instr_group.t list
     ; rodata_section : Data_decl.t list
@@ -183,18 +201,19 @@ module Program = struct
     }
 
   let pp_section fmt name contents ~f =
-    pp_line fmt "section" [ name ] ~f:(fun fmt -> Format.fprintf fmt ".%s");
-    List.iter contents ~f:(f fmt)
+    if not (List.is_empty contents)
+    then (
+      pp_line fmt "section" [ name ] ~f:(fun fmt -> Format.fprintf fmt ".%s");
+      List.iter contents ~f:(f fmt);
+      Format.pp_print_newline fmt ())
   ;;
 
   let pp fmt { globals; externs; text_section; rodata_section; bss_section } =
-    List.iter globals ~f:(fun name -> pp_line_one_arg fmt "global" name);
+    List.iter globals ~f:(fun global -> pp_line fmt "global" [ global ] ~f:Global_decl.pp);
     List.iter externs ~f:(fun name -> pp_line_one_arg fmt "extern" name);
     Format.pp_print_newline fmt ();
     pp_section fmt "text" text_section ~f:Instr_group.pp;
-    Format.pp_print_newline fmt ();
     pp_section fmt "rodata" rodata_section ~f:Data_decl.pp;
-    Format.pp_print_newline fmt ();
     pp_section fmt "bss" bss_section ~f:Bss_decl.pp
   ;;
 end
@@ -280,19 +299,23 @@ module Function_builder = struct
 
        Let's try something naive first.
     *)
-    let (), fold2_result =
-      Nonempty.fold2
+    let result =
+      Nonempty.iter2
         args
         (Call_conv.arg_registers call_conv)
-        ~init:()
-        ~f:(fun () current_loc target_reg ->
+        ~f:(fun current_loc target_reg ->
         match current_loc with
         | Register current_reg ->
           if not (Register.equal current_reg target_reg)
           then failwith "TODO: different regs"
-        | _ -> failwith "TODO: non-reg arg location")
+          else
+            Queue.enqueue
+              t.code
+              (Mov { src = Register current_reg; dst = Register target_reg })
+        | Global _ as src -> Queue.enqueue t.code (Mov { src; dst = Register target_reg })
+        | Memory _ -> failwith "TODO: memory arg location")
     in
-    (match fold2_result with
+    (match result with
      | Same_length | Right_trailing _ -> ()
      | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack");
     t
@@ -302,18 +325,26 @@ module Function_builder = struct
 end
 
 type t =
-  { name_table : Mir_name.Name_table.t
+  { (* FIXME: name_table is unused *)
+    name_table : Mir_name.Name_table.t
   ; globals : Mir_name.t Queue.t
   ; externs : Extern.t Mir_name.Table.t
   ; literals : Mir_name.t Literal.Table.t
   ; main_function : Function_builder.t
   }
 
+let constant_block = ()
+
 let to_program { globals; externs; literals; main_function = _; name_table = _ }
   : Program.t
   =
-  let globals = List.map (Queue.to_list globals) ~f:Mir_name.to_string in
-  { globals
+  let uninitialized_globals = List.map (Queue.to_list globals) ~f:Mir_name.to_string in
+  let literals = Hashtbl.to_alist literals in
+  { globals =
+      List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
+        { name; strength = `Strong })
+      @ List.map literals ~f:(fun ((_ : Literal.t), mir_name) : Global_decl.t ->
+          { name = Mir_name.to_string mir_name; strength = `Weak })
   ; externs =
       Hashtbl.to_alist externs
       |> List.map ~f:(fun (mir_name, extern) ->
@@ -322,11 +353,11 @@ let to_program { globals; externs; literals; main_function = _; name_table = _ }
            | Umber_function -> Mir_name.to_string mir_name)
   ; text_section = []
   ; rodata_section =
-      Hashtbl.to_alist literals
-      |> List.map ~f:(fun (literal, mir_name) : Data_decl.t ->
-           { label = Mir_name.to_string mir_name; kind = `Bytes; payload = [ literal ] })
+      List.map literals ~f:(fun (literal, mir_name) : Data_decl.t ->
+        (* FIXME: Need a block here *)
+        { label = Mir_name.to_string mir_name; kind = `Bytes; payload = [ literal ] })
   ; bss_section =
-      List.map globals ~f:(fun name : Bss_decl.t ->
+      List.map uninitialized_globals ~f:(fun name : Bss_decl.t ->
         { label = name; kind = `Words; size = 1 })
   }
 ;;
@@ -349,15 +380,14 @@ let codegen_literal t (literal : Literal.t) : Arg.t =
         match literal with
         | Int i -> sprintf "int.%d" i
         | Float x -> sprintf "float.%f" x
-        | String s -> sprintf !"string.%{Ustring}" s
-        | Char c -> sprintf !"char.%{Uchar}" c
+        | String s -> sprintf "string.%d" (Ustring.hash s)
+        | Char c -> sprintf "char.%d" (Uchar.to_int c)
       in
-      Mir_name.create_value_name
-        t.name_table
+      Mir_name.create_exportable_name
         (Value_name.Absolute.of_relative_unchecked
            (Value_name.Relative.of_ustrings_unchecked ([], Ustring.of_string_exn name))))
   in
-  Memory (Rel_label (Mir_name.to_string name))
+  Global (Mir_name.to_string name)
 ;;
 
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
@@ -416,7 +446,7 @@ let of_mir mir =
 
 let%expect_test "hello world" =
   let hello_world : Program.t =
-    { globals = [ "main" ]
+    { globals = [ { name = "main"; strength = `Strong } ]
     ; externs = [ "puts" ]
     ; text_section =
         [ { label = "main"
@@ -475,5 +505,17 @@ let%expect_test "hello world, from MIR" =
         )
     ]
   in
-  Program.pp Format.std_formatter (to_program (of_mir hello_world))
+  Program.pp Format.std_formatter (to_program (of_mir hello_world));
+  [%expect {|
+               global    HelloWorld.*binding.1
+               global    string.210886959:weak
+               extern    umber_print_endline
+
+               section   .rodata
+    string.210886959:
+               db        "Hello, world!"
+
+               section   .bss
+    HelloWorld.*binding.1:
+               resw      1 |}]
 ;;
