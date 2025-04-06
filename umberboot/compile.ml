@@ -250,13 +250,13 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
              fprintf out "%s\n" (Codegen.to_string codegen));
            module_path, mir, codegen))
       ~generating_asm:
-        (run_stage ~f:(fun (module_path, mir, llvm_codegen) ->
+        (run_stage ~f:(fun (module_path, mir, (_ : Codegen.t)) ->
            let asm = Asm_codegen.of_mir ~module_path mir in
            maybe_output Asm ~f:(fun out ->
              Asm_codegen.pp (Stdlib.Format.formatter_of_out_channel out) asm);
-           Ok (module_path, llvm_codegen)))
+           Ok (module_path, asm)))
       ~linking:
-        (run_stage ~f:(fun (module_path, codegen) ->
+        (run_stage ~f:(fun (module_path, asm) ->
            match Output.find_target output Exe with
            | None -> Ok ()
            | Some Stdout ->
@@ -274,7 +274,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
              with_tmpdir (fun tmpdir ->
                let object_file = tmpdir ^/ module_name ^ ".o" in
                let entry_file = tmpdir ^/ "_entry.o" in
-               Codegen.compile_to_object_and_dispose codegen ~output_file:object_file;
+               Asm_codegen.compile_to_object_file asm ~output_file:object_file;
                (* TODO: Hard-coding the Prelude module path here is a bit janky. We should
                   come up with something better when implementing linking arbitrary files. *)
                let prelude_module_path =
@@ -283,7 +283,7 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
                    ; Ast.Module_name.of_string_unchecked "Prelude"
                    ]
                in
-               Codegen.compile_entry_module
+               Asm_codegen.compile_entry_module
                  ~module_paths:[ prelude_module_path; module_path ]
                  ~entry_file;
                Linking.link_with_std_and_runtime

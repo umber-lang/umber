@@ -2,9 +2,9 @@ open Import
 
 let prelude_object_file =
   lazy
-    (let module_ = Llvm_helpers.parse_module (force Sites.prelude_llvm) in
-     let output_file = Filename_unix.temp_file "umber_prelude" "" in
-     Llvm_helpers.compile_module_to_object module_ ~output_file;
+    (let asm_file = force Sites.prelude_asm_file in
+     let output_file = Filename_unix.temp_file "umber_prelude" ".o" in
+     Asm_helpers.compile_to_object_file ~input_file:asm_file ~output_file;
      at_exit (fun () -> Sys_unix.remove output_file);
      output_file)
 ;;

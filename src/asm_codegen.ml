@@ -41,6 +41,7 @@ module Label_name : sig
 
   val of_mir_name : Mir_name.t -> t
   val of_extern_name : Extern_name.t -> t
+  val to_mir_name : t -> Mir_name.t
 end = struct
   type t = string
 
@@ -48,6 +49,11 @@ end = struct
   let to_string = Fn.id
   let of_mir_name = Mir_name.to_string >> of_string
   let of_extern_name = Extern_name.to_string >> of_string
+
+  let to_mir_name t =
+    Mir_name.create_exportable_name
+      (Value_name.Absolute.of_relative_unchecked (Value_name.Relative.of_string t))
+  ;;
 end
 
 let pp_args fmt args ~f =
@@ -297,16 +303,18 @@ module Call_conv = struct
     | C
     | Umber
 
+  (* TODO: Decide on an umber calling convention. For now, let's just copy C's calling
+     convention since we have to implement that anyway. We can probably switch to
+     basically copying OCaml's after that. *)
+
   (* TODO: Handle further arguments with the stack *)
   let arg_registers t : Register.t Nonempty.t =
     match t with
-    | C -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
-    | Umber -> failwith "umber cc"
+    | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
   ;;
 
   let return_value_reg : t -> Register.t = function
-    | C -> Rax
-    | Umber -> failwith "umber cc"
+    | C | Umber -> Rax
   ;;
 end
 
@@ -322,7 +330,18 @@ module Register_state = struct
     | Unused
 end
 
-module Function_builder = struct
+module Function_builder : sig
+  type t
+
+  val create : Label_name.t -> t
+  val add_code : t -> Instr.t -> unit
+
+  (* TODO: Consider if this API makes any sense *)
+  val move_values_for_call : t -> call_conv:Call_conv.t -> args:Arg.t Nonempty.t -> unit
+  val set_register_state : t -> Register.t -> Register_state.t -> unit
+  val name : t -> Label_name.t
+  val instr_groups : t -> Instr_group.t list
+end = struct
   (* TODO: Represents a partial codegened function. We need to consider the state of each
      register. *)
   type t =
@@ -339,6 +358,7 @@ module Function_builder = struct
   ;;
 
   let add_code t instr = Queue.enqueue (snd (Queue.get t.code t.current_group)) instr
+  let set_register_state t reg state = Hashtbl.set t.register_states ~key:reg ~data:state
 
   let move_values_for_call t ~call_conv ~(args : Arg.t Nonempty.t) =
     (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
@@ -384,10 +404,9 @@ module Function_builder = struct
         | Global _ as src -> add_code t (Mov { src; dst = Register target_reg })
         | Memory _ -> failwith "TODO: memory arg location")
     in
-    (match result with
-     | Same_length | Right_trailing _ -> ()
-     | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack");
-    t
+    match result with
+    | Same_length | Right_trailing _ -> ()
+    | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"
   ;;
 
   let instr_groups t =
@@ -395,6 +414,8 @@ module Function_builder = struct
     |> List.map ~f:(fun (label, instrs) : Instr_group.t ->
          { label; instrs = Queue.to_list instrs })
   ;;
+
+  let name t = fst (Queue.get t.code 0)
 end
 
 type t =
@@ -446,7 +467,7 @@ let to_program { bss_globals; externs; literals; main_function; name_table = _ }
   let uninitialized_globals = Queue.to_list bss_globals in
   let literals = Hashtbl.to_alist literals in
   { globals =
-      { name = Label_name.of_string "main"; strength = `Strong }
+      { name = Function_builder.name main_function; strength = `Strong }
       :: (List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
             { name; strength = `Strong })
           @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
@@ -469,16 +490,12 @@ let to_program { bss_globals; externs; literals; main_function; name_table = _ }
 
 let pp fmt t = Program.pp fmt (to_program t)
 
-let main_function_name ~(module_path : Module_path.Absolute.t) =
-  Label_name.of_string [%string "umber_main$%{module_path#Module_path}"]
-;;
-
-let create ~module_path =
+let create ~main_function_name =
   { name_table = Mir_name.Name_table.create ()
   ; bss_globals = Queue.create ()
   ; externs = Mir_name.Table.create ()
   ; literals = Literal.Table.create ()
-  ; main_function = Function_builder.create (main_function_name ~module_path)
+  ; main_function = Function_builder.create main_function_name
   }
 ;;
 
@@ -510,12 +527,10 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       | Some Umber_function -> Label_name.of_mir_name name, Umber, Extern_proc
       | None -> Label_name.of_mir_name name, Umber, Other
     in
-    let fun_builder =
-      Function_builder.move_values_for_call fun_builder ~call_conv ~args
-    in
+    Function_builder.move_values_for_call fun_builder ~call_conv ~args;
     Function_builder.add_code fun_builder (Call (Global (name, global_kind)));
     let output_register = Call_conv.return_value_reg call_conv in
-    Hashtbl.set fun_builder.register_states ~key:output_register ~data:Used;
+    Function_builder.set_register_state fun_builder output_register Used;
     Register output_register
   | Name _ | Let (_, _, _) | Make_block _ | Get_block_field (_, _) | Cond_assign _ ->
     failwith "TODO: missing mir expr kinds"
@@ -559,12 +574,45 @@ let codegen_runtime_required_functions t =
     ~fun_builder:t.main_function
 ;;
 
+let main_function_name ~(module_path : Module_path.Absolute.t) =
+  Label_name.of_string [%string "umber_main#%{module_path#Module_path}"]
+;;
+
 let of_mir ~module_path mir =
-  let t = create ~module_path in
+  let t = create ~main_function_name:(main_function_name ~module_path) in
   List.iter mir ~f:(codegen_stmt t);
   codegen_runtime_required_functions t;
   Function_builder.add_code t.main_function Ret;
   t
+;;
+
+(* TODO: Move this utility somewhere better. *)
+let with_tempfile ~prefix ~suffix ~f =
+  let tempfile = Filename_unix.temp_file prefix suffix in
+  protect ~f:(fun () -> f tempfile) ~finally:(fun () -> Sys_unix.remove tempfile)
+;;
+
+let compile_to_object_file t ~output_file =
+  with_tempfile ~prefix:"umber" ~suffix:".asm" ~f:(fun tempfile ->
+    Out_channel.with_file tempfile ~f:(fun out ->
+      pp (Format.formatter_of_out_channel out) t);
+    Shell.run "nasm" [ "-felf64"; tempfile; "-o"; output_file ])
+;;
+
+let compile_entry_module ~module_paths ~entry_file =
+  let t = create ~main_function_name:(Label_name.of_string "main") in
+  let umber_gc_init = Label_name.of_string "umber_gc_init" in
+  Hashtbl.add_exn
+    t.externs
+    ~key:(Label_name.to_mir_name umber_gc_init)
+    ~data:(C_function umber_gc_init);
+  Function_builder.add_code t.main_function (Call (Global (umber_gc_init, Extern_proc)));
+  List.iter module_paths ~f:(fun module_path ->
+    let fun_name = main_function_name ~module_path in
+    Hashtbl.add_exn t.externs ~key:(Label_name.to_mir_name fun_name) ~data:Umber_function;
+    Function_builder.add_code t.main_function (Call (Global (fun_name, Extern_proc))));
+  Function_builder.add_code t.main_function Ret;
+  compile_to_object_file t ~output_file:entry_file
 ;;
 
 let%expect_test "hello world" =
@@ -641,7 +689,7 @@ let%expect_test "hello world, from MIR" =
   [%expect
     {|
                default   rel
-               global    main
+               global    umber_main#HelloWorld
                global    HelloWorld.#binding.1
                global    umber_apply2
                global    string.210886959:weak
@@ -649,7 +697,7 @@ let%expect_test "hello world, from MIR" =
                extern    umber_print_endline
 
                section   .text
-    main:
+    umber_main#HelloWorld:
                mov       rdi, string.210886959
                call      umber_print_endline wrt ..plt
                mov       qword [HelloWorld.#binding.1], rax

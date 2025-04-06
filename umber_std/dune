@@ -2,7 +2,7 @@
  (section
   (site
    (umber stdlib)))
- (files prelude_names.sexp prelude_llvm.ll))
+ (files prelude_names.sexp prelude_llvm.ll prelude_asm.asm))
 
 (rule
  (target prelude_names.sexp)
@@ -32,3 +32,17 @@
     -parent
     Std
     -llvm))))
+
+(rule
+ (target prelude_asm.asm)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    %{dep:../umberboot.exe}
+    compile
+    %{dep:Std/Prelude.um}
+    -no-std
+    -parent
+    Std
+    -asm))))
