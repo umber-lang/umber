@@ -141,16 +141,21 @@ module Global_kind = struct
     | Other
 end
 
-module Arg = struct
+module Value = struct
   type t =
     | Register of Register.t
-    | Memory of Size.t * t
+    | Memory of Size.t * memory_expr
     | Global of Label_name.t * Global_kind.t
+    | Constant of Asm_literal.t
+
+  and memory_expr =
+    | Value of t
+    | Add of memory_expr * memory_expr
 
   let rec pp fmt t =
     match t with
     | Register reg -> Register.pp fmt reg
-    | Memory (size, t) ->
+    | Memory (size, memory_expr) ->
       Format.pp_print_string
         fmt
         (match size with
@@ -159,7 +164,7 @@ module Arg = struct
          | I32 -> "dword"
          | I64 -> "qword");
       Format.pp_print_string fmt " [";
-      pp fmt t;
+      pp_memory_expr fmt memory_expr;
       Format.pp_print_string fmt "]"
     | Global (name, kind) ->
       (match kind with
@@ -167,20 +172,31 @@ module Arg = struct
          (* "wrt ..plt" is needed for PIE (Position Independent Executables). *)
          Format.fprintf fmt !"%{Label_name} wrt ..plt" name
        | Other -> Format.fprintf fmt !"%{Label_name}" name)
+    | Constant literal -> Asm_literal.pp fmt literal
+
+  and pp_memory_expr fmt memory_expr =
+    match memory_expr with
+    | Value t -> pp fmt t
+    | Add (lhs, rhs) ->
+      pp_memory_expr fmt lhs;
+      Format.pp_print_string fmt " + ";
+      pp_memory_expr fmt rhs
   ;;
+
+  let mem_offset value size i = Memory (size, Add (Value value, Value (Constant (Int i))))
 end
 
 module Instr = struct
   type t =
     | Mov of
-        { dst : Arg.t
-        ; src : Arg.t
+        { dst : Value.t
+        ; src : Value.t
         }
     | Lea of
-        { dst : Arg.t
-        ; src : Arg.t
+        { dst : Value.t
+        ; src : Value.t
         }
-    | Call of Arg.t
+    | Call of Value.t
     | Ret
   [@@deriving variants]
 
@@ -191,7 +207,7 @@ module Instr = struct
     | Ret -> []
   ;;
 
-  let pp fmt t = pp_line fmt (String.lowercase (Variants.to_name t)) (args t) ~f:Arg.pp
+  let pp fmt t = pp_line fmt (String.lowercase (Variants.to_name t)) (args t) ~f:Value.pp
 end
 
 module Instr_group = struct
@@ -337,8 +353,10 @@ module Function_builder : sig
   val add_code : t -> Instr.t -> unit
 
   (* TODO: Consider if this API makes any sense *)
-  val move_values_for_call : t -> call_conv:Call_conv.t -> args:Arg.t Nonempty.t -> unit
+  val move_values_for_call : t -> call_conv:Call_conv.t -> args:Value.t Nonempty.t -> unit
   val set_register_state : t -> Register.t -> Register_state.t -> unit
+  val add_local : t -> Mir_name.t -> Value.t -> Call_conv.t -> unit
+  val find_local : t -> Mir_name.t -> (Value.t * Call_conv.t) option
   val name : t -> Label_name.t
   val instr_groups : t -> Instr_group.t list
 end = struct
@@ -346,12 +364,14 @@ end = struct
      register. *)
   type t =
     { register_states : Register_state.t Register.Table.t
+    ; locals : (Value.t * Call_conv.t) Mir_name.Table.t
     ; code : (Label_name.t * Instr.t Queue.t) Queue.t
     ; mutable current_group : int
     }
 
   let create fun_name =
     { register_states = Register.Table.create ()
+    ; locals = Mir_name.Table.create ()
     ; code = Queue.singleton (fun_name, Queue.create ())
     ; current_group = 0
     }
@@ -360,7 +380,13 @@ end = struct
   let add_code t instr = Queue.enqueue (snd (Queue.get t.code t.current_group)) instr
   let set_register_state t reg state = Hashtbl.set t.register_states ~key:reg ~data:state
 
-  let move_values_for_call t ~call_conv ~(args : Arg.t Nonempty.t) =
+  let add_local t name arg call_conv =
+    Hashtbl.add_exn t.locals ~key:name ~data:(arg, call_conv)
+  ;;
+
+  let find_local t name = Hashtbl.find t.locals name
+
+  let move_values_for_call t ~call_conv ~(args : Value.t Nonempty.t) =
     (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
        the current and target register states. Be careful about ordering - we need to be
        careful not to clobber any of the args, so we can't just be like "for each arg,
@@ -379,7 +405,7 @@ end = struct
 
        Also need to handle spilling onto the stack (and having values on the stack)
        if we run out of registers
-       - we might need a bit more extra info than Arg.t has e.g. what stack slock a
+       - we might need a bit more extra info than Value.t has e.g. what stack slock a
        variable is at 
        
        A different approach would be to *force* each of the subsequent generation functions
@@ -401,7 +427,8 @@ end = struct
           if not (Register.equal current_reg target_reg)
           then failwith "TODO: different regs"
           else add_code t (Mov { src = Register current_reg; dst = Register target_reg })
-        | Global _ as src -> add_code t (Mov { src; dst = Register target_reg })
+        | (Global _ | Constant _) as src ->
+          add_code t (Mov { src; dst = Register target_reg })
         | Memory _ -> failwith "TODO: memory arg location")
     in
     match result with
@@ -499,7 +526,68 @@ let create ~main_function_name =
   }
 ;;
 
-let codegen_literal t (literal : Literal.t) : Arg.t =
+let codegen_constant_tag tag : Value.t =
+  (* Put the int63 into an int64 and make the bottom bit 1. *)
+  Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1))
+;;
+
+let declare_extern_c_function ?mir_name t label_name =
+  let mir_name =
+    match mir_name with
+    | Some mir_name -> mir_name
+    | None -> Label_name.to_mir_name label_name
+  in
+  ignore
+    (Hashtbl.add t.externs ~key:mir_name ~data:(C_function label_name)
+      : [ `Ok | `Duplicate ])
+;;
+
+let lookup_name t name ~fun_builder : Value.t * Call_conv.t =
+  match Function_builder.find_local fun_builder name with
+  | Some result -> result
+  | None ->
+    (match Hashtbl.find t.externs name with
+     | Some (C_function name) -> Global (name, Extern_proc), C
+     | Some Umber_function -> Global (Label_name.of_mir_name name, Extern_proc), Umber
+     | None -> Global (Label_name.of_mir_name name, Other), Umber)
+;;
+
+let codegen_fun_call t fun_name args ~fun_builder : Value.t =
+  let fun_, call_conv = lookup_name t fun_name ~fun_builder in
+  Function_builder.move_values_for_call fun_builder ~call_conv ~args;
+  Function_builder.add_code fun_builder (Call fun_);
+  let output_register = Call_conv.return_value_reg call_conv in
+  Function_builder.set_register_state fun_builder output_register Used;
+  Register output_register
+;;
+
+let box t ~tag ~fields ~fun_builder =
+  let block_field_num = Nonempty.length fields in
+  let heap_pointer =
+    let allocation_size = 8 * (block_field_num + 1) in
+    let extern_name = Label_name.of_string "umber_gc_alloc" in
+    let mir_name = Label_name.to_mir_name extern_name in
+    declare_extern_c_function t ~mir_name extern_name;
+    codegen_fun_call t mir_name [ Constant (Int allocation_size) ] ~fun_builder
+  in
+  Function_builder.add_code
+    fun_builder
+    (Mov
+       { dst = Memory (I16, Value heap_pointer)
+       ; src = Constant (Int (Cnstr_tag.to_int tag))
+       });
+  Function_builder.add_code
+    fun_builder
+    (Mov
+       { dst = Value.mem_offset heap_pointer I16 2; src = Constant (Int block_field_num) });
+  Nonempty.iteri fields ~f:(fun i field_value ->
+    Function_builder.add_code
+      fun_builder
+      (Mov { dst = Value.mem_offset heap_pointer I64 (i + 1); src = field_value }));
+  heap_pointer
+;;
+
+let codegen_literal t (literal : Literal.t) : Value.t =
   let name =
     Hashtbl.find_or_add t.literals literal ~default:(fun () ->
       let name =
@@ -517,23 +605,26 @@ let codegen_literal t (literal : Literal.t) : Arg.t =
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
   match expr with
   | Primitive literal -> codegen_literal t literal
-  | Fun_call (name, args) ->
+  | Name name ->
+    let arg, (_ : Call_conv.t) = lookup_name t name ~fun_builder in
+    arg
+  | Let (name, expr, body) ->
+    let expr = codegen_expr t expr ~fun_builder in
+    Function_builder.add_local fun_builder name expr Umber;
+    codegen_expr t body ~fun_builder
+  | Fun_call (fun_name, args) ->
     (* TODO: Maybe we could do something cleverer like suggest a good place to put the
        expression value (to reduce the need for moves) *)
     let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) in
-    let name, (call_conv : Call_conv.t), (global_kind : Global_kind.t) =
-      match Hashtbl.find t.externs name with
-      | Some (C_function name) -> name, C, Extern_proc
-      | Some Umber_function -> Label_name.of_mir_name name, Umber, Extern_proc
-      | None -> Label_name.of_mir_name name, Umber, Other
-    in
-    Function_builder.move_values_for_call fun_builder ~call_conv ~args;
-    Function_builder.add_code fun_builder (Call (Global (name, global_kind)));
-    let output_register = Call_conv.return_value_reg call_conv in
-    Function_builder.set_register_state fun_builder output_register Used;
-    Register output_register
-  | Name _ | Let (_, _, _) | Make_block _ | Get_block_field (_, _) | Cond_assign _ ->
-    failwith "TODO: missing mir expr kinds"
+    codegen_fun_call t fun_name args ~fun_builder
+  | Make_block { tag; fields } ->
+    (match Nonempty.of_list fields with
+     | None -> codegen_constant_tag tag
+     | Some fields ->
+       let fields = Nonempty.map fields ~f:(codegen_expr t ~fun_builder) in
+       box t ~tag ~fields ~fun_builder)
+  | Get_block_field (_, _) | Cond_assign _ ->
+    failwithf !"TODO: missing mir expr kinds: %{sexp: Mir.Expr.t}" expr ()
 ;;
 
 let set_global t global expr ~fun_builder =
@@ -541,7 +632,7 @@ let set_global t global expr ~fun_builder =
   let expr_location = codegen_expr t expr ~fun_builder in
   Function_builder.add_code
     fun_builder
-    (Mov { dst = Memory (I64, Global (global, Other)); src = expr_location })
+    (Mov { dst = Memory (I64, Value (Global (global, Other))); src = expr_location })
 ;;
 
 (* FIXME: cleanup *)
@@ -557,10 +648,7 @@ let codegen_stmt t stmt =
     Hashtbl.add_exn t.externs ~key:name ~data:Umber_function
   | Extern_decl { name; extern_name; arity = _ } ->
     (* TODO: Do we even need arity anymore? Also applies to [Fun_decl] above. *)
-    Hashtbl.add_exn
-      t.externs
-      ~key:name
-      ~data:(C_function (Label_name.of_extern_name extern_name))
+    declare_extern_c_function t ~mir_name:name (Label_name.of_extern_name extern_name)
 ;;
 
 (* FIXME: Decide what to do with this *)
@@ -602,10 +690,7 @@ let compile_to_object_file t ~output_file =
 let compile_entry_module ~module_paths ~entry_file =
   let t = create ~main_function_name:(Label_name.of_string "main") in
   let umber_gc_init = Label_name.of_string "umber_gc_init" in
-  Hashtbl.add_exn
-    t.externs
-    ~key:(Label_name.to_mir_name umber_gc_init)
-    ~data:(C_function umber_gc_init);
+  declare_extern_c_function t umber_gc_init;
   Function_builder.add_code t.main_function (Call (Global (umber_gc_init, Extern_proc)));
   List.iter module_paths ~f:(fun module_path ->
     let fun_name = main_function_name ~module_path in
@@ -624,7 +709,8 @@ let%expect_test "hello world" =
           ; instrs =
               [ Lea
                   { dst = Register Rdi
-                  ; src = Memory (I64, Global (Label_name.of_string "message", Other))
+                  ; src =
+                      Memory (I64, Value (Global (Label_name.of_string "message", Other)))
                   }
               ; Call (Global (Label_name.of_string "puts", Extern_proc))
               ; Ret
