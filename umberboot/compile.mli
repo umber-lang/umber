@@ -10,6 +10,7 @@ module Stage : sig
     | Type_checking
     | Generating_mir
     | Generating_llvm
+    | Generating_asm
     | Linking
   [@@deriving compare, variants, sexp]
 end
@@ -25,6 +26,7 @@ module Target : sig
     | Names
     | Mir
     | Llvm
+    | Asm
     | Exe
   [@@deriving compare, variants, sexp]
 end

@@ -1,13 +1,9 @@
-(* FIXME: cleanup *)
-(* open Import *)
+open! Import
+open Names
 
 type t
 
-(* val of_mir
-  :  module_path:Module_path.Absolute.t
-  -> source_filename:Filename.t
-  -> Mir.t
-  -> (t, Compilation_error.t) result *)
+val of_mir : module_path:Module_path.Absolute.t -> Mir.t -> t
 
 (* val compile_to_object_and_dispose : t -> output_file:Filename.t -> unit
 

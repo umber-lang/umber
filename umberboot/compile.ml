@@ -9,6 +9,7 @@ module Stage = struct
       | Type_checking
       | Generating_mir
       | Generating_llvm
+      | Generating_asm
       | Linking
     [@@deriving compare, variants, sexp]
   end
@@ -27,6 +28,7 @@ module Target = struct
       | Names
       | Mir
       | Llvm
+      | Asm
       | Exe
     [@@deriving compare, variants, sexp]
   end
@@ -40,6 +42,7 @@ module Target = struct
     | Typed_ast | Type_annotated_code | Names -> Type_checking
     | Mir -> Generating_mir
     | Llvm -> Generating_llvm
+    | Asm -> Generating_asm
     | Exe -> Linking
   ;;
 end
@@ -109,6 +112,7 @@ end = struct
     and names = flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
     and mir = flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
     and llvm = flag "llvm" no_arg ~doc:"Print LLVM IR"
+    and asm = flag "asm" no_arg ~doc:"Print x86-64 assembly"
     and exe_filename =
       flag
         "exe"
@@ -127,6 +131,7 @@ end = struct
       ~names:(add names)
       ~mir:(add mir)
       ~llvm:(add llvm)
+      ~asm:(add asm)
       ~exe:(fun t variant ->
       match exe_filename with
       | Some exe_filename -> add_target t variant.constructor (File exe_filename)
@@ -243,7 +248,13 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
            in
            maybe_output Llvm ~f:(fun out ->
              fprintf out "%s\n" (Codegen.to_string codegen));
-           module_path, codegen))
+           module_path, mir, codegen))
+      ~generating_asm:
+        (run_stage ~f:(fun (module_path, mir, llvm_codegen) ->
+           let asm = Asm_codegen.of_mir ~module_path mir in
+           maybe_output Asm ~f:(fun out ->
+             Asm_codegen.pp (Stdlib.Format.formatter_of_out_channel out) asm);
+           Ok (module_path, llvm_codegen)))
       ~linking:
         (run_stage ~f:(fun (module_path, codegen) ->
            match Output.find_target output Exe with

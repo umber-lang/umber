@@ -97,6 +97,9 @@ let test ~in_file =
       | Parsing | Type_checking -> ast_file
       | Generating_mir -> mir_file
       | Generating_llvm -> llvm_file
+      | Generating_asm ->
+        (* TODO: Tests for asm? *)
+        "/dev/null"
       | Linking -> output_file
     in
     Out_channel.with_file file ~f:(fun out ->

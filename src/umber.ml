@@ -1,3 +1,4 @@
+module Asm_codegen = Asm_codegen
 module Ast = Ast
 module Auto_format = Auto_format
 module Codegen = Codegen

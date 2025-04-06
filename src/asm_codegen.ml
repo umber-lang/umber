@@ -469,14 +469,16 @@ let to_program { bss_globals; externs; literals; main_function; name_table = _ }
 
 let pp fmt t = Program.pp fmt (to_program t)
 
-let create () =
+let main_function_name ~(module_path : Module_path.Absolute.t) =
+  Label_name.of_string [%string "umber_main$%{module_path#Module_path}"]
+;;
+
+let create ~module_path =
   { name_table = Mir_name.Name_table.create ()
   ; bss_globals = Queue.create ()
   ; externs = Mir_name.Table.create ()
   ; literals = Literal.Table.create ()
-  ; main_function =
-      (* FIXME: Use umber_main and make up a unique name *)
-      Function_builder.create (Label_name.of_string "main")
+  ; main_function = Function_builder.create (main_function_name ~module_path)
   }
 ;;
 
@@ -557,8 +559,8 @@ let codegen_runtime_required_functions t =
     ~fun_builder:t.main_function
 ;;
 
-let of_mir mir =
-  let t = create () in
+let of_mir ~module_path mir =
+  let t = create ~module_path in
   List.iter mir ~f:(codegen_stmt t);
   codegen_runtime_required_functions t;
   Function_builder.add_code t.main_function Ret;
@@ -631,7 +633,11 @@ let%expect_test "hello world, from MIR" =
         )
     ]
   in
-  Program.pp Format.std_formatter (to_program (of_mir hello_world));
+  let module_path =
+    Module_path.Absolute.of_relative_unchecked
+      (Module_path.Relative.of_ustrings_exn [ Ustring.of_string_exn "HelloWorld" ])
+  in
+  Program.pp Format.std_formatter (to_program (of_mir ~module_path hello_world));
   [%expect
     {|
                default   rel
