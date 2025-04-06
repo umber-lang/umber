@@ -23,6 +23,33 @@ open Names
    Maybe I could try doing the coroutine thing and see if it works?
 *)
 
+(* TODO: Validation/sanitization of label names
+   - Symbols
+   - Unicode
+   - $ for reserved words
+   - Starting with $
+   - Colons
+   - periods
+
+   This is a sad mess :(. Might be best to append a hash and replace any fishy character
+   with an underscore
+*)
+module Label_name : sig
+  type t
+
+  include Stringable.S with type t := t
+
+  val of_mir_name : Mir_name.t -> t
+  val of_extern_name : Extern_name.t -> t
+end = struct
+  type t = string
+
+  let of_string = Fn.id
+  let to_string = Fn.id
+  let of_mir_name = Mir_name.to_string >> of_string
+  let of_extern_name = Extern_name.to_string >> of_string
+end
+
 let pp_args fmt args ~f =
   Format.pp_print_list ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ") f fmt args
 ;;
@@ -33,20 +60,36 @@ let pp_line fmt opcode args ~f =
   Format.pp_print_newline fmt ()
 ;;
 
-let pp_line_one_arg fmt opcode arg = pp_line fmt opcode [ arg ] ~f:Format.pp_print_string
-let pp_label fmt label = Format.fprintf fmt "%s:\n" label
+let pp_label fmt label = Format.fprintf fmt !"%{Label_name}:\n" label
 
-(* TODO: Nasm surely doesn't support exactly the same literals as OCaml, but this assumes
-   they're the same. *)
-module Literal = struct
-  include Literal
+module Asm_literal = struct
+  type t =
+    | Int of int
+    | Float of float
+    | String of Ustring.t
+
+  let pp_string_escaped fmt s =
+    Format.pp_print_char fmt '`';
+    Ustring.iter s ~f:(fun uchar ->
+      match Uchar.to_char uchar with
+      | Some c ->
+        (match c with
+         | '\\' -> Format.pp_print_string fmt "\\\\"
+         | '\000' .. '\031' | '\127' ->
+           (* Use a one-byte escape. *)
+           Format.fprintf fmt "\\x%x" (Char.to_int c)
+         | _ -> Format.pp_print_char fmt c)
+      | None ->
+        (* Use a UTF-8 escape. *)
+        Format.fprintf fmt !"\\u%x" (Uchar.to_int uchar));
+    Format.pp_print_char fmt '`'
+  ;;
 
   let pp fmt t =
     match t with
-    | String s -> String.pp fmt (Ustring.to_string s)
-    | Char c -> String.pp fmt (Uchar.to_string c)
-    | Int i -> Int.pp fmt i
-    | Float x -> Float.pp fmt x
+    | String s -> pp_string_escaped fmt s
+    | Int i -> Format.fprintf fmt "%d" i
+    | Float x -> Format.fprintf fmt "%f" x
   ;;
 end
 
@@ -82,9 +125,9 @@ module Arg = struct
   type t =
     | Register of Register.t
     | Memory of memory
-    | Global of string
+    | Global of Label_name.t
 
-  and memory = Rel_label of string
+  and memory = Rel_label of Label_name.t
 
   let rec pp fmt t =
     match t with
@@ -96,13 +139,13 @@ module Arg = struct
     | Global name ->
       (* TODO: I think this might only work for procedures, not other things *)
       (* "wrt ..plt" is needed for PIE (Position Independent Executables). *)
-      Format.fprintf fmt "%s wrt ..plt" name
+      Format.fprintf fmt !"%{Label_name} wrt ..plt" name
 
   and pp_memory fmt mem =
     match mem with
     | Rel_label name ->
       (* TODO: We could set default rel globally instead of having to do it every time. *)
-      Format.fprintf fmt "rel %s" name
+      Format.fprintf fmt !"rel %{Label_name}" name
   ;;
 end
 
@@ -132,7 +175,7 @@ end
 
 module Instr_group = struct
   type t =
-    { label : string
+    { label : Label_name.t
     ; instrs : Instr.t list
     }
 
@@ -143,25 +186,36 @@ module Instr_group = struct
 end
 
 module Data_decl = struct
+  module Kind = struct
+    type t =
+      | I8
+      | I16
+      | I32
+      | I64
+  end
+
   type t =
-    { label : string
-    ; kind : [ `Bytes ]
-    ; payload : Literal.t list
+    { label : Label_name.t
+    ; payloads : (Kind.t * Asm_literal.t) list
     }
 
-  let pp fmt { label; kind; payload } =
+  let pp fmt { label; payloads } =
     pp_label fmt label;
-    let kind =
-      match kind with
-      | `Bytes -> "db"
-    in
-    pp_line fmt kind payload ~f:Literal.pp
+    List.iter payloads ~f:(fun (kind, payload) ->
+      let kind =
+        match kind with
+        | I8 -> "db"
+        | I16 -> "dw"
+        | I32 -> "dd"
+        | I64 -> "dq"
+      in
+      pp_line fmt kind [ payload ] ~f:Asm_literal.pp)
   ;;
 end
 
 module Bss_decl = struct
   type t =
-    { label : string
+    { label : Label_name.t
     ; kind : [ `Words ]
     ; size : int
     }
@@ -170,7 +224,7 @@ module Bss_decl = struct
     pp_label fmt label;
     let kind =
       match kind with
-      | `Words -> "resw"
+      | `Words -> "resq"
     in
     pp_line fmt kind [ size ] ~f:Int.pp
   ;;
@@ -178,7 +232,7 @@ end
 
 module Global_decl = struct
   type t =
-    { name : string
+    { name : Label_name.t
     ; strength : [ `Weak | `Strong ]
         (** [strength] determines whether this global will be deduplicated with globals from
         other files. [`Strong] is the default. We use [`Weak] for literal constants. *)
@@ -186,35 +240,38 @@ module Global_decl = struct
 
   let pp fmt { name; strength } =
     match strength with
-    | `Strong -> Format.pp_print_string fmt name
-    | `Weak -> Format.fprintf fmt "%s:weak" name
+    | `Strong -> Format.fprintf fmt !"%{Label_name}" name
+    | `Weak -> Format.fprintf fmt !"%{Label_name}:weak" name
   ;;
 end
 
 module Program = struct
   type t =
     { globals : Global_decl.t list
-    ; externs : string list
+    ; externs : Label_name.t list
     ; text_section : Instr_group.t list
     ; rodata_section : Data_decl.t list
     ; bss_section : Bss_decl.t list
     }
 
-  let pp_section fmt name contents ~f =
+  let pp_section fmt name contents ~align ~f =
     if not (List.is_empty contents)
     then (
       pp_line fmt "section" [ name ] ~f:(fun fmt -> Format.fprintf fmt ".%s");
+      Option.iter align ~f:(fun align -> pp_line fmt "sectalign" [ align ] ~f:Int.pp);
       List.iter contents ~f:(f fmt);
       Format.pp_print_newline fmt ())
   ;;
 
   let pp fmt { globals; externs; text_section; rodata_section; bss_section } =
+    pp_line fmt "default" [ "rel" ] ~f:Format.pp_print_string;
     List.iter globals ~f:(fun global -> pp_line fmt "global" [ global ] ~f:Global_decl.pp);
-    List.iter externs ~f:(fun name -> pp_line_one_arg fmt "extern" name);
+    List.iter externs ~f:(fun name ->
+      pp_line fmt "extern" [ Label_name.to_string name ] ~f:Format.pp_print_string);
     Format.pp_print_newline fmt ();
-    pp_section fmt "text" text_section ~f:Instr_group.pp;
-    pp_section fmt "rodata" rodata_section ~f:Data_decl.pp;
-    pp_section fmt "bss" bss_section ~f:Bss_decl.pp
+    pp_section fmt "text" text_section ~align:None ~f:Instr_group.pp;
+    pp_section fmt "rodata" rodata_section ~align:(Some 8) ~f:Data_decl.pp;
+    pp_section fmt "bss" bss_section ~align:(Some 8) ~f:Bss_decl.pp
   ;;
 end
 
@@ -248,7 +305,7 @@ end
 
 module Extern = struct
   type t =
-    | C_function of Extern_name.t
+    | C_function of Label_name.t
     | Umber_function
 end
 
@@ -263,10 +320,18 @@ module Function_builder = struct
      register. *)
   type t =
     { register_states : Register_state.t Register.Table.t
-    ; code : Instr.t Queue.t
+    ; code : (Label_name.t * Instr.t Queue.t) Queue.t
+    ; mutable current_group : int
     }
 
-  let create () = { register_states = Register.Table.create (); code = Queue.create () }
+  let create fun_name =
+    { register_states = Register.Table.create ()
+    ; code = Queue.singleton (fun_name, Queue.create ())
+    ; current_group = 0
+    }
+  ;;
+
+  let add_code t instr = Queue.enqueue (snd (Queue.get t.code t.current_group)) instr
 
   let move_values_for_call t ~call_conv ~(args : Arg.t Nonempty.t) =
     (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
@@ -308,11 +373,8 @@ module Function_builder = struct
         | Register current_reg ->
           if not (Register.equal current_reg target_reg)
           then failwith "TODO: different regs"
-          else
-            Queue.enqueue
-              t.code
-              (Mov { src = Register current_reg; dst = Register target_reg })
-        | Global _ as src -> Queue.enqueue t.code (Mov { src; dst = Register target_reg })
+          else add_code t (Mov { src = Register current_reg; dst = Register target_reg })
+        | Global _ as src -> add_code t (Mov { src; dst = Register target_reg })
         | Memory _ -> failwith "TODO: memory arg location")
     in
     (match result with
@@ -321,41 +383,77 @@ module Function_builder = struct
     t
   ;;
 
-  (* FIXME: Remember to reverse when outputting code *)
+  let instr_groups t =
+    Queue.to_list t.code
+    |> List.map ~f:(fun (label, instrs) : Instr_group.t ->
+         { label; instrs = Queue.to_list instrs })
+  ;;
 end
 
 type t =
   { (* FIXME: name_table is unused *)
     name_table : Mir_name.Name_table.t
-  ; globals : Mir_name.t Queue.t
+  ; bss_globals : Label_name.t Queue.t
   ; externs : Extern.t Mir_name.Table.t
-  ; literals : Mir_name.t Literal.Table.t
+  ; literals : Label_name.t Literal.Table.t
   ; main_function : Function_builder.t
   }
 
-let constant_block = ()
+let constant_block ~tag ~len ~data_kind data : (Data_decl.Kind.t * Asm_literal.t) list =
+  [ I16, Int (Cnstr_tag.to_int tag)
+  ; I16, Int len
+  ; I32, Int 0 (* padding *)
+  ; data_kind, data
+  ]
+;;
 
-let to_program { globals; externs; literals; main_function = _; name_table = _ }
+let constant_block_for_literal (literal : Literal.t) =
+  match literal with
+  | Int i -> constant_block ~tag:Cnstr_tag.int ~len:1 ~data_kind:I64 (Int i)
+  | Float x -> constant_block ~tag:Cnstr_tag.float ~len:1 ~data_kind:I64 (Float x)
+  | Char c ->
+    (* TODO: We could just store Chars as immediate values, they are guaranteed to fit *)
+    constant_block ~tag:Cnstr_tag.char ~len:1 ~data_kind:I8 (String (Ustring.of_uchar c))
+  | String s ->
+    let s = Ustring.to_string s in
+    let n_chars = String.length s in
+    let n_words = (n_chars / 8) + 1 in
+    let padded_s =
+      String.init (n_words * 8) ~f:(fun char_index ->
+        if char_index < n_chars
+        then s.[char_index]
+        else if char_index = (n_words * 8) - 1
+        then (* Last byte *) Char.of_int_exn (7 - (n_chars % 8))
+        else (* Padding null prefix of last word *) Char.of_int_exn 0)
+    in
+    constant_block
+      ~tag:Cnstr_tag.string
+      ~len:n_words
+      ~data_kind:I8
+      (String (Ustring.of_string_exn padded_s))
+;;
+
+let to_program { bss_globals; externs; literals; main_function; name_table = _ }
   : Program.t
   =
-  let uninitialized_globals = List.map (Queue.to_list globals) ~f:Mir_name.to_string in
+  let uninitialized_globals = Queue.to_list bss_globals in
   let literals = Hashtbl.to_alist literals in
   { globals =
-      List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
-        { name; strength = `Strong })
-      @ List.map literals ~f:(fun ((_ : Literal.t), mir_name) : Global_decl.t ->
-          { name = Mir_name.to_string mir_name; strength = `Weak })
+      { name = Label_name.of_string "main"; strength = `Strong }
+      :: (List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
+            { name; strength = `Strong })
+          @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
+              { name; strength = `Weak }))
   ; externs =
       Hashtbl.to_alist externs
       |> List.map ~f:(fun (mir_name, extern) ->
            match extern with
-           | C_function extern_name -> Extern_name.to_string extern_name
-           | Umber_function -> Mir_name.to_string mir_name)
-  ; text_section = []
+           | C_function name -> name
+           | Umber_function -> Label_name.of_mir_name mir_name)
+  ; text_section = Function_builder.instr_groups main_function
   ; rodata_section =
-      List.map literals ~f:(fun (literal, mir_name) : Data_decl.t ->
-        (* FIXME: Need a block here *)
-        { label = Mir_name.to_string mir_name; kind = `Bytes; payload = [ literal ] })
+      List.map literals ~f:(fun (literal, label) : Data_decl.t ->
+        { label; payloads = constant_block_for_literal literal })
   ; bss_section =
       List.map uninitialized_globals ~f:(fun name : Bss_decl.t ->
         { label = name; kind = `Words; size = 1 })
@@ -366,10 +464,12 @@ let pp fmt t = Program.pp fmt (to_program t)
 
 let create () =
   { name_table = Mir_name.Name_table.create ()
-  ; globals = Queue.create ()
+  ; bss_globals = Queue.create ()
   ; externs = Mir_name.Table.create ()
   ; literals = Literal.Table.create ()
-  ; main_function = Function_builder.create ()
+  ; main_function =
+      (* FIXME: Use umber_main and make up a unique name *)
+      Function_builder.create (Label_name.of_string "main")
   }
 ;;
 
@@ -383,11 +483,9 @@ let codegen_literal t (literal : Literal.t) : Arg.t =
         | String s -> sprintf "string.%d" (Ustring.hash s)
         | Char c -> sprintf "char.%d" (Uchar.to_int c)
       in
-      Mir_name.create_exportable_name
-        (Value_name.Absolute.of_relative_unchecked
-           (Value_name.Relative.of_ustrings_unchecked ([], Ustring.of_string_exn name))))
+      Label_name.of_string name)
   in
-  Global (Mir_name.to_string name)
+  Global name
 ;;
 
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
@@ -399,13 +497,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) in
     let name, (call_conv : Call_conv.t) =
       match Hashtbl.find_exn t.externs name with
-      | C_function extern_name -> Extern_name.to_string extern_name, C
-      | Umber_function -> Mir_name.to_string name, Umber
+      | C_function name -> name, C
+      | Umber_function -> Label_name.of_mir_name name, Umber
     in
     let fun_builder =
       Function_builder.move_values_for_call fun_builder ~call_conv ~args
     in
-    Queue.enqueue fun_builder.code (Call (Global name));
+    Function_builder.add_code fun_builder (Call (Global name));
     let output_register = Call_conv.return_value_reg call_conv in
     Hashtbl.set fun_builder.register_states ~key:output_register ~data:Used;
     Register output_register
@@ -414,10 +512,11 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
 ;;
 
 let set_global t global expr ~fun_builder =
+  Queue.enqueue t.bss_globals global;
   let expr_location = codegen_expr t expr ~fun_builder in
-  Queue.enqueue
-    fun_builder.code
-    (Mov { dst = Memory (Rel_label (Mir_name.to_string global)); src = expr_location })
+  Function_builder.add_code
+    fun_builder
+    (Mov { dst = Memory (Rel_label global); src = expr_location })
 ;;
 
 (* FIXME: cleanup *)
@@ -425,8 +524,7 @@ let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
     (* TODO: values *)
-    Queue.enqueue t.globals name;
-    set_global t name expr ~fun_builder:t.main_function
+    set_global t (Label_name.of_mir_name name) expr ~fun_builder:t.main_function
   | Fun_def { fun_name = _; args = _; body = _ } ->
     (* TODO: functions definitions *)
     ()
@@ -435,32 +533,50 @@ let codegen_stmt t stmt =
     ()
   | Extern_decl { name; extern_name; arity = _ } ->
     (* TODO: Do we even need arity anymore? *)
-    Hashtbl.add_exn t.externs ~key:name ~data:(C_function extern_name)
+    Hashtbl.add_exn
+      t.externs
+      ~key:name
+      ~data:(C_function (Label_name.of_extern_name extern_name))
+;;
+
+(* FIXME: Decide what to do with this *)
+let codegen_runtime_required_functions t =
+  (* Ensure that functions the runtime needs are codegened. See closure.rs in the runtime. *)
+  (* codegen_umber_apply_fun t ~n_args:2 *)
+  set_global
+    t
+    (Label_name.of_string "umber_apply2")
+    (Primitive (Int 0))
+    ~fun_builder:t.main_function
 ;;
 
 let of_mir mir =
   let t = create () in
   List.iter mir ~f:(codegen_stmt t);
+  codegen_runtime_required_functions t;
+  Function_builder.add_code t.main_function Ret;
   t
 ;;
 
 let%expect_test "hello world" =
   let hello_world : Program.t =
-    { globals = [ { name = "main"; strength = `Strong } ]
-    ; externs = [ "puts" ]
+    { globals = [ { name = Label_name.of_string "main"; strength = `Strong } ]
+    ; externs = [ Label_name.of_string "puts" ]
     ; text_section =
-        [ { label = "main"
+        [ { label = Label_name.of_string "main"
           ; instrs =
-              [ Lea { dst = Register Rdi; src = Memory (Rel_label "message") }
-              ; Call (Global "puts")
+              [ Lea
+                  { dst = Register Rdi
+                  ; src = Memory (Rel_label (Label_name.of_string "message"))
+                  }
+              ; Call (Global (Label_name.of_string "puts"))
               ; Ret
               ]
           }
         ]
     ; rodata_section =
-        [ { label = "message"
-          ; kind = `Bytes
-          ; payload = [ String (Ustring.of_string_exn "Hello, world!"); Int 10 ]
+        [ { label = Label_name.of_string "message"
+          ; payloads = [ I8, String (Ustring.of_string_exn "Hello, world!"); I8, Int 10 ]
           }
         ]
     ; bss_section = []
@@ -469,6 +585,7 @@ let%expect_test "hello world" =
   Program.pp Format.std_formatter hello_world;
   [%expect
     {|
+               default   rel
                global    main
                extern    puts
 
@@ -479,8 +596,10 @@ let%expect_test "hello world" =
                ret
 
                section   .rodata
+               sectalign 8
     message:
-               db        "Hello, world!", 10 |}]
+               db        `Hello, world!`
+               db        10 |}]
 ;;
 
 let%expect_test "hello world, from MIR" =
@@ -499,23 +618,48 @@ let%expect_test "hello world, from MIR" =
     ; Value_def
         ( Mir_name.create_value_name
             name_table
-            (Value_name.Absolute.of_string "HelloWorld.*binding")
+            (Value_name.Absolute.of_string "HelloWorld.#binding")
         , Fun_call
             (print_name, [ Primitive (String (Ustring.of_string_exn "Hello, world!")) ])
         )
     ]
   in
   Program.pp Format.std_formatter (to_program (of_mir hello_world));
-  [%expect {|
-               global    HelloWorld.*binding.1
+  [%expect
+    {|
+               default   rel
+               global    main
+               global    HelloWorld.#binding.1
+               global    umber_apply2
                global    string.210886959:weak
+               global    int.0:weak
                extern    umber_print_endline
 
+               section   .text
+    main:
+               mov       rdi, string.210886959 wrt ..plt
+               call      umber_print_endline wrt ..plt
+               mov       [rel HelloWorld.#binding.1], rax
+               mov       [rel umber_apply2], int.0 wrt ..plt
+               ret
+
                section   .rodata
+               sectalign 8
     string.210886959:
-               db        "Hello, world!"
+               dw        32772
+               dw        2
+               dd        0
+               db        `Hello, world!\x0\x0\x2`
+    int.0:
+               dw        32769
+               dw        1
+               dd        0
+               dq        0
 
                section   .bss
-    HelloWorld.*binding.1:
-               resw      1 |}]
+               sectalign 8
+    HelloWorld.#binding.1:
+               resq      1
+    umber_apply2:
+               resq      1 |}]
 ;;
