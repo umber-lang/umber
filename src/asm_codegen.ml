@@ -62,6 +62,14 @@ let pp_line fmt opcode args ~f =
 
 let pp_label fmt label = Format.fprintf fmt !"%{Label_name}:\n" label
 
+module Size = struct
+  type t =
+    | I8
+    | I16
+    | I32
+    | I64
+end
+
 module Asm_literal = struct
   type t =
     | Int of int
@@ -121,31 +129,38 @@ module Register = struct
   let pp fmt t = Format.pp_print_string fmt (String.lowercase (Variants.to_name t))
 end
 
+module Global_kind = struct
+  type t =
+    | Extern_proc
+    | Other
+end
+
 module Arg = struct
   type t =
     | Register of Register.t
-    | Memory of memory
-    | Global of Label_name.t
-
-  and memory = Rel_label of Label_name.t
+    | Memory of Size.t * t
+    | Global of Label_name.t * Global_kind.t
 
   let rec pp fmt t =
     match t with
     | Register reg -> Register.pp fmt reg
-    | Memory mem ->
-      Format.pp_print_string fmt "[";
-      pp_memory fmt mem;
+    | Memory (size, t) ->
+      Format.pp_print_string
+        fmt
+        (match size with
+         | I8 -> "byte"
+         | I16 -> "word"
+         | I32 -> "dword"
+         | I64 -> "qword");
+      Format.pp_print_string fmt " [";
+      pp fmt t;
       Format.pp_print_string fmt "]"
-    | Global name ->
-      (* TODO: I think this might only work for procedures, not other things *)
-      (* "wrt ..plt" is needed for PIE (Position Independent Executables). *)
-      Format.fprintf fmt !"%{Label_name} wrt ..plt" name
-
-  and pp_memory fmt mem =
-    match mem with
-    | Rel_label name ->
-      (* TODO: We could set default rel globally instead of having to do it every time. *)
-      Format.fprintf fmt !"rel %{Label_name}" name
+    | Global (name, kind) ->
+      (match kind with
+       | Extern_proc ->
+         (* "wrt ..plt" is needed for PIE (Position Independent Executables). *)
+         Format.fprintf fmt !"%{Label_name} wrt ..plt" name
+       | Other -> Format.fprintf fmt !"%{Label_name}" name)
   ;;
 end
 
@@ -186,17 +201,9 @@ module Instr_group = struct
 end
 
 module Data_decl = struct
-  module Kind = struct
-    type t =
-      | I8
-      | I16
-      | I32
-      | I64
-  end
-
   type t =
     { label : Label_name.t
-    ; payloads : (Kind.t * Asm_literal.t) list
+    ; payloads : (Size.t * Asm_literal.t) list
     }
 
   let pp fmt { label; payloads } =
@@ -399,7 +406,7 @@ type t =
   ; main_function : Function_builder.t
   }
 
-let constant_block ~tag ~len ~data_kind data : (Data_decl.Kind.t * Asm_literal.t) list =
+let constant_block ~tag ~len ~data_kind data : (Size.t * Asm_literal.t) list =
   [ I16, Int (Cnstr_tag.to_int tag)
   ; I16, Int len
   ; I32, Int 0 (* padding *)
@@ -485,7 +492,7 @@ let codegen_literal t (literal : Literal.t) : Arg.t =
       in
       Label_name.of_string name)
   in
-  Global name
+  Global (name, Other)
 ;;
 
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
@@ -495,15 +502,16 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     (* TODO: Maybe we could do something cleverer like suggest a good place to put the
        expression value (to reduce the need for moves) *)
     let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) in
-    let name, (call_conv : Call_conv.t) =
-      match Hashtbl.find_exn t.externs name with
-      | C_function name -> name, C
-      | Umber_function -> Label_name.of_mir_name name, Umber
+    let name, (call_conv : Call_conv.t), (global_kind : Global_kind.t) =
+      match Hashtbl.find t.externs name with
+      | Some (C_function name) -> name, C, Extern_proc
+      | Some Umber_function -> Label_name.of_mir_name name, Umber, Extern_proc
+      | None -> Label_name.of_mir_name name, Umber, Other
     in
     let fun_builder =
       Function_builder.move_values_for_call fun_builder ~call_conv ~args
     in
-    Function_builder.add_code fun_builder (Call (Global name));
+    Function_builder.add_code fun_builder (Call (Global (name, global_kind)));
     let output_register = Call_conv.return_value_reg call_conv in
     Hashtbl.set fun_builder.register_states ~key:output_register ~data:Used;
     Register output_register
@@ -516,7 +524,7 @@ let set_global t global expr ~fun_builder =
   let expr_location = codegen_expr t expr ~fun_builder in
   Function_builder.add_code
     fun_builder
-    (Mov { dst = Memory (Rel_label global); src = expr_location })
+    (Mov { dst = Memory (I64, Global (global, Other)); src = expr_location })
 ;;
 
 (* FIXME: cleanup *)
@@ -528,11 +536,10 @@ let codegen_stmt t stmt =
   | Fun_def { fun_name = _; args = _; body = _ } ->
     (* TODO: functions definitions *)
     ()
-  | Fun_decl _ ->
-    (* TODO: functions declarations *)
-    ()
+  | Fun_decl { name; arity = _ } ->
+    Hashtbl.add_exn t.externs ~key:name ~data:Umber_function
   | Extern_decl { name; extern_name; arity = _ } ->
-    (* TODO: Do we even need arity anymore? *)
+    (* TODO: Do we even need arity anymore? Also applies to [Fun_decl] above. *)
     Hashtbl.add_exn
       t.externs
       ~key:name
@@ -567,9 +574,9 @@ let%expect_test "hello world" =
           ; instrs =
               [ Lea
                   { dst = Register Rdi
-                  ; src = Memory (Rel_label (Label_name.of_string "message"))
+                  ; src = Memory (I64, Global (Label_name.of_string "message", Other))
                   }
-              ; Call (Global (Label_name.of_string "puts"))
+              ; Call (Global (Label_name.of_string "puts", Extern_proc))
               ; Ret
               ]
           }
@@ -591,7 +598,7 @@ let%expect_test "hello world" =
 
                section   .text
     main:
-               lea       rdi, [rel message]
+               lea       rdi, qword [message]
                call      puts wrt ..plt
                ret
 
@@ -637,10 +644,10 @@ let%expect_test "hello world, from MIR" =
 
                section   .text
     main:
-               mov       rdi, string.210886959 wrt ..plt
+               mov       rdi, string.210886959
                call      umber_print_endline wrt ..plt
-               mov       [rel HelloWorld.#binding.1], rax
-               mov       [rel umber_apply2], int.0 wrt ..plt
+               mov       qword [HelloWorld.#binding.1], rax
+               mov       qword [umber_apply2], int.0
                ret
 
                section   .rodata
