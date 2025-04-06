@@ -6,13 +6,13 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_header = type { i16, i16, i32 }
 %umber_block16b = type { %umber_header, [16 x i8] }
 
-@"HelloWorld.*binding.1" = global %umber_block* null
+@"HelloWorld.#binding.1" = global %umber_block* null
 @string.578489388 = linkonce_odr constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"Hello world!\00\00\00\03" }
 
 define i32 @"umber_main:HelloWorld"() {
 entry:
   %fun_call = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block16b* @string.578489388 to %umber_block*))
-  store %umber_block* %fun_call, %umber_block** @"HelloWorld.*binding.1", align 8
+  store %umber_block* %fun_call, %umber_block** @"HelloWorld.#binding.1", align 8
   ret i32 0
 }
 

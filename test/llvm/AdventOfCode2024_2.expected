@@ -13,7 +13,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @AdventOfCode2024_2.Report.Increasing = constant %umber_block* inttoptr (i64 1 to %umber_block*)
 @AdventOfCode2024_2.Report.Decreasing = constant %umber_block* inttoptr (i64 3 to %umber_block*)
 @Std.Prelude.Option.None = external global %umber_block*
-@"AdventOfCode2024_2.*binding.2" = global %umber_block* null
+@"AdventOfCode2024_2.#binding.2" = global %umber_block* null
 @Std.Prelude.List.Nil = external global %umber_block*
 @"char. " = linkonce_odr constant %umber_block1 { %umber_header { i16 -32766, i16 1, i32 0 }, [1 x i64] [i64 32] }
 @int.1 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 1] }
@@ -43,7 +43,7 @@ entry:
   %fun_call12 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call10, %umber_block* %fun_call11)
   %fun_call13 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.0 to %umber_block*))
   %fun_call14 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call12, %umber_block* %fun_call13)
-  store %umber_block* %fun_call14, %umber_block** @"AdventOfCode2024_2.*binding.2", align 8
+  store %umber_block* %fun_call14, %umber_block** @"AdventOfCode2024_2.#binding.2", align 8
   ret i32 0
 }
 
@@ -68,12 +68,12 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.>="(%umber_block*, %umber_b
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.<="(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @AdventOfCode2024_2.Report.level_pair_is_safe(%umber_block* %"AdventOfCode2024_2.Report.*lambda_arg.1", %umber_block* %AdventOfCode2024_2.Report.dir.1) {
+define tailcc %umber_block* @AdventOfCode2024_2.Report.level_pair_is_safe(%umber_block* %"AdventOfCode2024_2.Report.#lambda_arg.1", %umber_block* %AdventOfCode2024_2.Report.dir.1) {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_2.Report.*lambda_arg.1", i32 0, i32 1, i32 0
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_2.Report.#lambda_arg.1", i32 0, i32 1, i32 0
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_2.Report.*lambda_arg.1", i32 0, i32 1, i32 1
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_2.Report.#lambda_arg.1", i32 0, i32 1, i32 1
   %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
   br label %cond

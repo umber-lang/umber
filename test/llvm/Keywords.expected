@@ -17,7 +17,7 @@ entry:
   ret i32 0
 }
 
-define tailcc %umber_block* @"Keywords.let's_go"(%umber_block* %"Keywords.*lambda_arg.1") {
+define tailcc %umber_block* @"Keywords.let's_go"(%umber_block* %"Keywords.#lambda_arg.1") {
 entry:
   %fun_call = tail call %umber_block* @umber_apply1(%umber_block* bitcast (%umber_block* (%umber_block*)* @"Keywords.let's_go" to %umber_block*), %umber_block* inttoptr (i64 1 to %umber_block*))
   ret %umber_block* %fun_call

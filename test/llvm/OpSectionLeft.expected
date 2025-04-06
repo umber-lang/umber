@@ -8,7 +8,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block16b = type { %umber_header, [16 x i8] }
 %umber_block8b = type { %umber_header, [8 x i8] }
 
-@"OpSectionLeft.*binding.1" = global %umber_block* null
+@"OpSectionLeft.#binding.1" = global %umber_block* null
 @string.885266753 = linkonce_odr constant %umber_block24b { %umber_header { i16 -32764, i16 3, i32 0 }, [24 x i8] c" is mid. I prefer \00\00\00\00\00\05" }
 @string.631358830 = linkonce_odr constant %umber_block16b { %umber_header { i16 -32764, i16 2, i32 0 }, [16 x i8] c"called apply\00\00\00\03" }
 @string.738315706 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"lasagna\00" }
@@ -21,7 +21,7 @@ entry:
   %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.76039754 to %umber_block*))
   %fun_call2 = tail call %umber_block* @umber_apply1(%umber_block* %fun_call, %umber_block* bitcast (%umber_block8b* @string.483149063 to %umber_block*))
   %fun_call3 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call1, %umber_block* %fun_call2)
-  store %umber_block* %fun_call3, %umber_block** @"OpSectionLeft.*binding.1", align 8
+  store %umber_block* %fun_call3, %umber_block** @"OpSectionLeft.#binding.1", align 8
   ret i32 0
 }
 
@@ -39,15 +39,15 @@ entry:
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"OpSectionLeft.*fun.1"(%umber_block* %"OpSectionLeft.*closure_env.1", %umber_block* %"OpSectionLeft.*arg1.1") {
+define tailcc %umber_block* @"OpSectionLeft.#fun.1"(%umber_block* %"OpSectionLeft.#closure_env.1", %umber_block* %"OpSectionLeft.#arg1.1") {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"OpSectionLeft.*closure_env.1", i32 0, i32 1, i32 2
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"OpSectionLeft.#closure_env.1", i32 0, i32 1, i32 2
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"OpSectionLeft.*closure_env.1", i32 0, i32 1, i32 1
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"OpSectionLeft.#closure_env.1", i32 0, i32 1, i32 1
   %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
-  %fun_call = tail call %umber_block* @umber_apply2(%umber_block* %block_field3, %umber_block* %block_field, %umber_block* %"OpSectionLeft.*arg1.1")
+  %fun_call = tail call %umber_block* @umber_apply2(%umber_block* %block_field3, %umber_block* %block_field, %umber_block* %"OpSectionLeft.#arg1.1")
   ret %umber_block* %fun_call
 }
 
@@ -62,7 +62,7 @@ entry:
   store i16 3, i16* %box3, align 2
   %box4 = bitcast i64* %box to %umber_block**
   %box5 = getelementptr %umber_block*, %umber_block** %box4, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"OpSectionLeft.*fun.1" to %umber_block*), %umber_block** %box5, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"OpSectionLeft.#fun.1" to %umber_block*), %umber_block** %box5, align 8
   %box6 = getelementptr %umber_block*, %umber_block** %box4, i32 2
   store %umber_block* %OpSectionLeft.f.1, %umber_block** %box6, align 8
   %box7 = getelementptr %umber_block*, %umber_block** %box4, i32 3

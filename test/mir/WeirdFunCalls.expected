@@ -1,5 +1,5 @@
 ((Fun_decl ((name Std.Prelude.print) (arity 1)))
- (Value_def WeirdFunCalls.*binding.1
+ (Value_def WeirdFunCalls.#binding.1
   (Fun_call Std.Prelude.print ((Primitive (String let)))))
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_def
@@ -9,20 +9,20 @@
      ((Fun_call Std.Prelude.print ((Name WeirdFunCalls.msg.1)))
       (Fun_call Std.Prelude.print ((Name WeirdFunCalls.msg.1))))))))
  (Value_def WeirdFunCalls.if_
-  (Let WeirdFunCalls.*fun.1
+  (Let WeirdFunCalls.#fun.1
    (Cond_assign (conds (((Constant_tag_equals (Make_block (tag 1)) 1) ())))
     (body (Name WeirdFunCalls.print_twice))
     (if_none_matched (Otherwise (Name Std.Prelude.print))))
-   (Fun_call WeirdFunCalls.*fun.1 ((Primitive (String if))))))
- (Value_def WeirdFunCalls.*binding.2
+   (Fun_call WeirdFunCalls.#fun.1 ((Primitive (String if))))))
+ (Value_def WeirdFunCalls.#binding.2
   (Fun_call Std.Prelude.print ((Primitive (String plain)))))
  (Fun_def
-  ((fun_name WeirdFunCalls.*fun.2) (args (WeirdFunCalls.*lambda_arg.2))
+  ((fun_name WeirdFunCalls.#fun.2) (args (WeirdFunCalls.#lambda_arg.2))
    (body (Fun_call Std.Prelude.print ((Primitive (String "fun call")))))))
  (Fun_def
-  ((fun_name WeirdFunCalls.fun_call) (args (WeirdFunCalls.*lambda_arg.1))
-   (body (Name WeirdFunCalls.*fun.2))))
- (Value_def WeirdFunCalls.*binding.3
-  (Let WeirdFunCalls.*fun.3
+  ((fun_name WeirdFunCalls.fun_call) (args (WeirdFunCalls.#lambda_arg.1))
+   (body (Name WeirdFunCalls.#fun.2))))
+ (Value_def WeirdFunCalls.#binding.3
+  (Let WeirdFunCalls.#fun.3
    (Fun_call WeirdFunCalls.fun_call ((Make_block (tag 0))))
-   (Fun_call WeirdFunCalls.*fun.3 ((Make_block (tag 0)))))))
+   (Fun_call WeirdFunCalls.#fun.3 ((Make_block (tag 0)))))))

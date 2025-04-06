@@ -31,15 +31,15 @@
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
  (Fun_def
-  ((fun_name AsPattern.*fun.1) (args (AsPattern.a.2 AsPattern.b.2))
+  ((fun_name AsPattern.#fun.1) (args (AsPattern.a.2 AsPattern.b.2))
    (body
     (Fun_call Std.Prelude.print
      ((Fun_call Std.Prelude.Operators.++
        ((Name AsPattern.a.2) (Name AsPattern.b.2))))))))
  (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
- (Value_def AsPattern.*binding.1
+ (Value_def AsPattern.#binding.1
   (Fun_call AsPattern.iter_pairs
-   ((Name AsPattern.*fun.1)
+   ((Name AsPattern.#fun.1)
     (Make_block (tag 0)
      (fields
       ((Primitive (String foo))

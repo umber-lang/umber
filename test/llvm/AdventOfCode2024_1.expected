@@ -10,7 +10,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 
 @Std.Prelude.List.Nil = external global %umber_block*
 @AdventOfCode2024_1.input = global %umber_block* null
-@"AdventOfCode2024_1.*binding.3" = global %umber_block* null
+@"AdventOfCode2024_1.#binding.3" = global %umber_block* null
 @int.17113 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 17113] }
 @int.23229 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 23229] }
 @int.55260 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 55260] }
@@ -23671,7 +23671,7 @@ entry:
   %fun_call14008 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call14004, %umber_block* %fun_call14007)
   %fun_call14009 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* bitcast (%umber_block8b* @string.0 to %umber_block*))
   %fun_call14010 = tail call tailcc %umber_block* @"Std.Prelude.Operators.;"(%umber_block* %fun_call14008, %umber_block* %fun_call14009)
-  store %umber_block* %fun_call14010, %umber_block** @"AdventOfCode2024_1.*binding.3", align 8
+  store %umber_block* %fun_call14010, %umber_block** @"AdventOfCode2024_1.#binding.3", align 8
   ret i32 0
 }
 
@@ -23697,12 +23697,12 @@ declare tailcc %umber_block* @Std.Prelude.Int.abs(%umber_block*)
 
 declare tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"AdventOfCode2024_1.*fun.1"(%umber_block* %"AdventOfCode2024_1.*lambda_arg.1") {
+define tailcc %umber_block* @"AdventOfCode2024_1.#fun.1"(%umber_block* %"AdventOfCode2024_1.#lambda_arg.1") {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.*lambda_arg.1", i32 0, i32 1, i32 0
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.#lambda_arg.1", i32 0, i32 1, i32 0
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.*lambda_arg.1", i32 0, i32 1, i32 1
+  %block_field_gep1 = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.#lambda_arg.1", i32 0, i32 1, i32 1
   %block_field_raw2 = load i64, i64* %block_field_gep1, align 8
   %block_field3 = inttoptr i64 %block_field_raw2 to %umber_block*
   %fun_call = tail call tailcc %umber_block* @Std.Prelude.Operators.-(%umber_block* %block_field, %umber_block* %block_field3)
@@ -23722,7 +23722,7 @@ entry:
   %fun_call4 = tail call tailcc %umber_block* @Std.Prelude.List.sort(%umber_block* %block_field)
   %fun_call5 = tail call tailcc %umber_block* @Std.Prelude.List.sort(%umber_block* %block_field3)
   %fun_call6 = tail call tailcc %umber_block* @Std.Prelude.List.zip_shortest(%umber_block* %fun_call4, %umber_block* %fun_call5)
-  %fun_call7 = tail call tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %fun_call6, %umber_block* bitcast (%umber_block* (%umber_block*)* @"AdventOfCode2024_1.*fun.1" to %umber_block*))
+  %fun_call7 = tail call tailcc %umber_block* @Std.Prelude.List.map(%umber_block* %fun_call6, %umber_block* bitcast (%umber_block* (%umber_block*)* @"AdventOfCode2024_1.#fun.1" to %umber_block*))
   %fun_call8 = tail call tailcc %umber_block* @AdventOfCode2024_1.sum(%umber_block* %fun_call7)
   ret %umber_block* %fun_call8
 }
@@ -23733,18 +23733,18 @@ declare tailcc %umber_block* @Std.Prelude.List.count(%umber_block*, %umber_block
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"AdventOfCode2024_1.*fun.2"(%umber_block* %"AdventOfCode2024_1.*closure_env.1", %umber_block* %"AdventOfCode2024_1.*arg0.1") {
+define tailcc %umber_block* @"AdventOfCode2024_1.#fun.2"(%umber_block* %"AdventOfCode2024_1.#closure_env.1", %umber_block* %"AdventOfCode2024_1.#arg0.1") {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.*closure_env.1", i32 0, i32 1, i32 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.#closure_env.1", i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* %"AdventOfCode2024_1.*arg0.1", %umber_block* %block_field)
+  %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block* %"AdventOfCode2024_1.#arg0.1", %umber_block* %block_field)
   ret %umber_block* %fun_call
 }
 
-define tailcc %umber_block* @"AdventOfCode2024_1.*fun.3"(%umber_block* %"AdventOfCode2024_1.*closure_env.2", %umber_block* %AdventOfCode2024_1.acc.1, %umber_block* %AdventOfCode2024_1.x.2) {
+define tailcc %umber_block* @"AdventOfCode2024_1.#fun.3"(%umber_block* %"AdventOfCode2024_1.#closure_env.2", %umber_block* %AdventOfCode2024_1.acc.1, %umber_block* %AdventOfCode2024_1.x.2) {
 entry:
-  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.*closure_env.2", i32 0, i32 1, i32 1
+  %block_field_gep = getelementptr %umber_block, %umber_block* %"AdventOfCode2024_1.#closure_env.2", i32 0, i32 1, i32 1
   %block_field_raw = load i64, i64* %block_field_gep, align 8
   %block_field = inttoptr i64 %block_field_raw to %umber_block*
   %box = call i64* @umber_gc_alloc(i64 24)
@@ -23754,7 +23754,7 @@ entry:
   store i16 2, i16* %box2, align 2
   %box3 = bitcast i64* %box to %umber_block**
   %box4 = getelementptr %umber_block*, %umber_block** %box3, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"AdventOfCode2024_1.*fun.2" to %umber_block*), %umber_block** %box4, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"AdventOfCode2024_1.#fun.2" to %umber_block*), %umber_block** %box4, align 8
   %box5 = getelementptr %umber_block*, %umber_block** %box3, i32 2
   store %umber_block* %AdventOfCode2024_1.x.2, %umber_block** %box5, align 8
   %box6 = bitcast %umber_block** %box3 to %umber_block*
@@ -23780,7 +23780,7 @@ entry:
   store i16 2, i16* %box5, align 2
   %box6 = bitcast i64* %box to %umber_block**
   %box7 = getelementptr %umber_block*, %umber_block** %box6, i32 1
-  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*, %umber_block*)* @"AdventOfCode2024_1.*fun.3" to %umber_block*), %umber_block** %box7, align 8
+  store %umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*, %umber_block*)* @"AdventOfCode2024_1.#fun.3" to %umber_block*), %umber_block** %box7, align 8
   %box8 = getelementptr %umber_block*, %umber_block** %box6, i32 2
   store %umber_block* %block_field3, %umber_block** %box8, align 8
   %box9 = bitcast %umber_block** %box6 to %umber_block*

@@ -1,28 +1,28 @@
 ((Fun_decl ((name Std.Prelude.List.concat_map) (arity 2)))
  (Fun_decl ((name Std.Prelude.List.map) (arity 2)))
  (Fun_def
-  ((fun_name Operators.*fun.1)
-   (args (Operators.*closure_env.1 Operators.y.1))
+  ((fun_name Operators.#fun.1)
+   (args (Operators.#closure_env.1 Operators.y.1))
    (body
-    (Let Operators.x.2 (Get_block_field 1 (Name Operators.*closure_env.1))
+    (Let Operators.x.2 (Get_block_field 1 (Name Operators.#closure_env.1))
      (Make_block (tag 0)
       (fields ((Name Operators.x.2) (Name Operators.y.1))))))))
  (Fun_def
-  ((fun_name Operators.*fun.2)
-   (args (Operators.*closure_env.2 Operators.x.1))
+  ((fun_name Operators.#fun.2)
+   (args (Operators.#closure_env.2 Operators.x.1))
    (body
-    (Let Operators.ys.2 (Get_block_field 1 (Name Operators.*closure_env.2))
+    (Let Operators.ys.2 (Get_block_field 1 (Name Operators.#closure_env.2))
      (Fun_call Std.Prelude.List.map
       ((Name Operators.ys.2)
        (Make_block (tag 12289)
-        (fields ((Name Operators.*fun.1) (Name Operators.x.1))))))))))
+        (fields ((Name Operators.#fun.1) (Name Operators.x.1))))))))))
  (Fun_def
   ((fun_name "Operators.\195\151") (args (Operators.xs.1 Operators.ys.1))
    (body
     (Fun_call Std.Prelude.List.concat_map
      ((Name Operators.xs.1)
       (Make_block (tag 12289)
-       (fields ((Name Operators.*fun.2) (Name Operators.ys.1)))))))))
+       (fields ((Name Operators.#fun.2) (Name Operators.ys.1)))))))))
  (Fun_decl ((name Std.Prelude.Operators.::) (arity 2)))
  (Fun_decl ((name Std.Prelude.List.Nil) (arity 0)))
  (Value_def Operators.unicode_my_dudes
@@ -39,37 +39,37 @@
          ((Primitive (String maybe?)) (Name Std.Prelude.List.Nil))))))))))
  (Fun_def
   ((fun_name Operators.~~~)
-   (args (Operators.*lambda_arg.1 Operators.*lambda_arg.2))
+   (args (Operators.#lambda_arg.1 Operators.#lambda_arg.2))
    (body (Make_block (tag 0)))))
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
  (Fun_def
-  ((fun_name Operators.*fun.3) (args (Operators.*lambda_arg.3))
+  ((fun_name Operators.#fun.3) (args (Operators.#lambda_arg.3))
    (body
-    (Let Operators.x.3 (Get_block_field 0 (Name Operators.*lambda_arg.3))
-     (Let Operators.y.2 (Get_block_field 1 (Name Operators.*lambda_arg.3))
+    (Let Operators.x.3 (Get_block_field 0 (Name Operators.#lambda_arg.3))
+     (Let Operators.y.2 (Get_block_field 1 (Name Operators.#lambda_arg.3))
       (Fun_call "Std.Prelude.Operators.;"
        ((Fun_call Std.Prelude.print ((Name Operators.x.3)))
         (Fun_call Std.Prelude.print ((Name Operators.y.2))))))))))
  (Value_def Operators._.1
   (Fun_call Std.Prelude.List.map
-   ((Name Operators.unicode_my_dudes) (Name Operators.*fun.3))))
+   ((Name Operators.unicode_my_dudes) (Name Operators.#fun.3))))
  (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_def
-  ((fun_name Operators.*fun.4)
-   (args (Operators.*closure_env.3 Operators.*arg0.1))
+  ((fun_name Operators.#fun.4)
+   (args (Operators.#closure_env.3 Operators.#arg0.1))
    (body
-    (Let Operators.*arg1.2
-     (Get_block_field 1 (Name Operators.*closure_env.3))
+    (Let Operators.#arg1.2
+     (Get_block_field 1 (Name Operators.#closure_env.3))
      (Fun_call Std.Prelude.Operators.*
-      ((Name Operators.*arg0.1) (Name Operators.*arg1.2)))))))
+      ((Name Operators.#arg0.1) (Name Operators.#arg1.2)))))))
  (Value_def Operators.right_section.1
-  (Let Operators.*arg1.1 (Primitive (Int 5))
+  (Let Operators.#arg1.1 (Primitive (Int 5))
    (Make_block (tag 12289)
-    (fields ((Name Operators.*fun.4) (Name Operators.*arg1.1))))))
+    (fields ((Name Operators.#fun.4) (Name Operators.#arg1.1))))))
  (Fun_def
-  ((fun_name Operators.right_section) (args (Operators.*arg0.2))
-   (body (Fun_call Operators.right_section.1 ((Name Operators.*arg0.2))))))
+  ((fun_name Operators.right_section) (args (Operators.#arg0.2))
+   (body (Fun_call Operators.right_section.1 ((Name Operators.#arg0.2))))))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.mod) (arity 2)))
@@ -85,40 +85,40 @@
    ((Primitive (Int 2)) (Primitive (Int 2)))))
  (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
  (Fun_decl ((name Std.Prelude.Int.to_string) (arity 1)))
- (Value_def Operators.*binding.1
+ (Value_def Operators.#binding.1
   (Fun_call Std.Prelude.print
    ((Fun_call Std.Prelude.Operators.++
      ((Primitive (String "four = "))
       (Fun_call Std.Prelude.Int.to_string ((Name Operators.four))))))))
  (Fun_def
-  ((fun_name Operators.*fun.5)
-   (args (Operators.*closure_env.4 Operators.*arg1.3))
+  ((fun_name Operators.#fun.5)
+   (args (Operators.#closure_env.4 Operators.#arg1.3))
    (body
-    (Let Operators.*arg0.4
-     (Get_block_field 1 (Name Operators.*closure_env.4))
+    (Let Operators.#arg0.4
+     (Get_block_field 1 (Name Operators.#closure_env.4))
      (Fun_call Std.Prelude.Operators.+
-      ((Name Operators.*arg0.4) (Name Operators.*arg1.3)))))))
+      ((Name Operators.#arg0.4) (Name Operators.#arg1.3)))))))
  (Value_def Operators.left_section.1
-  (Let Operators.*arg0.3 (Primitive (Int 2))
+  (Let Operators.#arg0.3 (Primitive (Int 2))
    (Make_block (tag 12289)
-    (fields ((Name Operators.*fun.5) (Name Operators.*arg0.3))))))
+    (fields ((Name Operators.#fun.5) (Name Operators.#arg0.3))))))
  (Fun_def
-  ((fun_name Operators.left_section) (args (Operators.*arg0.5))
-   (body (Fun_call Operators.left_section.1 ((Name Operators.*arg0.5))))))
+  ((fun_name Operators.left_section) (args (Operators.#arg0.5))
+   (body (Fun_call Operators.left_section.1 ((Name Operators.#arg0.5))))))
  (Fun_decl ((name Std.Prelude.Operators..) (arity 3)))
  (Value_def Operators...1 (Name Std.Prelude.Operators..))
  (Fun_def
   ((fun_name Operators..)
-   (args (Operators.*arg0.6 Operators.*arg1.4 Operators.*arg2.1))
+   (args (Operators.#arg0.6 Operators.#arg1.4 Operators.#arg2.1))
    (body
     (Fun_call Operators...1
-     ((Name Operators.*arg0.6) (Name Operators.*arg1.4)
-      (Name Operators.*arg2.1))))))
+     ((Name Operators.#arg0.6) (Name Operators.#arg1.4)
+      (Name Operators.#arg2.1))))))
  (Value_def Operators.one
   (Fun_call Std.Prelude.Operators.mod
    ((Primitive (Int 5)) (Primitive (Int 2)))))
  (Fun_decl ((name Std.Prelude.Bool.to_string) (arity 1)))
- (Value_def Operators.*binding.2
+ (Value_def Operators.#binding.2
   (Fun_call Std.Prelude.print
    ((Fun_call Std.Prelude.Operators.++
      ((Primitive (String "true = "))

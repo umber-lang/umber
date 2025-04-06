@@ -11895,13 +11895,13 @@
  (Fun_decl ((name Std.Prelude.Int.abs) (arity 1)))
  (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_def
-  ((fun_name AdventOfCode2024_1.*fun.1)
-   (args (AdventOfCode2024_1.*lambda_arg.1))
+  ((fun_name AdventOfCode2024_1.#fun.1)
+   (args (AdventOfCode2024_1.#lambda_arg.1))
    (body
     (Let AdventOfCode2024_1.x.1
-     (Get_block_field 0 (Name AdventOfCode2024_1.*lambda_arg.1))
+     (Get_block_field 0 (Name AdventOfCode2024_1.#lambda_arg.1))
      (Let AdventOfCode2024_1.y.1
-      (Get_block_field 1 (Name AdventOfCode2024_1.*lambda_arg.1))
+      (Get_block_field 1 (Name AdventOfCode2024_1.#lambda_arg.1))
       (Fun_call Std.Prelude.Int.abs
        ((Fun_call Std.Prelude.Operators.-
          ((Name AdventOfCode2024_1.x.1) (Name AdventOfCode2024_1.y.1))))))))))
@@ -11909,12 +11909,12 @@
   ((fun_name AdventOfCode2024_1.solve_part_1)
    (args (AdventOfCode2024_1.input.1))
    (body
-    (Let AdventOfCode2024_1.*binding.1
+    (Let AdventOfCode2024_1.#binding.1
      (Fun_call Std.Prelude.List.unzip ((Name AdventOfCode2024_1.input.1)))
      (Let AdventOfCode2024_1.nums1.1
-      (Get_block_field 0 (Name AdventOfCode2024_1.*binding.1))
+      (Get_block_field 0 (Name AdventOfCode2024_1.#binding.1))
       (Let AdventOfCode2024_1.nums2.1
-       (Get_block_field 1 (Name AdventOfCode2024_1.*binding.1))
+       (Get_block_field 1 (Name AdventOfCode2024_1.#binding.1))
        (Let AdventOfCode2024_1.nums1.2
         (Fun_call Std.Prelude.List.sort ((Name AdventOfCode2024_1.nums1.1)))
         (Let AdventOfCode2024_1.nums2.2
@@ -11924,60 +11924,60 @@
            ((Fun_call Std.Prelude.List.zip_shortest
              ((Name AdventOfCode2024_1.nums1.2)
               (Name AdventOfCode2024_1.nums2.2)))
-            (Name AdventOfCode2024_1.*fun.1)))
+            (Name AdventOfCode2024_1.#fun.1)))
           (Fun_call AdventOfCode2024_1.sum
            ((Name AdventOfCode2024_1.distances.1))))))))))))
  (Fun_decl ((name Std.Prelude.Operators.*) (arity 2)))
  (Fun_decl ((name Std.Prelude.List.count) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Fun_def
-  ((fun_name AdventOfCode2024_1.*fun.2)
-   (args (AdventOfCode2024_1.*closure_env.1 AdventOfCode2024_1.*arg0.1))
+  ((fun_name AdventOfCode2024_1.#fun.2)
+   (args (AdventOfCode2024_1.#closure_env.1 AdventOfCode2024_1.#arg0.1))
    (body
-    (Let AdventOfCode2024_1.*arg1.2
-     (Get_block_field 1 (Name AdventOfCode2024_1.*closure_env.1))
+    (Let AdventOfCode2024_1.#arg1.2
+     (Get_block_field 1 (Name AdventOfCode2024_1.#closure_env.1))
      (Fun_call Std.Prelude.Operators.==
-      ((Name AdventOfCode2024_1.*arg0.1) (Name AdventOfCode2024_1.*arg1.2)))))))
+      ((Name AdventOfCode2024_1.#arg0.1) (Name AdventOfCode2024_1.#arg1.2)))))))
  (Fun_def
-  ((fun_name AdventOfCode2024_1.*fun.3)
+  ((fun_name AdventOfCode2024_1.#fun.3)
    (args
-    (AdventOfCode2024_1.*closure_env.2 AdventOfCode2024_1.acc.1
+    (AdventOfCode2024_1.#closure_env.2 AdventOfCode2024_1.acc.1
      AdventOfCode2024_1.x.2))
    (body
     (Let AdventOfCode2024_1.right_nums.2
-     (Get_block_field 1 (Name AdventOfCode2024_1.*closure_env.2))
+     (Get_block_field 1 (Name AdventOfCode2024_1.#closure_env.2))
      (Fun_call Std.Prelude.Operators.+
       ((Name AdventOfCode2024_1.acc.1)
        (Fun_call Std.Prelude.Operators.*
         ((Name AdventOfCode2024_1.x.2)
          (Fun_call Std.Prelude.List.count
           ((Name AdventOfCode2024_1.right_nums.2)
-           (Let AdventOfCode2024_1.*arg1.1 (Name AdventOfCode2024_1.x.2)
+           (Let AdventOfCode2024_1.#arg1.1 (Name AdventOfCode2024_1.x.2)
             (Make_block (tag 12289)
              (fields
-              ((Name AdventOfCode2024_1.*fun.2)
-               (Name AdventOfCode2024_1.*arg1.1)))))))))))))))
+              ((Name AdventOfCode2024_1.#fun.2)
+               (Name AdventOfCode2024_1.#arg1.1)))))))))))))))
  (Fun_def
   ((fun_name AdventOfCode2024_1.solve_part_2)
    (args (AdventOfCode2024_1.input.2))
    (body
-    (Let AdventOfCode2024_1.*binding.2
+    (Let AdventOfCode2024_1.#binding.2
      (Fun_call Std.Prelude.List.unzip ((Name AdventOfCode2024_1.input.2)))
      (Let AdventOfCode2024_1.left_nums.1
-      (Get_block_field 0 (Name AdventOfCode2024_1.*binding.2))
+      (Get_block_field 0 (Name AdventOfCode2024_1.#binding.2))
       (Let AdventOfCode2024_1.right_nums.1
-       (Get_block_field 1 (Name AdventOfCode2024_1.*binding.2))
+       (Get_block_field 1 (Name AdventOfCode2024_1.#binding.2))
        (Fun_call Std.Prelude.List.fold
         ((Name AdventOfCode2024_1.left_nums.1) (Primitive (Int 0))
          (Make_block (tag 12289)
           (fields
-           ((Name AdventOfCode2024_1.*fun.3)
+           ((Name AdventOfCode2024_1.#fun.3)
             (Name AdventOfCode2024_1.right_nums.1))))))))))))
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_decl ((name Std.Prelude.print_string) (arity 1)))
  (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
- (Value_def AdventOfCode2024_1.*binding.3
+ (Value_def AdventOfCode2024_1.#binding.3
   (Fun_call "Std.Prelude.Operators.;"
    ((Fun_call "Std.Prelude.Operators.;"
      ((Fun_call "Std.Prelude.Operators.;"

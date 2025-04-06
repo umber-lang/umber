@@ -10,27 +10,27 @@
         (Name OpSectionLeft.y.1))))))))
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_def
-  ((fun_name OpSectionLeft.*fun.1)
-   (args (OpSectionLeft.*closure_env.1 OpSectionLeft.*arg1.1))
+  ((fun_name OpSectionLeft.#fun.1)
+   (args (OpSectionLeft.#closure_env.1 OpSectionLeft.#arg1.1))
    (body
-    (Let OpSectionLeft.*arg0.2
-     (Get_block_field 2 (Name OpSectionLeft.*closure_env.1))
+    (Let OpSectionLeft.#arg0.2
+     (Get_block_field 2 (Name OpSectionLeft.#closure_env.1))
      (Let OpSectionLeft.f.2
-      (Get_block_field 1 (Name OpSectionLeft.*closure_env.1))
+      (Get_block_field 1 (Name OpSectionLeft.#closure_env.1))
       (Fun_call OpSectionLeft.f.2
-       ((Name OpSectionLeft.*arg0.2) (Name OpSectionLeft.*arg1.1))))))))
+       ((Name OpSectionLeft.#arg0.2) (Name OpSectionLeft.#arg1.1))))))))
  (Fun_def
   ((fun_name OpSectionLeft.apply) (args (OpSectionLeft.f.1))
    (body
-    (Let OpSectionLeft.*arg0.1
+    (Let OpSectionLeft.#arg0.1
      (Fun_call "Std.Prelude.Operators.;"
       ((Fun_call Std.Prelude.print ((Primitive (String "called apply"))))
        (Primitive (String lasagna))))
      (Make_block (tag 12289)
       (fields
-       ((Name OpSectionLeft.*fun.1) (Name OpSectionLeft.f.1)
-        (Name OpSectionLeft.*arg0.1))))))))
- (Value_def OpSectionLeft.*binding.1
+       ((Name OpSectionLeft.#fun.1) (Name OpSectionLeft.f.1)
+        (Name OpSectionLeft.#arg0.1))))))))
+ (Value_def OpSectionLeft.#binding.1
   (Let OpSectionLeft.g.1
    (Fun_call OpSectionLeft.apply ((Name OpSectionLeft.:/)))
    (Fun_call "Std.Prelude.Operators.;"

@@ -4,12 +4,12 @@
  (Fun_def
   ((fun_name TypeChecking.id_for_bools) (args (TypeChecking.x.2))
    (body (Fun_call TypeChecking.id ((Name TypeChecking.x.2))))))
- (Value_def TypeChecking.*binding.1
+ (Value_def TypeChecking.#binding.1
   (Make_block (tag 0) (fields ((Name TypeChecking.id) (Primitive (Int 5))))))
  (Value_def TypeChecking.id_alias
-  (Get_block_field 0 (Name TypeChecking.*binding.1)))
+  (Get_block_field 0 (Name TypeChecking.#binding.1)))
  (Value_def TypeChecking.five
-  (Get_block_field 1 (Name TypeChecking.*binding.1)))
+  (Get_block_field 1 (Name TypeChecking.#binding.1)))
  (Fun_def
   ((fun_name TypeChecking.if')
    (args (TypeChecking.then_.1 TypeChecking.else_.1 TypeChecking.cond.1))
@@ -21,17 +21,17 @@
       (Otherwise (Fun_call TypeChecking.else_.1 ((Make_block (tag 0))))))))))
  (Value_def TypeChecking.id_for_chars.1 (Name TypeChecking.id))
  (Fun_def
-  ((fun_name TypeChecking.id_for_chars) (args (TypeChecking.*arg0.1))
+  ((fun_name TypeChecking.id_for_chars) (args (TypeChecking.#arg0.1))
    (body
-    (Fun_call TypeChecking.id_for_chars.1 ((Name TypeChecking.*arg0.1))))))
+    (Fun_call TypeChecking.id_for_chars.1 ((Name TypeChecking.#arg0.1))))))
  (Fun_def
-  ((fun_name TypeChecking.*fun.1)
-   (args (TypeChecking.*closure_env.1 TypeChecking.match.1))
+  ((fun_name TypeChecking.#fun.1)
+   (args (TypeChecking.#closure_env.1 TypeChecking.match.1))
    (body
     (Let TypeChecking.then_.3
-     (Get_block_field 2 (Name TypeChecking.*closure_env.1))
+     (Get_block_field 2 (Name TypeChecking.#closure_env.1))
      (Let TypeChecking.else_.3
-      (Get_block_field 1 (Name TypeChecking.*closure_env.1))
+      (Get_block_field 1 (Name TypeChecking.#closure_env.1))
       (Cond_assign
        (conds (((Constant_tag_equals (Name TypeChecking.match.1) 1) ())))
        (body (Fun_call TypeChecking.then_.3 ((Make_block (tag 0)))))
@@ -43,7 +43,7 @@
    (body
     (Make_block (tag 12289)
      (fields
-      ((Name TypeChecking.*fun.1) (Name TypeChecking.else_.2)
+      ((Name TypeChecking.#fun.1) (Name TypeChecking.else_.2)
        (Name TypeChecking.then_.2)))))))
  (Fun_def
   ((fun_name TypeChecking.id_for_floats) (args (TypeChecking.x.3))

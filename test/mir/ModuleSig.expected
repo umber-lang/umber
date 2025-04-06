@@ -11,12 +11,12 @@
  (Fun_decl ((name Std.Prelude.Operators.<=) (arity 2)))
  (Fun_def
   ((fun_name ModuleSig.Range.elem)
-   (args (ModuleSig.Range.x.1 ModuleSig.Range.*lambda_arg.1))
+   (args (ModuleSig.Range.x.1 ModuleSig.Range.#lambda_arg.1))
    (body
     (Let ModuleSig.Range.lo.2
-     (Get_block_field 0 (Name ModuleSig.Range.*lambda_arg.1))
+     (Get_block_field 0 (Name ModuleSig.Range.#lambda_arg.1))
      (Let ModuleSig.Range.hi.2
-      (Get_block_field 1 (Name ModuleSig.Range.*lambda_arg.1))
+      (Get_block_field 1 (Name ModuleSig.Range.#lambda_arg.1))
       (Fun_call Std.Prelude.Operators.&&
        ((Fun_call Std.Prelude.Operators.<=
          ((Name ModuleSig.Range.lo.2) (Name ModuleSig.Range.x.1)))
@@ -28,14 +28,14 @@
  (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
  (Fun_decl ((name Std.Prelude.print_bool) (arity 1)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
- (Value_def ModuleSig.*binding.1
+ (Value_def ModuleSig.#binding.1
   (Fun_call "Std.Prelude.Operators.;"
    ((Fun_call Std.Prelude.print_bool ((Name ModuleSig.is_10_in_range)))
     (Fun_call Std.Prelude.print ((Primitive (String "")))))))
  (Value_def ModuleSig.Range...=.1 (Name ModuleSig.Range.between))
  (Fun_def
   ((fun_name ModuleSig.Range...=)
-   (args (ModuleSig.Range.*arg0.1 ModuleSig.Range.*arg1.1))
+   (args (ModuleSig.Range.#arg0.1 ModuleSig.Range.#arg1.1))
    (body
     (Fun_call ModuleSig.Range...=.1
-     ((Name ModuleSig.Range.*arg0.1) (Name ModuleSig.Range.*arg1.1)))))))
+     ((Name ModuleSig.Range.#arg0.1) (Name ModuleSig.Range.#arg1.1)))))))

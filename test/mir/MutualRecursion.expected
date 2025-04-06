@@ -1,10 +1,10 @@
 ((Value_def MutualRecursion.Leaf (Make_block (tag 0)))
  (Fun_def
   ((fun_name MutualRecursion.Node)
-   (args (MutualRecursion.*arg0.1 MutualRecursion.*arg1.1))
+   (args (MutualRecursion.#arg0.1 MutualRecursion.#arg1.1))
    (body
     (Make_block (tag 0)
-     (fields ((Name MutualRecursion.*arg0.1) (Name MutualRecursion.*arg1.1)))))))
+     (fields ((Name MutualRecursion.#arg0.1) (Name MutualRecursion.#arg1.1)))))))
  (Fun_decl ((name Std.Prelude.Operators.==) (arity 2)))
  (Fun_decl ((name Std.Prelude.Operators.-) (arity 2)))
  (Fun_def
@@ -85,7 +85,7 @@
            (Fun_call MutualRecursion.sum_forest
             ((Name MutualRecursion.forest.3)))))))))))))
  (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
- (Value_def MutualRecursion.*binding.1
+ (Value_def MutualRecursion.#binding.1
   (Let MutualRecursion.tree.2
    (Make_block (tag 0)
     (fields

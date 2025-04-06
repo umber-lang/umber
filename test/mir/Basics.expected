@@ -4,18 +4,18 @@
  (Value_def Basics.Yellow (Make_block (tag 1)))
  (Value_def Basics.Purple (Make_block (tag 2)))
  (Fun_def
-  ((fun_name Basics.Regular) (args (Basics.*arg0.1))
-   (body (Make_block (tag 0) (fields ((Name Basics.*arg0.1)))))))
+  ((fun_name Basics.Regular) (args (Basics.#arg0.1))
+   (body (Make_block (tag 0) (fields ((Name Basics.#arg0.1)))))))
  (Fun_def
-  ((fun_name Basics.Expanded) (args (Basics.*arg0.2))
-   (body (Make_block (tag 1) (fields ((Name Basics.*arg0.2)))))))
+  ((fun_name Basics.Expanded) (args (Basics.#arg0.2))
+   (body (Make_block (tag 1) (fields ((Name Basics.#arg0.2)))))))
  (Fun_def
   ((fun_name Basics.Point3)
-   (args (Basics.*arg0.3 Basics.*arg1.1 Basics.*arg2.1))
+   (args (Basics.#arg0.3 Basics.#arg1.1 Basics.#arg2.1))
    (body
     (Make_block (tag 0)
      (fields
-      ((Name Basics.*arg0.3) (Name Basics.*arg1.1) (Name Basics.*arg2.1)))))))
+      ((Name Basics.#arg0.3) (Name Basics.#arg1.1) (Name Basics.#arg2.1)))))))
  (Value_def Basics.false (Make_block (tag 0)))
  (Value_def Basics.true (Make_block (tag 1)))
  (Value_def Basics.xyz

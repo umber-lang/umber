@@ -1,8 +1,8 @@
-((Value_def Text.*binding.1
+((Value_def Text.#binding.1
   (Let Text.empty.1 (Primitive (String ""))
    (Make_block (tag 0) (fields ((Primitive (Char a)) (Primitive (Char b)))))))
- (Value_def Text.a (Get_block_field 0 (Name Text.*binding.1)))
- (Value_def Text.b (Get_block_field 1 (Name Text.*binding.1)))
+ (Value_def Text.a (Get_block_field 0 (Name Text.#binding.1)))
+ (Value_def Text.b (Get_block_field 1 (Name Text.#binding.1)))
  (Value_def Text._UNICODE_WORKS_TOO
   (Primitive
    (String "\227\130\184\227\130\167\227\131\188\227\131\160\227\130\186")))

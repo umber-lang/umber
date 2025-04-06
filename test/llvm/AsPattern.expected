@@ -11,7 +11,7 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @AsPattern.one = global %umber_block* null
 @AsPattern.two = global %umber_block* null
 @Std.Prelude.List.Nil = external global %umber_block*
-@"AsPattern.*binding.1" = global %umber_block* null
+@"AsPattern.#binding.1" = global %umber_block* null
 @int.1 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 1] }
 @int.2 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 2] }
 @string.763646369 = linkonce_odr constant %umber_block8b { %umber_header { i16 -32764, i16 1, i32 0 }, [8 x i8] c"foo\00\00\00\00\04" }
@@ -76,8 +76,8 @@ entry:
   %box30 = getelementptr %umber_block*, %umber_block** %box28, i32 2
   store %umber_block* %box24, %umber_block** %box30, align 8
   %box31 = bitcast %umber_block** %box28 to %umber_block*
-  %fun_call = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"AsPattern.*fun.1" to %umber_block*), %umber_block* %box31)
-  store %umber_block* %fun_call, %umber_block** @"AsPattern.*binding.1", align 8
+  %fun_call = tail call tailcc %umber_block* @AsPattern.iter_pairs(%umber_block* bitcast (%umber_block* (%umber_block*, %umber_block*)* @"AsPattern.#fun.1" to %umber_block*), %umber_block* %box31)
+  store %umber_block* %fun_call, %umber_block** @"AsPattern.#binding.1", align 8
   ret i32 0
 }
 
@@ -150,7 +150,7 @@ declare tailcc %umber_block* @Std.Prelude.print(%umber_block*)
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block*, %umber_block*)
 
-define tailcc %umber_block* @"AsPattern.*fun.1"(%umber_block* %AsPattern.a.2, %umber_block* %AsPattern.b.2) {
+define tailcc %umber_block* @"AsPattern.#fun.1"(%umber_block* %AsPattern.a.2, %umber_block* %AsPattern.b.2) {
 entry:
   %fun_call = tail call tailcc %umber_block* @"Std.Prelude.Operators.++"(%umber_block* %AsPattern.a.2, %umber_block* %AsPattern.b.2)
   %fun_call1 = tail call tailcc %umber_block* @Std.Prelude.print(%umber_block* %fun_call)

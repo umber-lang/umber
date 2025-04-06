@@ -20,12 +20,12 @@
  (Fun_def
   ((fun_name AdventOfCode2024_2.Report.level_pair_is_safe)
    (args
-    (AdventOfCode2024_2.Report.*lambda_arg.1 AdventOfCode2024_2.Report.dir.1))
+    (AdventOfCode2024_2.Report.#lambda_arg.1 AdventOfCode2024_2.Report.dir.1))
    (body
     (Let AdventOfCode2024_2.Report.a.1
-     (Get_block_field 0 (Name AdventOfCode2024_2.Report.*lambda_arg.1))
+     (Get_block_field 0 (Name AdventOfCode2024_2.Report.#lambda_arg.1))
      (Let AdventOfCode2024_2.Report.b.1
-      (Get_block_field 1 (Name AdventOfCode2024_2.Report.*lambda_arg.1))
+      (Get_block_field 1 (Name AdventOfCode2024_2.Report.#lambda_arg.1))
       (Let AdventOfCode2024_2.Report.positive_diff.1
        (Cond_assign
         (conds
@@ -236,14 +236,14 @@
  (Fun_decl ((name Std.Prelude.print_string) (arity 1)))
  (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
  (Fun_decl ((name Std.Prelude.print) (arity 1)))
- (Value_def AdventOfCode2024_2.*binding.2
-  (Let AdventOfCode2024_2.*binding.1
+ (Value_def AdventOfCode2024_2.#binding.2
+  (Let AdventOfCode2024_2.#binding.1
    (Fun_call AdventOfCode2024_2.loop.1
     ((Primitive (Int 0)) (Primitive (Int 0))))
    (Let AdventOfCode2024_2.count1.3
-    (Get_block_field 0 (Name AdventOfCode2024_2.*binding.1))
+    (Get_block_field 0 (Name AdventOfCode2024_2.#binding.1))
     (Let AdventOfCode2024_2.count2.3
-     (Get_block_field 1 (Name AdventOfCode2024_2.*binding.1))
+     (Get_block_field 1 (Name AdventOfCode2024_2.#binding.1))
      (Fun_call "Std.Prelude.Operators.;"
       ((Fun_call "Std.Prelude.Operators.;"
         ((Fun_call "Std.Prelude.Operators.;"
