@@ -29,21 +29,27 @@ open Names
    - $ for reserved words
    - Starting with $
    - Colons
-   - periods
+   - periods 
 
    This is a sad mess :(. Might be best to append a hash and replace any fishy character
    with an underscore
 *)
 module Label_name : sig
-  type t
+  type t [@@deriving sexp_of]
 
   include Stringable.S with type t := t
+  include Hashable.S with type t := t
 
   val of_mir_name : Mir_name.t -> t
   val of_extern_name : Extern_name.t -> t
   val to_mir_name : t -> Mir_name.t
 end = struct
-  type t = string
+  module T = struct
+    type t = string [@@deriving sexp, compare, hash]
+  end
+
+  include T
+  include Hashable.Make (T)
 
   let of_string = Fn.id
   let to_string = Fn.id
@@ -74,6 +80,7 @@ module Size = struct
     | I16
     | I32
     | I64
+  [@@deriving sexp_of]
 end
 
 module Asm_literal = struct
@@ -81,6 +88,7 @@ module Asm_literal = struct
     | Int of int
     | Float of float
     | String of Ustring.t
+  [@@deriving sexp_of]
 
   let pp_string_escaped fmt s =
     Format.pp_print_char fmt '`';
@@ -139,6 +147,7 @@ module Global_kind = struct
   type t =
     | Extern_proc
     | Other
+  [@@deriving sexp_of]
 end
 
 module Value = struct
@@ -151,6 +160,7 @@ module Value = struct
   and memory_expr =
     | Value of t
     | Add of memory_expr * memory_expr
+  [@@deriving sexp_of]
 
   let rec pp fmt t =
     match t with
@@ -186,28 +196,44 @@ module Value = struct
   let mem_offset value size i = Memory (size, Add (Value value, Value (Constant (Int i))))
 end
 
+(* TODO: 64-bit values only work with mov - they'll get silently truncated
+   otherwise. They need to be loaded into a register first. Ideally the types shouldn't
+   allow any Instr except Mov to have a literal value. *)
 module Instr = struct
   type t =
-    | Mov of
-        { dst : Value.t
-        ; src : Value.t
-        }
-    | Lea of
+    | And of
         { dst : Value.t
         ; src : Value.t
         }
     | Call of Value.t
+    | Cmp of Value.t * Value.t
+    | Jmp of Label_name.t
+    | Jnz of Label_name.t
+    | Jz of Label_name.t
+    | Lea of
+        { dst : Value.t
+        ; src : Value.t
+        }
+    | Mov of
+        { dst : Value.t
+        ; src : Value.t
+        }
     | Ret
+    | Setz of Value.t
+    | Test of Value.t * Value.t
   [@@deriving variants]
 
-  let args t =
-    match t with
-    | Mov { dst; src } | Lea { dst; src } -> [ dst; src ]
-    | Call fun_name -> [ fun_name ]
-    | Ret -> []
+  let pp fmt t =
+    let args =
+      match t with
+      | And { dst; src } | Mov { dst; src } | Lea { dst; src } -> [ dst; src ]
+      | Cmp (a, b) | Test (a, b) -> [ a; b ]
+      | Call x | Setz x -> [ x ]
+      | Jmp label | Jnz label | Jz label -> [ Global (label, Other) ]
+      | Ret -> []
+    in
+    pp_line fmt (String.lowercase (Variants.to_name t)) args ~f:Value.pp
   ;;
-
-  let pp fmt t = pp_line fmt (String.lowercase (Variants.to_name t)) (args t) ~f:Value.pp
 end
 
 module Instr_group = struct
@@ -357,30 +383,64 @@ module Function_builder : sig
   val set_register_state : t -> Register.t -> Register_state.t -> unit
   val add_local : t -> Mir_name.t -> Value.t -> Call_conv.t -> unit
   val find_local : t -> Mir_name.t -> (Value.t * Call_conv.t) option
+  val current_label : t -> Label_name.t
+  val position_at_label : t -> Label_name.t -> unit
+  val move_if_needed : t -> Value.t -> target_reg:Register.t -> unit
+
+  (* TODO: It's not efficient to just randomly pick registers to pick things in. e.g.
+     sometimes you might want to return immediately so you'd like the value to be in rax.
+     To properly do this I think you need to plan ahead a little? Maybe inject some
+     information about the future? *)
+  val pick_available_reg_or_stack : t -> Value.t
   val name : t -> Label_name.t
   val instr_groups : t -> Instr_group.t list
 end = struct
   (* TODO: Represents a partial codegened function. We need to consider the state of each
      register. *)
   type t =
-    { register_states : Register_state.t Register.Table.t
+    { fun_name : Label_name.t
+    ; register_states : Register_state.t Register.Table.t
     ; locals : (Value.t * Call_conv.t) Mir_name.Table.t
-    ; code : (Label_name.t * Instr.t Queue.t) Queue.t
-    ; mutable current_group : int
+    ; code : Instr.t Queue.t Label_name.Hash_queue.t
+    ; mutable current_label : Label_name.t
     }
+
+  let name t = t.fun_name
+  let current_label t = t.current_label
 
   let create fun_name =
-    { register_states = Register.Table.create ()
-    ; locals = Mir_name.Table.create ()
-    ; code = Queue.singleton (fun_name, Queue.create ())
-    ; current_group = 0
-    }
+    let t =
+      { fun_name
+      ; register_states = Register.Table.create ()
+      ; locals = Mir_name.Table.create ()
+      ; code = Label_name.Hash_queue.create ()
+      ; current_label = fun_name
+      }
+    in
+    Hash_queue.enqueue_back_exn t.code fun_name (Queue.create ());
+    t
   ;;
 
-  let add_code t instr = Queue.enqueue (snd (Queue.get t.code t.current_group)) instr
+  let add_code t instr =
+    let instrs =
+      match Hash_queue.lookup t.code t.current_label with
+      | Some instrs -> instrs
+      | None ->
+        let instrs = Queue.create () in
+        Hash_queue.enqueue_back_exn t.code t.current_label instrs;
+        instrs
+    in
+    Queue.enqueue instrs instr
+  ;;
+
+  let position_at_label t label_name = t.current_label <- label_name
   let set_register_state t reg state = Hashtbl.set t.register_states ~key:reg ~data:state
 
   let add_local t name arg call_conv =
+    (* FIXME: I think the call conv will always be Umber, but need some logic elsewhere
+       to ensure that. THis doesn't need to accept a call conv argument. *)
+    (* FIXME: This should update the register states, I think? Maybe that should be
+       internal to this module though, so you can't forget to do it.  *)
     Hashtbl.add_exn t.locals ~key:name ~data:(arg, call_conv)
   ;;
 
@@ -436,13 +496,30 @@ end = struct
     | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"
   ;;
 
+  let move_if_needed t (value : Value.t) ~target_reg =
+    match value with
+    | Register reg when Register.equal reg target_reg -> ()
+    | _ -> add_code t (Mov { src = value; dst = Register target_reg })
+  ;;
+
+  let pick_available_reg_or_stack t : Value.t =
+    (* FIXME: Handle stack *)
+    let reg =
+      Hashtbl.to_alist t.register_states
+      |> List.find_map_exn ~f:(fun (register, state) ->
+           match state with
+           | Unused -> Some register
+           | Used -> None)
+    in
+    Hashtbl.set t.register_states ~key:reg ~data:Used;
+    Register reg
+  ;;
+
   let instr_groups t =
-    Queue.to_list t.code
+    Hash_queue.to_alist t.code
     |> List.map ~f:(fun (label, instrs) : Instr_group.t ->
          { label; instrs = Queue.to_list instrs })
   ;;
-
-  let name t = fst (Queue.get t.code 0)
 end
 
 type t =
@@ -451,6 +528,7 @@ type t =
   ; bss_globals : Label_name.t Queue.t
   ; externs : Extern.t Mir_name.Table.t
   ; literals : Label_name.t Literal.Table.t
+  ; functions : Function_builder.t Mir_name.Table.t
   ; main_function : Function_builder.t
   }
 
@@ -488,15 +566,19 @@ let constant_block_for_literal (literal : Literal.t) =
       (String (Ustring.of_string_exn padded_s))
 ;;
 
-let to_program { bss_globals; externs; literals; main_function; name_table = _ }
+let to_program
+  { bss_globals; externs; literals; functions; main_function; name_table = _ }
   : Program.t
   =
   let uninitialized_globals = Queue.to_list bss_globals in
   let literals = Hashtbl.to_alist literals in
+  let functions = Hashtbl.data functions in
   { globals =
       { name = Function_builder.name main_function; strength = `Strong }
       :: (List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
             { name; strength = `Strong })
+          @ List.map functions ~f:(fun fun_builder : Global_decl.t ->
+              { name = Function_builder.name fun_builder; strength = `Strong })
           @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
               { name; strength = `Weak }))
   ; externs =
@@ -505,7 +587,9 @@ let to_program { bss_globals; externs; literals; main_function; name_table = _ }
            match extern with
            | C_function name -> name
            | Umber_function -> Label_name.of_mir_name mir_name)
-  ; text_section = Function_builder.instr_groups main_function
+  ; text_section =
+      Function_builder.instr_groups main_function
+      @ List.concat_map functions ~f:Function_builder.instr_groups
   ; rodata_section =
       List.map literals ~f:(fun (literal, label) : Data_decl.t ->
         { label; payloads = constant_block_for_literal literal })
@@ -522,11 +606,12 @@ let create ~main_function_name =
   ; bss_globals = Queue.create ()
   ; externs = Mir_name.Table.create ()
   ; literals = Literal.Table.create ()
+  ; functions = Mir_name.Table.create ()
   ; main_function = Function_builder.create main_function_name
   }
 ;;
 
-let codegen_constant_tag tag : Value.t =
+let int_constant_tag tag : Value.t =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
   Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1))
 ;;
@@ -542,14 +627,18 @@ let declare_extern_c_function ?mir_name t label_name =
       : [ `Ok | `Duplicate ])
 ;;
 
+(* FIXME: Handle file-local functions *)
 let lookup_name t name ~fun_builder : Value.t * Call_conv.t =
   match Function_builder.find_local fun_builder name with
   | Some result -> result
   | None ->
-    (match Hashtbl.find t.externs name with
-     | Some (C_function name) -> Global (name, Extern_proc), C
-     | Some Umber_function -> Global (Label_name.of_mir_name name, Extern_proc), Umber
-     | None -> Global (Label_name.of_mir_name name, Other), Umber)
+    (match Hashtbl.find t.functions name with
+     | Some fun_builder -> Global (Function_builder.name fun_builder, Other), Umber
+     | None ->
+       (match Hashtbl.find t.externs name with
+        | Some (C_function name) -> Global (name, Extern_proc), C
+        | Some Umber_function -> Global (Label_name.of_mir_name name, Extern_proc), Umber
+        | None -> Global (Label_name.of_mir_name name, Other), Umber))
 ;;
 
 let codegen_fun_call t fun_name args ~fun_builder : Value.t =
@@ -602,6 +691,43 @@ let codegen_literal t (literal : Literal.t) : Value.t =
   Global (name, Other)
 ;;
 
+let get_block_field value index =
+  Value.mem_offset value I64 (Mir.Block_index.to_int index + 1)
+;;
+
+let check_value_is_block fun_builder value =
+  (* Check if this value is a pointer to a block. Pointers always have bottom bit 0.
+     This is done by checking (in C syntax) `(value & 1) == 0`. *)
+  Function_builder.add_code fun_builder (Test (value, Constant (Int 1)))
+;;
+
+(** Insert code such that all the values end up in the same place. *)
+let merge_branches
+  fun_builder
+  (label_a, (value_a : Value.t))
+  (label_b, (value_b : Value.t))
+  =
+  match value_a, value_b with
+  | Register a, Register b ->
+    (* FIXME: Unclear if a might be used for something else useful in the b case? *)
+    if not (Register.equal a b)
+    then (
+      Function_builder.position_at_label fun_builder label_b;
+      Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
+    value_a
+  | Register _, (Memory _ | Global _ | Constant _) ->
+    Function_builder.position_at_label fun_builder label_b;
+    Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b });
+    value_a
+  | (Memory _ | Global _ | Constant _), Register _ ->
+    Function_builder.position_at_label fun_builder label_a;
+    Function_builder.add_code fun_builder (Mov { dst = value_b; src = value_a });
+    value_b
+  | Memory _, _ | Global _, _ | Constant _, _ ->
+    raise_s
+      [%message "TODO: merge_branches cases" (value_a : Value.t) (value_b : Value.t)]
+;;
+
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
   match expr with
   | Primitive literal -> codegen_literal t literal
@@ -619,12 +745,122 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     codegen_fun_call t fun_name args ~fun_builder
   | Make_block { tag; fields } ->
     (match Nonempty.of_list fields with
-     | None -> codegen_constant_tag tag
+     | None -> int_constant_tag tag
      | Some fields ->
        let fields = Nonempty.map fields ~f:(codegen_expr t ~fun_builder) in
        box t ~tag ~fields ~fun_builder)
-  | Get_block_field (_, _) | Cond_assign _ ->
-    failwithf !"TODO: missing mir expr kinds: %{sexp: Mir.Expr.t}" expr ()
+  | Get_block_field (field_index, block) ->
+    let block = codegen_expr t block ~fun_builder in
+    get_block_field block field_index
+  | Cond_assign { vars; conds; body; if_none_matched } ->
+    (* FIXME: Need a way to mint new label names. Guess a name table isn't awful
+       Might be easier to just use a counter or something though
+       We can prefix with . to get namespacing, kinda relying on nasm a lot with that tho
+    *)
+    (* Setup is like 
+       
+       if cond1 then goto cond_binding1
+       else if cond2 then goto cond_binding2
+       else goto if_none_matched
+
+       cond_binding1:
+         a =..
+         b =..
+         goto body
+
+       body:
+         ...
+
+       if_none_matched:
+         ...
+    *)
+    let cond_label i = Label_name.of_string [%string "cond_assign.cond%{i#Int}"] in
+    let body_label = Label_name.of_string "cond_assign.body" in
+    let if_none_matched_label = Label_name.of_string "cond_assign.if_none_matched" in
+    let n_conds = Nonempty.length conds in
+    let assign_vars_and_jump_to_body var_exprs =
+      List.iter2_exn vars var_exprs ~f:(fun var var_expr ->
+        let var_value = codegen_expr t var_expr ~fun_builder in
+        (* FIXME: add_local assumes we know where the local is, but we don't. But to
+           generate code properly, we need to make sure it ends up in the same place
+           every time. Enforce it's always in the same place. *)
+        Function_builder.add_local fun_builder var var_value Umber);
+      Function_builder.add_code fun_builder (Jmp body_label)
+    in
+    Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
+      if i <> 0 then Function_builder.position_at_label fun_builder (cond_label i);
+      codegen_cond t cond ~fun_builder;
+      let next_label =
+        if i < n_conds then cond_label (i + 1) else if_none_matched_label
+      in
+      Function_builder.add_code fun_builder (Jnz next_label);
+      (* If we didn't jump, the condition succeeded, so set the variables. *)
+      assign_vars_and_jump_to_body var_exprs;
+      Function_builder.add_code fun_builder (Jmp body_label));
+    (* TODO: We kinda have to represent something like phi nodes, where the branches
+       "merge" back into one value. We could either let [Value.t] represent values in
+       possibly different places (some kind of union), or enforce that the values end up
+       in the same place. Enforcing they're in the same place seems easier. *)
+    Function_builder.position_at_label fun_builder if_none_matched_label;
+    let otherwise_value =
+      match if_none_matched with
+      | Use_bindings var_exprs ->
+        assign_vars_and_jump_to_body var_exprs;
+        None
+      | Otherwise otherwise_expr -> Some (codegen_expr t otherwise_expr ~fun_builder)
+    in
+    (* FIXME: Need to merge the values of the vars *)
+    if n_conds > 1 && List.length vars > 0 then failwith "FIXME: merge vars";
+    Function_builder.position_at_label fun_builder body_label;
+    let body_value = codegen_expr t body ~fun_builder in
+    (match otherwise_value with
+     | None -> body_value
+     | Some otherwise_value ->
+       merge_branches
+         fun_builder
+         (body_label, body_value)
+         (if_none_matched_label, otherwise_value))
+
+and codegen_cond t cond ~fun_builder =
+  let cmp value value' = Function_builder.add_code fun_builder (Cmp (value, value')) in
+  match cond with
+  | Equals (expr, literal) ->
+    let expr_value = codegen_expr t expr ~fun_builder in
+    let literal_value = codegen_literal t literal in
+    (* FIXME: Handle conditionally loading values from the stack into registers *)
+    let load_expr ~expr_value = get_block_field expr_value (Mir.Block_index.of_int 0) in
+    let load_literal ~literal_value =
+      get_block_field literal_value (Mir.Block_index.of_int 0)
+    in
+    (match literal with
+     | Int _ | Char _ -> cmp (load_expr ~expr_value) (load_literal ~literal_value)
+     | Float _ -> failwith "TODO: float equality in patterns"
+     | String _ -> failwith "TODO: string equality in patterns")
+  | Constant_tag_equals (expr, tag) ->
+    cmp (codegen_expr t expr ~fun_builder) (int_constant_tag tag)
+  | Non_constant_tag_equals (expr, tag) ->
+    let value = codegen_expr t expr ~fun_builder in
+    check_value_is_block fun_builder value;
+    (* FIXME: mint new label names *)
+    let is_block_label = Label_name.of_string "non_constant_tag_equals.is_block" in
+    let end_label = Label_name.of_string "non_constant_tag_equals.end" in
+    Function_builder.add_code fun_builder (Jz is_block_label);
+    (* If it's not a block, we want to "return false" (ZF = 0). This is already the case. *)
+    Function_builder.add_code fun_builder (Jmp end_label);
+    (* If it's a block, check the tag. *)
+    Function_builder.position_at_label fun_builder is_block_label;
+    Function_builder.add_code
+      fun_builder
+      (Cmp (Memory (I16, Value value), Constant (Int (Cnstr_tag.to_int tag))));
+    Function_builder.position_at_label fun_builder end_label
+  | And (cond1, cond2) ->
+    codegen_cond t cond1 ~fun_builder;
+    let cond1_result = Function_builder.pick_available_reg_or_stack fun_builder in
+    Function_builder.add_code fun_builder (Setz cond1_result);
+    codegen_cond t cond2 ~fun_builder;
+    let cond2_result = Function_builder.pick_available_reg_or_stack fun_builder in
+    Function_builder.add_code fun_builder (Setz cond2_result);
+    Function_builder.add_code fun_builder (Test (cond1_result, cond2_result))
 ;;
 
 let set_global t global expr ~fun_builder =
@@ -635,15 +871,36 @@ let set_global t global expr ~fun_builder =
     (Mov { dst = Memory (I64, Value (Global (global, Other))); src = expr_location })
 ;;
 
-(* FIXME: cleanup *)
+let define_function t ~fun_name ~args ~body =
+  (* TODO: Need a function prelude for e.g. the frame pointer *)
+  let call_conv : Call_conv.t = Umber in
+  let fun_builder = Function_builder.create (Label_name.of_mir_name fun_name) in
+  Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
+  (* FIXME: Initialize register states based on knowledge of how many arguments there are
+     (the args are in there). Then set the values. *)
+  let result =
+    Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
+      (* FIXME: We need to generate and use a wrapper function if passing an extern
+         function as an argument so that it's valid to assume cc = Umber here. *)
+      Function_builder.add_local fun_builder arg_name (Register reg) Umber)
+  in
+  (match result with
+   | Same_length | Right_trailing _ -> ()
+   | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack");
+  let return_value = codegen_expr t body ~fun_builder in
+  Function_builder.move_if_needed
+    fun_builder
+    return_value
+    ~target_reg:(Call_conv.return_value_reg call_conv);
+  Function_builder.add_code fun_builder Ret
+;;
+
 let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
     (* TODO: values *)
     set_global t (Label_name.of_mir_name name) expr ~fun_builder:t.main_function
-  | Fun_def { fun_name = _; args = _; body = _ } ->
-    (* TODO: functions definitions *)
-    ()
+  | Fun_def { fun_name; args; body } -> define_function t ~fun_name ~args ~body
   | Fun_decl { name; arity = _ } ->
     Hashtbl.add_exn t.externs ~key:name ~data:Umber_function
   | Extern_decl { name; extern_name; arity = _ } ->

@@ -61,6 +61,7 @@ val fold2
 val fold2_exn : 'a t -> 'b t -> init:'acc -> f:('acc -> 'a -> 'b -> 'acc) -> 'acc
 val iteri : 'a t -> f:(int -> 'a -> unit) -> unit
 val iter2 : 'a t -> 'b t -> f:('a -> 'b -> unit) -> ('a, 'b) Fold2_result.t
+val iter2_exn : 'a t -> 'b t -> f:('a -> 'b -> unit) -> unit
 val reduce : 'a t -> f:('a -> 'a -> 'a) -> 'a
 val mapi : 'a t -> f:(int -> 'a -> 'b) -> 'b t
 val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t

@@ -103,6 +103,7 @@ let mapi (x :: xs) ~f =
   f 0 x :: snd (List.fold_map xs ~init:1 ~f:(fun i x -> i + 1, f i x))
 ;;
 
+(* TODO: This should probably be called map2_lenient or something *)
 let map2 (x :: xs) (y :: ys) ~f =
   let rec loop xs ys acc =
     match xs, ys with
@@ -173,6 +174,7 @@ let zip (x :: xs) (y :: ys) =
 let fold2_exn xs ys ~init ~f = List.fold2_exn (to_list xs) (to_list ys) ~init ~f
 let iteri t ~f = foldi t ~init:() ~f:(fun i () x -> f i x)
 let iter2 xs ys ~f = fold2 xs ys ~init:() ~f:(fun () x y -> f x y) |> snd
+let iter2_exn xs ys ~f = List.iter2_exn (to_list xs) (to_list ys) ~f
 
 let split_last xs =
   let (last :: rest) = rev xs in
