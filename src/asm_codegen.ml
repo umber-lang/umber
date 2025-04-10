@@ -117,6 +117,7 @@ end
 
 module Register = struct
   module T = struct
+    (* TODO: Floating point registers xmm0 to xmm7 *)
     type t =
       | Rax
       | Rcx
@@ -249,9 +250,21 @@ module Instr_group = struct
 end
 
 module Data_decl = struct
+  module Payload = struct
+    type t =
+      | Literal of Asm_literal.t
+      | Label of Label_name.t
+
+    let pp fmt t =
+      match t with
+      | Literal literal -> Asm_literal.pp fmt literal
+      | Label label_name -> Format.fprintf fmt !"%{Label_name}" label_name
+    ;;
+  end
+
   type t =
     { label : Label_name.t
-    ; payloads : (Size.t * Asm_literal.t) list
+    ; payloads : (Size.t * Payload.t) list
     }
 
   let pp fmt { label; payloads } =
@@ -264,7 +277,7 @@ module Data_decl = struct
         | I32 -> "dd"
         | I64 -> "dq"
       in
-      pp_line fmt kind [ payload ] ~f:Asm_literal.pp)
+      pp_line fmt kind [ payload ] ~f:Payload.pp)
   ;;
 end
 
@@ -355,8 +368,12 @@ module Call_conv = struct
     | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
   ;;
 
-  let return_value_reg : t -> Register.t = function
+  let return_value_register : t -> Register.t = function
     | C | Umber -> Rax
+  ;;
+
+  let reserved_registers : t -> Register.t list = function
+    | C | Umber -> [ (* Stack pointer *) Rsp; (* Frame pointer *) Rbp ]
   ;;
 end
 
@@ -381,8 +398,8 @@ module Function_builder : sig
   (* TODO: Consider if this API makes any sense *)
   val move_values_for_call : t -> call_conv:Call_conv.t -> args:Value.t Nonempty.t -> unit
   val set_register_state : t -> Register.t -> Register_state.t -> unit
-  val add_local : t -> Mir_name.t -> Value.t -> Call_conv.t -> unit
-  val find_local : t -> Mir_name.t -> (Value.t * Call_conv.t) option
+  val add_local : t -> Mir_name.t -> Value.t -> unit
+  val find_local : t -> Mir_name.t -> Value.t option
   val current_label : t -> Label_name.t
   val position_at_label : t -> Label_name.t -> unit
   val move_if_needed : t -> Value.t -> target_reg:Register.t -> unit
@@ -400,7 +417,7 @@ end = struct
   type t =
     { fun_name : Label_name.t
     ; register_states : Register_state.t Register.Table.t
-    ; locals : (Value.t * Call_conv.t) Mir_name.Table.t
+    ; locals : Value.t Mir_name.Table.t
     ; code : Instr.t Queue.t Label_name.Hash_queue.t
     ; mutable current_label : Label_name.t
     }
@@ -436,15 +453,34 @@ end = struct
   let position_at_label t label_name = t.current_label <- label_name
   let set_register_state t reg state = Hashtbl.set t.register_states ~key:reg ~data:state
 
-  let add_local t name arg call_conv =
-    (* FIXME: I think the call conv will always be Umber, but need some logic elsewhere
-       to ensure that. THis doesn't need to accept a call conv argument. *)
+  let add_local t name value =
     (* FIXME: This should update the register states, I think? Maybe that should be
-       internal to this module though, so you can't forget to do it.  *)
-    Hashtbl.add_exn t.locals ~key:name ~data:(arg, call_conv)
+       internal to this module though, so you can't forget to do it.
+       
+       PROBLEM: We can't notice when registers become unused. Some notion of lifetimes
+       would be needed to notice this. Alternatively we can fall back on the stack. *)
+    Hashtbl.add_exn t.locals ~key:name ~data:value;
+    match value with
+    | Register reg -> set_register_state t reg Used
+    | Memory _ | Global _ | Constant _ -> ()
   ;;
 
   let find_local t name = Hashtbl.find t.locals name
+
+  let pick_available_reg_or_stack t : Value.t =
+    (* FIXME: Handle stack *)
+    (* FIXME: You can't pick just any register I think. We need to reserve some of these
+       e.g. stack pointer. *)
+    let reg =
+      Hashtbl.to_alist t.register_states
+      |> List.find_map_exn ~f:(fun (register, state) ->
+           match state with
+           | Unused -> Some register
+           | Used -> None)
+    in
+    Hashtbl.set t.register_states ~key:reg ~data:Used;
+    Register reg
+  ;;
 
   let move_values_for_call t ~call_conv ~(args : Value.t Nonempty.t) =
     (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
@@ -476,43 +512,56 @@ end = struct
        with whatever ended up happening is easier after all...
 
        Let's try something naive first.
+
+       Actually, maybe we want the codegen to generate virtual registers first, then have
+       a separate register allocation phase.
     *)
-    let result =
-      Nonempty.iter2
-        args
-        (Call_conv.arg_registers call_conv)
-        ~f:(fun current_loc target_reg ->
-        match current_loc with
-        | Register current_reg ->
-          if not (Register.equal current_reg target_reg)
-          then failwith "TODO: different regs"
-          else add_code t (Mov { src = Register current_reg; dst = Register target_reg })
-        | (Global _ | Constant _) as src ->
-          add_code t (Mov { src; dst = Register target_reg })
-        | Memory _ -> failwith "TODO: memory arg location")
+    let args = Nonempty.to_array args in
+    let arg_registers =
+      Call_conv.arg_registers call_conv
+      |> Nonempty.to_list
+      |> Fn.flip List.take (Array.length args)
+      |> List.to_array
     in
-    match result with
-    | Same_length | Right_trailing _ -> ()
-    | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"
+    if Array.length args > Array.length arg_registers
+    then failwith "TODO: ran out of registers for args, use stack";
+    (* Set all argument registers as used up-front so we don't try to use them as
+       temporary registers. *)
+    Array.iter arg_registers ~f:(fun reg -> set_register_state t reg Used);
+    Array.iteri (Array.zip_exn args arg_registers) ~f:(fun _i (current_loc, target_reg) ->
+      match current_loc with
+      | Register current_reg ->
+        if Register.equal current_reg target_reg
+        then (* Already in the right place. Nothing to do. *) ()
+        else (
+          match
+            Array.findi args ~f:(fun (_ : int) -> function
+              | Register reg -> Register.equal reg target_reg
+              | _ -> false)
+          with
+          | Some (other_arg, (_ : Value.t)) ->
+            (* One of the arguments is sitting in the register we need. Move it elsewhere. *)
+            (* FIXME: It's just a matter of making sure we don't clobber a register which is
+             currently being used for something. 
+             
+             Although, it'd be easier if we could just express the register constraints
+             and put it into some kind of solver which would work forwards and backwards.
+            *)
+            let tmp = pick_available_reg_or_stack t in
+            add_code t (Mov { src = Register target_reg; dst = tmp });
+            args.(other_arg) <- tmp;
+            add_code t (Mov { src = Register current_reg; dst = Register target_reg })
+          | None ->
+            add_code t (Mov { src = Register current_reg; dst = Register target_reg }))
+      | (Global _ | Constant _) as src ->
+        add_code t (Mov { src; dst = Register target_reg })
+      | Memory _ -> failwith "TODO: memory arg location")
   ;;
 
   let move_if_needed t (value : Value.t) ~target_reg =
     match value with
     | Register reg when Register.equal reg target_reg -> ()
     | _ -> add_code t (Mov { src = value; dst = Register target_reg })
-  ;;
-
-  let pick_available_reg_or_stack t : Value.t =
-    (* FIXME: Handle stack *)
-    let reg =
-      Hashtbl.to_alist t.register_states
-      |> List.find_map_exn ~f:(fun (register, state) ->
-           match state with
-           | Unused -> Some register
-           | Used -> None)
-    in
-    Hashtbl.set t.register_states ~key:reg ~data:Used;
-    Register reg
   ;;
 
   let instr_groups t =
@@ -522,31 +571,51 @@ end = struct
   ;;
 end
 
+(* TODO: This only handles no-environment wrapper closures. MIR should handle this instead. *)
+module Closure = struct
+  type t =
+    { closure_name : Label_name.t
+    ; fun_name : Label_name.t
+    }
+
+  let of_fun_name fun_name =
+    { fun_name
+    ; closure_name = Label_name.of_string [%string "%{fun_name#Label_name}#closure"]
+    }
+  ;;
+end
+
 type t =
   { (* FIXME: name_table is unused *)
     name_table : Mir_name.Name_table.t
   ; bss_globals : Label_name.t Queue.t
   ; externs : Extern.t Mir_name.Table.t
   ; literals : Label_name.t Literal.Table.t
+  ; closures : Closure.t Mir_name.Table.t
   ; functions : Function_builder.t Mir_name.Table.t
   ; main_function : Function_builder.t
   }
 
-let constant_block ~tag ~len ~data_kind data : (Size.t * Asm_literal.t) list =
-  [ I16, Int (Cnstr_tag.to_int tag)
-  ; I16, Int len
-  ; I32, Int 0 (* padding *)
+let constant_block ~tag ~len ~data_kind data : (Size.t * Data_decl.Payload.t) list =
+  [ I16, Literal (Int (Cnstr_tag.to_int tag))
+  ; I16, Literal (Int len)
+  ; I32, Literal (Int 0) (* padding *)
   ; data_kind, data
   ]
 ;;
 
 let constant_block_for_literal (literal : Literal.t) =
   match literal with
-  | Int i -> constant_block ~tag:Cnstr_tag.int ~len:1 ~data_kind:I64 (Int i)
-  | Float x -> constant_block ~tag:Cnstr_tag.float ~len:1 ~data_kind:I64 (Float x)
+  | Int i -> constant_block ~tag:Cnstr_tag.int ~len:1 ~data_kind:I64 (Literal (Int i))
+  | Float x ->
+    constant_block ~tag:Cnstr_tag.float ~len:1 ~data_kind:I64 (Literal (Float x))
   | Char c ->
     (* TODO: We could just store Chars as immediate values, they are guaranteed to fit *)
-    constant_block ~tag:Cnstr_tag.char ~len:1 ~data_kind:I8 (String (Ustring.of_uchar c))
+    constant_block
+      ~tag:Cnstr_tag.char
+      ~len:1
+      ~data_kind:I8
+      (Literal (String (Ustring.of_uchar c)))
   | String s ->
     let s = Ustring.to_string s in
     let n_chars = String.length s in
@@ -563,15 +632,20 @@ let constant_block_for_literal (literal : Literal.t) =
       ~tag:Cnstr_tag.string
       ~len:n_words
       ~data_kind:I8
-      (String (Ustring.of_string_exn padded_s))
+      (Literal (String (Ustring.of_string_exn padded_s)))
+;;
+
+let constant_block_for_closure ~fun_name =
+  constant_block ~tag:Cnstr_tag.closure ~len:1 ~data_kind:I64 (Label fun_name)
 ;;
 
 let to_program
-  { bss_globals; externs; literals; functions; main_function; name_table = _ }
+  { bss_globals; externs; literals; closures; functions; main_function; name_table = _ }
   : Program.t
   =
   let uninitialized_globals = Queue.to_list bss_globals in
   let literals = Hashtbl.to_alist literals in
+  let closures = Hashtbl.data closures in
   let functions = Hashtbl.data functions in
   { globals =
       { name = Function_builder.name main_function; strength = `Strong }
@@ -593,6 +667,8 @@ let to_program
   ; rodata_section =
       List.map literals ~f:(fun (literal, label) : Data_decl.t ->
         { label; payloads = constant_block_for_literal literal })
+      @ List.map closures ~f:(fun { fun_name; closure_name } : Data_decl.t ->
+          { label = closure_name; payloads = constant_block_for_closure ~fun_name })
   ; bss_section =
       List.map uninitialized_globals ~f:(fun name : Bss_decl.t ->
         { label = name; kind = `Words; size = 1 })
@@ -606,6 +682,7 @@ let create ~main_function_name =
   ; bss_globals = Queue.create ()
   ; externs = Mir_name.Table.create ()
   ; literals = Literal.Table.create ()
+  ; closures = Mir_name.Table.create ()
   ; functions = Mir_name.Table.create ()
   ; main_function = Function_builder.create main_function_name
   }
@@ -628,9 +705,44 @@ let declare_extern_c_function ?mir_name t label_name =
 ;;
 
 (* FIXME: Handle file-local functions *)
-let lookup_name t name ~fun_builder : Value.t * Call_conv.t =
+(* FIXME: Handle values and function lookups differently (may need a closure)
+   Hmm, except closures are already explicit in MIR, right? Do they actually need
+   special handling? Oh, they do because MIR treats function pointers as reasonable values
+*)
+(* TODO: Amend MIR to treat function pointers and closures differently. *)
+let lookup_name_for_value t name ~fun_builder : Value.t =
   match Function_builder.find_local fun_builder name with
-  | Some result -> result
+  | Some value -> value
+  | None ->
+    (* FIXME: For everything except locals, we need to create a closure and possibly a
+       wrapper function. We need to treat it as if wrapped in a [Make_block] 
+        
+       For now, treat externs and functions the same. This will break when implementing a
+       proper calling convention besides copying C's.
+    *)
+    let closure =
+      Hashtbl.find_or_add t.closures name ~default:(fun () ->
+        let fun_name =
+          (* FIXME: Code duplication *)
+          match Hashtbl.find t.functions name with
+          | Some fun_builder -> Function_builder.name fun_builder
+          | None ->
+            (match Hashtbl.find t.externs name with
+             | Some (C_function name) -> name
+             | Some Umber_function -> Label_name.of_mir_name name
+             | None -> Label_name.of_mir_name name)
+        in
+        Closure.of_fun_name fun_name)
+    in
+    Global (closure.closure_name, Other)
+;;
+
+let lookup_name_for_fun_call t name ~fun_builder : Value.t * Call_conv.t =
+  (* FIXME: Handle calling closures *)
+  match Function_builder.find_local fun_builder name with
+  | Some closure ->
+    (* We are calling a closure. Load the function pointer from the first field. *)
+    Value.mem_offset closure I64 1, Umber
   | None ->
     (match Hashtbl.find t.functions name with
      | Some fun_builder -> Global (Function_builder.name fun_builder, Other), Umber
@@ -642,10 +754,10 @@ let lookup_name t name ~fun_builder : Value.t * Call_conv.t =
 ;;
 
 let codegen_fun_call t fun_name args ~fun_builder : Value.t =
-  let fun_, call_conv = lookup_name t fun_name ~fun_builder in
+  let fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
   Function_builder.move_values_for_call fun_builder ~call_conv ~args;
   Function_builder.add_code fun_builder (Call fun_);
-  let output_register = Call_conv.return_value_reg call_conv in
+  let output_register = Call_conv.return_value_register call_conv in
   Function_builder.set_register_state fun_builder output_register Used;
   Register output_register
 ;;
@@ -683,7 +795,10 @@ let codegen_literal t (literal : Literal.t) : Value.t =
         match literal with
         | Int i -> sprintf "int.%d" i
         | Float x -> sprintf "float.%f" x
-        | String s -> sprintf "string.%d" (Ustring.hash s)
+        | String s ->
+          (* TODO: I think this is a 31-bit hash which is pretty sus considering the
+             posibility of collisions. *)
+          sprintf "string.%d" (Ustring.hash s)
         | Char c -> sprintf "char.%d" (Uchar.to_int c)
       in
       Label_name.of_string name)
@@ -731,12 +846,10 @@ let merge_branches
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
   match expr with
   | Primitive literal -> codegen_literal t literal
-  | Name name ->
-    let arg, (_ : Call_conv.t) = lookup_name t name ~fun_builder in
-    arg
+  | Name name -> lookup_name_for_value t name ~fun_builder
   | Let (name, expr, body) ->
     let expr = codegen_expr t expr ~fun_builder in
-    Function_builder.add_local fun_builder name expr Umber;
+    Function_builder.add_local fun_builder name expr;
     codegen_expr t body ~fun_builder
   | Fun_call (fun_name, args) ->
     (* TODO: Maybe we could do something cleverer like suggest a good place to put the
@@ -784,7 +897,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         (* FIXME: add_local assumes we know where the local is, but we don't. But to
            generate code properly, we need to make sure it ends up in the same place
            every time. Enforce it's always in the same place. *)
-        Function_builder.add_local fun_builder var var_value Umber);
+        Function_builder.add_local fun_builder var var_value);
       Function_builder.add_code fun_builder (Jmp body_label)
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
@@ -876,13 +989,9 @@ let define_function t ~fun_name ~args ~body =
   let call_conv : Call_conv.t = Umber in
   let fun_builder = Function_builder.create (Label_name.of_mir_name fun_name) in
   Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
-  (* FIXME: Initialize register states based on knowledge of how many arguments there are
-     (the args are in there). Then set the values. *)
   let result =
     Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
-      (* FIXME: We need to generate and use a wrapper function if passing an extern
-         function as an argument so that it's valid to assume cc = Umber here. *)
-      Function_builder.add_local fun_builder arg_name (Register reg) Umber)
+      Function_builder.add_local fun_builder arg_name (Register reg))
   in
   (match result with
    | Same_length | Right_trailing _ -> ()
@@ -891,7 +1000,7 @@ let define_function t ~fun_name ~args ~body =
   Function_builder.move_if_needed
     fun_builder
     return_value
-    ~target_reg:(Call_conv.return_value_reg call_conv);
+    ~target_reg:(Call_conv.return_value_register call_conv);
   Function_builder.add_code fun_builder Ret
 ;;
 
@@ -908,8 +1017,17 @@ let codegen_stmt t stmt =
     declare_extern_c_function t ~mir_name:name (Label_name.of_extern_name extern_name)
 ;;
 
-(* FIXME: Decide what to do with this *)
-let codegen_runtime_required_functions t =
+(* FIXME: Decide what to do with this.
+
+   Having umber_apply be a thing at all seems somewhat sad? I guess we need something to
+   translate an Umber function call into something the Rust runtime can call though.
+
+   But having to check every function call first is unfortunate. It might be better to
+   enforce that constant block wrappers are created for function values (possibly lazily,
+   when they're first used.) How about this - when we look up a function name for a call,
+   we inline it specially, but other times, the block representation is used.
+*)
+(* let codegen_runtime_required_functions t =
   (* Ensure that functions the runtime needs are codegened. See closure.rs in the runtime. *)
   (* codegen_umber_apply_fun t ~n_args:2 *)
   set_global
@@ -917,7 +1035,7 @@ let codegen_runtime_required_functions t =
     (Label_name.of_string "umber_apply2")
     (Primitive (Int 0))
     ~fun_builder:t.main_function
-;;
+;; *)
 
 let main_function_name ~(module_path : Module_path.Absolute.t) =
   Label_name.of_string [%string "umber_main#%{module_path#Module_path}"]
@@ -926,7 +1044,6 @@ let main_function_name ~(module_path : Module_path.Absolute.t) =
 let of_mir ~module_path mir =
   let t = create ~main_function_name:(main_function_name ~module_path) in
   List.iter mir ~f:(codegen_stmt t);
-  codegen_runtime_required_functions t;
   Function_builder.add_code t.main_function Ret;
   t
 ;;
@@ -976,7 +1093,10 @@ let%expect_test "hello world" =
         ]
     ; rodata_section =
         [ { label = Label_name.of_string "message"
-          ; payloads = [ I8, String (Ustring.of_string_exn "Hello, world!"); I8, Int 10 ]
+          ; payloads =
+              [ I8, Literal (String (Ustring.of_string_exn "Hello, world!"))
+              ; I8, Literal (Int 10)
+              ]
           }
         ]
     ; bss_section = []
