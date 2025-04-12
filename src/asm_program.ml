@@ -130,15 +130,15 @@ module Global_kind = struct
 end
 
 module Value = struct
-  type t =
-    | Register of Register.t
-    | Memory of Size.t * memory_expr
+  type 'reg t =
+    | Register of 'reg
+    | Memory of Size.t * 'reg memory_expr
     | Global of Label_name.t * Global_kind.t
     | Constant of Asm_literal.t
 
-  and memory_expr =
-    | Value of t
-    | Add of memory_expr * memory_expr
+  and 'reg memory_expr =
+    | Value of 'reg t
+    | Add of 'reg memory_expr * 'reg memory_expr
   [@@deriving sexp_of]
 
   let rec pp fmt t =
@@ -173,33 +173,56 @@ module Value = struct
   ;;
 
   let mem_offset value size i = Memory (size, Add (Value value, Value (Constant (Int i))))
+
+  let rec fold_map_registers t ~init ~f =
+    match t with
+    | Register reg ->
+      let init, reg = f init reg in
+      init, Register reg
+    | (Global _ | Constant _) as t -> init, t
+    | Memory (size, mem) ->
+      let init, mem = fold_map_registers_memory_expr mem ~init ~f in
+      init, Memory (size, mem)
+
+  and fold_map_registers_memory_expr mem ~init ~f =
+    match mem with
+    | Value t ->
+      let init, t = fold_map_registers t ~init ~f in
+      init, Value t
+    | Add (lhs, rhs) ->
+      let init, lhs = fold_map_registers_memory_expr lhs ~init ~f in
+      let init, rhs = fold_map_registers_memory_expr rhs ~init ~f in
+      init, Add (lhs, rhs)
+  ;;
 end
 
 (* TODO: 64-bit values only work with mov - they'll get silently truncated
    otherwise. They need to be loaded into a register first. Ideally the types shouldn't
    allow any Instr except Mov to have a literal value. *)
+(* TODO: Might make sense to abstract this a little more e.g. group the jumps into one
+   variant. Might make some of the code easier to handle. *)
 module Instr = struct
-  type t =
+  type 'reg t =
     | And of
-        { dst : Value.t
-        ; src : Value.t
+        { dst : 'reg Value.t
+        ; src : 'reg Value.t
         }
-    | Call of Value.t
-    | Cmp of Value.t * Value.t
+    | Call of 'reg Value.t
+    | Cmp of 'reg Value.t * 'reg Value.t
     | Jmp of Label_name.t
     | Jnz of Label_name.t
     | Jz of Label_name.t
     | Lea of
-        { dst : Value.t
-        ; src : Value.t
+        { dst : 'reg Value.t
+        ; src : 'reg Value.t
         }
     | Mov of
-        { dst : Value.t
-        ; src : Value.t
+        { dst : 'reg Value.t
+        ; src : 'reg Value.t
         }
     | Ret
-    | Setz of Value.t
-    | Test of Value.t * Value.t
+    | Setz of 'reg Value.t
+    | Test of 'reg Value.t * 'reg Value.t
   [@@deriving variants]
 
   let pp fmt t =
@@ -213,12 +236,57 @@ module Instr = struct
     in
     pp_line fmt (String.lowercase (Variants.to_name t)) args ~f:Value.pp
   ;;
+
+  let fold_map_args t ~init ~f =
+    let handle_jump init label ~(f : _ -> _ Value.t -> _ * _ Value.t) ~mk =
+      let init, value = f init (Global (label, Other)) in
+      let label =
+        match value with
+        | Global (label, _) -> label
+        | _ ->
+          compiler_bug
+            [%message "Expected label name for jump instruction" (value : _ Value.t)]
+      in
+      init, mk label
+    in
+    match t with
+    | And { dst; src } ->
+      let init, dst = f init dst in
+      let init, src = f init src in
+      init, And { dst; src }
+    | Mov { dst; src } ->
+      let init, dst = f init dst in
+      let init, src = f init src in
+      init, Mov { dst; src }
+    | Lea { dst; src } ->
+      let init, dst = f init dst in
+      let init, src = f init src in
+      init, Lea { dst; src }
+    | Cmp (a, b) ->
+      let init, a = f init a in
+      let init, b = f init b in
+      init, Cmp (a, b)
+    | Test (a, b) ->
+      let init, a = f init a in
+      let init, b = f init b in
+      init, Test (a, b)
+    | Call x ->
+      let init, x = f init x in
+      init, Call x
+    | Setz x ->
+      let init, x = f init x in
+      init, Setz x
+    | Jmp label -> handle_jump init label ~f ~mk:jmp
+    | Jnz label -> handle_jump init label ~f ~mk:jnz
+    | Jz label -> handle_jump init label ~f ~mk:jz
+    | Ret -> init, Ret
+  ;;
 end
 
 module Instr_group = struct
   type t =
     { label : Label_name.t
-    ; instrs : Instr.t list
+    ; instrs : Register.t Instr.t list
     }
 
   let pp fmt { label; instrs } =

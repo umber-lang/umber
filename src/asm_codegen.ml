@@ -23,7 +23,6 @@ open Names
 open struct
   open Asm_program
   module Label_name = Label_name
-  module Register = Register
   module Value = Value
   module Instr = Instr
   module Instr_group = Instr_group
@@ -43,17 +42,210 @@ module Call_conv = struct
      basically copying OCaml's after that. *)
 
   (* TODO: Handle further arguments with the stack *)
-  let arg_registers t : Register.t Nonempty.t =
+  let arg_registers t : Asm_program.Register.t Nonempty.t =
     match t with
     | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
   ;;
 
-  let return_value_register : t -> Register.t = function
+  let return_value_register : t -> Asm_program.Register.t = function
     | C | Umber -> Rax
   ;;
 
-  let reserved_registers : t -> Register.t list = function
+  (* FIXME: figure out what to do with this *)
+  (* let reserved_registers : t -> Asm_program.Register.t list = function
     | C | Umber -> [ (* Stack pointer *) Rsp; (* Frame pointer *) Rbp ]
+  ;; *)
+end
+
+module Virtual_register : sig
+  type t [@@deriving equal, sexp_of]
+
+  include Hashable.S with type t := t
+
+  module Counter : sig
+    type id := t
+    type t
+
+    val create : unit -> t
+    val next : t -> id
+  end
+end = struct
+  include Int
+
+  module Counter = struct
+    type t = int ref
+
+    let create () = ref 0
+
+    let next t =
+      let id = !t in
+      incr t;
+      id
+    ;;
+  end
+end
+
+module Reg_alloc : sig
+  val allocate
+    :  (Label_name.t * Virtual_register.t Instr.t list) list
+    -> register_input_constraints:Asm_program.Register.t Virtual_register.Table.t
+    -> register_output_constraints:Asm_program.Register.t Virtual_register.Table.t
+    -> Instr_group.t list
+end = struct
+  (* TODO: Handle spilling. Per https://en.wikipedia.org/wiki/Brooks%27_theorem, 
+     it's sufficient to check that no node has degree >= # of usable registers. *)
+
+  (* FIXME: Let's just do something very dumb - never reuse any registers within a given
+     function. Trying to be clever and re-use registers by handling lifetimes can wait
+     until later. It's not clear to me the best way to structure the code, though it feels
+     very painful to do without SSA form letting me compute a CFG to then get the
+     interference graph.
+     
+     Ok, this can't work - it means we can never call another function!
+   *)
+
+  (* module Interference_graph = Graph.Imperative.Graph.Concrete (Virtual_register) *)
+
+  (* module Arg_kind = struct
+    type t =
+      | Use
+      | Assignment
+  end *)
+
+  (* FIXME: Maybe we need to insert an implicit use of return registers? *)
+  (* FIXME: "int" can't really properly represent paths through the program - what about
+     jumps? *)
+  (* module Lifetime : sig
+    (** A lifetime is a region of time where a value in a register is live. It corresponds
+        to number of paths of execution through a program, beginning with an initial
+        assignment and ending with a final use (with intermediate assignments and uses in
+        between). *)
+    type t
+
+    val create : unit -> t
+    val add : t -> Arg_kind.t -> int -> unit
+    val is_overlapping : t -> t -> bool
+  end = struct
+    type t =
+      { assignments : Int.Hash_set.t
+      ; uses : Int.Hash_set.t
+      }
+
+    let create () =
+      { assignments = Int.Hash_set.create (); uses = Int.Hash_set.create () }
+    ;;
+
+    let add t kind i =
+      match kind with
+      | Use -> Hash_set.add t.uses i
+      | Assignment -> Hash_set.add t.assignments i
+    ;;
+
+    let is_overlapping t t' = not (Hash_se !t !t')
+  end *)
+
+  (* let instr_args : _ Instr.t -> (Arg_kind.t * _ Value.t) list = function
+    | Mov { dst; src } | Lea { dst; src } -> [ Use, src; Assignment, dst ]
+    | And { dst; src } -> [ Use, src; Use, dst; Assignment, dst ]
+    | Call a | Setz a -> [ Use, a ]
+    | Cmp (a, b) | Test (a, b) -> [ Use, a; Use, b ]
+    | Jmp _ | Jnz _ | Jz _ | Ret -> []
+  ;; *)
+
+  (* FIXME: You have to think about register lifetimes across jumps! Just an index doesn't
+     work? Maybe I need some kind of SSA form...? Atm we never jump backwards so it might
+     be ok...?
+     
+     Problems:
+     - You need to traverse the program while understanding control flow (jumps) and
+       variable lifetimes (assignments, uses). Doing that over asm requires understanding
+       every single instruction. It is likely easier to do with a simpler IR.
+     - I think we kinda need a proper control flow graph to understand lifetimes? Whatever
+       ad-hoc approach I use will likely be a bad re-implementation of that
+
+     Options:
+     - Make a decent effort of doing this now on asm
+     - Do something really trivial like always use the stack and store/load on every use,
+       except for C functions which need arguments in registers.
+  *)
+  (* let create_interference_graph instr_groups =
+    let graph = Interference_graph.create () in
+    (* FIXME: We could traverse the program graph and find which variables are live.
+       We basically want, for each basic block, what are the required inputs for this
+       block? (the variables alive during this block). That makes computing lifetimes easy.
+
+       When we don't have that, it's trickier, we kinda need to track this info ourselves.
+       I guess whenever we try to use a variable, it must be live - maybe good enough?
+    *)
+    let lifetimes = Virtual_register.Table.create () in
+    let index = ref 0 in
+    List.iter instr_groups ~f:(fun ((_ : Label_name.t), instrs) ->
+      List.iter instrs ~f:(fun instr ->
+        List.iter (instr_args instr) ~f:(fun (kind, value) ->
+          let lifetime = Hashtbl.find_or_add lifetimes ~default:Lifetime.create in
+          match kind with
+          | Use ->
+            (* If a value is used, it must be live between now and when it was last
+               assigned. *)
+            ()
+          | Assignment -> ());
+        incr index));
+    graph
+  ;; *)
+
+  let allocate
+    (instr_groups : (Label_name.t * Virtual_register.t Instr.t list) list)
+    ~register_input_constraints
+    ~register_output_constraints
+    =
+    (* Input constraints mean that the virtual register will use the given real register,
+       so immediate take those allocations as given. *)
+    let allocations = Hashtbl.copy register_input_constraints in
+    (* Output constraints mean that the value in the virtual register must end up in the
+       given real register. We can either set the virtual register to be that real
+       register, or do a move. *)
+    let allocate_register
+      :  Virtual_register.t
+      -> Asm_program.Register.t Instr.t option * Asm_program.Register.t
+      =
+     fun virtual_reg ->
+      match Hashtbl.find allocations virtual_reg with
+      | Some real_reg -> None, real_reg
+      | None ->
+        (* FIXME: For output constraints, catch when multiple registers match? *)
+        (match Hashtbl.find register_output_constraints virtual_reg with
+         | None ->
+           (* failwith
+             "TODO: pick any available register - but avoid picking one we'll want to \
+              use somewhere else?" *)
+           None, Rax
+         | Some output_reg -> None, output_reg)
+    in
+    (* FIXME: I think this probably needs to understand Mov, at least? Or maybe we should
+       encode all of that in the constraints. 
+       
+       Ok, let's just go implement some standard algorithm instead of naively rolling my
+       own thing here. Can use graph coloring from ocamlgraph which should make this
+       pretty easy? Just encode the instructions as a graph.
+
+       Nodes are lifetimes of variables (virtual registers). Can use instruction index
+       ranges. Edges are lifetimes that overlap. Need some pre-coloring for input/output
+       constraints.
+
+       PROBLEM: How do you detect when you need to spill?
+    *)
+    List.map instr_groups ~f:(fun (label, instrs) : Instr_group.t ->
+      let instrs =
+        List.concat_map instrs ~f:(fun instr : Asm_program.Register.t Instr.t list ->
+          let added_instrs, instr =
+            Instr.fold_map_args instr ~init:[] ~f:(fun acc arg ->
+              Value.fold_map_registers arg ~init:acc ~f:(fun acc virtual_reg ->
+                let added_instr, reg = allocate_register virtual_reg in
+                Option.to_list added_instr @ acc, reg))
+          in
+          List.rev (instr :: added_instrs))
+      in
+      { label; instrs })
   ;;
 end
 
@@ -63,31 +255,26 @@ module Extern = struct
     | Umber_function
 end
 
-module Register_state = struct
-  type t =
-    | Used
-    | Unused
-end
-
 module Function_builder : sig
   type t
 
   val create : Label_name.t -> t
-  val add_code : t -> Instr.t -> unit
+  val add_code : t -> Virtual_register.t Instr.t -> unit
 
   (* TODO: Consider if this API makes any sense *)
-  val move_values_for_call : t -> call_conv:Call_conv.t -> args:Value.t Nonempty.t -> unit
-  val set_register_state : t -> Register.t -> Register_state.t -> unit
-  val add_local : t -> Mir_name.t -> Value.t -> unit
-  val find_local : t -> Mir_name.t -> Value.t option
-  val position_at_label : t -> Label_name.t -> unit
-  val move_if_needed : t -> Value.t -> target_reg:Register.t -> unit
+  val move_values_for_call
+    :  t
+    -> call_conv:Call_conv.t
+    -> args:Virtual_register.t Value.t Nonempty.t
+    -> unit
 
-  (* TODO: It's not efficient to just randomly pick registers to pick things in. e.g.
-     sometimes you might want to return immediately so you'd like the value to be in rax.
-     To properly do this I think you need to plan ahead a little? Maybe inject some
-     information about the future? *)
-  val pick_available_reg_or_stack : t -> Value.t
+  val add_local : t -> Mir_name.t -> Virtual_register.t Value.t -> unit
+  val find_local : t -> Mir_name.t -> Virtual_register.t Value.t option
+  val position_at_label : t -> Label_name.t -> unit
+  val pick_register : t -> Virtual_register.t
+  val pick_register' : t -> Virtual_register.t Value.t
+  val constrain_register_input : t -> Virtual_register.t -> Asm_program.Register.t -> unit
+  val constrain_output : t -> Virtual_register.t Value.t -> Asm_program.Register.t -> unit
   val name : t -> Label_name.t
   val instr_groups : t -> Instr_group.t list
 end = struct
@@ -95,34 +282,21 @@ end = struct
      register. *)
   type t =
     { fun_name : Label_name.t
-    ; register_states : Register_state.t Register.Table.t
-    ; locals : Value.t Mir_name.Table.t
-    ; code : Instr.t Queue.t Label_name.Hash_queue.t
+    ; register_counter : Virtual_register.Counter.t
+        (* FIXME: Aren't these constraints time-based? Maybe they need to exist in-line
+           with the code, to make the lifetimes explicit? *)
+    ; register_input_constraints : Asm_program.Register.t Virtual_register.Table.t
+    ; register_output_constraints : Asm_program.Register.t Virtual_register.Table.t
+    ; locals : Virtual_register.t Value.t Mir_name.Table.t
+    ; code : Virtual_register.t Instr.t Queue.t Label_name.Hash_queue.t
     ; mutable current_label : Label_name.t
     }
 
   let name t = t.fun_name
+  let pick_register t = Virtual_register.Counter.next t.register_counter
 
-  let create fun_name =
-    let reserved_regisers = Call_conv.reserved_registers Umber in
-    let t =
-      { fun_name
-      ; register_states =
-          List.filter_map
-            Register.all
-            ~f:(fun reg : (Register.t * Register_state.t) option ->
-            (* FIXME: callee saved registers must be marked Used *)
-            if List.mem reserved_regisers reg ~equal:Register.equal
-            then None
-            else Some (reg, Unused))
-          |> Register.Table.of_alist_exn
-      ; locals = Mir_name.Table.create ()
-      ; code = Label_name.Hash_queue.create ()
-      ; current_label = fun_name
-      }
-    in
-    Hash_queue.enqueue_back_exn t.code fun_name (Queue.create ());
-    t
+  let pick_register' t : _ Value.t =
+    Register (Virtual_register.Counter.next t.register_counter)
   ;;
 
   let add_code t instr =
@@ -137,39 +311,55 @@ end = struct
     Queue.enqueue instrs instr
   ;;
 
-  let set_register_state t reg state = Hashtbl.set t.register_states ~key:reg ~data:state
-  let position_at_label t label_name = t.current_label <- label_name
-
-  let add_local t name value =
-    (* FIXME: This should update the register states, I think? Maybe that should be
-       internal to this module though, so you can't forget to do it.
-       
-       PROBLEM: We can't notice when registers become unused. Some notion of lifetimes
-       would be needed to notice this. Alternatively we can fall back on the stack. *)
-    Hashtbl.add_exn t.locals ~key:name ~data:value;
-    match value with
-    | Register reg -> set_register_state t reg Used
-    | Memory _ | Global _ | Constant _ -> ()
+  let constrain_register_input t virtual_reg real_reg =
+    Hashtbl.add_exn t.register_input_constraints ~key:virtual_reg ~data:real_reg
   ;;
 
+  let constrain_register_output t virtual_reg real_reg =
+    Hashtbl.update t.register_output_constraints virtual_reg ~f:(function
+      | None -> real_reg
+      | Some existing ->
+        if Asm_program.Register.equal existing real_reg
+        then real_reg
+        else
+          raise_s
+            [%message
+              "Duplicate output constraint"
+                (virtual_reg : Virtual_register.t)
+                (real_reg : Asm_program.Register.t)
+                (existing : Asm_program.Register.t)])
+  ;;
+
+  let constrain_output t (value : Virtual_register.t Value.t) real_reg =
+    match value with
+    | Register reg -> constrain_register_output t reg real_reg
+    | Memory _ | Global _ | Constant _ ->
+      let target_reg = pick_register t in
+      constrain_register_output t target_reg real_reg;
+      add_code t (Mov { src = value; dst = Register target_reg })
+  ;;
+
+  let create fun_name =
+    (* FIXME: callee saved registers must be marked Used *)
+    let t =
+      { fun_name
+      ; register_counter = Virtual_register.Counter.create ()
+      ; register_input_constraints = Virtual_register.Table.create ()
+      ; register_output_constraints = Virtual_register.Table.create ()
+      ; locals = Mir_name.Table.create ()
+      ; code = Label_name.Hash_queue.create ()
+      ; current_label = fun_name
+      }
+    in
+    Hash_queue.enqueue_back_exn t.code fun_name (Queue.create ());
+    t
+  ;;
+
+  let position_at_label t label_name = t.current_label <- label_name
+  let add_local t name value = Hashtbl.add_exn t.locals ~key:name ~data:value
   let find_local t name = Hashtbl.find t.locals name
 
-  let pick_available_reg_or_stack t : Value.t =
-    (* FIXME: Handle stack *)
-    (* FIXME: You can't pick just any register I think. We need to reserve some of these
-       e.g. stack pointer. *)
-    let reg =
-      Hashtbl.to_alist t.register_states
-      |> List.find_map_exn ~f:(fun (register, state) ->
-           match state with
-           | Unused -> Some register
-           | Used -> None)
-    in
-    Hashtbl.set t.register_states ~key:reg ~data:Used;
-    Register reg
-  ;;
-
-  let move_values_for_call t ~call_conv ~(args : Value.t Nonempty.t) =
+  let move_values_for_call t ~call_conv ~(args : Virtual_register.t Value.t Nonempty.t) =
     (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
        the current and target register states. Be careful about ordering - we need to be
        careful not to clobber any of the args, so we can't just be like "for each arg,
@@ -212,9 +402,14 @@ end = struct
     in
     if Array.length args > Array.length arg_registers
     then failwith "TODO: ran out of registers for args, use stack";
-    (* Set all argument registers as used up-front so we don't try to use them as
+    Array.iter2_exn args arg_registers ~f:(fun arg arg_register ->
+      constrain_output t arg arg_register)
+  ;;
+
+  (* FIXME: cleanup *)
+  (* Set all argument registers as used up-front so we don't try to use them as
        temporary registers. *)
-    Array.iter arg_registers ~f:(fun reg -> set_register_state t reg Used);
+  (* Array.iter arg_registers ~f:(fun reg -> set_register_state t reg Used);
     Array.iteri (Array.zip_exn args arg_registers) ~f:(fun _i (current_loc, target_reg) ->
       match current_loc with
       | Register current_reg ->
@@ -242,19 +437,14 @@ end = struct
             add_code t (Mov { src = Register current_reg; dst = Register target_reg }))
       | (Global _ | Constant _) as src ->
         add_code t (Mov { src; dst = Register target_reg })
-      | Memory _ -> failwith "TODO: memory arg location")
-  ;;
-
-  let move_if_needed t (value : Value.t) ~target_reg =
-    match value with
-    | Register reg when Register.equal reg target_reg -> ()
-    | _ -> add_code t (Mov { src = value; dst = Register target_reg })
-  ;;
+      | Memory _ -> failwith "TODO: memory arg location") *)
 
   let instr_groups t =
     Hash_queue.to_alist t.code
-    |> List.map ~f:(fun (label, instrs) : Instr_group.t ->
-         { label; instrs = Queue.to_list instrs })
+    |> List.map ~f:(fun (label, instrs) -> label, Queue.to_list instrs)
+    |> Reg_alloc.allocate
+         ~register_input_constraints:t.register_output_constraints
+         ~register_output_constraints:t.register_output_constraints
   ;;
 end
 
@@ -375,7 +565,7 @@ let create ~main_function_name =
   }
 ;;
 
-let int_constant_tag tag : Value.t =
+let int_constant_tag tag : _ Value.t =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
   Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1))
 ;;
@@ -397,7 +587,7 @@ let declare_extern_c_function ?mir_name t label_name =
    special handling? Oh, they do because MIR treats function pointers as reasonable values
 *)
 (* TODO: Amend MIR to treat function pointers and closures differently. *)
-let lookup_name_for_value t name ~fun_builder : Value.t =
+let lookup_name_for_value t name ~fun_builder : _ Value.t =
   match Function_builder.find_local fun_builder name with
   | Some value -> value
   | None ->
@@ -424,7 +614,7 @@ let lookup_name_for_value t name ~fun_builder : Value.t =
     Global (closure.closure_name, Other)
 ;;
 
-let lookup_name_for_fun_call t name ~fun_builder : Value.t * Call_conv.t =
+let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
   (* FIXME: Handle calling closures *)
   match Function_builder.find_local fun_builder name with
   | Some closure ->
@@ -441,12 +631,15 @@ let lookup_name_for_fun_call t name ~fun_builder : Value.t * Call_conv.t =
 ;;
 
 (* FIXME: Have to save and restore any caller-save registers. *)
-let codegen_fun_call t fun_name args ~fun_builder : Value.t =
+let codegen_fun_call t fun_name args ~fun_builder : _ Value.t =
   let fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
   Function_builder.move_values_for_call fun_builder ~call_conv ~args;
   Function_builder.add_code fun_builder (Call fun_);
-  let output_register = Call_conv.return_value_register call_conv in
-  Function_builder.set_register_state fun_builder output_register Used;
+  let output_register = Function_builder.pick_register fun_builder in
+  Function_builder.constrain_register_input
+    fun_builder
+    output_register
+    (Call_conv.return_value_register call_conv);
   Register output_register
 ;;
 
@@ -476,7 +669,7 @@ let box t ~tag ~fields ~fun_builder =
   heap_pointer
 ;;
 
-let codegen_literal t (literal : Literal.t) : Value.t =
+let codegen_literal t (literal : Literal.t) : _ Value.t =
   let name =
     Hashtbl.find_or_add t.literals literal ~default:(fun () ->
       let name =
@@ -504,16 +697,17 @@ let check_value_is_block fun_builder value =
   Function_builder.add_code fun_builder (Test (value, Constant (Int 1)))
 ;;
 
+(* FIXME: Simplify with constraints? *)
 (** Insert code such that all the values end up in the same place. *)
 let merge_branches
   fun_builder
-  (label_a, (value_a : Value.t))
-  (label_b, (value_b : Value.t))
+  (label_a, (value_a : _ Value.t))
+  (label_b, (value_b : _ Value.t))
   =
   match value_a, value_b with
   | Register a, Register b ->
     (* FIXME: Unclear if a might be used for something else useful in the b case? *)
-    if not (Register.equal a b)
+    if not (Virtual_register.equal a b)
     then (
       Function_builder.position_at_label fun_builder label_b;
       Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
@@ -526,9 +720,13 @@ let merge_branches
     Function_builder.position_at_label fun_builder label_a;
     Function_builder.add_code fun_builder (Mov { dst = value_b; src = value_a });
     value_b
-  | Memory _, _ | Global _, _ | Constant _, _ ->
-    raise_s
-      [%message "TODO: merge_branches cases" (value_a : Value.t) (value_b : Value.t)]
+  | (Memory _ | Global _ | Constant _), (Memory _ | Global _ | Constant _) ->
+    let dst = Function_builder.pick_register' fun_builder in
+    Function_builder.position_at_label fun_builder label_a;
+    Function_builder.add_code fun_builder (Mov { dst; src = value_a });
+    Function_builder.position_at_label fun_builder label_b;
+    Function_builder.add_code fun_builder (Mov { dst; src = value_b });
+    dst
 ;;
 
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
@@ -656,10 +854,10 @@ and codegen_cond t cond ~fun_builder =
     Function_builder.position_at_label fun_builder end_label
   | And (cond1, cond2) ->
     codegen_cond t cond1 ~fun_builder;
-    let cond1_result = Function_builder.pick_available_reg_or_stack fun_builder in
+    let cond1_result = Function_builder.pick_register' fun_builder in
     Function_builder.add_code fun_builder (Setz cond1_result);
     codegen_cond t cond2 ~fun_builder;
-    let cond2_result = Function_builder.pick_available_reg_or_stack fun_builder in
+    let cond2_result = Function_builder.pick_register' fun_builder in
     Function_builder.add_code fun_builder (Setz cond2_result);
     Function_builder.add_code fun_builder (Test (cond1_result, cond2_result))
 ;;
@@ -679,16 +877,20 @@ let define_function t ~fun_name ~args ~body =
   Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
   let result =
     Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
-      Function_builder.add_local fun_builder arg_name (Register reg))
+      let virtual_reg = Function_builder.pick_register fun_builder in
+      Function_builder.constrain_register_input fun_builder virtual_reg reg;
+      Function_builder.add_local fun_builder arg_name (Register virtual_reg))
   in
   (match result with
    | Same_length | Right_trailing _ -> ()
    | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack");
   let return_value = codegen_expr t body ~fun_builder in
-  Function_builder.move_if_needed
+  Function_builder.constrain_output
     fun_builder
     return_value
-    ~target_reg:(Call_conv.return_value_register call_conv);
+    (Call_conv.return_value_register call_conv);
+  (* FIXME: Don't we have to add ret to every possible return point? The function could
+     finish in multiple different places. *)
   Function_builder.add_code fun_builder Ret
 ;;
 

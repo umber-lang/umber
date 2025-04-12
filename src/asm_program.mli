@@ -60,48 +60,60 @@ module Global_kind : sig
 end
 
 module Value : sig
-  type t =
-    | Register of Register.t
-    | Memory of Size.t * memory_expr
+  type 'reg t =
+    | Register of 'reg
+    | Memory of Size.t * 'reg memory_expr
     | Global of Label_name.t * Global_kind.t
     | Constant of Asm_literal.t
 
-  and memory_expr =
-    | Value of t
-    | Add of memory_expr * memory_expr
+  and 'reg memory_expr =
+    | Value of 'reg t
+    | Add of 'reg memory_expr * 'reg memory_expr
   [@@deriving sexp_of]
 
-  val mem_offset : t -> Size.t -> int -> t
+  val mem_offset : 'reg t -> Size.t -> int -> 'reg t
+
+  val fold_map_registers
+    :  'r1 t
+    -> init:'acc
+    -> f:('acc -> 'r1 -> 'acc * 'r2)
+    -> 'acc * 'r2 t
 end
 
 module Instr : sig
-  type t =
+  type 'reg t =
     | And of
-        { dst : Value.t
-        ; src : Value.t
+        { dst : 'reg Value.t
+        ; src : 'reg Value.t
         }
-    | Call of Value.t
-    | Cmp of Value.t * Value.t
+    | Call of 'reg Value.t
+    | Cmp of 'reg Value.t * 'reg Value.t
     | Jmp of Label_name.t
     | Jnz of Label_name.t
     | Jz of Label_name.t
     | Lea of
-        { dst : Value.t
-        ; src : Value.t
+        { dst : 'reg Value.t
+        ; src : 'reg Value.t
         }
     | Mov of
-        { dst : Value.t
-        ; src : Value.t
+        { dst : 'reg Value.t
+        ; src : 'reg Value.t
         }
     | Ret
-    | Setz of Value.t
-    | Test of Value.t * Value.t
+    | Setz of 'reg Value.t
+    | Test of 'reg Value.t * 'reg Value.t
+
+  val fold_map_args
+    :  'r1 t
+    -> init:'acc
+    -> f:('acc -> 'r1 Value.t -> 'acc * 'r2 Value.t)
+    -> 'acc * 'r2 t
 end
 
 module Instr_group : sig
   type t =
     { label : Label_name.t
-    ; instrs : Instr.t list
+    ; instrs : Register.t Instr.t list
     }
 end
 
