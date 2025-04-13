@@ -12,18 +12,9 @@ open Names
    This is a sad mess :(. Might be best to append a hash and replace any fishy character
    with an underscore
 *)
-module Label_name : sig
-  type t [@@deriving sexp_of]
-
-  include Stringable.S with type t := t
-  include Hashable.S with type t := t
-
-  val of_mir_name : Mir_name.t -> t
-  val of_extern_name : Extern_name.t -> t
-  val to_mir_name : t -> Mir_name.t
-end = struct
+module Label_name = struct
   module T = struct
-    type t = string [@@deriving sexp, compare, hash]
+    type t = string [@@deriving sexp, compare, equal, hash]
   end
 
   include T
@@ -174,6 +165,20 @@ module Value = struct
 
   let mem_offset value size i = Memory (size, Add (Value value, Value (Constant (Int i))))
 
+  let rec fold_registers t ~init ~f =
+    match t with
+    | Register reg -> f init reg
+    | Global _ | Constant _ -> init
+    | Memory ((_ : Size.t), mem) -> fold_registers_memory_expr mem ~init ~f
+
+  and fold_registers_memory_expr mem ~init ~f =
+    match mem with
+    | Value t -> fold_registers t ~init ~f
+    | Add (lhs, rhs) ->
+      let init = fold_registers_memory_expr lhs ~init ~f in
+      fold_registers_memory_expr rhs ~init ~f
+  ;;
+
   let rec fold_map_registers t ~init ~f =
     match t with
     | Register reg ->
@@ -202,47 +207,89 @@ end
 (* TODO: Might make sense to abstract this a little more e.g. group the jumps into one
    variant. Might make some of the code easier to handle. *)
 module Instr = struct
-  type 'reg t =
-    | And of
-        { dst : 'reg Value.t
-        ; src : 'reg Value.t
-        }
-    | Call of 'reg Value.t
-    | Cmp of 'reg Value.t * 'reg Value.t
-    | Jmp of Label_name.t
-    | Jnz of Label_name.t
-    | Jz of Label_name.t
-    | Lea of
-        { dst : 'reg Value.t
-        ; src : 'reg Value.t
-        }
-    | Mov of
-        { dst : 'reg Value.t
-        ; src : 'reg Value.t
-        }
-    | Ret
-    | Setz of 'reg Value.t
-    | Test of 'reg Value.t * 'reg Value.t
-  [@@deriving variants, sexp_of]
+  module Nonterminal = struct
+    type 'reg t =
+      | And of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Call of 'reg Value.t
+      | Cmp of 'reg Value.t * 'reg Value.t
+      | Lea of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Mov of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Setz of 'reg Value.t
+      | Test of 'reg Value.t * 'reg Value.t
+    [@@deriving sexp_of, variants]
 
-  let pp fmt t =
-    let args =
-      match t with
+    let args = function
       | And { dst; src } | Mov { dst; src } | Lea { dst; src } -> [ dst; src ]
       | Cmp (a, b) | Test (a, b) -> [ a; b ]
       | Call x | Setz x -> [ x ]
+    ;;
+
+    let fold_map_args t ~init ~f =
+      match t with
+      | And { dst; src } ->
+        let init, dst = f init dst in
+        let init, src = f init src in
+        init, And { dst; src }
+      | Mov { dst; src } ->
+        let init, dst = f init dst in
+        let init, src = f init src in
+        init, Mov { dst; src }
+      | Lea { dst; src } ->
+        let init, dst = f init dst in
+        let init, src = f init src in
+        init, Lea { dst; src }
+      | Cmp (a, b) ->
+        let init, a = f init a in
+        let init, b = f init b in
+        init, Cmp (a, b)
+      | Test (a, b) ->
+        let init, a = f init a in
+        let init, b = f init b in
+        init, Test (a, b)
+      | Call x ->
+        let init, x = f init x in
+        init, Call x
+      | Setz x ->
+        let init, x = f init x in
+        init, Setz x
+    ;;
+  end
+
+  module Terminal = struct
+    type t =
+      | Jmp of Label_name.t
+      | Jnz of Label_name.t
+      | Jz of Label_name.t
+      | Ret
+    [@@deriving sexp_of, variants]
+
+    let args : t -> _ Value.t list = function
       | Jmp label | Jnz label | Jz label -> [ Global (label, Other) ]
       | Ret -> []
-    in
-    pp_line fmt (String.lowercase (Variants.to_name t)) args ~f:Value.pp
-  ;;
+    ;;
+  end
 
-  (* TODO: Consider properly separating terminators and non-terminators - each block can
-     only have 1 terminator, and terminators can't be present in the middle of the block.
-     Maybe have Instr be a variant of Terminator or Non_terminator. *)
-  let is_terminator = function
-    | Jmp _ | Jnz _ | Jz _ | Ret -> true
-    | And _ | Mov _ | Lea _ | Cmp _ | Test _ | Call _ | Setz _ -> false
+  type 'reg t =
+    | Terminal of Terminal.t
+    | Nonterminal of 'reg Nonterminal.t
+  [@@deriving sexp_of, variants]
+
+  let pp fmt t =
+    let name, args =
+      match t with
+      | Terminal t -> Terminal.Variants.to_name t, Terminal.args t
+      | Nonterminal t -> Nonterminal.Variants.to_name t, Nonterminal.args t
+    in
+    pp_line fmt (String.lowercase name) args ~f:Value.pp
   ;;
 
   let fold_map_args t ~init ~f =
@@ -258,48 +305,32 @@ module Instr = struct
       init, mk label
     in
     match t with
-    | And { dst; src } ->
-      let init, dst = f init dst in
-      let init, src = f init src in
-      init, And { dst; src }
-    | Mov { dst; src } ->
-      let init, dst = f init dst in
-      let init, src = f init src in
-      init, Mov { dst; src }
-    | Lea { dst; src } ->
-      let init, dst = f init dst in
-      let init, src = f init src in
-      init, Lea { dst; src }
-    | Cmp (a, b) ->
-      let init, a = f init a in
-      let init, b = f init b in
-      init, Cmp (a, b)
-    | Test (a, b) ->
-      let init, a = f init a in
-      let init, b = f init b in
-      init, Test (a, b)
-    | Call x ->
-      let init, x = f init x in
-      init, Call x
-    | Setz x ->
-      let init, x = f init x in
-      init, Setz x
-    | Jmp label -> handle_jump init label ~f ~mk:jmp
-    | Jnz label -> handle_jump init label ~f ~mk:jnz
-    | Jz label -> handle_jump init label ~f ~mk:jz
-    | Ret -> init, Ret
+    | Nonterminal t ->
+      let init, t = Nonterminal.fold_map_args t ~init ~f in
+      init, Nonterminal t
+    | Terminal t ->
+      let init, (t : Terminal.t) =
+        match t with
+        | Jmp label -> handle_jump init label ~f ~mk:Terminal.jmp
+        | Jnz label -> handle_jump init label ~f ~mk:Terminal.jnz
+        | Jz label -> handle_jump init label ~f ~mk:Terminal.jz
+        | Ret -> init, Ret
+      in
+      init, Terminal t
   ;;
 end
 
-module Instr_group = struct
-  type t =
+module Basic_block = struct
+  type 'reg t =
     { label : Label_name.t
-    ; instrs : Register.t Instr.t list
+    ; code : 'reg Instr.Nonterminal.t list
+    ; terminal : Instr.Terminal.t
     }
 
-  let pp fmt { label; instrs } =
+  let pp fmt { label; code; terminal } =
     pp_label fmt label;
-    List.iter instrs ~f:(Instr.pp fmt)
+    List.iter code ~f:(Instr.pp fmt << Instr.nonterminal);
+    Instr.pp fmt (Terminal terminal)
   ;;
 end
 
@@ -370,7 +401,7 @@ end
 type t =
   { globals : Global_decl.t list
   ; externs : Label_name.t list
-  ; text_section : Instr_group.t list
+  ; text_section : Register.t Basic_block.t list
   ; rodata_section : Data_decl.t list
   ; bss_section : Bss_decl.t list
   }
@@ -390,7 +421,7 @@ let pp fmt { globals; externs; text_section; rodata_section; bss_section } =
   List.iter externs ~f:(fun name ->
     pp_line fmt "extern" [ Label_name.to_string name ] ~f:Format.pp_print_string);
   Format.pp_print_newline fmt ();
-  pp_section fmt "text" text_section ~align:None ~f:Instr_group.pp;
+  pp_section fmt "text" text_section ~align:None ~f:Basic_block.pp;
   pp_section fmt "rodata" rodata_section ~align:(Some 8) ~f:Data_decl.pp;
   pp_section fmt "bss" bss_section ~align:(Some 8) ~f:Bss_decl.pp
 ;;

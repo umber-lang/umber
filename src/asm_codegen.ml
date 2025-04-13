@@ -25,7 +25,7 @@ open struct
   module Label_name = Label_name
   module Value = Value
   module Instr = Instr
-  module Instr_group = Instr_group
+  module Basic_block = Basic_block
   module Size = Size
   module Data_decl = Data_decl
   module Bss_decl = Bss_decl
@@ -58,8 +58,9 @@ module Call_conv = struct
 end
 
 module Virtual_register : sig
-  type t [@@deriving equal, sexp_of]
+  type t [@@deriving compare, equal, sexp_of]
 
+  include Comparable.S with type t := t
   include Hashable.S with type t := t
 
   module Counter : sig
@@ -97,10 +98,10 @@ end *)
 
 module Reg_alloc : sig
   val allocate
-    :  (Label_name.t * Virtual_register.t Instr.t list) list
+    :  Virtual_register.t Basic_block.t list
     -> register_input_constraints:Asm_program.Register.t Virtual_register.Table.t
     -> register_output_constraints:Asm_program.Register.t Virtual_register.Table.t
-    -> Instr_group.t list
+    -> Asm_program.Register.t Basic_block.t list
 end = struct
   (* TODO: Handle spilling. Per https://en.wikipedia.org/wiki/Brooks%27_theorem, 
      it's sufficient to check that no node has degree >= # of usable registers. *)
@@ -114,13 +115,47 @@ end = struct
      Ok, this can't work - it means we can never call another function!
    *)
 
-  (* module Interference_graph = Graph.Imperative.Graph.Concrete (Virtual_register) *)
+  module Cfg_node = struct
+    type t =
+      | Label of Label_name.t
+      | Ret
+    [@@deriving sexp_of, compare, equal, hash]
+  end
 
-  (* module Arg_kind = struct
+  module Cfg = Graph.Imperative.Digraph.Concrete (Cfg_node)
+
+  let create_cfg ~(basic_blocks : _ Basic_block.t list) =
+    let cfg = Cfg.create () in
+    List.iter basic_blocks ~f:(fun { label; code = _; terminal } ->
+      Cfg.add_vertex cfg (Label label);
+      Cfg.add_edge
+        cfg
+        (Label label)
+        (match terminal with
+         | Jmp label | Jz label | Jnz label -> Label label
+         | Ret -> Ret));
+    cfg
+  ;;
+
+  let fold_cfg_backwards ~cfg node ~init ~f =
+    let rec loop ~cfg node ~init ~f =
+      let init = f init node in
+      List.iter (Cfg.pred cfg node) ~f:(loop ~cfg ~init ~f)
+    in
+    loop ~cfg node ~init ~f
+  ;;
+
+  module Interference_graph = struct
+    module G = Graph.Imperative.Graph.Concrete (Virtual_register)
+    include G
+    include Graph.Coloring.Make (G)
+  end
+
+  module Arg_kind = struct
     type t =
       | Use
       | Assignment
-  end *)
+  end
 
   (* FIXME: Maybe we need to insert an implicit use of return registers? *)
   (* FIXME: "int" can't really properly represent paths through the program - what about
@@ -154,13 +189,17 @@ end = struct
     let is_overlapping t t' = not (Hash_se !t !t')
   end *)
 
-  (* let instr_args : _ Instr.t -> (Arg_kind.t * _ Value.t) list = function
+  (* TODO: Move to Instr module? *)
+  let instr_args : _ Instr.Nonterminal.t -> (Arg_kind.t * _ Value.t) list = function
     | Mov { dst; src } | Lea { dst; src } -> [ Use, src; Assignment, dst ]
-    | And { dst; src } -> [ Use, src; Use, dst; Assignment, dst ]
+    | And { dst; src } ->
+      (* NOTE: It's important that [Use, dst] comes before [Assignment, dst] for the logic
+         calculating lifetimes to work. This reflectts the reality that the register is
+         used *before* being assigned to. *)
+      [ Use, src; Use, dst; Assignment, dst ]
     | Call a | Setz a -> [ Use, a ]
     | Cmp (a, b) | Test (a, b) -> [ Use, a; Use, b ]
-    | Jmp _ | Jnz _ | Jz _ | Ret -> []
-  ;; *)
+  ;;
 
   (* FIXME: You have to think about register lifetimes across jumps! Just an index doesn't
      work? Maybe I need some kind of SSA form...? Atm we never jump backwards so it might
@@ -178,33 +217,52 @@ end = struct
      - Do something really trivial like always use the stack and store/load on every use,
        except for C functions which need arguments in registers.
   *)
-  (* let create_interference_graph instr_groups =
+  let create_interference_graph ~cfg ~(basic_blocks : _ Basic_block.t list) =
+    (* To create a lifetime interference graph from a control-flow graph (CFG), we have
+       to do a backwards traversal over the control flow graph, starting at the return
+       points and moving backwards through jumps. At each step, whenever we encounter a
+       use of a register, we know it must be live. We can trace each use back to an
+       assignment to find the lifetime of the value in the register. *)
+    let basic_blocks =
+      List.map basic_blocks ~f:(fun bb -> bb.label, bb) |> Label_name.Table.of_alist_exn
+    in
     let graph = Interference_graph.create () in
-    (* FIXME: We could traverse the program graph and find which variables are live.
-       We basically want, for each basic block, what are the required inputs for this
-       block? (the variables alive during this block). That makes computing lifetimes easy.
-
-       When we don't have that, it's trickier, we kinda need to track this info ourselves.
-       I guess whenever we try to use a variable, it must be live - maybe good enough?
-    *)
-    let lifetimes = Virtual_register.Table.create () in
-    let index = ref 0 in
-    List.iter instr_groups ~f:(fun ((_ : Label_name.t), instrs) ->
-      List.iter instrs ~f:(fun instr ->
-        List.iter (instr_args instr) ~f:(fun (kind, value) ->
-          let lifetime = Hashtbl.find_or_add lifetimes ~default:Lifetime.create in
-          match kind with
-          | Use ->
-            (* If a value is used, it must be live between now and when it was last
-               assigned. *)
-            ()
-          | Assignment -> ());
-        incr index));
+    fold_cfg_backwards
+      ~cfg
+      Ret
+      ~init:Virtual_register.Set.empty
+      ~f:(fun live_registers cfg_node ->
+      match cfg_node with
+      | Ret -> live_registers
+      | Label label ->
+        let ({ label = _; code; terminal = _ } : _ Basic_block.t) =
+          Hashtbl.find_exn basic_blocks label
+        in
+        List.fold_right code ~init:live_registers ~f:(fun instr live_registers ->
+          List.fold_right
+            (instr_args instr)
+            ~init:live_registers
+            ~f:(fun (kind, value) live_registers ->
+            match kind with
+            | Use ->
+              (* When a variable is used, we know it must be live at this point. *)
+              let live_registers =
+                Value.fold_registers value ~init:live_registers ~f:Set.add
+              in
+              Set.iter live_registers ~f:(fun reg1 ->
+                Set.iter live_registers ~f:(fun reg2 ->
+                  Interference_graph.add_edge graph reg1 reg2));
+              live_registers
+            | Assignment ->
+              (* When a variable is assigned to, it doesn't have to be live before this
+                 point anymore. There is a "hole" in the lifetime between the assignment
+                 and the previous use where the register isn't needed. *)
+              Value.fold_registers value ~init:live_registers ~f:Set.remove)));
     graph
-  ;; *)
+  ;;
 
   let allocate
-    (instr_groups : (Label_name.t * Virtual_register.t Instr.t list) list)
+    (basic_blocks : Virtual_register.t Basic_block.t list)
     ~register_input_constraints
     ~register_output_constraints
     =
@@ -216,7 +274,7 @@ end = struct
        register, or do a move. *)
     let allocate_register
       :  Virtual_register.t
-      -> Asm_program.Register.t Instr.t option * Asm_program.Register.t
+      -> Asm_program.Register.t Instr.Nonterminal.t option * Asm_program.Register.t
       =
      fun virtual_reg ->
       match Hashtbl.find allocations virtual_reg with
@@ -244,18 +302,18 @@ end = struct
 
        PROBLEM: How do you detect when you need to spill?
     *)
-    List.map instr_groups ~f:(fun (label, instrs) : Instr_group.t ->
-      let instrs =
-        List.concat_map instrs ~f:(fun instr : Asm_program.Register.t Instr.t list ->
+    List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
+      let code =
+        List.concat_map code ~f:(fun instr ->
           let added_instrs, instr =
-            Instr.fold_map_args instr ~init:[] ~f:(fun acc arg ->
+            Instr.Nonterminal.fold_map_args instr ~init:[] ~f:(fun acc arg ->
               Value.fold_map_registers arg ~init:acc ~f:(fun acc virtual_reg ->
                 let added_instr, reg = allocate_register virtual_reg in
                 Option.to_list added_instr @ acc, reg))
           in
           List.rev (instr :: added_instrs))
       in
-      { label; instrs })
+      { label; code; terminal })
   ;;
 end
 
@@ -269,7 +327,8 @@ module Function_builder : sig
   type t
 
   val create : Label_name.t -> t
-  val add_code : t -> Virtual_register.t Instr.t -> unit
+  val add_code : t -> Virtual_register.t Instr.Nonterminal.t -> unit
+  val add_terminal : t -> Instr.Terminal.t -> unit
 
   (* TODO: Consider if this API makes any sense *)
   val move_values_for_call
@@ -286,8 +345,17 @@ module Function_builder : sig
   val constrain_register_input : t -> Virtual_register.t -> Asm_program.Register.t -> unit
   val constrain_output : t -> Virtual_register.t Value.t -> Asm_program.Register.t -> unit
   val name : t -> Label_name.t
-  val instr_groups : t -> Instr_group.t list
+  val basic_blocks : t -> Asm_program.Register.t Basic_block.t list
 end = struct
+  module Block_builder = struct
+    type t =
+      { code : Virtual_register.t Instr.Nonterminal.t Queue.t
+      ; terminal : Instr.Terminal.t Set_once.t
+      }
+
+    let create () = { code = Queue.create (); terminal = Set_once.create () }
+  end
+
   (* TODO: Represents a partial codegened function. We need to consider the state of each
      register. *)
   type t =
@@ -298,7 +366,7 @@ end = struct
     ; register_input_constraints : Asm_program.Register.t Virtual_register.Table.t
     ; register_output_constraints : Asm_program.Register.t Virtual_register.Table.t
     ; locals : Virtual_register.t Value.t Mir_name.Table.t
-    ; code : Virtual_register.t Instr.t Queue.t Label_name.Hash_queue.t
+    ; basic_blocks : Block_builder.t Label_name.Hash_queue.t
     ; mutable current_label : Label_name.t
     }
 
@@ -309,17 +377,17 @@ end = struct
     Register (Virtual_register.Counter.next t.register_counter)
   ;;
 
-  let add_code t instr =
-    let instrs =
-      match Hash_queue.lookup t.code t.current_label with
-      | Some instrs -> instrs
-      | None ->
-        let instrs = Queue.create () in
-        Hash_queue.enqueue_back_exn t.code t.current_label instrs;
-        instrs
-    in
-    Queue.enqueue instrs instr
+  let get_bb t =
+    match Hash_queue.lookup t.basic_blocks t.current_label with
+    | Some bb -> bb
+    | None ->
+      let bb = Block_builder.create () in
+      Hash_queue.enqueue_back_exn t.basic_blocks t.current_label bb;
+      bb
   ;;
+
+  let add_code t instr = Queue.enqueue (get_bb t).code instr
+  let add_terminal t terminal = Set_once.set_exn (get_bb t).terminal [%here] terminal
 
   let constrain_register_input t virtual_reg real_reg =
     Hashtbl.add_exn t.register_input_constraints ~key:virtual_reg ~data:real_reg
@@ -357,11 +425,11 @@ end = struct
       ; register_input_constraints = Virtual_register.Table.create ()
       ; register_output_constraints = Virtual_register.Table.create ()
       ; locals = Mir_name.Table.create ()
-      ; code = Label_name.Hash_queue.create ()
+      ; basic_blocks = Label_name.Hash_queue.create ()
       ; current_label = fun_name
       }
     in
-    Hash_queue.enqueue_back_exn t.code fun_name (Queue.create ());
+    Hash_queue.enqueue_back_exn t.basic_blocks fun_name (Block_builder.create ());
     t
   ;;
 
@@ -449,27 +517,17 @@ end = struct
         add_code t (Mov { src; dst = Register target_reg })
       | Memory _ -> failwith "TODO: memory arg location") *)
 
-  let verify_instr_group label instrs =
-    match List.last instrs with
-    | None -> compiler_bug [%message "Empty instr group" (label : Label_name.t)]
-    | Some last_instr ->
-      if not (Instr.is_terminator last_instr)
-      then
-        compiler_bug
-          [%message
-            "Instr group does not end in terminator"
-              (label : Label_name.t)
-              (instrs : Virtual_register.t Instr.t list)]
-  ;;
-
-  let instr_groups t =
-    let instr_groups =
-      Hash_queue.to_alist t.code
-      |> List.map ~f:(fun (label, instrs) -> label, Queue.to_list instrs)
+  let basic_blocks t =
+    let basic_blocks =
+      Hash_queue.to_alist t.basic_blocks
+      |> List.map ~f:(fun (label, { code; terminal }) : _ Basic_block.t ->
+           { label
+           ; code = Queue.to_list code
+           ; terminal = Set_once.get_exn terminal [%here]
+           })
     in
-    List.iter instr_groups ~f:(fun (label, instrs) -> verify_instr_group label instrs);
     Reg_alloc.allocate
-      instr_groups
+      basic_blocks
       ~register_input_constraints:t.register_output_constraints
       ~register_output_constraints:t.register_output_constraints
   ;;
@@ -566,8 +624,8 @@ let to_program
            | C_function name -> name
            | Umber_function -> Label_name.of_mir_name mir_name)
   ; text_section =
-      Function_builder.instr_groups main_function
-      @ List.concat_map functions ~f:Function_builder.instr_groups
+      Function_builder.basic_blocks main_function
+      @ List.concat_map functions ~f:Function_builder.basic_blocks
   ; rodata_section =
       List.map literals ~f:(fun (literal, label) : Data_decl.t ->
         { label; payloads = constant_block_for_literal literal })
@@ -764,9 +822,9 @@ let merge_branches
      just contains "Ret". We could try to avoid doing this or add an extra pass to optimize
      these. Unclear if it's worth much. *)
   Function_builder.position_at_label fun_builder label_a;
-  Function_builder.add_code fun_builder (Jmp merge_label);
+  Function_builder.add_terminal fun_builder (Jmp merge_label);
   Function_builder.position_at_label fun_builder label_b;
-  Function_builder.add_code fun_builder (Jmp merge_label);
+  Function_builder.add_terminal fun_builder (Jmp merge_label);
   Function_builder.position_at_label fun_builder merge_label;
   value
 ;;
@@ -827,7 +885,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
            generate code properly, we need to make sure it ends up in the same place
            every time. Enforce it's always in the same place. *)
         Function_builder.add_local fun_builder var var_value);
-      Function_builder.add_code fun_builder (Jmp body_label)
+      Function_builder.add_terminal fun_builder (Jmp body_label)
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
       if i <> 0 then Function_builder.position_at_label fun_builder (cond_label i);
@@ -835,7 +893,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       let next_label =
         if i < n_conds - 1 then cond_label (i + 1) else if_none_matched_label
       in
-      Function_builder.add_code fun_builder (Jnz next_label);
+      Function_builder.add_terminal fun_builder (Jnz next_label);
       Function_builder.position_at_label fun_builder (vars_label i);
       (* If we didn't jump, the condition succeeded, so set the variables. *)
       assign_vars_and_jump_to_body var_exprs);
@@ -887,9 +945,9 @@ and codegen_cond t cond ~fun_builder =
     (* FIXME: mint new label names *)
     let is_block_label = Label_name.of_string "non_constant_tag_equals.is_block" in
     let end_label = Label_name.of_string "non_constant_tag_equals.end" in
-    Function_builder.add_code fun_builder (Jz is_block_label);
+    Function_builder.add_terminal fun_builder (Jz is_block_label);
     (* If it's not a block, we want to "return false" (ZF = 0). This is already the case. *)
-    Function_builder.add_code fun_builder (Jmp end_label);
+    Function_builder.add_terminal fun_builder (Jmp end_label);
     (* If it's a block, check the tag. *)
     Function_builder.position_at_label fun_builder is_block_label;
     Function_builder.add_code
@@ -933,7 +991,7 @@ let define_function t ~fun_name ~args ~body =
     fun_builder
     return_value
     (Call_conv.return_value_register call_conv);
-  Function_builder.add_code fun_builder Ret
+  Function_builder.add_terminal fun_builder Ret
 ;;
 
 let codegen_stmt t stmt =
@@ -976,7 +1034,7 @@ let main_function_name ~(module_path : Module_path.Absolute.t) =
 let of_mir ~module_path mir =
   let t = create ~main_function_name:(main_function_name ~module_path) in
   List.iter mir ~f:(codegen_stmt t);
-  Function_builder.add_code t.main_function Ret;
+  Function_builder.add_terminal t.main_function Ret;
   t
 ;;
 
@@ -1002,7 +1060,7 @@ let compile_entry_module ~module_paths ~entry_file =
     let fun_name = main_function_name ~module_path in
     Hashtbl.add_exn t.externs ~key:(Label_name.to_mir_name fun_name) ~data:Umber_function;
     Function_builder.add_code t.main_function (Call (Global (fun_name, Extern_proc))));
-  Function_builder.add_code t.main_function Ret;
+  Function_builder.add_terminal t.main_function Ret;
   compile_to_object_file t ~output_file:entry_file
 ;;
 
@@ -1012,15 +1070,15 @@ let%expect_test "hello world" =
     ; externs = [ Label_name.of_string "puts" ]
     ; text_section =
         [ { label = Label_name.of_string "main"
-          ; instrs =
+          ; code =
               [ Lea
                   { dst = Register Rdi
                   ; src =
                       Memory (I64, Value (Global (Label_name.of_string "message", Other)))
                   }
               ; Call (Global (Label_name.of_string "puts", Extern_proc))
-              ; Ret
               ]
+          ; terminal = Ret
           }
         ]
     ; rodata_section =

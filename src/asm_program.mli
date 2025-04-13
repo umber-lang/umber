@@ -2,7 +2,7 @@ open Import
 open Names
 
 module Label_name : sig
-  type t [@@deriving sexp_of]
+  type t [@@deriving compare, equal, sexp_of]
 
   include Stringable.S with type t := t
   include Hashable.S with type t := t
@@ -72,6 +72,7 @@ module Value : sig
   [@@deriving sexp_of]
 
   val mem_offset : 'reg t -> Size.t -> int -> 'reg t
+  val fold_registers : 'reg t -> init:'acc -> f:('acc -> 'reg -> 'acc) -> 'acc
 
   val fold_map_registers
     :  'r1 t
@@ -81,31 +82,46 @@ module Value : sig
 end
 
 module Instr : sig
-  type 'reg t =
-    | And of
-        { dst : 'reg Value.t
-        ; src : 'reg Value.t
-        }
-    | Call of 'reg Value.t
-    | Cmp of 'reg Value.t * 'reg Value.t
-    | Jmp of Label_name.t
-    | Jnz of Label_name.t
-    | Jz of Label_name.t
-    | Lea of
-        { dst : 'reg Value.t
-        ; src : 'reg Value.t
-        }
-    | Mov of
-        { dst : 'reg Value.t
-        ; src : 'reg Value.t
-        }
-    | Ret
-    | Setz of 'reg Value.t
-    | Test of 'reg Value.t * 'reg Value.t
-  [@@deriving sexp_of]
+  module Nonterminal : sig
+    type 'reg t =
+      | And of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Call of 'reg Value.t
+      | Cmp of 'reg Value.t * 'reg Value.t
+      | Lea of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Mov of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Setz of 'reg Value.t
+      | Test of 'reg Value.t * 'reg Value.t
+    [@@deriving sexp_of]
 
-  (** Returns [true] iff the instruction is valid to terminator an instruction group. *)
-  val is_terminator : _ t -> bool
+    val fold_map_args
+      :  'r1 t
+      -> init:'acc
+      -> f:('acc -> 'r1 Value.t -> 'acc * 'r2 Value.t)
+      -> 'acc * 'r2 t
+  end
+
+  module Terminal : sig
+    type t =
+      | Jmp of Label_name.t
+      | Jnz of Label_name.t
+      | Jz of Label_name.t
+      | Ret
+    [@@deriving sexp_of]
+  end
+
+  type 'reg t =
+    | Terminal of Terminal.t
+    | Nonterminal of 'reg Nonterminal.t
+  [@@deriving sexp_of]
 
   val fold_map_args
     :  'r1 t
@@ -114,10 +130,11 @@ module Instr : sig
     -> 'acc * 'r2 t
 end
 
-module Instr_group : sig
-  type t =
+module Basic_block : sig
+  type 'reg t =
     { label : Label_name.t
-    ; instrs : Register.t Instr.t list
+    ; code : 'reg Instr.Nonterminal.t list
+    ; terminal : Instr.Terminal.t
     }
 end
 
@@ -154,7 +171,7 @@ end
 type t =
   { globals : Global_decl.t list
   ; externs : Label_name.t list
-  ; text_section : Instr_group.t list
+  ; text_section : Register.t Basic_block.t list
   ; rodata_section : Data_decl.t list
   ; bss_section : Bss_decl.t list
   }
