@@ -171,38 +171,6 @@ end = struct
       | Assignment
   end
 
-  (* FIXME: Maybe we need to insert an implicit use of return registers? *)
-  (* FIXME: "int" can't really properly represent paths through the program - what about
-     jumps? *)
-  (* module Lifetime : sig
-    (** A lifetime is a region of time where a value in a register is live. It corresponds
-        to number of paths of execution through a program, beginning with an initial
-        assignment and ending with a final use (with intermediate assignments and uses in
-        between). *)
-    type t
-
-    val create : unit -> t
-    val add : t -> Arg_kind.t -> int -> unit
-    val is_overlapping : t -> t -> bool
-  end = struct
-    type t =
-      { assignments : Int.Hash_set.t
-      ; uses : Int.Hash_set.t
-      }
-
-    let create () =
-      { assignments = Int.Hash_set.create (); uses = Int.Hash_set.create () }
-    ;;
-
-    let add t kind i =
-      match kind with
-      | Use -> Hash_set.add t.uses i
-      | Assignment -> Hash_set.add t.assignments i
-    ;;
-
-    let is_overlapping t t' = not (Hash_se !t !t')
-  end *)
-
   (* TODO: Move to Instr module? *)
   let instr_args : _ Instr.Nonterminal.t -> (Arg_kind.t * _ Value.t) list = function
     | Mov { dst; src } | Lea { dst; src } -> [ Use, src; Assignment, dst ]
@@ -215,22 +183,6 @@ end = struct
     | Cmp (a, b) | Test (a, b) -> [ Use, a; Use, b ]
   ;;
 
-  (* FIXME: You have to think about register lifetimes across jumps! Just an index doesn't
-     work? Maybe I need some kind of SSA form...? Atm we never jump backwards so it might
-     be ok...?
-     
-     Problems:
-     - You need to traverse the program while understanding control flow (jumps) and
-       variable lifetimes (assignments, uses). Doing that over asm requires understanding
-       every single instruction. It is likely easier to do with a simpler IR.
-     - I think we kinda need a proper control flow graph to understand lifetimes? Whatever
-       ad-hoc approach I use will likely be a bad re-implementation of that
-
-     Options:
-     - Make a decent effort of doing this now on asm
-     - Do something really trivial like always use the stack and store/load on every use,
-       except for C functions which need arguments in registers.
-  *)
   let create_interference_graph ~cfg ~(basic_blocks : _ Basic_block.t list) =
     (* To create a lifetime interference graph from a control-flow graph (CFG), we have
        to do a backwards traversal over the control flow graph, starting at the return
@@ -283,19 +235,6 @@ end = struct
   ;;
 
   let allocate (basic_blocks : Register.t Basic_block.t list) =
-    (* FIXME: I think this probably needs to understand Mov, at least? Or maybe we should
-       encode all of that in the constraints. 
-       
-       Ok, let's just go implement some standard algorithm instead of naively rolling my
-       own thing here. Can use graph coloring from ocamlgraph which should make this
-       pretty easy? Just encode the instructions as a graph.
-
-       Nodes are lifetimes of variables (virtual registers). Can use instruction index
-       ranges. Edges are lifetimes that overlap. Need some pre-coloring for input/output
-       constraints.
-
-       PROBLEM: How do you detect when you need to spill?
-    *)
     eprint_s [%here] [%lazy_message (basic_blocks : Register.t Basic_block.t list)];
     let cfg = create_cfg ~basic_blocks in
     eprint_s
@@ -390,18 +329,6 @@ end = struct
     in
     basic_blocks
   ;;
-  (* List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
-      let code =
-        List.concat_map code ~f:(fun instr ->
-          let added_instrs, instr =
-            Instr.Nonterminal.fold_map_args instr ~init:[] ~f:(fun acc arg ->
-              Value.fold_map_registers arg ~init:acc ~f:(fun acc virtual_reg ->
-                let added_instr, reg = allocate_register virtual_reg in
-                Option.to_list added_instr @ acc, reg))
-          in
-          List.rev (instr :: added_instrs))
-      in
-      { label; code; terminal }) *)
 end
 
 module Extern = struct
