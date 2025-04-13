@@ -234,32 +234,13 @@ end = struct
     graph
   ;;
 
-  let allocate (basic_blocks : Register.t Basic_block.t list) =
-    eprint_s [%here] [%lazy_message (basic_blocks : Register.t Basic_block.t list)];
-    let cfg = create_cfg ~basic_blocks in
-    eprint_s
-      [%here]
-      [%lazy_message
-        ""
-          ~cfg:
-            (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
-              : (Cfg_node.t * Cfg_node.t) list)];
-    let interference_graph = create_interference_graph ~cfg ~basic_blocks in
+  let color_and_allocate
+    ~(basic_blocks : Register.t Basic_block.t list)
+    ~interference_graph
+    =
     let all_available_registers =
       Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
     in
-    (* FIXME: Check in advance if there is any vertex with degree > N - 1, and pick things
-       to spill before trying to color. *)
-    eprint_s
-      [%here]
-      [%lazy_message
-        ""
-          ~interference_graph:
-            (Interference_graph.fold_edges
-               (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
-               interference_graph
-               []
-              : (Register.t * Register.t) list)];
     let coloring =
       Interference_graph.coloring interference_graph (Set.length all_available_registers)
     in
@@ -328,6 +309,32 @@ end = struct
         available_registers, ({ label; code; terminal } : _ Basic_block.t))
     in
     basic_blocks
+  ;;
+
+  let allocate (basic_blocks : Register.t Basic_block.t list) =
+    eprint_s [%here] [%lazy_message (basic_blocks : Register.t Basic_block.t list)];
+    let cfg = create_cfg ~basic_blocks in
+    eprint_s
+      [%here]
+      [%lazy_message
+        ""
+          ~cfg:
+            (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
+              : (Cfg_node.t * Cfg_node.t) list)];
+    let interference_graph = create_interference_graph ~cfg ~basic_blocks in
+    (* FIXME: Check in advance if there is any vertex with degree > N - 1, and pick things
+       to spill before trying to color. *)
+    eprint_s
+      [%here]
+      [%lazy_message
+        ""
+          ~interference_graph:
+            (Interference_graph.fold_edges
+               (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
+               interference_graph
+               []
+              : (Register.t * Register.t) list)];
+    color_and_allocate ~basic_blocks ~interference_graph
   ;;
 end
 
