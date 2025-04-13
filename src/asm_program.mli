@@ -111,10 +111,13 @@ module Instr : sig
 
   module Terminal : sig
     type t =
-      | Jmp of Label_name.t
-      | Jnz of Label_name.t
-      | Jz of Label_name.t
       | Ret
+      | Jump of Label_name.t
+      | Jump_if of
+          { cond : [ `Zero | `Nonzero ]
+          ; then_ : Label_name.t
+          ; else_ : Label_name.t
+          }
     [@@deriving sexp_of]
   end
 
@@ -123,11 +126,12 @@ module Instr : sig
     | Nonterminal of 'reg Nonterminal.t
   [@@deriving sexp_of]
 
-  val fold_map_args
+  (* FIXME: Cleanup. Also, do we even need the [Instr] type? *)
+  (* val fold_map_args
     :  'r1 t
     -> init:'acc
     -> f:('acc -> 'r1 Value.t -> 'acc * 'r2 Value.t)
-    -> 'acc * 'r2 t
+    -> 'acc * 'r2 t *)
 end
 
 module Basic_block : sig

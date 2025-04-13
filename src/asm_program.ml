@@ -266,14 +266,27 @@ module Instr = struct
 
   module Terminal = struct
     type t =
-      | Jmp of Label_name.t
-      | Jnz of Label_name.t
-      | Jz of Label_name.t
       | Ret
+      | Jump of Label_name.t
+      | Jump_if of
+          { cond : [ `Zero | `Nonzero ]
+          ; then_ : Label_name.t
+          ; else_ : Label_name.t
+          }
     [@@deriving sexp_of, variants]
 
+    let name = function
+      | Ret -> "ret"
+      | Jump _ -> "jmp"
+      | Jump_if { cond; _ } ->
+        (match cond with
+         | `Zero -> "jz"
+         | `Nonzero -> "jnz")
+    ;;
+
     let args : t -> _ Value.t list = function
-      | Jmp label | Jnz label | Jz label -> [ Global (label, Other) ]
+      | Jump label | Jump_if { cond = _; then_ = label; else_ = _ } ->
+        [ Global (label, Other) ]
       | Ret -> []
     ;;
   end
@@ -286,13 +299,14 @@ module Instr = struct
   let pp fmt t =
     let name, args =
       match t with
-      | Terminal t -> Terminal.Variants.to_name t, Terminal.args t
+      | Terminal t -> Terminal.name t, Terminal.args t
       | Nonterminal t -> Nonterminal.Variants.to_name t, Nonterminal.args t
     in
     pp_line fmt (String.lowercase name) args ~f:Value.pp
   ;;
 
-  let fold_map_args t ~init ~f =
+  (* FIXME: cleanup *)
+  (* let fold_map_args t ~init ~f =
     let handle_jump init label ~(f : _ -> _ Value.t -> _ * _ Value.t) ~mk =
       let init, value = f init (Global (label, Other)) in
       let label =
@@ -316,8 +330,7 @@ module Instr = struct
         | Jz label -> handle_jump init label ~f ~mk:Terminal.jz
         | Ret -> init, Ret
       in
-      init, Terminal t
-  ;;
+      init, Terminal t *)
 end
 
 module Basic_block = struct

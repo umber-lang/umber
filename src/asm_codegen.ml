@@ -127,16 +127,13 @@ end = struct
     let cfg = Cfg.create () in
     List.iter basic_blocks ~f:(fun { label; code = _; terminal } ->
       Cfg.add_vertex cfg (Label label);
-      (* FIXME: We also implicitly go to the next block, which seems kinda awful btw.
-      
-         How about we abstract over jumps and have to explicitly list each block we jump
-         to? I could then add an extra pass later to eliminate jumps to the next line. *)
-      Cfg.add_edge
-        cfg
-        (Label label)
-        (match terminal with
-         | Jmp label | Jz label | Jnz label -> Label label
-         | Ret -> Ret));
+      let other_nodes : Cfg_node.t list =
+        match terminal with
+        | Ret -> [ Ret ]
+        | Jump label -> [ Label label ]
+        | Jump_if { cond = _; then_; else_ } -> [ Label then_; Label else_ ]
+      in
+      List.iter other_nodes ~f:(fun node -> Cfg.add_edge cfg (Label label) node));
     cfg
   ;;
 
@@ -829,9 +826,9 @@ let merge_branches
      just contains "Ret". We could try to avoid doing this or add an extra pass to optimize
      these. Unclear if it's worth much. *)
   Function_builder.position_at_label fun_builder label_a;
-  Function_builder.add_terminal fun_builder (Jmp merge_label);
+  Function_builder.add_terminal fun_builder (Jump merge_label);
   Function_builder.position_at_label fun_builder label_b;
-  Function_builder.add_terminal fun_builder (Jmp merge_label);
+  Function_builder.add_terminal fun_builder (Jump merge_label);
   Function_builder.position_at_label fun_builder merge_label;
   value
 ;;
@@ -892,7 +889,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
            generate code properly, we need to make sure it ends up in the same place
            every time. Enforce it's always in the same place. *)
         Function_builder.add_local fun_builder var var_value);
-      Function_builder.add_terminal fun_builder (Jmp body_label)
+      Function_builder.add_terminal fun_builder (Jump body_label)
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
       if i <> 0 then Function_builder.position_at_label fun_builder (cond_label i);
@@ -900,8 +897,11 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       let next_label =
         if i < n_conds - 1 then cond_label (i + 1) else if_none_matched_label
       in
-      Function_builder.add_terminal fun_builder (Jnz next_label);
-      Function_builder.position_at_label fun_builder (vars_label i);
+      let vars_label = vars_label i in
+      Function_builder.add_terminal
+        fun_builder
+        (Jump_if { cond = `Nonzero; then_ = next_label; else_ = vars_label });
+      Function_builder.position_at_label fun_builder vars_label;
       (* If we didn't jump, the condition succeeded, so set the variables. *)
       assign_vars_and_jump_to_body var_exprs);
     (* TODO: We kinda have to represent something like phi nodes, where the branches
@@ -952,9 +952,11 @@ and codegen_cond t cond ~fun_builder =
     (* FIXME: mint new label names *)
     let is_block_label = Label_name.of_string "non_constant_tag_equals.is_block" in
     let end_label = Label_name.of_string "non_constant_tag_equals.end" in
-    Function_builder.add_terminal fun_builder (Jz is_block_label);
-    (* If it's not a block, we want to "return false" (ZF = 0). This is already the case. *)
-    Function_builder.add_terminal fun_builder (Jmp end_label);
+    (* If it's not a block, we want to "return false" (ZF = 0). This is already the case,
+       so we can jump to the end in the [else_] case. *)
+    Function_builder.add_terminal
+      fun_builder
+      (Jump_if { cond = `Zero; then_ = is_block_label; else_ = end_label });
     (* If it's a block, check the tag. *)
     Function_builder.position_at_label fun_builder is_block_label;
     Function_builder.add_code
