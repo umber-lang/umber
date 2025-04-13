@@ -73,6 +73,7 @@ module Value : sig
   [@@deriving sexp_of]
 
   val mem_offset : 'reg t -> Size.t -> int -> 'reg t
+  val map_registers : 'r1 t -> f:('r1 -> 'r2) -> 'r2 t
   val fold_registers : 'reg t -> init:'acc -> f:('acc -> 'reg -> 'acc) -> 'acc
 
   val fold_map_registers
@@ -102,6 +103,8 @@ module Instr : sig
       | Setz of 'reg Value.t
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of]
+
+    val map_args : 'r1 t -> f:('r1 Value.t -> 'r2 Value.t) -> 'r2 t
 
     val fold_map_args
       :  'r1 t

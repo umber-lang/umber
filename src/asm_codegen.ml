@@ -234,6 +234,48 @@ end = struct
     graph
   ;;
 
+  (** Find cases where multiple registers do not interfere with each other and are
+      related by moves, and coalesce them into one virtual register.*)
+  let coalesce_registers
+    ~(basic_blocks : Register.t Basic_block.t list)
+    ~interference_graph
+    =
+    let coalesced_registers = Virtual_register.Table.create () in
+    List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
+      let code =
+        List.filter_map code ~f:(fun instr ->
+          match instr with
+          | Mov { src = Register src_reg; dst = Register dst_reg } ->
+            (match src_reg, dst_reg with
+             | Real _, Real _ -> Some instr
+             | (Virtual reg_to_coalesce as node), ((Real _ | Virtual _) as other_reg)
+             | (Real _ as other_reg), (Virtual reg_to_coalesce as node) ->
+               if Interference_graph.mem_edge interference_graph src_reg dst_reg
+               then Some instr
+               else (
+                 ignore
+                   (Hashtbl.add coalesced_registers ~key:reg_to_coalesce ~data:other_reg
+                     : [ `Ok | `Duplicate ]);
+                 if Interference_graph.mem_vertex interference_graph node
+                 then (
+                   let neighbours = Interference_graph.succ interference_graph node in
+                   List.iter neighbours ~f:(fun neighbour ->
+                     Interference_graph.add_edge interference_graph other_reg neighbour);
+                   Interference_graph.remove_vertex interference_graph node);
+                 None))
+          | instr ->
+            Some
+              (Instr.Nonterminal.map_args instr ~f:(fun value ->
+                 Value.map_registers value ~f:(fun reg ->
+                   match reg with
+                   | Real _ -> reg
+                   | Virtual virtual_reg ->
+                     Hashtbl.find coalesced_registers virtual_reg
+                     |> Option.value ~default:reg))))
+      in
+      { label; code; terminal })
+  ;;
+
   let color_and_allocate
     ~(basic_blocks : Register.t Basic_block.t list)
     ~interference_graph
@@ -334,6 +376,7 @@ end = struct
                interference_graph
                []
               : (Register.t * Register.t) list)];
+    let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
     color_and_allocate ~basic_blocks ~interference_graph
   ;;
 end
@@ -1144,8 +1187,7 @@ let%expect_test "hello world, from MIR" =
     umber_main#HelloWorld:
                mov       rdi, string.210886959
                call      umber_print_endline wrt ..plt
-               mov       rax, r9
-               mov       qword [HelloWorld.#binding.1], r9
+               mov       qword [HelloWorld.#binding.1], rax
                ret
 
                section   .rodata

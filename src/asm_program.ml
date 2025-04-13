@@ -166,6 +166,21 @@ module Value = struct
 
   let mem_offset value size i = Memory (size, Add (Value value, Value (Constant (Int i))))
 
+  let rec map_registers t ~f =
+    match t with
+    | Register reg -> Register (f reg)
+    | (Global _ | Constant _) as t -> t
+    | Memory (size, mem) -> Memory (size, map_registers_memory_expr mem ~f)
+
+  and map_registers_memory_expr mem ~f =
+    match mem with
+    | Value t -> Value (map_registers t ~f)
+    | Add (lhs, rhs) ->
+      let lhs = map_registers_memory_expr lhs ~f in
+      let rhs = map_registers_memory_expr rhs ~f in
+      Add (lhs, rhs)
+  ;;
+
   let rec fold_registers t ~init ~f =
     match t with
     | Register reg -> f init reg
@@ -232,6 +247,32 @@ module Instr = struct
       | And { dst; src } | Mov { dst; src } | Lea { dst; src } -> [ dst; src ]
       | Cmp (a, b) | Test (a, b) -> [ a; b ]
       | Call x | Setz x -> [ x ]
+    ;;
+
+    let map_args t ~f =
+      match t with
+      | And { dst; src } ->
+        let dst = f dst in
+        let src = f src in
+        And { dst; src }
+      | Mov { dst; src } ->
+        let dst = f dst in
+        let src = f src in
+        Mov { dst; src }
+      | Lea { dst; src } ->
+        let dst = f dst in
+        let src = f src in
+        Lea { dst; src }
+      | Cmp (a, b) ->
+        let a = f a in
+        let b = f b in
+        Cmp (a, b)
+      | Test (a, b) ->
+        let a = f a in
+        let b = f b in
+        Test (a, b)
+      | Call x -> Call (f x)
+      | Setz x -> Setz (f x)
     ;;
 
     let fold_map_args t ~init ~f =
