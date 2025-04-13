@@ -326,6 +326,7 @@ module Basic_block = struct
     ; code : 'reg Instr.Nonterminal.t list
     ; terminal : Instr.Terminal.t
     }
+  [@@deriving sexp_of]
 
   let pp fmt { label; code; terminal } =
     pp_label fmt label;

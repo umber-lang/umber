@@ -51,10 +51,9 @@ module Call_conv = struct
     | C | Umber -> Rax
   ;;
 
-  (* FIXME: figure out what to do with this *)
-  (* let reserved_registers : t -> Asm_program.Register.t list = function
+  let reserved_registers : t -> Asm_program.Register.t list = function
     | C | Umber -> [ (* Stack pointer *) Rsp; (* Frame pointer *) Rbp ]
-  ;; *)
+  ;;
 end
 
 module Virtual_register : sig
@@ -128,6 +127,10 @@ end = struct
     let cfg = Cfg.create () in
     List.iter basic_blocks ~f:(fun { label; code = _; terminal } ->
       Cfg.add_vertex cfg (Label label);
+      (* FIXME: We also implicitly go to the next block, which seems kinda awful btw.
+      
+         How about we abstract over jumps and have to explicitly list each block we jump
+         to? I could then add an extra pass later to eliminate jumps to the next line. *)
       Cfg.add_edge
         cfg
         (Label label)
@@ -251,7 +254,8 @@ end = struct
               in
               Set.iter live_registers ~f:(fun reg1 ->
                 Set.iter live_registers ~f:(fun reg2 ->
-                  Interference_graph.add_edge graph reg1 reg2));
+                  if not (Register.equal reg1 reg2)
+                  then Interference_graph.add_edge graph reg1 reg2));
               live_registers
             | Assignment ->
               (* When a variable is assigned to, it doesn't have to be live before this
@@ -261,7 +265,7 @@ end = struct
     graph
   ;;
 
-  let allocate (_basic_blocks : Register.t Basic_block.t list) =
+  let allocate (basic_blocks : Register.t Basic_block.t list) =
     (* FIXME: I think this probably needs to understand Mov, at least? Or maybe we should
        encode all of that in the constraints. 
        
@@ -275,7 +279,75 @@ end = struct
 
        PROBLEM: How do you detect when you need to spill?
     *)
-    failwith "TODO: reg alloc"
+    eprint_s [%here] [%lazy_message (basic_blocks : Register.t Basic_block.t list)];
+    let cfg = create_cfg ~basic_blocks in
+    eprint_s
+      [%here]
+      [%lazy_message
+        ""
+          ~cfg:
+            (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
+              : (Cfg_node.t * Cfg_node.t) list)];
+    let interference_graph = create_interference_graph ~cfg ~basic_blocks in
+    let available_registers =
+      let reserved_registers = Call_conv.reserved_registers Umber in
+      List.filter
+        Asm_program.Register.all
+        ~f:(not << List.mem reserved_registers ~equal:Asm_program.Register.equal)
+      |> Asm_program.Register.Hash_set.of_list
+    in
+    let available_register_count = Hash_set.length available_registers in
+    (* FIXME: Check in advance if there is any vertex with degree > N - 1, and pick things
+       to spill before trying to color. *)
+    eprint_s
+      [%here]
+      [%lazy_message
+        ""
+          ~interference_graph:
+            (Interference_graph.fold_edges
+               (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
+               interference_graph
+               []
+              : (Register.t * Register.t) list)];
+    let coloring =
+      Interference_graph.coloring interference_graph available_register_count
+    in
+    (* Once we have a coloring, we need to associate colors to real registers. All the
+       real registers need to be processed first, since those constraints are fixed.  *)
+    let real_register_by_color = Int.Table.create () in
+    Interference_graph.iter_vertex
+      (function
+       | Real reg as node ->
+         let color = Interference_graph.H.find coloring node in
+         Hashtbl.add_exn real_register_by_color ~key:color ~data:reg;
+         Hash_set.remove available_registers reg
+       | Virtual _ -> ())
+      interference_graph;
+    (* Now we can arbitrarily pick real registers to occupy the remaining colors. *)
+
+    (* TODO: Do an extra pass to remove useless [Mov]s. Can probably do other similar
+       pinhole optimizations as well. *)
+    List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
+      let code =
+        List.map code ~f:(fun instr ->
+          (* TODO: Maybe replace this with [map_args] for minimal power. *)
+          Instr.Nonterminal.fold_map_args instr ~init:() ~f:(fun () value ->
+            Value.fold_map_registers value ~init:() ~f:(fun () reg ->
+              match reg with
+              | Real reg -> (), reg
+              | Virtual _ as node ->
+                let color = Interference_graph.H.find coloring node in
+                ( ()
+                , Hashtbl.find_or_add real_register_by_color color ~default:(fun () ->
+                    let reg =
+                      Hash_set.find available_registers ~f:(const true)
+                      |> Option.value_exn ~here:[%here]
+                    in
+                    Hash_set.remove available_registers reg;
+                    reg) )))
+          |> snd)
+      in
+      { label; code; terminal })
   ;;
   (* List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
@@ -453,6 +525,8 @@ end = struct
         add_code t (Mov { src; dst = Register target_reg })
       | Memory _ -> failwith "TODO: memory arg location") *)
 
+  (* TODO: It's a little weird that register allocations gets done as part of
+     [Asm_codegen.pp]. Maybe [or_mir] should also just call [to_program]. *)
   let basic_blocks t =
     Hash_queue.to_alist t.basic_blocks
     |> List.map ~f:(fun (label, { code; terminal }) : _ Basic_block.t ->

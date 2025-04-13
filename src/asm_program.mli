@@ -136,6 +136,7 @@ module Basic_block : sig
     ; code : 'reg Instr.Nonterminal.t list
     ; terminal : Instr.Terminal.t
     }
+  [@@deriving sexp_of]
 end
 
 module Data_decl : sig
