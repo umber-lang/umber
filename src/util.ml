@@ -164,10 +164,10 @@ let never_happens here _ : Nothing.t =
     [%message "this is never supposed to happen" (here : Source_code_position.t)]
 ;;
 
+(* TODO: Rename to something a little clearer like [debug_print] *)
 let eprint_s (here : Source_code_position.t) msg =
   let file = Filename.basename here.pos_fname in
   match file with
-  | "asm_codegen.ml" ->
-    eprint_s [%sexp (Info.tag ~tag:file (Info.of_lazy_sexp msg) : Info.t)]
+  | "" -> eprint_s [%sexp (Info.tag ~tag:file (Info.of_lazy_sexp msg) : Info.t)]
   | _ -> ()
 ;;

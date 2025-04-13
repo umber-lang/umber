@@ -108,6 +108,7 @@ module Register = struct
   end
 
   include T
+  include Comparable.Make (T)
   include Hashable.Make (T)
 
   let pp fmt t = Format.pp_print_string fmt (String.lowercase (Variants.to_name t))

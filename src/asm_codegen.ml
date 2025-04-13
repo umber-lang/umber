@@ -51,8 +51,15 @@ module Call_conv = struct
     | C | Umber -> Rax
   ;;
 
-  let reserved_registers : t -> Asm_program.Register.t list = function
-    | C | Umber -> [ (* Stack pointer *) Rsp; (* Frame pointer *) Rbp ]
+  let register_is_reserved t (reg : Asm_program.Register.t) =
+    match t, reg with
+    | (C | Umber), (Rsp (* Stack pointer *) | Rbp (* Frame pointer *)) -> true
+    | _ -> false
+  ;;
+
+  let all_available_registers t =
+    (* FIXME: Handle caller vs callee saved registers. *)
+    List.filter Asm_program.Register.all ~f:(not << register_is_reserved t)
   ;;
 end
 
@@ -121,7 +128,11 @@ end = struct
     [@@deriving sexp_of, compare, equal, hash]
   end
 
-  module Cfg = Graph.Imperative.Digraph.Concrete (Cfg_node)
+  module Cfg = struct
+    module G = Graph.Imperative.Digraph.Concrete (Cfg_node)
+    include G
+    module Topologically_sorted_components = Graph.Components.Make (G)
+  end
 
   let create_cfg ~(basic_blocks : _ Basic_block.t list) =
     let cfg = Cfg.create () in
@@ -137,12 +148,15 @@ end = struct
     cfg
   ;;
 
-  let fold_cfg_backwards ~cfg node ~init ~f =
-    let rec loop ~cfg node ~init ~f =
-      let init = f init node in
-      List.iter (Cfg.pred cfg node) ~f:(loop ~cfg ~init ~f)
-    in
-    loop ~cfg node ~init ~f
+  let fold_cfg_backwards ~cfg ~init ~f =
+    Cfg.Topologically_sorted_components.scc_array cfg
+    |> Array.fold ~init ~f:(fun acc component ->
+         match component with
+         | [ cfg_node ] -> f acc cfg_node
+         | _ :: _ :: _ ->
+           (* TODO: Think about how liveness analysis should handle cycles. *)
+           failwith "TODO: Cycles in CFG"
+         | [] -> compiler_bug [%message "Empty cfg component"])
   ;;
 
   module Interference_graph = struct
@@ -227,38 +241,44 @@ end = struct
       List.map basic_blocks ~f:(fun bb -> bb.label, bb) |> Label_name.Table.of_alist_exn
     in
     let graph = Interference_graph.create () in
-    fold_cfg_backwards
-      ~cfg
-      Ret
-      ~init:Register.Set.empty
-      ~f:(fun live_registers cfg_node ->
-      match cfg_node with
-      | Ret -> live_registers
-      | Label label ->
-        let ({ label = _; code; terminal = _ } : _ Basic_block.t) =
-          Hashtbl.find_exn basic_blocks label
-        in
-        List.fold_right code ~init:live_registers ~f:(fun instr live_registers ->
-          List.fold_right
-            (instr_args instr)
-            ~init:live_registers
-            ~f:(fun (kind, value) live_registers ->
-            match kind with
-            | Use ->
-              (* When a variable is used, we know it must be live at this point. *)
-              let live_registers =
-                Value.fold_registers value ~init:live_registers ~f:Set.add
-              in
-              Set.iter live_registers ~f:(fun reg1 ->
-                Set.iter live_registers ~f:(fun reg2 ->
-                  if not (Register.equal reg1 reg2)
-                  then Interference_graph.add_edge graph reg1 reg2));
-              live_registers
-            | Assignment ->
-              (* When a variable is assigned to, it doesn't have to be live before this
-                 point anymore. There is a "hole" in the lifetime between the assignment
-                 and the previous use where the register isn't needed. *)
-              Value.fold_registers value ~init:live_registers ~f:Set.remove)));
+    let record_value live_registers (kind : Arg_kind.t) value =
+      match kind with
+      | Use ->
+        (* When a variable is used, we know it must be live at this point. *)
+        let live_registers = Value.fold_registers value ~init:live_registers ~f:Set.add in
+        Set.iter live_registers ~f:(fun reg1 ->
+          Set.iter live_registers ~f:(fun reg2 ->
+            if not (Register.equal reg1 reg2)
+            then Interference_graph.add_edge graph reg1 reg2));
+        live_registers
+      | Assignment ->
+        (* When a variable is assigned to, it doesn't have to be live before this
+           point anymore. There is a "hole" in the lifetime between the assignment
+           and the previous use where the register isn't needed. *)
+        Value.fold_registers value ~init:live_registers ~f:Set.remove
+    in
+    let (_ : Register.Set.t) =
+      fold_cfg_backwards ~cfg ~init:Register.Set.empty ~f:(fun live_registers cfg_node ->
+        eprint_s
+          [%here]
+          [%lazy_message
+            "Walking cfg node" (cfg_node : Cfg_node.t) (live_registers : Register.Set.t)];
+        match cfg_node with
+        | Ret ->
+          (* Ret implicitly uses the return register. *)
+          (* FIXME: Decide if it actually matters if we track this or not.  *)
+          live_registers
+        | Label label ->
+          let ({ label = _; code; terminal = _ } : _ Basic_block.t) =
+            Hashtbl.find_exn basic_blocks label
+          in
+          List.fold_right code ~init:live_registers ~f:(fun instr live_registers ->
+            List.fold_right
+              (instr_args instr)
+              ~init:live_registers
+              ~f:(fun (kind, value) live_registers ->
+              record_value live_registers kind value)))
+    in
     graph
   ;;
 
@@ -286,14 +306,9 @@ end = struct
             (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
               : (Cfg_node.t * Cfg_node.t) list)];
     let interference_graph = create_interference_graph ~cfg ~basic_blocks in
-    let available_registers =
-      let reserved_registers = Call_conv.reserved_registers Umber in
-      List.filter
-        Asm_program.Register.all
-        ~f:(not << List.mem reserved_registers ~equal:Asm_program.Register.equal)
-      |> Asm_program.Register.Hash_set.of_list
+    let all_available_registers =
+      Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
     in
-    let available_register_count = Hash_set.length available_registers in
     (* FIXME: Check in advance if there is any vertex with degree > N - 1, and pick things
        to spill before trying to color. *)
     eprint_s
@@ -307,44 +322,73 @@ end = struct
                []
               : (Register.t * Register.t) list)];
     let coloring =
-      Interference_graph.coloring interference_graph available_register_count
+      Interference_graph.coloring interference_graph (Set.length all_available_registers)
     in
     (* Once we have a coloring, we need to associate colors to real registers. All the
        real registers need to be processed first, since those constraints are fixed.  *)
     let real_register_by_color = Int.Table.create () in
-    Interference_graph.iter_vertex
-      (function
-       | Real reg as node ->
-         let color = Interference_graph.H.find coloring node in
-         Hashtbl.add_exn real_register_by_color ~key:color ~data:reg;
-         Hash_set.remove available_registers reg
-       | Virtual _ -> ())
-      interference_graph;
-    (* Now we can arbitrarily pick real registers to occupy the remaining colors. *)
+    let available_registers =
+      Interference_graph.fold_vertex
+        (fun node available_registers ->
+          match node with
+          | Real reg ->
+            let color = Interference_graph.H.find coloring node in
+            Hashtbl.add_exn real_register_by_color ~key:color ~data:reg;
+            assert_or_compiler_bug (Set.mem available_registers reg) ~here:[%here];
+            Set.remove available_registers reg
+          | Virtual _ -> available_registers)
+        interference_graph
+        all_available_registers
+    in
+    let allocate_register available_registers (reg : Register.t) =
+      match reg with
+      | Real reg -> available_registers, reg
+      | Virtual _ as node ->
+        (match Interference_graph.H.find_opt coloring node with
+         | Some color ->
+           (* FIXME: Rather than picking randomly, we could try to pick registers we
+              already want to move to? i.e. go looking for moves to that register or
+              something.
+              
+              Look at https://en.wikipedia.org/wiki/Register_allocation
 
+              Maybe we want the "Coalesce" step here to merge lifetimes of registers
+              related by coping?
+              *)
+           let reg =
+             Hashtbl.find_or_add real_register_by_color color ~default:(fun () ->
+               Set.choose_exn available_registers)
+           in
+           Set.remove available_registers reg, reg
+         | None ->
+           (* If the vertex was not part of the interference graph and hence didn't get a
+              color, we can pick any register. *)
+           available_registers, Set.choose_exn all_available_registers)
+    in
     (* TODO: Do an extra pass to remove useless [Mov]s. Can probably do other similar
        pinhole optimizations as well. *)
-    List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
-      let code =
-        List.map code ~f:(fun instr ->
-          (* TODO: Maybe replace this with [map_args] for minimal power. *)
-          Instr.Nonterminal.fold_map_args instr ~init:() ~f:(fun () value ->
-            Value.fold_map_registers value ~init:() ~f:(fun () reg ->
-              match reg with
-              | Real reg -> (), reg
-              | Virtual _ as node ->
-                let color = Interference_graph.H.find coloring node in
-                ( ()
-                , Hashtbl.find_or_add real_register_by_color color ~default:(fun () ->
-                    let reg =
-                      Hash_set.find available_registers ~f:(const true)
-                      |> Option.value_exn ~here:[%here]
-                    in
-                    Hash_set.remove available_registers reg;
-                    reg) )))
-          |> snd)
-      in
-      { label; code; terminal })
+    let (_ : Asm_program.Register.Set.t), basic_blocks =
+      List.fold_map
+        basic_blocks
+        ~init:available_registers
+        ~f:(fun available_registers { label; code; terminal } ->
+        let available_registers, code =
+          List.fold_map
+            code
+            ~init:available_registers
+            ~f:(fun available_registers instr ->
+            Instr.Nonterminal.fold_map_args
+              instr
+              ~init:available_registers
+              ~f:(fun available_registers value ->
+              Value.fold_map_registers
+                value
+                ~init:available_registers
+                ~f:allocate_register))
+        in
+        available_registers, ({ label; code; terminal } : _ Basic_block.t))
+    in
+    basic_blocks
   ;;
   (* List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
@@ -1010,9 +1054,11 @@ let define_function t ~fun_name ~args ~body =
 let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
-    (* TODO: values *)
     set_global t (Label_name.of_mir_name name) expr ~fun_builder:t.main_function
-  | Fun_def { fun_name; args; body } -> define_function t ~fun_name ~args ~body
+  | Fun_def { fun_name; args; body } ->
+    (* FIXME: Need a preprocessing step like the llvm codegen to handle mutually
+       recursive functions. *)
+    define_function t ~fun_name ~args ~body
   | Fun_decl { name; arity = _ } ->
     Hashtbl.add_exn t.externs ~key:name ~data:Umber_function
   | Extern_decl { name; extern_name; arity = _ } ->
@@ -1157,17 +1203,15 @@ let%expect_test "hello world, from MIR" =
                default   rel
                global    umber_main#HelloWorld
                global    HelloWorld.#binding.1
-               global    umber_apply2
                global    string.210886959:weak
-               global    int.0:weak
                extern    umber_print_endline
 
                section   .text
     umber_main#HelloWorld:
                mov       rdi, string.210886959
                call      umber_print_endline wrt ..plt
-               mov       qword [HelloWorld.#binding.1], rax
-               mov       qword [umber_apply2], int.0
+               mov       rax, r9
+               mov       qword [HelloWorld.#binding.1], r9
                ret
 
                section   .rodata
@@ -1177,16 +1221,9 @@ let%expect_test "hello world, from MIR" =
                dw        2
                dd        0
                db        `Hello, world!\x0\x0\x2`
-    int.0:
-               dw        32769
-               dw        1
-               dd        0
-               dq        0
 
                section   .bss
                sectalign 8
     HelloWorld.#binding.1:
-               resq      1
-    umber_apply2:
                resq      1 |}]
 ;;

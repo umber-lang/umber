@@ -49,6 +49,7 @@ module Register : sig
     | R15
   [@@deriving compare, equal, hash, sexp, enumerate]
 
+  include Comparable.S with type t := t
   include Hashable.S with type t := t
 end
 
