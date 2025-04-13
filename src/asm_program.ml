@@ -223,7 +223,7 @@ module Instr = struct
     | Ret
     | Setz of 'reg Value.t
     | Test of 'reg Value.t * 'reg Value.t
-  [@@deriving variants]
+  [@@deriving variants, sexp_of]
 
   let pp fmt t =
     let args =
@@ -235,6 +235,14 @@ module Instr = struct
       | Ret -> []
     in
     pp_line fmt (String.lowercase (Variants.to_name t)) args ~f:Value.pp
+  ;;
+
+  (* TODO: Consider properly separating terminators and non-terminators - each block can
+     only have 1 terminator, and terminators can't be present in the middle of the block.
+     Maybe have Instr be a variant of Terminator or Non_terminator. *)
+  let is_terminator = function
+    | Jmp _ | Jnz _ | Jz _ | Ret -> true
+    | And _ | Mov _ | Lea _ | Cmp _ | Test _ | Call _ | Setz _ -> false
   ;;
 
   let fold_map_args t ~init ~f =

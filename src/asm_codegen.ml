@@ -85,6 +85,16 @@ end = struct
   end
 end
 
+(* FIXME: Consider using this representation where you're allowed to use real registers
+   directly rather than input/ouptut constraints. Writing a Mov between real and virtual
+   registers feels like it expresses the intent more naturally, and we have to understand
+   Mov anyway to understand uses and assignments. *)
+(* module Register = struct
+  type t =
+    | Real of Asm_program.Register.t
+    | Virtual of Virtual_register.t
+end *)
+
 module Reg_alloc : sig
   val allocate
     :  (Label_name.t * Virtual_register.t Instr.t list) list
@@ -439,12 +449,29 @@ end = struct
         add_code t (Mov { src; dst = Register target_reg })
       | Memory _ -> failwith "TODO: memory arg location") *)
 
+  let verify_instr_group label instrs =
+    match List.last instrs with
+    | None -> compiler_bug [%message "Empty instr group" (label : Label_name.t)]
+    | Some last_instr ->
+      if not (Instr.is_terminator last_instr)
+      then
+        compiler_bug
+          [%message
+            "Instr group does not end in terminator"
+              (label : Label_name.t)
+              (instrs : Virtual_register.t Instr.t list)]
+  ;;
+
   let instr_groups t =
-    Hash_queue.to_alist t.code
-    |> List.map ~f:(fun (label, instrs) -> label, Queue.to_list instrs)
-    |> Reg_alloc.allocate
-         ~register_input_constraints:t.register_output_constraints
-         ~register_output_constraints:t.register_output_constraints
+    let instr_groups =
+      Hash_queue.to_alist t.code
+      |> List.map ~f:(fun (label, instrs) -> label, Queue.to_list instrs)
+    in
+    List.iter instr_groups ~f:(fun (label, instrs) -> verify_instr_group label instrs);
+    Reg_alloc.allocate
+      instr_groups
+      ~register_input_constraints:t.register_output_constraints
+      ~register_output_constraints:t.register_output_constraints
   ;;
 end
 
@@ -703,30 +730,45 @@ let merge_branches
   fun_builder
   (label_a, (value_a : _ Value.t))
   (label_b, (value_b : _ Value.t))
+  ~merge_label
   =
-  match value_a, value_b with
-  | Register a, Register b ->
-    (* FIXME: Unclear if a might be used for something else useful in the b case? *)
-    if not (Virtual_register.equal a b)
-    then (
+  let value =
+    match value_a, value_b with
+    | Register a, Register b ->
+      (* FIXME: Unclear if a might be used for something else useful in the b case? *)
+      if not (Virtual_register.equal a b)
+      then (
+        Function_builder.position_at_label fun_builder label_b;
+        Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
+      value_a
+    | Register _, (Memory _ | Global _ | Constant _) ->
       Function_builder.position_at_label fun_builder label_b;
-      Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
-    value_a
-  | Register _, (Memory _ | Global _ | Constant _) ->
-    Function_builder.position_at_label fun_builder label_b;
-    Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b });
-    value_a
-  | (Memory _ | Global _ | Constant _), Register _ ->
-    Function_builder.position_at_label fun_builder label_a;
-    Function_builder.add_code fun_builder (Mov { dst = value_b; src = value_a });
-    value_b
-  | (Memory _ | Global _ | Constant _), (Memory _ | Global _ | Constant _) ->
-    let dst = Function_builder.pick_register' fun_builder in
-    Function_builder.position_at_label fun_builder label_a;
-    Function_builder.add_code fun_builder (Mov { dst; src = value_a });
-    Function_builder.position_at_label fun_builder label_b;
-    Function_builder.add_code fun_builder (Mov { dst; src = value_b });
-    dst
+      Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b });
+      value_a
+    | (Memory _ | Global _ | Constant _), Register _ ->
+      Function_builder.position_at_label fun_builder label_a;
+      Function_builder.add_code fun_builder (Mov { dst = value_b; src = value_a });
+      value_b
+    | (Memory _ | Global _ | Constant _), (Memory _ | Global _ | Constant _) ->
+      let dst = Function_builder.pick_register' fun_builder in
+      Function_builder.position_at_label fun_builder label_a;
+      Function_builder.add_code fun_builder (Mov { dst; src = value_a });
+      Function_builder.position_at_label fun_builder label_b;
+      Function_builder.add_code fun_builder (Mov { dst; src = value_b });
+      dst
+  in
+  (* Finally, finish at a single "merge" instr group. It's important we always finish at
+     the same place for composability - code generated after this can just continue here,
+     rather than having to deal with multiple branch points. *)
+  (* TODO: This often generates "useless" jumps to either the next line or a block that
+     just contains "Ret". We could try to avoid doing this or add an extra pass to optimize
+     these. Unclear if it's worth much. *)
+  Function_builder.position_at_label fun_builder label_a;
+  Function_builder.add_code fun_builder (Jmp merge_label);
+  Function_builder.position_at_label fun_builder label_b;
+  Function_builder.add_code fun_builder (Jmp merge_label);
+  Function_builder.position_at_label fun_builder merge_label;
+  value
 ;;
 
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
@@ -774,6 +816,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          ...
     *)
     let cond_label i = Label_name.of_string [%string "cond_assign.cond%{i#Int}"] in
+    let vars_label i = Label_name.of_string [%string "cond_assign.vars%{i#Int}"] in
     let body_label = Label_name.of_string "cond_assign.body" in
     let if_none_matched_label = Label_name.of_string "cond_assign.if_none_matched" in
     let n_conds = Nonempty.length conds in
@@ -790,12 +833,12 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       if i <> 0 then Function_builder.position_at_label fun_builder (cond_label i);
       codegen_cond t cond ~fun_builder;
       let next_label =
-        if i < n_conds then cond_label (i + 1) else if_none_matched_label
+        if i < n_conds - 1 then cond_label (i + 1) else if_none_matched_label
       in
       Function_builder.add_code fun_builder (Jnz next_label);
+      Function_builder.position_at_label fun_builder (vars_label i);
       (* If we didn't jump, the condition succeeded, so set the variables. *)
-      assign_vars_and_jump_to_body var_exprs;
-      Function_builder.add_code fun_builder (Jmp body_label));
+      assign_vars_and_jump_to_body var_exprs);
     (* TODO: We kinda have to represent something like phi nodes, where the branches
        "merge" back into one value. We could either let [Value.t] represent values in
        possibly different places (some kind of union), or enforce that the values end up
@@ -818,7 +861,8 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        merge_branches
          fun_builder
          (body_label, body_value)
-         (if_none_matched_label, otherwise_value))
+         (if_none_matched_label, otherwise_value)
+         ~merge_label:(Label_name.of_string [%string "cond_assign.merge"]))
 
 and codegen_cond t cond ~fun_builder =
   let cmp value value' = Function_builder.add_code fun_builder (Cmp (value, value')) in
@@ -889,8 +933,6 @@ let define_function t ~fun_name ~args ~body =
     fun_builder
     return_value
     (Call_conv.return_value_register call_conv);
-  (* FIXME: Don't we have to add ret to every possible return point? The function could
-     finish in multiple different places. *)
   Function_builder.add_code fun_builder Ret
 ;;
 

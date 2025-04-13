@@ -102,6 +102,10 @@ module Instr : sig
     | Ret
     | Setz of 'reg Value.t
     | Test of 'reg Value.t * 'reg Value.t
+  [@@deriving sexp_of]
+
+  (** Returns [true] iff the instruction is valid to terminator an instruction group. *)
+  val is_terminator : _ t -> bool
 
   val fold_map_args
     :  'r1 t
