@@ -219,6 +219,10 @@ end = struct
         | Ret ->
           (* Ret implicitly uses the return register. *)
           (* FIXME: Decide if it actually matters if we track this or not.  *)
+          (* record_value
+            live_registers
+            Use
+            (Register (Real (Call_conv.return_value_register Umber))) *)
           live_registers
         | Label label ->
           let ({ label = _; code; terminal = _ } : _ Basic_block.t) =
@@ -241,37 +245,42 @@ end = struct
     ~interference_graph
     =
     let coalesced_registers = Virtual_register.Table.create () in
+    let basic_blocks =
+      List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
+        let code =
+          List.filter code ~f:(fun instr ->
+            match instr with
+            | Mov { src = Register src_reg; dst = Register dst_reg } ->
+              (match src_reg, dst_reg with
+               | Real _, Real _ -> true
+               | (Virtual reg_to_coalesce as node), ((Real _ | Virtual _) as other_reg)
+               | (Real _ as other_reg), (Virtual reg_to_coalesce as node) ->
+                 if Interference_graph.mem_edge interference_graph src_reg dst_reg
+                 then true
+                 else (
+                   ignore
+                     (Hashtbl.add coalesced_registers ~key:reg_to_coalesce ~data:other_reg
+                       : [ `Ok | `Duplicate ]);
+                   if Interference_graph.mem_vertex interference_graph node
+                   then (
+                     let neighbours = Interference_graph.succ interference_graph node in
+                     List.iter neighbours ~f:(fun neighbour ->
+                       Interference_graph.add_edge interference_graph other_reg neighbour);
+                     Interference_graph.remove_vertex interference_graph node);
+                   false))
+            | _ -> true)
+        in
+        { label; code; terminal })
+    in
     List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
-        List.filter_map code ~f:(fun instr ->
-          match instr with
-          | Mov { src = Register src_reg; dst = Register dst_reg } ->
-            (match src_reg, dst_reg with
-             | Real _, Real _ -> Some instr
-             | (Virtual reg_to_coalesce as node), ((Real _ | Virtual _) as other_reg)
-             | (Real _ as other_reg), (Virtual reg_to_coalesce as node) ->
-               if Interference_graph.mem_edge interference_graph src_reg dst_reg
-               then Some instr
-               else (
-                 ignore
-                   (Hashtbl.add coalesced_registers ~key:reg_to_coalesce ~data:other_reg
-                     : [ `Ok | `Duplicate ]);
-                 if Interference_graph.mem_vertex interference_graph node
-                 then (
-                   let neighbours = Interference_graph.succ interference_graph node in
-                   List.iter neighbours ~f:(fun neighbour ->
-                     Interference_graph.add_edge interference_graph other_reg neighbour);
-                   Interference_graph.remove_vertex interference_graph node);
-                 None))
-          | instr ->
-            Some
-              (Instr.Nonterminal.map_args instr ~f:(fun value ->
-                 Value.map_registers value ~f:(fun reg ->
-                   match reg with
-                   | Real _ -> reg
-                   | Virtual virtual_reg ->
-                     Hashtbl.find coalesced_registers virtual_reg
-                     |> Option.value ~default:reg))))
+        List.map code ~f:(fun instr ->
+          Instr.Nonterminal.map_args instr ~f:(fun value ->
+            Value.map_registers value ~f:(fun reg ->
+              match reg with
+              | Real _ -> reg
+              | Virtual virtual_reg ->
+                Hashtbl.find coalesced_registers virtual_reg |> Option.value ~default:reg)))
       in
       { label; code; terminal })
   ;;
@@ -377,6 +386,9 @@ end = struct
                []
               : (Register.t * Register.t) list)];
     let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
+    eprint_s
+      [%here]
+      [%lazy_message "After coalescing" (basic_blocks : Register.t Basic_block.t list)];
     color_and_allocate ~basic_blocks ~interference_graph
   ;;
 end
