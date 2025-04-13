@@ -86,21 +86,21 @@ end = struct
   end
 end
 
-(* FIXME: Consider using this representation where you're allowed to use real registers
-   directly rather than input/ouptut constraints. Writing a Mov between real and virtual
-   registers feels like it expresses the intent more naturally, and we have to understand
-   Mov anyway to understand uses and assignments. *)
-(* module Register = struct
-  type t =
-    | Real of Asm_program.Register.t
-    | Virtual of Virtual_register.t
-end *)
+module Register = struct
+  module T = struct
+    type t =
+      | Real of Asm_program.Register.t
+      | Virtual of Virtual_register.t
+    [@@deriving compare, equal, hash, sexp_of]
+  end
+
+  include T
+  include Comparable.Make_plain (T)
+end
 
 module Reg_alloc : sig
   val allocate
-    :  Virtual_register.t Basic_block.t list
-    -> register_input_constraints:Asm_program.Register.t Virtual_register.Table.t
-    -> register_output_constraints:Asm_program.Register.t Virtual_register.Table.t
+    :  Register.t Basic_block.t list
     -> Asm_program.Register.t Basic_block.t list
 end = struct
   (* TODO: Handle spilling. Per https://en.wikipedia.org/wiki/Brooks%27_theorem, 
@@ -146,7 +146,7 @@ end = struct
   ;;
 
   module Interference_graph = struct
-    module G = Graph.Imperative.Graph.Concrete (Virtual_register)
+    module G = Graph.Imperative.Graph.Concrete (Register)
     include G
     include Graph.Coloring.Make (G)
   end
@@ -230,7 +230,7 @@ end = struct
     fold_cfg_backwards
       ~cfg
       Ret
-      ~init:Virtual_register.Set.empty
+      ~init:Register.Set.empty
       ~f:(fun live_registers cfg_node ->
       match cfg_node with
       | Ret -> live_registers
@@ -261,34 +261,7 @@ end = struct
     graph
   ;;
 
-  let allocate
-    (basic_blocks : Virtual_register.t Basic_block.t list)
-    ~register_input_constraints
-    ~register_output_constraints
-    =
-    (* Input constraints mean that the virtual register will use the given real register,
-       so immediate take those allocations as given. *)
-    let allocations = Hashtbl.copy register_input_constraints in
-    (* Output constraints mean that the value in the virtual register must end up in the
-       given real register. We can either set the virtual register to be that real
-       register, or do a move. *)
-    let allocate_register
-      :  Virtual_register.t
-      -> Asm_program.Register.t Instr.Nonterminal.t option * Asm_program.Register.t
-      =
-     fun virtual_reg ->
-      match Hashtbl.find allocations virtual_reg with
-      | Some real_reg -> None, real_reg
-      | None ->
-        (* FIXME: For output constraints, catch when multiple registers match? *)
-        (match Hashtbl.find register_output_constraints virtual_reg with
-         | None ->
-           (* failwith
-             "TODO: pick any available register - but avoid picking one we'll want to \
-              use somewhere else?" *)
-           None, Rax
-         | Some output_reg -> None, output_reg)
-    in
+  let allocate (_basic_blocks : Register.t Basic_block.t list) =
     (* FIXME: I think this probably needs to understand Mov, at least? Or maybe we should
        encode all of that in the constraints. 
        
@@ -302,7 +275,9 @@ end = struct
 
        PROBLEM: How do you detect when you need to spill?
     *)
-    List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
+    failwith "TODO: reg alloc"
+  ;;
+  (* List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
         List.concat_map code ~f:(fun instr ->
           let added_instrs, instr =
@@ -313,8 +288,7 @@ end = struct
           in
           List.rev (instr :: added_instrs))
       in
-      { label; code; terminal })
-  ;;
+      { label; code; terminal }) *)
 end
 
 module Extern = struct
@@ -327,29 +301,26 @@ module Function_builder : sig
   type t
 
   val create : Label_name.t -> t
-  val add_code : t -> Virtual_register.t Instr.Nonterminal.t -> unit
+  val add_code : t -> Register.t Instr.Nonterminal.t -> unit
   val add_terminal : t -> Instr.Terminal.t -> unit
 
   (* TODO: Consider if this API makes any sense *)
   val move_values_for_call
     :  t
     -> call_conv:Call_conv.t
-    -> args:Virtual_register.t Value.t Nonempty.t
+    -> args:Register.t Value.t Nonempty.t
     -> unit
 
-  val add_local : t -> Mir_name.t -> Virtual_register.t Value.t -> unit
-  val find_local : t -> Mir_name.t -> Virtual_register.t Value.t option
+  val add_local : t -> Mir_name.t -> Register.t Value.t -> unit
+  val find_local : t -> Mir_name.t -> Register.t Value.t option
   val position_at_label : t -> Label_name.t -> unit
-  val pick_register : t -> Virtual_register.t
-  val pick_register' : t -> Virtual_register.t Value.t
-  val constrain_register_input : t -> Virtual_register.t -> Asm_program.Register.t -> unit
-  val constrain_output : t -> Virtual_register.t Value.t -> Asm_program.Register.t -> unit
+  val pick_register : t -> Register.t Value.t
   val name : t -> Label_name.t
   val basic_blocks : t -> Asm_program.Register.t Basic_block.t list
 end = struct
   module Block_builder = struct
     type t =
-      { code : Virtual_register.t Instr.Nonterminal.t Queue.t
+      { code : Register.t Instr.Nonterminal.t Queue.t
       ; terminal : Instr.Terminal.t Set_once.t
       }
 
@@ -361,20 +332,15 @@ end = struct
   type t =
     { fun_name : Label_name.t
     ; register_counter : Virtual_register.Counter.t
-        (* FIXME: Aren't these constraints time-based? Maybe they need to exist in-line
-           with the code, to make the lifetimes explicit? *)
-    ; register_input_constraints : Asm_program.Register.t Virtual_register.Table.t
-    ; register_output_constraints : Asm_program.Register.t Virtual_register.Table.t
-    ; locals : Virtual_register.t Value.t Mir_name.Table.t
+    ; locals : Register.t Value.t Mir_name.Table.t
     ; basic_blocks : Block_builder.t Label_name.Hash_queue.t
     ; mutable current_label : Label_name.t
     }
 
   let name t = t.fun_name
-  let pick_register t = Virtual_register.Counter.next t.register_counter
 
-  let pick_register' t : _ Value.t =
-    Register (Virtual_register.Counter.next t.register_counter)
+  let pick_register t : Register.t Value.t =
+    Register (Virtual (Virtual_register.Counter.next t.register_counter))
   ;;
 
   let get_bb t =
@@ -389,41 +355,11 @@ end = struct
   let add_code t instr = Queue.enqueue (get_bb t).code instr
   let add_terminal t terminal = Set_once.set_exn (get_bb t).terminal [%here] terminal
 
-  let constrain_register_input t virtual_reg real_reg =
-    Hashtbl.add_exn t.register_input_constraints ~key:virtual_reg ~data:real_reg
-  ;;
-
-  let constrain_register_output t virtual_reg real_reg =
-    Hashtbl.update t.register_output_constraints virtual_reg ~f:(function
-      | None -> real_reg
-      | Some existing ->
-        if Asm_program.Register.equal existing real_reg
-        then real_reg
-        else
-          raise_s
-            [%message
-              "Duplicate output constraint"
-                (virtual_reg : Virtual_register.t)
-                (real_reg : Asm_program.Register.t)
-                (existing : Asm_program.Register.t)])
-  ;;
-
-  let constrain_output t (value : Virtual_register.t Value.t) real_reg =
-    match value with
-    | Register reg -> constrain_register_output t reg real_reg
-    | Memory _ | Global _ | Constant _ ->
-      let target_reg = pick_register t in
-      constrain_register_output t target_reg real_reg;
-      add_code t (Mov { src = value; dst = Register target_reg })
-  ;;
-
   let create fun_name =
     (* FIXME: callee saved registers must be marked Used *)
     let t =
       { fun_name
       ; register_counter = Virtual_register.Counter.create ()
-      ; register_input_constraints = Virtual_register.Table.create ()
-      ; register_output_constraints = Virtual_register.Table.create ()
       ; locals = Mir_name.Table.create ()
       ; basic_blocks = Label_name.Hash_queue.create ()
       ; current_label = fun_name
@@ -437,7 +373,7 @@ end = struct
   let add_local t name value = Hashtbl.add_exn t.locals ~key:name ~data:value
   let find_local t name = Hashtbl.find t.locals name
 
-  let move_values_for_call t ~call_conv ~(args : Virtual_register.t Value.t Nonempty.t) =
+  let move_values_for_call t ~call_conv ~(args : Register.t Value.t Nonempty.t) =
     (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
        the current and target register states. Be careful about ordering - we need to be
        careful not to clobber any of the args, so we can't just be like "for each arg,
@@ -481,7 +417,7 @@ end = struct
     if Array.length args > Array.length arg_registers
     then failwith "TODO: ran out of registers for args, use stack";
     Array.iter2_exn args arg_registers ~f:(fun arg arg_register ->
-      constrain_output t arg arg_register)
+      add_code t (Mov { src = arg; dst = Register (Real arg_register) }))
   ;;
 
   (* FIXME: cleanup *)
@@ -518,18 +454,13 @@ end = struct
       | Memory _ -> failwith "TODO: memory arg location") *)
 
   let basic_blocks t =
-    let basic_blocks =
-      Hash_queue.to_alist t.basic_blocks
-      |> List.map ~f:(fun (label, { code; terminal }) : _ Basic_block.t ->
-           { label
-           ; code = Queue.to_list code
-           ; terminal = Set_once.get_exn terminal [%here]
-           })
-    in
-    Reg_alloc.allocate
-      basic_blocks
-      ~register_input_constraints:t.register_output_constraints
-      ~register_output_constraints:t.register_output_constraints
+    Hash_queue.to_alist t.basic_blocks
+    |> List.map ~f:(fun (label, { code; terminal }) : _ Basic_block.t ->
+         { label
+         ; code = Queue.to_list code
+         ; terminal = Set_once.get_exn terminal [%here]
+         })
+    |> Reg_alloc.allocate
   ;;
 end
 
@@ -721,11 +652,13 @@ let codegen_fun_call t fun_name args ~fun_builder : _ Value.t =
   Function_builder.move_values_for_call fun_builder ~call_conv ~args;
   Function_builder.add_code fun_builder (Call fun_);
   let output_register = Function_builder.pick_register fun_builder in
-  Function_builder.constrain_register_input
+  Function_builder.add_code
     fun_builder
-    output_register
-    (Call_conv.return_value_register call_conv);
-  Register output_register
+    (Mov
+       { src = output_register
+       ; dst = Register (Real (Call_conv.return_value_register call_conv))
+       });
+  output_register
 ;;
 
 let box t ~tag ~fields ~fun_builder =
@@ -794,7 +727,7 @@ let merge_branches
     match value_a, value_b with
     | Register a, Register b ->
       (* FIXME: Unclear if a might be used for something else useful in the b case? *)
-      if not (Virtual_register.equal a b)
+      if not (Register.equal a b)
       then (
         Function_builder.position_at_label fun_builder label_b;
         Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
@@ -808,7 +741,7 @@ let merge_branches
       Function_builder.add_code fun_builder (Mov { dst = value_b; src = value_a });
       value_b
     | (Memory _ | Global _ | Constant _), (Memory _ | Global _ | Constant _) ->
-      let dst = Function_builder.pick_register' fun_builder in
+      let dst = Function_builder.pick_register fun_builder in
       Function_builder.position_at_label fun_builder label_a;
       Function_builder.add_code fun_builder (Mov { dst; src = value_a });
       Function_builder.position_at_label fun_builder label_b;
@@ -956,10 +889,10 @@ and codegen_cond t cond ~fun_builder =
     Function_builder.position_at_label fun_builder end_label
   | And (cond1, cond2) ->
     codegen_cond t cond1 ~fun_builder;
-    let cond1_result = Function_builder.pick_register' fun_builder in
+    let cond1_result = Function_builder.pick_register fun_builder in
     Function_builder.add_code fun_builder (Setz cond1_result);
     codegen_cond t cond2 ~fun_builder;
-    let cond2_result = Function_builder.pick_register' fun_builder in
+    let cond2_result = Function_builder.pick_register fun_builder in
     Function_builder.add_code fun_builder (Setz cond2_result);
     Function_builder.add_code fun_builder (Test (cond1_result, cond2_result))
 ;;
@@ -980,17 +913,21 @@ let define_function t ~fun_name ~args ~body =
   let result =
     Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
       let virtual_reg = Function_builder.pick_register fun_builder in
-      Function_builder.constrain_register_input fun_builder virtual_reg reg;
-      Function_builder.add_local fun_builder arg_name (Register virtual_reg))
+      Function_builder.add_code
+        fun_builder
+        (Mov { src = Register (Real reg); dst = virtual_reg });
+      Function_builder.add_local fun_builder arg_name virtual_reg)
   in
   (match result with
    | Same_length | Right_trailing _ -> ()
    | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack");
   let return_value = codegen_expr t body ~fun_builder in
-  Function_builder.constrain_output
+  Function_builder.add_code
     fun_builder
-    return_value
-    (Call_conv.return_value_register call_conv);
+    (Mov
+       { src = return_value
+       ; dst = Register (Real (Call_conv.return_value_register call_conv))
+       });
   Function_builder.add_terminal fun_builder Ret
 ;;
 
