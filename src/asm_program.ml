@@ -75,7 +75,7 @@ module Size = struct
     | I16
     | I32
     | I64
-  [@@deriving sexp_of]
+  [@@deriving equal, sexp_of]
 
   let n_bytes = function
     | I8 -> 1
@@ -86,6 +86,8 @@ module Size = struct
 end
 
 module Asm_literal = struct
+  (* TODO: I think 64-bit assembly does weird things with int literals, and they'll get
+     silently truncated except in Mov. Look into that and write a test. *)
   type t =
     | Int of int
     | Float of float
@@ -189,16 +191,37 @@ end
 module Value = struct
   type 'reg t =
     | Register of 'reg
-    | Memory of Size.t * 'reg memory_expr
     | Global of Label_name.t * Global_kind.t
     | Constant of Asm_literal.t
+    | Memory of Size.t * 'reg memory_expr
 
   and 'reg memory_expr =
-    | Value of 'reg t
+    | Register of 'reg
+    | Global of Label_name.t * Global_kind.t
+    | Offset of int
     | Add of 'reg memory_expr * 'reg memory_expr
   [@@deriving sexp_of]
 
-  let rec pp fmt t =
+  let pp_global fmt name (kind : Global_kind.t) =
+    match kind with
+    | Extern_proc ->
+      (* "wrt ..plt" is needed for PIE (Position Independent Executables). *)
+      Format.fprintf fmt !"%{Label_name} wrt ..plt" name
+    | Other -> Format.fprintf fmt !"%{Label_name}" name
+  ;;
+
+  let rec pp_memory_expr fmt memory_expr =
+    match memory_expr with
+    | Offset i -> Format.fprintf fmt "%d" i
+    | Register reg -> Register.pp fmt reg
+    | Global (name, kind) -> pp_global fmt name kind
+    | Add (lhs, rhs) ->
+      pp_memory_expr fmt lhs;
+      Format.pp_print_string fmt " + ";
+      pp_memory_expr fmt rhs
+  ;;
+
+  let pp fmt t =
     match t with
     | Register reg -> Register.pp fmt reg
     | Memory (size, memory_expr) ->
@@ -212,57 +235,74 @@ module Value = struct
       Format.pp_print_string fmt " [";
       pp_memory_expr fmt memory_expr;
       Format.pp_print_string fmt "]"
-    | Global (name, kind) ->
-      (match kind with
-       | Extern_proc ->
-         (* "wrt ..plt" is needed for PIE (Position Independent Executables). *)
-         Format.fprintf fmt !"%{Label_name} wrt ..plt" name
-       | Other -> Format.fprintf fmt !"%{Label_name}" name)
+    | Global (name, kind) -> pp_global fmt name kind
     | Constant literal -> Asm_literal.pp fmt literal
-
-  and pp_memory_expr fmt memory_expr =
-    match memory_expr with
-    | Value t -> pp fmt t
-    | Add (lhs, rhs) ->
-      pp_memory_expr fmt lhs;
-      Format.pp_print_string fmt " + ";
-      pp_memory_expr fmt rhs
   ;;
 
-  let mem_offset value size offset =
-    Memory (size, Add (Value value, Value (Constant (Int (Size.n_bytes size * offset)))))
+  let mem_offset mem size offset =
+    if offset = 0
+    then Memory (size, mem)
+    else Memory (size, Add (mem, Offset (Size.n_bytes size * offset)))
   ;;
 
-  let rec map_registers t ~f =
-    match t with
-    | Register reg -> Register (f reg)
-    | (Global _ | Constant _) as t -> t
-    | Memory (size, mem) -> Memory (size, map_registers_memory_expr mem ~f)
+  let mem_of_value (value : _ t) : _ memory_expr option =
+    match value with
+    | Register reg -> Some (Register reg)
+    | Global (name, kind) -> Some (Global (name, kind))
+    | Memory _ -> None
+    | Constant (Int i) -> Some (Offset i)
+    | Constant (Float _ | String _) ->
+      compiler_bug [%message "Invalid memory expression" (value : _ t)]
+  ;;
 
-  and map_registers_memory_expr mem ~f =
+  let rec map_registers_memory_expr (mem : _ memory_expr) ~f : _ memory_expr =
     match mem with
-    | Value t -> Value (map_registers t ~f)
+    | Register reg -> Register (f reg)
+    | (Global _ | Offset _) as mem -> mem
     | Add (lhs, rhs) ->
       let lhs = map_registers_memory_expr lhs ~f in
       let rhs = map_registers_memory_expr rhs ~f in
       Add (lhs, rhs)
   ;;
 
-  let rec fold_registers t ~init ~f =
+  let map_registers t ~f =
     match t with
-    | Register reg -> f init reg
-    | Global _ | Constant _ -> init
-    | Memory ((_ : Size.t), mem) -> fold_registers_memory_expr mem ~init ~f
+    | Register reg -> Register (f reg)
+    | (Global _ | Constant _) as t -> t
+    | Memory (size, mem) -> Memory (size, map_registers_memory_expr mem ~f)
+  ;;
 
-  and fold_registers_memory_expr mem ~init ~f =
+  let rec fold_registers_memory_expr (mem : _ memory_expr) ~init ~f =
     match mem with
-    | Value t -> fold_registers t ~init ~f
+    | Register reg -> f init reg
+    | Global _ | Offset _ -> init
     | Add (lhs, rhs) ->
       let init = fold_registers_memory_expr lhs ~init ~f in
       fold_registers_memory_expr rhs ~init ~f
   ;;
 
-  let rec fold_map_registers t ~init ~f =
+  let fold_registers t ~init ~f =
+    match t with
+    | Register reg -> f init reg
+    | Global _ | Constant _ -> init
+    | Memory ((_ : Size.t), mem) -> fold_registers_memory_expr mem ~init ~f
+  ;;
+
+  let rec fold_map_registers_memory_expr (mem : _ memory_expr) ~init ~f
+    : _ * _ memory_expr
+    =
+    match mem with
+    | Register reg ->
+      let init, reg = f init reg in
+      init, Register reg
+    | (Global _ | Offset _) as mem -> init, mem
+    | Add (lhs, rhs) ->
+      let init, lhs = fold_map_registers_memory_expr lhs ~init ~f in
+      let init, rhs = fold_map_registers_memory_expr rhs ~init ~f in
+      init, Add (lhs, rhs)
+  ;;
+
+  let fold_map_registers t ~init ~f =
     match t with
     | Register reg ->
       let init, reg = f init reg in
@@ -271,16 +311,6 @@ module Value = struct
     | Memory (size, mem) ->
       let init, mem = fold_map_registers_memory_expr mem ~init ~f in
       init, Memory (size, mem)
-
-  and fold_map_registers_memory_expr mem ~init ~f =
-    match mem with
-    | Value t ->
-      let init, t = fold_map_registers t ~init ~f in
-      init, Value t
-    | Add (lhs, rhs) ->
-      let init, lhs = fold_map_registers_memory_expr lhs ~init ~f in
-      let init, rhs = fold_map_registers_memory_expr rhs ~init ~f in
-      init, Add (lhs, rhs)
   ;;
 end
 
@@ -306,6 +336,8 @@ module Instr = struct
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
+      (* FIXME: Prevent Mov between two memory locations, it's not allowed. Likely
+         similar constraints for other instructions. *)
       | Mov of
           { dst : 'reg Value.t
           ; src : 'reg Value.t

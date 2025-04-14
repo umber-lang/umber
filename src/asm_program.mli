@@ -18,7 +18,7 @@ module Size : sig
     | I16
     | I32
     | I64
-  [@@deriving sexp_of]
+  [@@deriving equal, sexp_of]
 
   val n_bytes : t -> int
 end
@@ -76,19 +76,22 @@ end
 module Value : sig
   type 'reg t =
     | Register of 'reg
-    | Memory of Size.t * 'reg memory_expr
     | Global of Label_name.t * Global_kind.t
     | Constant of Asm_literal.t
+    | Memory of Size.t * 'reg memory_expr
 
   and 'reg memory_expr =
-    | Value of 'reg t
+    | Register of 'reg
+    | Global of Label_name.t * Global_kind.t
+    | Offset of int
     | Add of 'reg memory_expr * 'reg memory_expr
   [@@deriving sexp_of]
 
   (** Dereference memory with an offset, with similar semantics to C dereferencing, so if 
       calling [mem_offset t size n], the actual byte offset is [Size.n_bytes size * n]. *)
-  val mem_offset : 'reg t -> Size.t -> int -> 'reg t
+  val mem_offset : 'reg memory_expr -> Size.t -> int -> 'reg t
 
+  val mem_of_value : 'reg t -> 'reg memory_expr option
   val map_registers : 'r1 t -> f:('r1 -> 'r2) -> 'r2 t
   val fold_registers : 'reg t -> init:'acc -> f:('acc -> 'reg -> 'acc) -> 'acc
 
