@@ -305,14 +305,20 @@ end = struct
     in
     (* Once we have a coloring, we need to associate colors to real registers. All the
        real registers need to be processed first, since those constraints are fixed.  *)
-    let real_register_by_color = Int.Table.create () in
+    let real_registers_by_color = Int.Table.create () in
     let available_registers =
       Interference_graph.fold_vertex
         (fun node available_registers ->
           match node with
           | Real reg ->
+            (* FIXME: We can't have multiple real registers with the same color, right?
+               Or maybe it's ok, it just means we can pick an arbitrary one? 
+               
+               Could this mess things up? *)
             let color = Interference_graph.H.find coloring node in
-            Hashtbl.add_exn real_register_by_color ~key:color ~data:reg;
+            Hashtbl.update real_registers_by_color color ~f:(function
+              | Some existing -> Nonempty.cons reg existing
+              | None -> [ reg ]);
             assert_or_compiler_bug (Set.mem available_registers reg) ~here:[%here];
             Set.remove available_registers reg
           | Virtual _ -> available_registers)
@@ -334,11 +340,11 @@ end = struct
               Maybe we want the "Coalesce" step here to merge lifetimes of registers
               related by coping?
               *)
-           let reg =
-             Hashtbl.find_or_add real_register_by_color color ~default:(fun () ->
-               Set.choose_exn available_registers)
+           let (reg_to_use :: _other_regs) =
+             Hashtbl.find_or_add real_registers_by_color color ~default:(fun () ->
+               [ Set.choose_exn available_registers ])
            in
-           Set.remove available_registers reg, reg
+           Set.remove available_registers reg_to_use, reg_to_use
          | None ->
            (* If the vertex was not part of the interference graph and hence didn't get a
               color, we can pick any register. *)
