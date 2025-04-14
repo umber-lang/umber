@@ -50,6 +50,13 @@ module Size = struct
     | I32
     | I64
   [@@deriving sexp_of]
+
+  let n_bytes = function
+    | I8 -> 1
+    | I16 -> 2
+    | I32 -> 4
+    | I64 -> 8
+  ;;
 end
 
 module Asm_literal = struct
@@ -196,7 +203,9 @@ module Value = struct
       pp_memory_expr fmt rhs
   ;;
 
-  let mem_offset value size i = Memory (size, Add (Value value, Value (Constant (Int i))))
+  let mem_offset value size offset =
+    Memory (size, Add (Value value, Value (Constant (Int (Size.n_bytes size * offset)))))
+  ;;
 
   let rec map_registers t ~f =
     match t with

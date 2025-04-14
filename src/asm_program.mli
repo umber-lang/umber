@@ -19,6 +19,8 @@ module Size : sig
     | I32
     | I64
   [@@deriving sexp_of]
+
+  val n_bytes : t -> int
 end
 
 module Asm_literal : sig
@@ -83,7 +85,10 @@ module Value : sig
     | Add of 'reg memory_expr * 'reg memory_expr
   [@@deriving sexp_of]
 
+  (** Dereference memory with an offset, with similar semantics to C dereferencing, so if 
+      calling [mem_offset t size n], the actual byte offset is [Size.n_bytes size * n]. *)
   val mem_offset : 'reg t -> Size.t -> int -> 'reg t
+
   val map_registers : 'r1 t -> f:('r1 -> 'r2) -> 'r2 t
   val fold_registers : 'reg t -> init:'acc -> f:('acc -> 'reg -> 'acc) -> 'acc
 

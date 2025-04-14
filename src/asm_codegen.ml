@@ -798,7 +798,7 @@ let box t ~tag ~fields ~fun_builder =
   Function_builder.add_code
     fun_builder
     (Mov
-       { dst = Value.mem_offset heap_pointer I16 2; src = Constant (Int block_field_num) });
+       { dst = Value.mem_offset heap_pointer I16 1; src = Constant (Int block_field_num) });
   Nonempty.iteri fields ~f:(fun i field_value ->
     Function_builder.add_code
       fun_builder
