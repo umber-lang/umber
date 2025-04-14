@@ -409,7 +409,7 @@ module Function_builder : sig
 
   val create : Label_name.t -> t
   val add_code : t -> Register.t Instr.Nonterminal.t -> unit
-  val add_terminal : ?here:Source_code_position.t -> t -> Instr.Terminal.t -> unit
+  val add_terminal : t -> Instr.Terminal.t -> unit
 
   (* TODO: Consider if this API makes any sense *)
   val move_values_for_call
@@ -420,6 +420,7 @@ module Function_builder : sig
 
   val add_local : t -> Mir_name.t -> Register.t Value.t -> unit
   val find_local : t -> Mir_name.t -> Register.t Value.t option
+  val current_label : t -> Label_name.t
   val position_at_label : t -> Label_name.t -> unit
   val create_label : t -> ('a, unit, string, Label_name.t) format4 -> 'a
   val pick_register : t -> Register.t Value.t
@@ -448,6 +449,8 @@ end = struct
     }
 
   let name t = t.fun_name
+  let current_label t = t.current_label
+  let position_at_label t label_name = t.current_label <- label_name
 
   let pick_register t : Register.t Value.t =
     Register (Virtual (Virtual_register.Counter.next t.register_counter))
@@ -464,9 +467,9 @@ end = struct
 
   let add_code t instr = Queue.enqueue (get_bb t).code instr
 
-  let add_terminal ?(here = [%here]) t terminal =
+  let add_terminal t terminal =
     let bb = get_bb t in
-    match Set_once.set bb.terminal here terminal with
+    match Set_once.set bb.terminal [%here] terminal with
     | Ok () -> ()
     | Error error ->
       compiler_bug
@@ -494,7 +497,6 @@ end = struct
     t
   ;;
 
-  let position_at_label t label_name = t.current_label <- label_name
   let add_local t name value = Hashtbl.add_exn t.locals ~key:name ~data:value
   let find_local t name = Hashtbl.find t.locals name
 
@@ -911,20 +913,22 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         Function_builder.create_label fun_builder "cond_assign.vars%d" i)
     in
     let vars =
-      List.map vars ~f:(fun var -> var, Function_builder.pick_register fun_builder)
+      List.map vars ~f:(fun var ->
+        let tmp = Function_builder.pick_register fun_builder in
+        Function_builder.add_local fun_builder var tmp;
+        tmp)
     in
     let body_label = Function_builder.create_label fun_builder "cond_assign.body" in
     let if_none_matched_label =
       Function_builder.create_label fun_builder "cond_assign.if_none_matched"
     in
     let assign_vars_and_jump_to_body var_exprs =
-      List.iter2_exn vars var_exprs ~f:(fun (var, tmp) var_expr ->
+      List.iter2_exn vars var_exprs ~f:(fun var var_expr ->
         let var_value = codegen_expr t var_expr ~fun_builder in
         (* Move to a register which is consistent in all branches. This is important for
            the correctness of [add_local], which will be used for all future branches. *)
-        Function_builder.add_code fun_builder (Mov { src = var_value; dst = tmp });
-        Function_builder.add_local fun_builder var tmp);
-      Function_builder.add_terminal ~here:[%here] fun_builder (Jump body_label)
+        Function_builder.add_code fun_builder (Mov { src = var_value; dst = var }));
+      Function_builder.add_terminal fun_builder (Jump body_label)
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
       if i <> 0 then Function_builder.position_at_label fun_builder cond_labels.(i);
@@ -948,12 +952,14 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
      | Otherwise otherwise_expr ->
        Function_builder.position_at_label fun_builder body_label;
        let body_value = codegen_expr t body ~fun_builder in
+       let body_end_label = Function_builder.current_label fun_builder in
        Function_builder.position_at_label fun_builder if_none_matched_label;
        let otherwise_value = codegen_expr t otherwise_expr ~fun_builder in
+       let otherwise_end_label = Function_builder.current_label fun_builder in
        merge_branches
          fun_builder
-         (body_label, body_value)
-         (if_none_matched_label, otherwise_value)
+         (body_end_label, body_value)
+         (otherwise_end_label, otherwise_value)
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
 
 and codegen_cond t cond ~fun_builder =
@@ -992,6 +998,7 @@ and codegen_cond t cond ~fun_builder =
     Function_builder.add_code
       fun_builder
       (Cmp (Memory (I16, Value value), Constant (Int (Cnstr_tag.to_int tag))));
+    Function_builder.add_terminal fun_builder (Jump end_label);
     Function_builder.position_at_label fun_builder end_label
   | And (cond1, cond2) ->
     codegen_cond t cond1 ~fun_builder;
