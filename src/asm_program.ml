@@ -522,7 +522,12 @@ let pp fmt { globals; externs; text_section; rodata_section; bss_section } =
   List.iter externs ~f:(fun name ->
     pp_line fmt "extern" [ Label_name.to_string name ] ~f:Format.pp_print_string);
   Format.pp_print_newline fmt ();
-  pp_section fmt "text" text_section ~align:None ~f:Basic_block.pp;
+  pp_section fmt "text" text_section ~align:None ~f:(fun fmt bb ->
+    (* Labels starting with "." are local to a function. Other labels are function names.
+       Add an extra newline in between functions to help readability. *)
+    if not (String.is_prefix ~prefix:"." (Label_name.to_string bb.label))
+    then Format.pp_print_newline fmt ();
+    Basic_block.pp fmt bb);
   pp_section fmt "rodata" rodata_section ~align:(Some 8) ~f:Data_decl.pp;
   pp_section fmt "bss" bss_section ~align:(Some 8) ~f:Bss_decl.pp
 ;;

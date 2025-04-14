@@ -1053,6 +1053,8 @@ let define_function t ~fun_name ~args ~body =
 let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
+    (* TODO: We could recognize constant expressions in globals (and locals too) and not
+       have to do runtime initialization, instead just keeping them in rodata. *)
     set_global t (Label_name.of_mir_name name) expr ~fun_builder:t.main_function
   | Fun_def { fun_name; args; body } ->
     (* FIXME: Need a preprocessing step like the llvm codegen to handle mutually
