@@ -50,11 +50,6 @@ module Label_name = struct
   let to_string = Fn.id
   let of_mir_name = Mir_name.to_string >> of_string
   let of_extern_name = Extern_name.to_string >> of_string
-
-  let to_mir_name t =
-    Mir_name.create_exportable_name
-      (Value_name.Absolute.of_relative_unchecked (Value_name.Relative.of_string t))
-  ;;
 end
 
 let pp_args fmt args ~f =

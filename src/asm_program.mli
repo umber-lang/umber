@@ -9,7 +9,6 @@ module Label_name : sig
 
   val of_mir_name : Mir_name.t -> t
   val of_extern_name : Extern_name.t -> t
-  val to_mir_name : t -> Mir_name.t
 end
 
 module Size : sig

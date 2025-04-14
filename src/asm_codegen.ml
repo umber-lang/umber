@@ -416,14 +416,6 @@ module Function_builder : sig
   val create : Label_name.t -> t
   val add_code : t -> Register.t Instr.Nonterminal.t -> unit
   val add_terminal : t -> Instr.Terminal.t -> unit
-
-  (* TODO: Consider if this API makes any sense *)
-  val move_values_for_call
-    :  t
-    -> call_conv:Call_conv.t
-    -> args:Register.t Value.t Nonempty.t
-    -> unit
-
   val add_local : t -> Mir_name.t -> Register.t Value.t -> unit
   val find_local : t -> Mir_name.t -> Register.t Value.t option
   val current_label : t -> Label_name.t
@@ -515,65 +507,6 @@ end = struct
   let add_local t name value = Hashtbl.add_exn t.locals ~key:name ~data:value
   let find_local t name = Hashtbl.find t.locals name
 
-  let move_values_for_call t ~call_conv ~(args : Register.t Value.t Nonempty.t) =
-    (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
-       the current and target register states. Be careful about ordering - we need to be
-       careful not to clobber any of the args, so we can't just be like "for each arg,
-       move it to where it should go". We might need to use extra registers to do swaps.
-       
-       e.g. how to handle this:
-
-       Current: 1: a, 2: b, 3: c
-       Target:  1: c, 2: a, 3: b
-
-       We need:
-       1 -> 4 (1: a, 2: b, 3: c, 4: a)
-       3 -> 1 (1: c, 2: b, 3: c, 4: a)
-       2 -> 3 (1: c, 2: b, 3: b, 4: a)
-       4 -> 2 (1: c, 2: a, 3: b, 4: a)
-
-       Also need to handle spilling onto the stack (and having values on the stack)
-       if we run out of registers
-       - we might need a bit more extra info than Value.t has e.g. what stack slock a
-       variable is at 
-       
-       A different approach would be to *force* each of the subsequent generation functions
-       to put their result in target register. Then other calls could either avoid using
-       that register or spill it, then restore it (it'd be most efficient to restore only
-       at the end, I think, to reduce traffic, but then we'd have to keep track of the
-       fact that it's been spilled...). Maybe keeping a suggestion but being able to deal
-       with whatever ended up happening is easier after all...
-
-       Let's try something naive first.
-
-       Actually, maybe we want the codegen to generate virtual registers first, then have
-       a separate register allocation phase.
-
-       The function counts as a value to move as well!
-
-       TODO: Move this out out Function_builder, it doesn't need to be here.
-    *)
-    let args = Nonempty.to_array args in
-    let arg_registers =
-      Call_conv.arg_registers call_conv
-      |> Nonempty.to_list
-      |> Fn.flip List.take (Array.length args)
-      |> List.to_array
-    in
-    if Array.length args > Array.length arg_registers
-    then failwith "TODO: ran out of registers for args, use stack";
-    (* Use a temporary to avoid cases where we'd overwrite something already in one of
-       the target registers. *)
-    let temporaries_to_move =
-      Array.map args ~f:(fun arg ->
-        let tmp = pick_register t in
-        add_code t (Mov { src = arg; dst = tmp });
-        tmp)
-    in
-    Array.iter2_exn temporaries_to_move arg_registers ~f:(fun tmp arg_register ->
-      add_code t (Mov { src = tmp; dst = Register (Real arg_register) }))
-  ;;
-
   let create_label t format =
     let id = Label_id.Counter.next t.label_counter in
     ksprintf (fun s -> Label_name.of_string [%string ".%{s}#%{id#Label_id}"]) format
@@ -663,6 +596,7 @@ let to_program
   : Asm_program.t
   =
   let uninitialized_globals = Queue.to_list bss_globals in
+  let externs = Hashtbl.to_alist externs in
   let literals = Hashtbl.to_alist literals in
   let closures = Hashtbl.data closures in
   let functions = Hashtbl.data functions in
@@ -675,11 +609,10 @@ let to_program
           @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
               { name; strength = `Weak }))
   ; externs =
-      Hashtbl.to_alist externs
-      |> List.map ~f:(fun (mir_name, extern) ->
-           match extern with
-           | C_function name -> name
-           | Umber_function -> Label_name.of_mir_name mir_name)
+      List.map externs ~f:(fun (mir_name, extern) ->
+        match extern with
+        | C_function name -> name
+        | Umber_function -> Label_name.of_mir_name mir_name)
   ; text_section =
       Function_builder.basic_blocks main_function
       @ List.concat_map functions ~f:Function_builder.basic_blocks
@@ -710,12 +643,7 @@ let int_constant_tag tag : _ Value.t =
   Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1))
 ;;
 
-let declare_extern_c_function ?mir_name t label_name =
-  let mir_name =
-    match mir_name with
-    | Some mir_name -> mir_name
-    | None -> Label_name.to_mir_name label_name
-  in
+let declare_extern_c_function t mir_name label_name =
   ignore
     (Hashtbl.add t.externs ~key:mir_name ~data:(C_function label_name)
       : [ `Ok | `Duplicate ])
@@ -783,13 +711,75 @@ let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
         | None -> Global (Label_name.of_mir_name name, Other), Umber))
 ;;
 
+let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list) =
+  (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
+     the current and target register states. Be careful about ordering - we need to be
+     careful not to clobber any of the args, so we can't just be like "for each arg,
+     move it to where it should go". We might need to use extra registers to do swaps.
+     
+     e.g. how to handle this:
+
+     Current: 1: a, 2: b, 3: c
+     Target:  1: c, 2: a, 3: b
+
+     We need:
+     1 -> 4 (1: a, 2: b, 3: c, 4: a)
+     3 -> 1 (1: c, 2: b, 3: c, 4: a)
+     2 -> 3 (1: c, 2: b, 3: b, 4: a)
+     4 -> 2 (1: c, 2: a, 3: b, 4: a)
+
+     Also need to handle spilling onto the stack (and having values on the stack)
+     if we run out of registers
+     - we might need a bit more extra info than Value.t has e.g. what stack slock a
+     variable is at 
+     
+     A different approach would be to *force* each of the subsequent generation functions
+     to put their result in target register. Then other calls could either avoid using
+     that register or spill it, then restore it (it'd be most efficient to restore only
+     at the end, I think, to reduce traffic, but then we'd have to keep track of the
+     fact that it's been spilled...). Maybe keeping a suggestion but being able to deal
+     with whatever ended up happening is easier after all...
+
+     Let's try something naive first.
+
+     Actually, maybe we want the codegen to generate virtual registers first, then have
+     a separate register allocation phase.
+
+     The function counts as a value to move as well!
+
+     TODO: Move this out out Function_builder, it doesn't need to be here.
+    *)
+  let args = List.to_array args in
+  let arg_registers =
+    Call_conv.arg_registers call_conv
+    |> Nonempty.to_list
+    |> Fn.flip List.take (Array.length args)
+    |> List.to_array
+  in
+  if Array.length args > Array.length arg_registers
+  then failwith "TODO: ran out of registers for args, use stack";
+  (* Use a temporary to avoid cases where we'd overwrite something already in one of
+       the target registers. *)
+  let temporaries_to_move =
+    Array.map args ~f:(fun arg ->
+      let tmp = Function_builder.pick_register fun_builder in
+      Function_builder.add_code fun_builder (Mov { src = arg; dst = tmp });
+      tmp)
+  in
+  Array.iter2_exn temporaries_to_move arg_registers ~f:(fun tmp arg_register ->
+    Function_builder.add_code
+      fun_builder
+      (Mov { src = tmp; dst = Register (Real arg_register) }))
+;;
+
 (* FIXME: Have to save and restore any caller-save registers. *)
-let codegen_fun_call t fun_name args ~fun_builder =
-  let fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
-  Function_builder.move_values_for_call fun_builder ~call_conv ~args;
+(* FIXME: Depending on the calling convention, we might need to have the stack pointer be
+   aligned to 16 bytes or something. *)
+let codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args =
+  move_values_for_call fun_builder ~call_conv ~args;
   Function_builder.add_code
     fun_builder
-    (Call { fun_; call_conv; arity = Nonempty.length args });
+    (Call { fun_; call_conv; arity = List.length args });
   let output_register = Function_builder.pick_register' fun_builder in
   Function_builder.add_code
     fun_builder
@@ -800,13 +790,24 @@ let codegen_fun_call t fun_name args ~fun_builder =
   output_register
 ;;
 
+let codegen_fun_call t fun_name args ~fun_builder =
+  let fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
+  codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args
+;;
+
 let box t ~tag ~fields ~fun_builder =
   let block_field_num = Nonempty.length fields in
   let heap_pointer_reg =
     let allocation_size = 8 * (block_field_num + 1) in
-    let extern_name = Label_name.of_string "umber_gc_alloc" in
-    let mir_name = Label_name.to_mir_name extern_name in
-    declare_extern_c_function t ~mir_name extern_name;
+    let umber_gc_alloc = "umber_gc_alloc" in
+    (* FIXME: Can you have an extern name as a mir name? Write a test for calling an
+       extern declared in the same file. *)
+    let mir_name =
+      Mir_name.create_exportable_name
+        (Value_name.Absolute.of_relative_unchecked
+           (Value_name.Relative.of_string umber_gc_alloc))
+    in
+    declare_extern_c_function t mir_name (Label_name.of_string umber_gc_alloc);
     codegen_fun_call t mir_name [ Constant (Int allocation_size) ] ~fun_builder
   in
   let heap_pointer : Register.t Value.memory_expr = Register (Virtual heap_pointer_reg) in
@@ -913,7 +914,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
   | Fun_call (fun_name, args) ->
     (* TODO: Maybe we could do something cleverer like suggest a good place to put the
        expression value (to reduce the need for moves) *)
-    let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) in
+    let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) |> Nonempty.to_list in
     Register (Virtual (codegen_fun_call t fun_name args ~fun_builder))
   | Make_block { tag; fields } ->
     (match Nonempty.of_list fields with
@@ -1075,6 +1076,43 @@ let define_function t ~fun_name ~args ~body =
   Function_builder.add_terminal fun_builder Ret
 ;;
 
+(* TODO: Share code with [define_function]? *)
+let define_extern_wrapper_function t ~fun_name ~extern_name ~arity =
+  let outer_call_conv : Call_conv.t = Umber in
+  let inner_call_conv : Call_conv.t = C in
+  let fun_builder = Function_builder.create (Label_name.of_mir_name fun_name) in
+  Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
+  let args =
+    Call_conv.arg_registers outer_call_conv
+    |> Nonempty.to_list
+    |> Fn.flip List.take arity
+    |> List.map ~f:(fun reg ->
+         let virtual_reg = Function_builder.pick_register fun_builder in
+         Function_builder.add_code
+           fun_builder
+           (Mov { src = Register (Real reg); dst = virtual_reg });
+         virtual_reg)
+  in
+  (* FIXME: Handle using stack for args. *)
+  (* (match result with
+   | Same_length | Right_trailing _ -> ()
+   | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"); *)
+  let return_value =
+    codegen_fun_call_internal
+      fun_builder
+      ~fun_:(Global (Label_name.of_extern_name extern_name, Extern_proc))
+      ~call_conv:inner_call_conv
+      ~args
+  in
+  Function_builder.add_code
+    fun_builder
+    (Mov
+       { src = Register (Virtual return_value)
+       ; dst = Register (Real (Call_conv.return_value_register outer_call_conv))
+       });
+  Function_builder.add_terminal fun_builder Ret
+;;
+
 let codegen_stmt t stmt =
   match (stmt : Mir.Stmt.t) with
   | Value_def (name, expr) ->
@@ -1086,10 +1124,13 @@ let codegen_stmt t stmt =
        recursive functions. *)
     define_function t ~fun_name ~args ~body
   | Fun_decl { name; arity = _ } ->
+    (* TODO: Do we need arity here anymore? Ah, I guess whenever we generate a call we
+       know the arity, so I guess not. *)
     Hashtbl.add_exn t.externs ~key:name ~data:Umber_function
-  | Extern_decl { name; extern_name; arity = _ } ->
-    (* TODO: Do we even need arity anymore? Also applies to [Fun_decl] above. *)
-    declare_extern_c_function t ~mir_name:name (Label_name.of_extern_name extern_name)
+  | Extern_decl { name; extern_name; arity } ->
+    declare_extern_c_function t name (Label_name.of_extern_name extern_name);
+    (* Create a wrapper function for other files to use. *)
+    define_extern_wrapper_function t ~fun_name:name ~extern_name ~arity
 ;;
 
 let main_function_name ~(module_path : Module_path.Absolute.t) =
@@ -1118,14 +1159,25 @@ let compile_to_object_file program ~output_file =
 
 let compile_entry_module ~module_paths ~entry_file =
   let t = create ~main_function_name:(Label_name.of_string "main") in
-  let umber_gc_init = Label_name.of_string "umber_gc_init" in
-  declare_extern_c_function t umber_gc_init;
+  let umber_gc_init = "umber_gc_init" in
+  let umber_gc_init_label = Label_name.of_string umber_gc_init in
+  let umber_gc_init_mir_name =
+    Mir_name.create_exportable_name
+      (Value_name.Absolute.of_relative_unchecked
+         (Value_name.Relative.of_string umber_gc_init))
+  in
+  declare_extern_c_function t umber_gc_init_mir_name umber_gc_init_label;
   Function_builder.add_code
     t.main_function
-    (Call { fun_ = Global (umber_gc_init, Extern_proc); call_conv = C; arity = 0 });
+    (Call { fun_ = Global (umber_gc_init_label, Extern_proc); call_conv = C; arity = 0 });
   List.iter module_paths ~f:(fun module_path ->
     let fun_name = main_function_name ~module_path in
-    Hashtbl.add_exn t.externs ~key:(Label_name.to_mir_name fun_name) ~data:Umber_function;
+    let mir_name =
+      Mir_name.create_exportable_name
+        (Value_name.Absolute.of_relative_unchecked
+           (Value_name.Relative.of_string (Label_name.to_string fun_name)))
+    in
+    Hashtbl.add_exn t.externs ~key:mir_name ~data:Umber_function;
     Function_builder.add_code
       t.main_function
       (Call { fun_ = Global (fun_name, Extern_proc); call_conv = Umber; arity = 0 }));
@@ -1217,6 +1269,7 @@ let%expect_test "hello world, from MIR" =
                default   rel
                global    umber_main#HelloWorld
                global    HelloWorld.#binding.1
+               global    Std.Prelude.print
                global    string.210886959:weak
                extern    umber_print_endline
 
@@ -1224,8 +1277,12 @@ let%expect_test "hello world, from MIR" =
 
     umber_main#HelloWorld:
                mov       rdi, string.210886959
-               call      umber_print_endline wrt ..plt
+               call      Std.Prelude.print
                mov       qword [HelloWorld.#binding.1], rax
+               ret
+
+    Std.Prelude.print:
+               call      umber_print_endline wrt ..plt
                ret
 
                section   .rodata
