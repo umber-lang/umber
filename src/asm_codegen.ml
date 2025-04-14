@@ -23,6 +23,7 @@ open Names
 open struct
   open Asm_program
   module Label_name = Label_name
+  module Call_conv = Call_conv
   module Value = Value
   module Instr = Instr
   module Basic_block = Basic_block
@@ -30,37 +31,6 @@ open struct
   module Data_decl = Data_decl
   module Bss_decl = Bss_decl
   module Global_decl = Global_decl
-end
-
-module Call_conv = struct
-  type t =
-    | C
-    | Umber
-
-  (* TODO: Decide on an umber calling convention. For now, let's just copy C's calling
-     convention since we have to implement that anyway. We can probably switch to
-     basically copying OCaml's after that. *)
-
-  (* TODO: Handle further arguments with the stack *)
-  let arg_registers t : Asm_program.Register.t Nonempty.t =
-    match t with
-    | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
-  ;;
-
-  let return_value_register : t -> Asm_program.Register.t = function
-    | C | Umber -> Rax
-  ;;
-
-  let register_is_reserved t (reg : Asm_program.Register.t) =
-    match t, reg with
-    | (C | Umber), (Rsp (* Stack pointer *) | Rbp (* Frame pointer *)) -> true
-    | _ -> false
-  ;;
-
-  let all_available_registers t =
-    (* FIXME: Handle caller vs callee saved registers. *)
-    List.filter Asm_program.Register.all ~f:(not << register_is_reserved t)
-  ;;
 end
 
 module Virtual_register : sig
@@ -171,15 +141,39 @@ end = struct
       | Assignment
   end
 
+  (* FIXME: Handle Call properly! 
+     It uses the arg registers (for its arity).
+     It assigns to the return register.
+     It may assign to other caller-saved registers (they are clobbered)
+     => I guess that counts as an assignment but we need extra handling to maintain the
+        correct register state afterward
+
+     We need to know the calling convention and arity of the function being called.
+  *)
   (* TODO: Move to Instr module? *)
-  let instr_args : _ Instr.Nonterminal.t -> (Arg_kind.t * _ Value.t) list = function
+  let instr_uses_and_assignments (instr : _ Instr.Nonterminal.t)
+    : (Arg_kind.t * _ Value.t) list
+    =
+    match instr with
     | Mov { dst; src } | Lea { dst; src } -> [ Use, src; Assignment, dst ]
     | And { dst; src } ->
       (* NOTE: It's important that [Use, dst] comes before [Assignment, dst] for the logic
          calculating lifetimes to work. This reflectts the reality that the register is
          used *before* being assigned to. *)
       [ Use, src; Use, dst; Assignment, dst ]
-    | Call a | Setz a -> [ Use, a ]
+    | Call { fun_; call_conv; arity } ->
+      let args =
+        Call_conv.arg_registers call_conv
+        |> Nonempty.to_list
+        |> Fn.flip List.take arity
+        |> List.map ~f:(fun reg : (Arg_kind.t * Register.t Value.t) ->
+             Use, Register (Real reg))
+      in
+      let return_value : Arg_kind.t * Register.t Value.t =
+        Assignment, Register (Real (Call_conv.return_value_register call_conv))
+      in
+      (Use, fun_) :: (args @ [ return_value ])
+    | Setz a -> [ Use, a ]
     | Cmp (a, b) | Test (a, b) -> [ Use, a; Use, b ]
   ;;
 
@@ -193,7 +187,7 @@ end = struct
       List.map basic_blocks ~f:(fun bb -> bb.label, bb) |> Label_name.Table.of_alist_exn
     in
     let graph = Interference_graph.create () in
-    let record_value live_registers (kind : Arg_kind.t) value =
+    let record_use_or_assignment live_registers (kind : Arg_kind.t) value =
       match kind with
       | Use ->
         (* When a variable is used, we know it must be live at this point. *)
@@ -230,10 +224,10 @@ end = struct
           in
           List.fold_right code ~init:live_registers ~f:(fun instr live_registers ->
             List.fold_right
-              (instr_args instr)
+              (instr_uses_and_assignments instr)
               ~init:live_registers
               ~f:(fun (kind, value) live_registers ->
-              record_value live_registers kind value)))
+              record_use_or_assignment live_registers kind value)))
     in
     graph
   ;;
@@ -245,44 +239,54 @@ end = struct
     ~interference_graph
     =
     let coalesced_registers = Virtual_register.Table.create () in
+    List.iter basic_blocks ~f:(fun { label = _; code; terminal = _ } ->
+      List.iter code ~f:(fun instr ->
+        match instr with
+        | Mov { src = Register src_reg; dst = Register dst_reg } ->
+          (match src_reg, dst_reg with
+           | Real _, Real _ -> ()
+           | (Virtual reg_to_coalesce as node), ((Real _ | Virtual _) as other_reg)
+           | (Real _ as other_reg), (Virtual reg_to_coalesce as node) ->
+             if not (Interference_graph.mem_edge interference_graph src_reg dst_reg)
+             then (
+               ignore
+                 (Hashtbl.add coalesced_registers ~key:reg_to_coalesce ~data:other_reg
+                   : [ `Ok | `Duplicate ]);
+               if Interference_graph.mem_vertex interference_graph node
+               then (
+                 let neighbours = Interference_graph.succ interference_graph node in
+                 List.iter neighbours ~f:(fun neighbour ->
+                   Interference_graph.add_edge interference_graph other_reg neighbour);
+                 Interference_graph.remove_vertex interference_graph node)))
+        | _ -> ()));
     let basic_blocks =
       List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
         let code =
-          List.filter code ~f:(fun instr ->
+          List.filter_map code ~f:(fun instr ->
+            let instr =
+              Instr.Nonterminal.map_args instr ~f:(fun value ->
+                Value.map_registers value ~f:(fun reg ->
+                  match reg with
+                  | Real _ -> reg
+                  | Virtual virtual_reg ->
+                    Hashtbl.find coalesced_registers virtual_reg
+                    |> Option.value ~default:reg))
+            in
+            (* Drop no-op moves which may have appeared due to coalescing. *)
             match instr with
-            | Mov { src = Register src_reg; dst = Register dst_reg } ->
-              (match src_reg, dst_reg with
-               | Real _, Real _ -> true
-               | (Virtual reg_to_coalesce as node), ((Real _ | Virtual _) as other_reg)
-               | (Real _ as other_reg), (Virtual reg_to_coalesce as node) ->
-                 if Interference_graph.mem_edge interference_graph src_reg dst_reg
-                 then true
-                 else (
-                   ignore
-                     (Hashtbl.add coalesced_registers ~key:reg_to_coalesce ~data:other_reg
-                       : [ `Ok | `Duplicate ]);
-                   if Interference_graph.mem_vertex interference_graph node
-                   then (
-                     let neighbours = Interference_graph.succ interference_graph node in
-                     List.iter neighbours ~f:(fun neighbour ->
-                       Interference_graph.add_edge interference_graph other_reg neighbour);
-                     Interference_graph.remove_vertex interference_graph node);
-                   false))
-            | _ -> true)
+            | Mov { src = Register src_reg; dst = Register dst_reg }
+              when Register.equal src_reg dst_reg -> None
+            | _ -> Some instr)
         in
         { label; code; terminal })
     in
-    List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
-      let code =
-        List.map code ~f:(fun instr ->
-          Instr.Nonterminal.map_args instr ~f:(fun value ->
-            Value.map_registers value ~f:(fun reg ->
-              match reg with
-              | Real _ -> reg
-              | Virtual virtual_reg ->
-                Hashtbl.find coalesced_registers virtual_reg |> Option.value ~default:reg)))
-      in
-      { label; code; terminal })
+    eprint_s
+      [%here]
+      [%lazy_message
+        "After coalescing"
+          (coalesced_registers : Register.t Virtual_register.Table.t)
+          (basic_blocks : Register.t Basic_block.t list)];
+    basic_blocks
   ;;
 
   let color_and_allocate
@@ -386,9 +390,6 @@ end = struct
                []
               : (Register.t * Register.t) list)];
     let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
-    eprint_s
-      [%here]
-      [%lazy_message "After coalescing" (basic_blocks : Register.t Basic_block.t list)];
     color_and_allocate ~basic_blocks ~interference_graph
   ;;
 end
@@ -508,6 +509,10 @@ end = struct
 
        Actually, maybe we want the codegen to generate virtual registers first, then have
        a separate register allocation phase.
+
+       The function counts as a value to move as well!
+
+       TODO: Move this out out Function_builder, it doesn't need to be here.
     *)
     let args = Nonempty.to_array args in
     let arg_registers =
@@ -518,8 +523,16 @@ end = struct
     in
     if Array.length args > Array.length arg_registers
     then failwith "TODO: ran out of registers for args, use stack";
-    Array.iter2_exn args arg_registers ~f:(fun arg arg_register ->
-      add_code t (Mov { src = arg; dst = Register (Real arg_register) }))
+    (* Use a temporary to avoid cases where we'd overwrite something already in one of
+       the target registers. *)
+    let temporaries_to_move =
+      Array.map args ~f:(fun arg ->
+        let tmp = pick_register t in
+        add_code t (Mov { src = arg; dst = tmp });
+        tmp)
+    in
+    Array.iter2_exn temporaries_to_move arg_registers ~f:(fun tmp arg_register ->
+      add_code t (Mov { src = tmp; dst = Register (Real arg_register) }))
   ;;
 
   (* FIXME: cleanup *)
@@ -754,13 +767,15 @@ let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
 let codegen_fun_call t fun_name args ~fun_builder : _ Value.t =
   let fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
   Function_builder.move_values_for_call fun_builder ~call_conv ~args;
-  Function_builder.add_code fun_builder (Call fun_);
+  Function_builder.add_code
+    fun_builder
+    (Call { fun_; call_conv; arity = Nonempty.length args });
   let output_register = Function_builder.pick_register fun_builder in
   Function_builder.add_code
     fun_builder
     (Mov
-       { src = output_register
-       ; dst = Register (Real (Call_conv.return_value_register call_conv))
+       { src = Register (Real (Call_conv.return_value_register call_conv))
+       ; dst = output_register
        });
   output_register
 ;;
@@ -1103,11 +1118,15 @@ let compile_entry_module ~module_paths ~entry_file =
   let t = create ~main_function_name:(Label_name.of_string "main") in
   let umber_gc_init = Label_name.of_string "umber_gc_init" in
   declare_extern_c_function t umber_gc_init;
-  Function_builder.add_code t.main_function (Call (Global (umber_gc_init, Extern_proc)));
+  Function_builder.add_code
+    t.main_function
+    (Call { fun_ = Global (umber_gc_init, Extern_proc); call_conv = C; arity = 0 });
   List.iter module_paths ~f:(fun module_path ->
     let fun_name = main_function_name ~module_path in
     Hashtbl.add_exn t.externs ~key:(Label_name.to_mir_name fun_name) ~data:Umber_function;
-    Function_builder.add_code t.main_function (Call (Global (fun_name, Extern_proc))));
+    Function_builder.add_code
+      t.main_function
+      (Call { fun_ = Global (fun_name, Extern_proc); call_conv = Umber; arity = 0 }));
   Function_builder.add_terminal t.main_function Ret;
   compile_to_object_file t ~output_file:entry_file
 ;;
@@ -1124,7 +1143,11 @@ let%expect_test "hello world" =
                   ; src =
                       Memory (I64, Value (Global (Label_name.of_string "message", Other)))
                   }
-              ; Call (Global (Label_name.of_string "puts", Extern_proc))
+              ; Call
+                  { fun_ = Global (Label_name.of_string "puts", Extern_proc)
+                  ; call_conv = C
+                  ; arity = 1
+                  }
               ]
           ; terminal = Ret
           }

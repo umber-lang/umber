@@ -53,6 +53,17 @@ module Register : sig
   include Hashable.S with type t := t
 end
 
+module Call_conv : sig
+  type t =
+    | C
+    | Umber
+
+  val arg_registers : t -> Register.t Nonempty.t
+  val return_value_register : t -> Register.t
+  val register_is_reserved : t -> Register.t -> bool
+  val all_available_registers : t -> Register.t list
+end
+
 module Global_kind : sig
   type t =
     | Extern_proc
@@ -90,7 +101,11 @@ module Instr : sig
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
-      | Call of 'reg Value.t
+      | Call of
+          { fun_ : 'reg Value.t
+          ; call_conv : Call_conv.t
+          ; arity : int
+          }
       | Cmp of 'reg Value.t * 'reg Value.t
       | Lea of
           { dst : 'reg Value.t

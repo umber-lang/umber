@@ -114,6 +114,38 @@ module Register = struct
   let pp fmt t = Format.pp_print_string fmt (String.lowercase (Variants.to_name t))
 end
 
+module Call_conv = struct
+  type t =
+    | C
+    | Umber
+  [@@deriving sexp_of]
+
+  (* TODO: Decide on an umber calling convention. For now, let's just copy C's calling
+     convention since we have to implement that anyway. We can probably switch to
+     basically copying OCaml's after that. *)
+
+  (* TODO: Handle further arguments with the stack *)
+  let arg_registers t : Register.t Nonempty.t =
+    match t with
+    | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
+  ;;
+
+  let return_value_register : t -> Register.t = function
+    | C | Umber -> Rax
+  ;;
+
+  let register_is_reserved t (reg : Register.t) =
+    match t, reg with
+    | (C | Umber), (Rsp (* Stack pointer *) | Rbp (* Frame pointer *)) -> true
+    | _ -> false
+  ;;
+
+  let all_available_registers t =
+    (* FIXME: Handle caller vs callee saved registers. *)
+    List.filter Register.all ~f:(not << register_is_reserved t)
+  ;;
+end
+
 module Global_kind = struct
   type t =
     | Extern_proc
@@ -229,7 +261,11 @@ module Instr = struct
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
-      | Call of 'reg Value.t
+      | Call of
+          { fun_ : 'reg Value.t
+          ; call_conv : Call_conv.t
+          ; arity : int
+          }
       | Cmp of 'reg Value.t * 'reg Value.t
       | Lea of
           { dst : 'reg Value.t
@@ -246,7 +282,7 @@ module Instr = struct
     let args = function
       | And { dst; src } | Mov { dst; src } | Lea { dst; src } -> [ dst; src ]
       | Cmp (a, b) | Test (a, b) -> [ a; b ]
-      | Call x | Setz x -> [ x ]
+      | Call { fun_ = x; call_conv = _; arity = _ } | Setz x -> [ x ]
     ;;
 
     let map_args t ~f =
@@ -271,7 +307,7 @@ module Instr = struct
         let a = f a in
         let b = f b in
         Test (a, b)
-      | Call x -> Call (f x)
+      | Call { fun_; call_conv; arity } -> Call { fun_ = f fun_; call_conv; arity }
       | Setz x -> Setz (f x)
     ;;
 
@@ -297,9 +333,9 @@ module Instr = struct
         let init, a = f init a in
         let init, b = f init b in
         init, Test (a, b)
-      | Call x ->
-        let init, x = f init x in
-        init, Call x
+      | Call { fun_; call_conv; arity } ->
+        let init, fun_ = f init fun_ in
+        init, Call { fun_; call_conv; arity }
       | Setz x ->
         let init, x = f init x in
         init, Setz x
