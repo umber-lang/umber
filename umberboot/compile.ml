@@ -251,9 +251,9 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
            module_path, mir, codegen))
       ~generating_asm:
         (run_stage ~f:(fun (module_path, mir, (_ : Codegen.t)) ->
-           let asm = Asm_codegen.of_mir ~module_path mir in
+           let asm = Asm_codegen.convert_mir ~module_path mir in
            maybe_output Asm ~f:(fun out ->
-             Asm_codegen.pp (Stdlib.Format.formatter_of_out_channel out) asm);
+             Asm_program.pp (Stdlib.Format.formatter_of_out_channel out) asm);
            Ok (module_path, asm)))
       ~linking:
         (run_stage ~f:(fun (module_path, asm) ->

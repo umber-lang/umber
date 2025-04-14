@@ -568,8 +568,6 @@ end = struct
         add_code t (Mov { src; dst = Register target_reg })
       | Memory _ -> failwith "TODO: memory arg location") *)
 
-  (* TODO: It's a little weird that register allocations gets done as part of
-     [Asm_codegen.pp]. Maybe [or_mir] should also just call [to_program]. *)
   let basic_blocks t =
     Hash_queue.to_alist t.basic_blocks
     |> List.map ~f:(fun (label, { code; terminal }) : _ Basic_block.t ->
@@ -684,8 +682,6 @@ let to_program
         { label = name; kind = `Words; size = 1 })
   }
 ;;
-
-let pp fmt t = Asm_program.pp fmt (to_program t)
 
 let create ~main_function_name =
   { name_table = Mir_name.Name_table.create ()
@@ -1094,11 +1090,11 @@ let main_function_name ~(module_path : Module_path.Absolute.t) =
   Label_name.of_string [%string "umber_main#%{module_path#Module_path}"]
 ;;
 
-let of_mir ~module_path mir =
+let convert_mir ~module_path mir =
   let t = create ~main_function_name:(main_function_name ~module_path) in
   List.iter mir ~f:(codegen_stmt t);
   Function_builder.add_terminal t.main_function Ret;
-  t
+  to_program t
 ;;
 
 (* TODO: Move this utility somewhere better. *)
@@ -1107,11 +1103,11 @@ let with_tempfile ~prefix ~suffix ~f =
   protect ~f:(fun () -> f tempfile) ~finally:(fun () -> Sys_unix.remove tempfile)
 ;;
 
-let compile_to_object_file t ~output_file =
+let compile_to_object_file program ~output_file =
   with_tempfile ~prefix:"umber" ~suffix:".asm" ~f:(fun tempfile ->
     Out_channel.with_file tempfile ~f:(fun out ->
-      pp (Format.formatter_of_out_channel out) t);
-    Shell.run "nasm" [ "-felf64"; tempfile; "-o"; output_file ])
+      Asm_program.pp (Format.formatter_of_out_channel out) program);
+    Asm_helpers.compile_to_object_file ~input_file:tempfile ~output_file)
 ;;
 
 let compile_entry_module ~module_paths ~entry_file =
@@ -1128,7 +1124,7 @@ let compile_entry_module ~module_paths ~entry_file =
       t.main_function
       (Call { fun_ = Global (fun_name, Extern_proc); call_conv = Umber; arity = 0 }));
   Function_builder.add_terminal t.main_function Ret;
-  compile_to_object_file t ~output_file:entry_file
+  compile_to_object_file (to_program t) ~output_file:entry_file
 ;;
 
 let%expect_test "hello world" =
@@ -1209,7 +1205,7 @@ let%expect_test "hello world, from MIR" =
     Module_path.Absolute.of_relative_unchecked
       (Module_path.Relative.of_ustrings_exn [ Ustring.of_string_exn "HelloWorld" ])
   in
-  Asm_program.pp Format.std_formatter (to_program (of_mir ~module_path hello_world));
+  Asm_program.pp Format.std_formatter (convert_mir ~module_path hello_world);
   [%expect
     {|
                default   rel
