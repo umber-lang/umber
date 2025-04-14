@@ -33,11 +33,13 @@ open struct
   module Global_decl = Global_decl
 end
 
-module Virtual_register : sig
+module Unique_counter () : sig
   type t [@@deriving compare, equal, sexp_of]
 
-  include Comparable.S with type t := t
-  include Hashable.S with type t := t
+  val to_string : t -> string
+
+  include Comparable.S_plain with type t := t
+  include Hashable.S_plain with type t := t
 
   module Counter : sig
     type id := t
@@ -61,6 +63,8 @@ end = struct
     ;;
   end
 end
+
+module Virtual_register = Unique_counter ()
 
 module Register = struct
   module T = struct
@@ -405,7 +409,7 @@ module Function_builder : sig
 
   val create : Label_name.t -> t
   val add_code : t -> Register.t Instr.Nonterminal.t -> unit
-  val add_terminal : t -> Instr.Terminal.t -> unit
+  val add_terminal : ?here:Source_code_position.t -> t -> Instr.Terminal.t -> unit
 
   (* TODO: Consider if this API makes any sense *)
   val move_values_for_call
@@ -417,6 +421,7 @@ module Function_builder : sig
   val add_local : t -> Mir_name.t -> Register.t Value.t -> unit
   val find_local : t -> Mir_name.t -> Register.t Value.t option
   val position_at_label : t -> Label_name.t -> unit
+  val create_label : t -> ('a, unit, string, Label_name.t) format4 -> 'a
   val pick_register : t -> Register.t Value.t
   val name : t -> Label_name.t
   val basic_blocks : t -> Asm_program.Register.t Basic_block.t list
@@ -426,14 +431,16 @@ end = struct
       { code : Register.t Instr.Nonterminal.t Queue.t
       ; terminal : Instr.Terminal.t Set_once.t
       }
+    [@@deriving sexp_of]
 
     let create () = { code = Queue.create (); terminal = Set_once.create () }
   end
 
-  (* TODO: Represents a partial codegened function. We need to consider the state of each
-     register. *)
+  module Label_id = Unique_counter ()
+
   type t =
     { fun_name : Label_name.t
+    ; label_counter : Label_id.Counter.t
     ; register_counter : Virtual_register.Counter.t
     ; locals : Register.t Value.t Mir_name.Table.t
     ; basic_blocks : Block_builder.t Label_name.Hash_queue.t
@@ -456,12 +463,27 @@ end = struct
   ;;
 
   let add_code t instr = Queue.enqueue (get_bb t).code instr
-  let add_terminal t terminal = Set_once.set_exn (get_bb t).terminal [%here] terminal
+
+  let add_terminal ?(here = [%here]) t terminal =
+    let bb = get_bb t in
+    match Set_once.set bb.terminal here terminal with
+    | Ok () -> ()
+    | Error error ->
+      compiler_bug
+        [%message
+          "Tried to add multiple terminals to a block"
+            ~new_terminal:(terminal : Instr.Terminal.t)
+            ~existing_terminal:(bb.terminal : Instr.Terminal.t Set_once.t)
+            ~current_label:(t.current_label : Label_name.t)
+            (bb : Block_builder.t)
+            (error : Error.t)]
+  ;;
 
   let create fun_name =
     (* FIXME: callee saved registers must be marked Used *)
     let t =
       { fun_name
+      ; label_counter = Label_id.Counter.create ()
       ; register_counter = Virtual_register.Counter.create ()
       ; locals = Mir_name.Table.create ()
       ; basic_blocks = Label_name.Hash_queue.create ()
@@ -535,38 +557,10 @@ end = struct
       add_code t (Mov { src = tmp; dst = Register (Real arg_register) }))
   ;;
 
-  (* FIXME: cleanup *)
-  (* Set all argument registers as used up-front so we don't try to use them as
-       temporary registers. *)
-  (* Array.iter arg_registers ~f:(fun reg -> set_register_state t reg Used);
-    Array.iteri (Array.zip_exn args arg_registers) ~f:(fun _i (current_loc, target_reg) ->
-      match current_loc with
-      | Register current_reg ->
-        if Register.equal current_reg target_reg
-        then (* Already in the right place. Nothing to do. *) ()
-        else (
-          match
-            Array.findi args ~f:(fun (_ : int) -> function
-              | Register reg -> Register.equal reg target_reg
-              | _ -> false)
-          with
-          | Some (other_arg, (_ : Value.t)) ->
-            (* One of the arguments is sitting in the register we need. Move it elsewhere. *)
-            (* FIXME: It's just a matter of making sure we don't clobber a register which is
-             currently being used for something. 
-             
-             Although, it'd be easier if we could just express the register constraints
-             and put it into some kind of solver which would work forwards and backwards.
-            *)
-            let tmp = pick_available_reg_or_stack t in
-            add_code t (Mov { src = Register target_reg; dst = tmp });
-            args.(other_arg) <- tmp;
-            add_code t (Mov { src = Register current_reg; dst = Register target_reg })
-          | None ->
-            add_code t (Mov { src = Register current_reg; dst = Register target_reg }))
-      | (Global _ | Constant _) as src ->
-        add_code t (Mov { src; dst = Register target_reg })
-      | Memory _ -> failwith "TODO: memory arg location") *)
+  let create_label t format =
+    let id = Label_id.Counter.next t.label_counter in
+    ksprintf (fun s -> Label_name.of_string [%string ".%{s}#%{id#Label_id}"]) format
+  ;;
 
   let basic_blocks t =
     Hash_queue.to_alist t.basic_blocks
@@ -802,6 +796,9 @@ let box t ~tag ~fields ~fun_builder =
   heap_pointer
 ;;
 
+(* TODO: Depending on how the constant value is used, we could just return a [Constant]
+   directly, and we might not even need to generate the literal in the first place. This
+   might be easier to handle in a later inlining pass. *)
 let codegen_literal t (literal : Literal.t) : _ Value.t =
   let name =
     Hashtbl.find_or_add t.literals literal ~default:(fun () ->
@@ -904,74 +901,60 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        Might be easier to just use a counter or something though
        We can prefix with . to get namespacing, kinda relying on nasm a lot with that tho
     *)
-    (* Setup is like 
-       
-       if cond1 then goto cond_binding1
-       else if cond2 then goto cond_binding2
-       else goto if_none_matched
-
-       cond_binding1:
-         a =..
-         b =..
-         goto body
-
-       body:
-         ...
-
-       if_none_matched:
-         ...
-    *)
-    let cond_label i = Label_name.of_string [%string "cond_assign.cond%{i#Int}"] in
-    let vars_label i = Label_name.of_string [%string "cond_assign.vars%{i#Int}"] in
-    let body_label = Label_name.of_string "cond_assign.body" in
-    let if_none_matched_label = Label_name.of_string "cond_assign.if_none_matched" in
     let n_conds = Nonempty.length conds in
+    let cond_labels =
+      Array.init n_conds ~f:(fun i ->
+        Function_builder.create_label fun_builder "cond_assign.cond%d" i)
+    in
+    let vars_labels =
+      Array.init n_conds ~f:(fun i ->
+        Function_builder.create_label fun_builder "cond_assign.vars%d" i)
+    in
+    let vars =
+      List.map vars ~f:(fun var -> var, Function_builder.pick_register fun_builder)
+    in
+    let body_label = Function_builder.create_label fun_builder "cond_assign.body" in
+    let if_none_matched_label =
+      Function_builder.create_label fun_builder "cond_assign.if_none_matched"
+    in
     let assign_vars_and_jump_to_body var_exprs =
-      List.iter2_exn vars var_exprs ~f:(fun var var_expr ->
+      List.iter2_exn vars var_exprs ~f:(fun (var, tmp) var_expr ->
         let var_value = codegen_expr t var_expr ~fun_builder in
-        (* FIXME: add_local assumes we know where the local is, but we don't. But to
-           generate code properly, we need to make sure it ends up in the same place
-           every time. Enforce it's always in the same place. *)
-        Function_builder.add_local fun_builder var var_value);
-      Function_builder.add_terminal fun_builder (Jump body_label)
+        (* Move to a register which is consistent in all branches. This is important for
+           the correctness of [add_local], which will be used for all future branches. *)
+        Function_builder.add_code fun_builder (Mov { src = var_value; dst = tmp });
+        Function_builder.add_local fun_builder var tmp);
+      Function_builder.add_terminal ~here:[%here] fun_builder (Jump body_label)
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
-      if i <> 0 then Function_builder.position_at_label fun_builder (cond_label i);
+      if i <> 0 then Function_builder.position_at_label fun_builder cond_labels.(i);
       codegen_cond t cond ~fun_builder;
       let next_label =
-        if i < n_conds - 1 then cond_label (i + 1) else if_none_matched_label
+        if i < n_conds - 1 then cond_labels.(i + 1) else if_none_matched_label
       in
-      let vars_label = vars_label i in
       Function_builder.add_terminal
         fun_builder
-        (Jump_if { cond = `Nonzero; then_ = next_label; else_ = vars_label });
-      Function_builder.position_at_label fun_builder vars_label;
+        (Jump_if { cond = `Nonzero; then_ = next_label; else_ = vars_labels.(i) });
+      Function_builder.position_at_label fun_builder vars_labels.(i);
       (* If we didn't jump, the condition succeeded, so set the variables. *)
       assign_vars_and_jump_to_body var_exprs);
-    (* TODO: We kinda have to represent something like phi nodes, where the branches
-       "merge" back into one value. We could either let [Value.t] represent values in
-       possibly different places (some kind of union), or enforce that the values end up
-       in the same place. Enforcing they're in the same place seems easier. *)
-    Function_builder.position_at_label fun_builder if_none_matched_label;
-    let otherwise_value =
-      match if_none_matched with
-      | Use_bindings var_exprs ->
-        assign_vars_and_jump_to_body var_exprs;
-        None
-      | Otherwise otherwise_expr -> Some (codegen_expr t otherwise_expr ~fun_builder)
-    in
-    (* FIXME: Need to merge the values of the vars *)
-    if n_conds > 1 && List.length vars > 0 then failwith "FIXME: merge vars";
-    Function_builder.position_at_label fun_builder body_label;
-    let body_value = codegen_expr t body ~fun_builder in
-    (match otherwise_value with
-     | None -> body_value
-     | Some otherwise_value ->
+    (match if_none_matched with
+     | Use_bindings var_exprs ->
+       Function_builder.position_at_label fun_builder if_none_matched_label;
+       assign_vars_and_jump_to_body var_exprs;
+       Function_builder.position_at_label fun_builder body_label;
+       let body_value = codegen_expr t body ~fun_builder in
+       body_value
+     | Otherwise otherwise_expr ->
+       Function_builder.position_at_label fun_builder body_label;
+       let body_value = codegen_expr t body ~fun_builder in
+       Function_builder.position_at_label fun_builder if_none_matched_label;
+       let otherwise_value = codegen_expr t otherwise_expr ~fun_builder in
        merge_branches
          fun_builder
          (body_label, body_value)
          (if_none_matched_label, otherwise_value)
-         ~merge_label:(Label_name.of_string [%string "cond_assign.merge"]))
+         ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
 
 and codegen_cond t cond ~fun_builder =
   let cmp value value' = Function_builder.add_code fun_builder (Cmp (value, value')) in
@@ -993,9 +976,12 @@ and codegen_cond t cond ~fun_builder =
   | Non_constant_tag_equals (expr, tag) ->
     let value = codegen_expr t expr ~fun_builder in
     check_value_is_block fun_builder value;
-    (* FIXME: mint new label names *)
-    let is_block_label = Label_name.of_string "non_constant_tag_equals.is_block" in
-    let end_label = Label_name.of_string "non_constant_tag_equals.end" in
+    let is_block_label =
+      Function_builder.create_label fun_builder "non_constant_tag_equals.is_block"
+    in
+    let end_label =
+      Function_builder.create_label fun_builder "non_constant_tag_equals.end"
+    in
     (* If it's not a block, we want to "return false" (ZF = 0). This is already the case,
        so we can jump to the end in the [else_] case. *)
     Function_builder.add_terminal
@@ -1065,26 +1051,6 @@ let codegen_stmt t stmt =
     (* TODO: Do we even need arity anymore? Also applies to [Fun_decl] above. *)
     declare_extern_c_function t ~mir_name:name (Label_name.of_extern_name extern_name)
 ;;
-
-(* FIXME: Decide what to do with this.
-
-   Having umber_apply be a thing at all seems somewhat sad? I guess we need something to
-   translate an Umber function call into something the Rust runtime can call though.
-
-   But having to check every function call first is unfortunate. It might be better to
-   enforce that constant block wrappers are created for function values (possibly lazily,
-   when they're first used.) How about this - when we look up a function name for a call,
-   we inline it specially, but other times, the block representation is used.
-*)
-(* let codegen_runtime_required_functions t =
-  (* Ensure that functions the runtime needs are codegened. See closure.rs in the runtime. *)
-  (* codegen_umber_apply_fun t ~n_args:2 *)
-  set_global
-    t
-    (Label_name.of_string "umber_apply2")
-    (Primitive (Int 0))
-    ~fun_builder:t.main_function
-;; *)
 
 let main_function_name ~(module_path : Module_path.Absolute.t) =
   Label_name.of_string [%string "umber_main#%{module_path#Module_path}"]
