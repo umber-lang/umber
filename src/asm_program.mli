@@ -123,7 +123,6 @@ module Instr : sig
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
-      | Setz of 'reg Value.t
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of]
 

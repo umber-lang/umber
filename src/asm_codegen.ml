@@ -178,7 +178,6 @@ end = struct
         Assignment, Register (Real (Call_conv.return_value_register call_conv))
       in
       (Use, fun_) :: (args @ [ return_value ])
-    | Setz a -> [ Use, a ]
     | Cmp (a, b) | Test (a, b) -> [ Use, a; Use, b ]
   ;;
 
@@ -1010,34 +1009,36 @@ and codegen_cond t cond ~fun_builder =
     cmp (codegen_expr t expr ~fun_builder) (int_constant_tag tag)
   | Non_constant_tag_equals (expr, tag) ->
     let value = codegen_expr t expr ~fun_builder in
-    check_value_is_block fun_builder value;
-    let is_block_label =
-      Function_builder.create_label fun_builder "non_constant_tag_equals.is_block"
-    in
-    let end_label =
-      Function_builder.create_label fun_builder "non_constant_tag_equals.end"
-    in
-    (* If it's not a block, we want to "return false" (ZF = 0). This is already the case,
-       so we can jump to the end in the [else_] case. *)
-    Function_builder.add_terminal
-      fun_builder
-      (Jump_if { cond = `Zero; then_ = is_block_label; else_ = end_label });
-    (* If it's a block, check the tag. *)
-    Function_builder.position_at_label fun_builder is_block_label;
-    Function_builder.add_code
-      fun_builder
-      (Cmp
-         (mem_offset_value fun_builder value I16 0, Constant (Int (Cnstr_tag.to_int tag))));
-    Function_builder.add_terminal fun_builder (Jump end_label);
-    Function_builder.position_at_label fun_builder end_label
+    codegen_and
+      ~fun_builder
+      ~codegen_cond1:(fun () -> check_value_is_block fun_builder value)
+      ~cond2_label:
+        (Function_builder.create_label fun_builder "non_constant_tag_equals.is_block")
+      ~codegen_cond2:(fun () ->
+        Function_builder.add_code
+          fun_builder
+          (Cmp
+             ( mem_offset_value fun_builder value I16 0
+             , Constant (Int (Cnstr_tag.to_int tag)) )))
+      ~end_label:(Function_builder.create_label fun_builder "non_constant_tag_equals.end")
   | And (cond1, cond2) ->
-    codegen_cond t cond1 ~fun_builder;
-    let cond1_result = Function_builder.pick_register fun_builder in
-    Function_builder.add_code fun_builder (Setz cond1_result);
-    codegen_cond t cond2 ~fun_builder;
-    let cond2_result = Function_builder.pick_register fun_builder in
-    Function_builder.add_code fun_builder (Setz cond2_result);
-    Function_builder.add_code fun_builder (Test (cond1_result, cond2_result))
+    codegen_and
+      ~fun_builder
+      ~codegen_cond1:(fun () -> codegen_cond t ~fun_builder cond1)
+      ~codegen_cond2:(fun () -> codegen_cond t ~fun_builder cond2)
+      ~cond2_label:(Function_builder.create_label fun_builder "and.cond2")
+      ~end_label:(Function_builder.create_label fun_builder "and.end")
+
+and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_label =
+  (* We use the reasoning that `x and y` is the same as `if x then y else x`. *)
+  codegen_cond1 ();
+  Function_builder.add_terminal
+    fun_builder
+    (Jump_if { cond = `Zero; then_ = cond2_label; else_ = end_label });
+  Function_builder.position_at_label fun_builder cond2_label;
+  codegen_cond2 ();
+  Function_builder.add_terminal fun_builder (Jump end_label);
+  Function_builder.position_at_label fun_builder end_label
 ;;
 
 let set_global t global expr ~fun_builder =

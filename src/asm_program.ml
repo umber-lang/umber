@@ -342,14 +342,13 @@ module Instr = struct
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
-      | Setz of 'reg Value.t
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of, variants]
 
     let args = function
       | And { dst; src } | Mov { dst; src } | Lea { dst; src } -> [ dst; src ]
       | Cmp (a, b) | Test (a, b) -> [ a; b ]
-      | Call { fun_ = x; call_conv = _; arity = _ } | Setz x -> [ x ]
+      | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
     ;;
 
     let map_args t ~f =
@@ -375,7 +374,6 @@ module Instr = struct
         let b = f b in
         Test (a, b)
       | Call { fun_; call_conv; arity } -> Call { fun_ = f fun_; call_conv; arity }
-      | Setz x -> Setz (f x)
     ;;
 
     let fold_map_args t ~init ~f =
@@ -403,9 +401,6 @@ module Instr = struct
       | Call { fun_; call_conv; arity } ->
         let init, fun_ = f init fun_ in
         init, Call { fun_; call_conv; arity }
-      | Setz x ->
-        let init, x = f init x in
-        init, Setz x
     ;;
   end
 
