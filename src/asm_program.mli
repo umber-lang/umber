@@ -60,6 +60,7 @@ module Call_conv : sig
     | Umber
 
   val arg_registers : t -> Register.t Nonempty.t
+  val non_arg_caller_save_registers : t -> Register.t list
   val return_value_register : t -> Register.t
   val register_is_reserved : t -> Register.t -> bool
   val all_available_registers : t -> Register.t list
@@ -101,9 +102,20 @@ module Value : sig
     -> 'acc * 'r2 t
 end
 
+module Register_op : sig
+  type t =
+    | Use
+    | Assignment
+    | Use_and_assignment
+end
+
 module Instr : sig
   module Nonterminal : sig
     type 'reg t =
+      | Add of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
       | And of
           { dst : 'reg Value.t
           ; src : 'reg Value.t
@@ -122,6 +134,10 @@ module Instr : sig
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
+      | Sub of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of]
 
@@ -130,7 +146,7 @@ module Instr : sig
     val fold_map_args
       :  'r1 t
       -> init:'acc
-      -> f:('acc -> 'r1 Value.t -> 'acc * 'r2 Value.t)
+      -> f:('acc -> 'r1 Value.t -> op:Register_op.t -> 'acc * 'r2 Value.t)
       -> 'acc * 'r2 t
   end
 

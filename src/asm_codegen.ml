@@ -25,6 +25,7 @@ open struct
   module Label_name = Label_name
   module Call_conv = Call_conv
   module Value = Value
+  module Register_op = Register_op
   module Instr = Instr
   module Basic_block = Basic_block
   module Size = Size
@@ -81,7 +82,8 @@ end
 
 module Reg_alloc : sig
   val allocate
-    :  Register.t Basic_block.t list
+    :  basic_blocks:Register.t Basic_block.t list
+    -> register_counter:Virtual_register.Counter.t
     -> Asm_program.Register.t Basic_block.t list
 end = struct
   (* TODO: Handle spilling. Per https://en.wikipedia.org/wiki/Brooks%27_theorem, 
@@ -140,13 +142,6 @@ end = struct
     module Dfs = Graph.Traverse.Dfs (G)
   end
 
-  module Register_op = struct
-    (* FIXME: Add Clobber here *)
-    type t =
-      | Use
-      | Assignment
-  end
-
   (* FIXME: Handle Call properly! 
      It uses the arg registers (for its arity).
      It assigns to the return register.
@@ -155,6 +150,39 @@ end = struct
         correct register state afterward
 
      We need to know the calling convention and arity of the function being called.
+
+     If we see one of the caller-saved registers is lived right after a call (except rax)
+     we know that something has gone wrong. Some options:
+     - Reg alloc could notice this and insert moves before and after the call to fresh
+       virtual registers. Would need to somehow pass through the virtual register counter
+       though which is a tiny bit annoying. Reg alloc also hadn't inserted any
+       instructions up to this point (though it'll have to do that later for stack spilling!)
+       We have the same problem as below where we need to keep track of the instructions
+       to add and add them later.
+     - Instruction selection could add moves for all affected registers in advance. These
+       will be useless if the value isn't in use or used later. Reg alloc could notice
+       assignments to values that aren't needed to be live and remove them. This seems
+       trickier tbh, it's unclear how to keep track of the liveness information properly
+       while iterating over the cfg. We'd have to put the location of the useless moves
+       somewhere to schedule their remmoval or something. I guess label + index is ok
+       but awkward to think about indexes while removing instructions.
+       => Actually, wait, we already handle removing useless moves by coalescing virtual
+          registers, maybe adding the moves should work?
+       => Unclear if blindly moving all registers would work, even if they aren't used.
+          I think that'd make them interfere with every preceding register if they were
+          never assigned to? (since lifetime analysis will think they then live for the
+          whole function) Maybe we could remove the moves if the values aren't used? Bit
+          sketchy, easy to write bugs that silently do weird things. I think function
+          builder can keep track of all registers that have been used at some point maybe?
+          Hmm, but the register would not interfere with the one it was moved from, so it
+          should coalesce actually and be fine.
+
+     There's a bigger problem here: we need to make sure reg alloc doesn't start using
+     these registers before the call and then not save them. So we need to encode the
+     clobbering in the interference graph. The clobbered registers need to interfere with
+     ....? At least all the other arguments. You could maybe treat it like all the args
+     getting assigned to, then the clobbered args getting used. Any of the virtual regs
+     will have a lifetime streching over the call so they'll interfere.
   *)
   (* TODO: Move to Instr module? *)
   let instr_register_ops (instr : _ Instr.Nonterminal.t)
@@ -162,23 +190,38 @@ end = struct
     =
     match instr with
     | Mov { dst; src } | Lea { dst; src } -> [ Use, src; Assignment, dst ]
-    | And { dst; src } ->
-      (* NOTE: It's important that [Use, dst] comes before [Assignment, dst] for the logic
-         calculating lifetimes to work. This reflectts the reality that the register is
-         used *before* being assigned to. *)
-      [ Use, src; Use, dst; Assignment, dst ]
+    | And { dst; src } | Add { dst; src } | Sub { dst; src } ->
+      [ Use, src; Use_and_assignment, dst ]
     | Call { fun_; call_conv; arity } ->
-      let args =
+      let fun_use : Register_op.t * _ = Use, fun_ in
+      let args, clobbered_arg_registers =
         Call_conv.arg_registers call_conv
         |> Nonempty.to_list
-        |> Fn.flip List.take arity
-        |> List.map ~f:(fun reg : (Register_op.t * Register.t Value.t) ->
-             Use, Register (Real reg))
+        |> Fn.flip List.split_n arity
       in
-      let return_value : Register_op.t * Register.t Value.t =
+      let arg_uses =
+        List.map args ~f:(fun reg : (Register_op.t * Register.t Value.t) ->
+          Use, Register (Real reg))
+      in
+      let clobbered_register_assignments, clobbered_register_uses =
+        List.map
+          (clobbered_arg_registers @ Call_conv.non_arg_caller_save_registers call_conv)
+          ~f:(fun reg : ((Register_op.t * _) * (Register_op.t * _)) ->
+            let reg : Register.t Value.t = Register (Real reg) in
+            (Assignment, reg), (Use, reg))
+        |> List.unzip
+      in
+      (* FIXME: I think return value assignment might not be needed? *)
+      let return_value_assignment : Register_op.t * Register.t Value.t =
         Assignment, Register (Real (Call_conv.return_value_register call_conv))
       in
-      (Use, fun_) :: (args @ [ return_value ])
+      List.concat
+        [ [ fun_use ]
+        ; clobbered_register_assignments
+        ; arg_uses
+        ; clobbered_register_uses
+        ; [ return_value_assignment ]
+        ]
     | Cmp (a, b) | Test (a, b) -> [ Use, a; Use, b ]
   ;;
 
@@ -192,21 +235,20 @@ end = struct
       List.map basic_blocks ~f:(fun bb -> bb.label, bb) |> Label_name.Table.of_alist_exn
     in
     let graph = Interference_graph.create () in
-    let record_register_op live_registers (op : Register_op.t) value =
-      match op with
-      | Use ->
-        (* When a variable is used, we know it must be live at this point. *)
-        let live_registers = Value.fold_registers value ~init:live_registers ~f:Set.add in
-        Set.iter live_registers ~f:(fun reg1 ->
-          Set.iter live_registers ~f:(fun reg2 ->
-            if not (Register.equal reg1 reg2)
-            then Interference_graph.add_edge graph reg1 reg2));
-        live_registers
-      | Assignment ->
-        (* When a variable is assigned to, it doesn't have to be live before this
-           point anymore. There is a "hole" in the lifetime between the assignment
-           and the previous use where the register isn't needed. *)
-        Value.fold_registers value ~init:live_registers ~f:Set.remove
+    let record_register_use live_registers value =
+      (* When a variable is used, we know it must be live at this point. *)
+      let live_registers = Value.fold_registers value ~init:live_registers ~f:Set.add in
+      Set.iter live_registers ~f:(fun reg1 ->
+        Set.iter live_registers ~f:(fun reg2 ->
+          if not (Register.equal reg1 reg2)
+          then Interference_graph.add_edge graph reg1 reg2));
+      live_registers
+    in
+    let record_register_assignment live_registers value =
+      (* When a variable is assigned to, it doesn't have to be live before this point
+         anymore. There is a "hole" in the lifetime between the assignment and the
+         previous use where the register isn't needed. *)
+      Value.fold_registers value ~init:live_registers ~f:Set.remove
     in
     let (_ : Register.Set.t) =
       fold_cfg_backwards ~cfg ~init:Register.Set.empty ~f:(fun live_registers cfg_node ->
@@ -232,7 +274,12 @@ end = struct
               (instr_register_ops instr)
               ~init:live_registers
               ~f:(fun (op, value) live_registers ->
-              record_register_op live_registers op value)))
+              match op with
+              | Use -> record_register_use live_registers value
+              | Assignment -> record_register_assignment live_registers value
+              | Use_and_assignment ->
+                let live_registers = record_register_assignment live_registers value in
+                record_register_use live_registers value)))
     in
     graph
   ;;
@@ -356,22 +403,6 @@ end = struct
       | exception Exit -> ()
     in
     loop ();
-    (* Color the trivial nodes. *)
-    let coloring = Virtual_register.Table.create () in
-    let vertex_color (reg : Register.t) =
-      match reg with
-      | Real reg -> Some reg
-      | Virtual virtual_reg -> Hashtbl.find coloring virtual_reg
-    in
-    Stack.iter ignored_stack ~f:(fun virtual_reg ->
-      (* Pick a color. *)
-      let neighbouring_colors =
-        Interference_graph.succ interference_graph (Virtual virtual_reg)
-        |> List.filter_map ~f:vertex_color
-        |> Asm_program.Register.Set.of_list
-      in
-      let color = Set.choose_exn (Set.diff all_available_registers neighbouring_colors) in
-      Hashtbl.add_exn coloring ~key:virtual_reg ~data:color);
     let spilled_registers =
       Hashtbl.to_alist vertex_states
       |> List.filter_map ~f:(fun (virtual_reg, state) ->
@@ -379,55 +410,201 @@ end = struct
            | `Ignored -> None
            | `Spilled -> Some virtual_reg)
     in
-    coloring, spilled_registers
+    match Nonempty.of_list spilled_registers with
+    | Some spilled_registers ->
+      (* If some registers were spilled, fail, prompting the caller to spill them and then
+         retry. *)
+      Error spilled_registers
+    | None ->
+      (* Color the trivial nodes. *)
+      let coloring = Virtual_register.Table.create () in
+      let vertex_color (reg : Register.t) =
+        match reg with
+        | Real reg -> Some reg
+        | Virtual virtual_reg -> Hashtbl.find coloring virtual_reg
+      in
+      Stack.iter ignored_stack ~f:(fun virtual_reg ->
+        (* Pick a color. *)
+        let neighbouring_colors =
+          Interference_graph.succ interference_graph (Virtual virtual_reg)
+          |> List.filter_map ~f:vertex_color
+          |> Asm_program.Register.Set.of_list
+        in
+        let color =
+          Set.choose_exn (Set.diff all_available_registers neighbouring_colors)
+        in
+        Hashtbl.add_exn coloring ~key:virtual_reg ~data:color);
+      Ok coloring
   ;;
 
-  let allocate (basic_blocks : Register.t Basic_block.t list) =
-    eprint_s [%here] [%lazy_message (basic_blocks : Register.t Basic_block.t list)];
-    let cfg = create_cfg ~basic_blocks in
-    eprint_s
-      [%here]
-      [%lazy_message
-        ""
-          ~cfg:
-            (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
-              : (Cfg_node.t * Cfg_node.t) list)];
-    let interference_graph = create_interference_graph ~cfg ~basic_blocks in
-    eprint_s
-      [%here]
-      [%lazy_message
-        ""
-          ~interference_graph:
-            (Interference_graph.fold_edges
-               (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
-               interference_graph
-               []
-              : (Register.t * Register.t) list)];
-    let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
-    let all_available_registers =
-      Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
+  (** Replace all mentions of spilled registers with memory loads and stores. *)
+  let update_code_to_spill_registers
+    ~(basic_blocks : Register.t Basic_block.t list)
+    ~newly_spilled_registers
+    ~alredy_spilled_count
+    ~register_counter
+    =
+    (* FIXME: Add in the sub/add to rsp later at the end. *)
+    let spilled_memory_locations =
+      Nonempty.to_list newly_spilled_registers
+      |> List.mapi ~f:(fun i reg : (_ * Register.t Value.t) ->
+           ( reg
+           , Memory
+               (I64, Add (Register (Real Rsp), Offset (8 * (i + alredy_spilled_count)))) ))
+      |> Virtual_register.Map.of_alist_exn
     in
-    let coloring, spilled_registers =
-      color_interference_graph ~interference_graph ~all_available_registers
-    in
-    (* FIXME: Handle spilling *)
-    if not (List.is_empty spilled_registers) then failwith "TODO: register spilling";
+    (* FIXME: Make sure this process doesn't spill things that have already been spilled. *)
     List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
-        List.map code ~f:(fun instr ->
-          Instr.Nonterminal.map_args instr ~f:(fun value ->
-            Value.map_registers value ~f:(function
-              | Real reg -> reg
-              | Virtual virtual_reg ->
-                (match Hashtbl.find coloring virtual_reg with
-                 | Some reg -> reg
-                 | None ->
-                   (* If a register wasn't in the interference graph, we can safely
-                      pick any register. *)
-                   Set.choose_exn all_available_registers))))
+        List.concat_map code ~f:(fun instr ->
+          let (spilled_uses, spilled_assignments), instr =
+            Instr.Nonterminal.fold_map_args instr ~init:([], []) ~f:(fun acc value ~op ->
+              Value.fold_map_registers value ~init:acc ~f:(fun acc reg ->
+                match reg with
+                | Real _ -> acc, reg
+                | Virtual vreg ->
+                  if Nonempty.mem
+                       newly_spilled_registers
+                       vreg
+                       ~equal:Virtual_register.equal
+                  then (
+                    let tmp : Register.t =
+                      Virtual (Virtual_register.Counter.next register_counter)
+                    in
+                    let spilled_uses, spilled_assignments = acc in
+                    match op with
+                    | Use -> ((vreg, tmp) :: spilled_uses, spilled_assignments), tmp
+                    | Assignment ->
+                      (spilled_uses, (vreg, tmp) :: spilled_assignments), tmp
+                    | Use_and_assignment ->
+                      ( ((vreg, tmp) :: spilled_uses, (vreg, tmp) :: spilled_assignments)
+                      , tmp ))
+                  else acc, reg))
+          in
+          (* TODO: We could be smarter and elide some of these loads if they are read from
+             multiple times. That would require reasoning about lifetimes here. *)
+          let loads =
+            List.map spilled_uses ~f:(fun (reg, tmp) : _ Instr.Nonterminal.t ->
+              Mov { src = Map.find_exn spilled_memory_locations reg; dst = Register tmp })
+          in
+          let stores =
+            List.map spilled_assignments ~f:(fun (reg, tmp) : _ Instr.Nonterminal.t ->
+              Mov { src = Register tmp; dst = Map.find_exn spilled_memory_locations reg })
+          in
+          List.concat [ loads; [ instr ]; stores ])
       in
       { label; code; terminal })
   ;;
+
+  (* TODO: Could add frame pointer handling here. *)
+  (** Add code to allocate space for stack variables and release it later. *)
+  let add_function_prologue_and_epilogue ~basic_blocks ~spilled_count
+    : _ Basic_block.t list
+    =
+    if spilled_count = 0
+    then basic_blocks
+    else (
+      let entry_bb = List.hd_exn basic_blocks in
+      let allocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
+        Sub { dst = Register Rsp; src = Constant (Int (8 * spilled_count)) }
+      in
+      let all_but_last, exit_bb =
+        List.split_last basic_blocks |> Option.value_exn ~here:[%here]
+      in
+      let deallocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
+        Add { dst = Register Rsp; src = Constant (Int (8 * spilled_count)) }
+      in
+      let other_bbs = List.tl all_but_last |> Option.value ~default:[] in
+      List.concat
+        [ [ { entry_bb with code = allocate_stack :: entry_bb.code } ]
+        ; other_bbs
+        ; [ { exit_bb with code = exit_bb.code @ [ deallocate_stack ] } ]
+        ])
+  ;;
+
+  let allocate ~(basic_blocks : Register.t Basic_block.t list) ~register_counter =
+    eprint_s [%here] [%lazy_message (basic_blocks : Register.t Basic_block.t list)];
+    let all_available_registers =
+      Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
+    in
+    let try_find_coloring ~cfg ~basic_blocks =
+      eprint_s
+        [%here]
+        [%lazy_message
+          ""
+            ~cfg:
+              (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
+                : (Cfg_node.t * Cfg_node.t) list)];
+      let interference_graph = create_interference_graph ~cfg ~basic_blocks in
+      eprint_s
+        [%here]
+        [%lazy_message
+          ""
+            ~interference_graph:
+              (Interference_graph.fold_edges
+                 (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
+                 interference_graph
+                 []
+                : (Register.t * Register.t) list)];
+      let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
+      color_interference_graph ~interference_graph ~all_available_registers, basic_blocks
+    in
+    let rec loop ~cfg ~basic_blocks ~spilled_registers =
+      let result, basic_blocks = try_find_coloring ~cfg ~basic_blocks in
+      match result with
+      | Error newly_spilled_registers ->
+        let basic_blocks =
+          update_code_to_spill_registers
+            ~basic_blocks
+            ~newly_spilled_registers
+            ~alredy_spilled_count:(List.length spilled_registers)
+            ~register_counter
+        in
+        let spilled_registers =
+          Nonempty.to_list newly_spilled_registers @ spilled_registers
+        in
+        loop ~cfg ~basic_blocks ~spilled_registers
+      | Ok coloring ->
+        let basic_blocks =
+          List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
+            let code =
+              List.map code ~f:(fun instr ->
+                Instr.Nonterminal.map_args instr ~f:(fun value ->
+                  Value.map_registers value ~f:(function
+                    | Real reg -> reg
+                    | Virtual virtual_reg ->
+                      (match Hashtbl.find coloring virtual_reg with
+                       | Some reg -> reg
+                       | None ->
+                         (* If a register wasn't in the interference graph, we can safely
+                      pick any register. *)
+                         Set.choose_exn all_available_registers))))
+            in
+            { label; code; terminal })
+        in
+        add_function_prologue_and_epilogue
+          ~basic_blocks
+          ~spilled_count:(List.length spilled_registers)
+    in
+    loop ~cfg:(create_cfg ~basic_blocks) ~basic_blocks ~spilled_registers:[]
+  ;;
+  (* FIXME: Handle spilling: 
+       - At first assignment, push the initial value. Keep track of the order of pushes
+         inserted so we know what the address is (hmmm...?) If this is annoying we could
+         also push initial values at function start.
+       - Assignments and uses after that refer to memory like [rsp+offset] 
+       - After the last use but before returning, we have to pop, and pick a register to
+         pop into. Any caller-save register will do. Or I guess you can just call add
+         on rsp directly?
+
+       Other ideas:
+       - Can use rbp (frame pointer)
+       - Directly add/sub to rsp at function start and end
+       - When calling functions, sometimes we have to use the stack also. They can use
+         push/pop around the call for simplicitity. If things are already in memory then
+         pushing will mess up the offsets though. Could give offsets relative to rbp to
+         make this a little easier?
+    *)
 end
 
 module Extern = struct
@@ -450,6 +627,8 @@ module Function_builder : sig
   val pick_register : t -> Register.t Value.t
   val pick_register' : t -> Virtual_register.t
   val name : t -> Label_name.t
+
+  (* TODO: This could be Nonempty because we always at least have an entry block. *)
   val basic_blocks : t -> Asm_program.Register.t Basic_block.t list
 end = struct
   module Block_builder = struct
@@ -539,13 +718,15 @@ end = struct
   ;;
 
   let basic_blocks t =
-    Hash_queue.to_alist t.basic_blocks
-    |> List.map ~f:(fun (label, { code; terminal }) : _ Basic_block.t ->
-         { label
-         ; code = Queue.to_list code
-         ; terminal = Set_once.get_exn terminal [%here]
-         })
-    |> Reg_alloc.allocate
+    let basic_blocks =
+      Hash_queue.to_alist t.basic_blocks
+      |> List.map ~f:(fun (label, { code; terminal }) : _ Basic_block.t ->
+           { label
+           ; code = Queue.to_list code
+           ; terminal = Set_once.get_exn terminal [%here]
+           })
+    in
+    Reg_alloc.allocate ~basic_blocks ~register_counter:t.register_counter
   ;;
 end
 
@@ -738,64 +919,34 @@ let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
 ;;
 
 let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list) =
-  (* FIXME: Sort out the arguments - move them to where they need to be. Do a diff with
-     the current and target register states. Be careful about ordering - we need to be
-     careful not to clobber any of the args, so we can't just be like "for each arg,
-     move it to where it should go". We might need to use extra registers to do swaps.
-     
-     e.g. how to handle this:
-
-     Current: 1: a, 2: b, 3: c
-     Target:  1: c, 2: a, 3: b
-
-     We need:
-     1 -> 4 (1: a, 2: b, 3: c, 4: a)
-     3 -> 1 (1: c, 2: b, 3: c, 4: a)
-     2 -> 3 (1: c, 2: b, 3: b, 4: a)
-     4 -> 2 (1: c, 2: a, 3: b, 4: a)
-
-     Also need to handle spilling onto the stack (and having values on the stack)
-     if we run out of registers
-     - we might need a bit more extra info than Value.t has e.g. what stack slock a
-     variable is at 
-     
-     A different approach would be to *force* each of the subsequent generation functions
-     to put their result in target register. Then other calls could either avoid using
-     that register or spill it, then restore it (it'd be most efficient to restore only
-     at the end, I think, to reduce traffic, but then we'd have to keep track of the
-     fact that it's been spilled...). Maybe keeping a suggestion but being able to deal
-     with whatever ended up happening is easier after all...
-
-     Let's try something naive first.
-
-     Actually, maybe we want the codegen to generate virtual registers first, then have
-     a separate register allocation phase.
-
-     The function counts as a value to move as well!
-
-     TODO: Move this out out Function_builder, it doesn't need to be here.
-    *)
-  let args = List.to_array args in
-  let arg_registers =
-    Call_conv.arg_registers call_conv
-    |> Nonempty.to_list
-    |> Fn.flip List.take (Array.length args)
-    |> List.to_array
+  let n_args = List.length args in
+  let arg_registers, clobbered_arg_registers =
+    Call_conv.arg_registers call_conv |> Nonempty.to_list |> Fn.flip List.split_n n_args
   in
-  if Array.length args > Array.length arg_registers
+  let clobbered_registers =
+    clobbered_arg_registers @ Call_conv.non_arg_caller_save_registers call_conv
+  in
+  if n_args > List.length arg_registers
   then failwith "TODO: ran out of registers for args, use stack";
-  (* Use a temporary to avoid cases where we'd overwrite something already in one of
-       the target registers. *)
+  (* Use a temporary to avoid cases where we'd overwrite something already in one of the
+     target registers. It's important to move to all the temporaries first - otherwise,
+     by writing to one of the real registers, it's possible we could lose one of the arg
+     values if it was already in that register. *)
   let temporaries_to_move =
-    Array.map args ~f:(fun arg ->
+    List.map args ~f:(fun arg ->
       let tmp = Function_builder.pick_register fun_builder in
       Function_builder.add_code fun_builder (Mov { src = arg; dst = tmp });
       tmp)
   in
-  Array.iter2_exn temporaries_to_move arg_registers ~f:(fun tmp arg_register ->
+  List.iter2_exn temporaries_to_move arg_registers ~f:(fun tmp arg_register ->
     Function_builder.add_code
       fun_builder
-      (Mov { src = tmp; dst = Register (Real arg_register) }))
+      (Mov { src = tmp; dst = Register (Real arg_register) }));
+  (* In case we are using any clobbered registers, move from them to new temporary
+     registers. Any useless moves will get removed by the register allocator later. *)
+  List.iter clobbered_registers ~f:(fun reg ->
+    let tmp = Function_builder.pick_register fun_builder in
+    Function_builder.add_code fun_builder (Mov { src = Register (Real reg); dst = tmp }))
 ;;
 
 (* FIXME: Have to save and restore any caller-save registers. *)

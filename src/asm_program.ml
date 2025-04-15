@@ -160,6 +160,11 @@ module Call_conv = struct
     | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
   ;;
 
+  let non_arg_caller_save_registers t : Register.t list =
+    match t with
+    | C | Umber -> [ Rax; R10; R11 ]
+  ;;
+
   let return_value_register : t -> Register.t = function
     | C | Umber -> Rax
   ;;
@@ -309,6 +314,13 @@ module Value = struct
   ;;
 end
 
+module Register_op = struct
+  type t =
+    | Use
+    | Assignment
+    | Use_and_assignment
+end
+
 (* TODO: 64-bit values only work with mov - they'll get silently truncated
    otherwise. They need to be loaded into a register first. Ideally the types shouldn't
    allow any Instr except Mov to have a literal value. *)
@@ -317,6 +329,10 @@ end
 module Instr = struct
   module Nonterminal = struct
     type 'reg t =
+      | Add of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
       | And of
           { dst : 'reg Value.t
           ; src : 'reg Value.t
@@ -337,17 +353,29 @@ module Instr = struct
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
+      | Sub of
+          { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of, variants]
 
     let args = function
-      | And { dst; src } | Mov { dst; src } | Lea { dst; src } -> [ dst; src ]
+      | Add { dst; src }
+      | And { dst; src }
+      | Sub { dst; src }
+      | Mov { dst; src }
+      | Lea { dst; src } -> [ dst; src ]
       | Cmp (a, b) | Test (a, b) -> [ a; b ]
       | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
     ;;
 
     let map_args t ~f =
       match t with
+      | Add { dst; src } ->
+        let dst = f dst in
+        let src = f src in
+        Add { dst; src }
       | And { dst; src } ->
         let dst = f dst in
         let src = f src in
@@ -364,6 +392,10 @@ module Instr = struct
         let a = f a in
         let b = f b in
         Cmp (a, b)
+      | Sub { dst; src } ->
+        let dst = f dst in
+        let src = f src in
+        Sub { dst; src }
       | Test (a, b) ->
         let a = f a in
         let b = f b in
@@ -371,30 +403,38 @@ module Instr = struct
       | Call { fun_; call_conv; arity } -> Call { fun_ = f fun_; call_conv; arity }
     ;;
 
-    let fold_map_args t ~init ~f =
+    let fold_map_args t ~init ~(f : _ -> _ -> op:Register_op.t -> _) =
       match t with
+      | Add { dst; src } ->
+        let init, dst = f init dst ~op:Use_and_assignment in
+        let init, src = f init src ~op:Use in
+        init, Add { dst; src }
       | And { dst; src } ->
-        let init, dst = f init dst in
-        let init, src = f init src in
+        let init, dst = f init dst ~op:Use_and_assignment in
+        let init, src = f init src ~op:Use in
         init, And { dst; src }
       | Mov { dst; src } ->
-        let init, dst = f init dst in
-        let init, src = f init src in
+        let init, dst = f init dst ~op:Assignment in
+        let init, src = f init src ~op:Use in
         init, Mov { dst; src }
       | Lea { dst; src } ->
-        let init, dst = f init dst in
-        let init, src = f init src in
+        let init, dst = f init dst ~op:Assignment in
+        let init, src = f init src ~op:Use in
         init, Lea { dst; src }
       | Cmp (a, b) ->
-        let init, a = f init a in
-        let init, b = f init b in
+        let init, a = f init a ~op:Use in
+        let init, b = f init b ~op:Use in
         init, Cmp (a, b)
+      | Sub { dst; src } ->
+        let init, dst = f init dst ~op:Use_and_assignment in
+        let init, src = f init src ~op:Use in
+        init, Sub { dst; src }
       | Test (a, b) ->
-        let init, a = f init a in
-        let init, b = f init b in
+        let init, a = f init a ~op:Use in
+        let init, b = f init b ~op:Use in
         init, Test (a, b)
       | Call { fun_; call_conv; arity } ->
-        let init, fun_ = f init fun_ in
+        let init, fun_ = f init fun_ ~op:Use in
         init, Call { fun_; call_conv; arity }
     ;;
   end
