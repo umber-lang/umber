@@ -76,6 +76,7 @@ module Register = struct
 
   include T
   include Comparable.Make_plain (T)
+  include Hashable.Make_plain (T)
 end
 
 module Reg_alloc : sig
@@ -136,7 +137,7 @@ end = struct
   module Interference_graph = struct
     module G = Graph.Imperative.Graph.Concrete (Register)
     include G
-    include Graph.Coloring.Make (G)
+    module Dfs = Graph.Traverse.Dfs (G)
   end
 
   module Register_op = struct
@@ -293,87 +294,92 @@ end = struct
     basic_blocks
   ;;
 
-  let color_and_allocate
-    ~(basic_blocks : Register.t Basic_block.t list)
-    ~interference_graph
-    =
-    let all_available_registers =
-      Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
+  let color_interference_graph ~interference_graph ~all_available_registers =
+    (* See https://web.eecs.umich.edu/~mahlke/courses/583f12/reading/chaitin82.pdf for
+       a description of the rough algorithm. *)
+    let k = Set.length all_available_registers in
+    let vertex_states = Virtual_register.Table.create () in
+    let ignored_stack = Stack.create () in
+    let degree vertex =
+      List.count (Interference_graph.succ interference_graph vertex) ~f:(function
+        | Real _ -> true
+        | Virtual v ->
+          (match Hashtbl.find vertex_states v with
+           | None -> true
+           | Some (`Ignored | `Spilled) -> false))
     in
-    let coloring =
-      Interference_graph.coloring interference_graph (Set.length all_available_registers)
+    let rec remove_low_degree_vertices () =
+      let any_removed = ref false in
+      Interference_graph.iter_vertex
+        (function
+         | Real _ -> ()
+         | Virtual virtual_reg as vertex ->
+           (match Hashtbl.find vertex_states virtual_reg with
+            | Some (`Ignored | `Spilled) -> ()
+            | None ->
+              if degree vertex < k
+              then (
+                (* The vertex has [degree < k]. It doesn't affect colorability and can be
+                   trivially given a color later. *)
+                any_removed := true;
+                Stack.push ignored_stack virtual_reg;
+                Hashtbl.set vertex_states ~key:virtual_reg ~data:`Ignored)
+              else
+                (* The vertex has a [degree >= k]. It may still be possible to k-color
+                   the graph if some of its neighbours share colors. *)
+                ()))
+        interference_graph;
+      if !any_removed then remove_low_degree_vertices ()
     in
-    (* Once we have a coloring, we need to associate colors to real registers. All the
-       real registers need to be processed first, since those constraints are fixed.  *)
-    let real_registers_by_color = Int.Table.create () in
-    let available_registers =
-      Interference_graph.fold_vertex
-        (fun node available_registers ->
-          match node with
-          | Real reg ->
-            (* FIXME: We can't have multiple real registers with the same color, right?
-               Or maybe it's ok, it just means we can pick an arbitrary one? 
-               
-               Could this mess things up? *)
-            let color = Interference_graph.H.find coloring node in
-            Hashtbl.update real_registers_by_color color ~f:(function
-              | Some existing -> Nonempty.cons reg existing
-              | None -> [ reg ]);
-            assert_or_compiler_bug (Set.mem available_registers reg) ~here:[%here];
-            Set.remove available_registers reg
-          | Virtual _ -> available_registers)
-        interference_graph
-        all_available_registers
-    in
-    let allocate_register available_registers (reg : Register.t) =
-      match reg with
-      | Real reg -> available_registers, reg
-      | Virtual _ as node ->
-        (match Interference_graph.H.find_opt coloring node with
-         | Some color ->
-           (* FIXME: Rather than picking randomly, we could try to pick registers we
-              already want to move to? i.e. go looking for moves to that register or
-              something.
-              
-              Look at https://en.wikipedia.org/wiki/Register_allocation
-
-              Maybe we want the "Coalesce" step here to merge lifetimes of registers
-              related by coping?
-              *)
-           let (reg_to_use :: _other_regs) =
-             Hashtbl.find_or_add real_registers_by_color color ~default:(fun () ->
-               [ Set.choose_exn available_registers ])
-           in
-           Set.remove available_registers reg_to_use, reg_to_use
+    (* TODO: Could use some heuristics to pick a register to spill rather than doing it
+       arbitrarily. e.g. picking registers with the highest degree or lowest spill cost. *)
+    let rec pick_a_register_to_spill iter =
+      let continue () = pick_a_register_to_spill (Interference_graph.Dfs.step iter) in
+      match Interference_graph.Dfs.get iter with
+      | Real _ -> continue ()
+      | Virtual virtual_reg as vertex ->
+        (match Hashtbl.find vertex_states virtual_reg with
+         | Some (`Ignored | `Spilled) -> continue ()
          | None ->
-           (* If the vertex was not part of the interference graph and hence didn't get a
-              color, we can pick any register. *)
-           available_registers, Set.choose_exn all_available_registers)
+           assert_or_compiler_bug (degree vertex >= k) ~here:[%here];
+           virtual_reg)
     in
-    (* TODO: Do an extra pass to remove useless [Mov]s. Can probably do other similar
-       pinhole optimizations as well. *)
-    let (_ : Asm_program.Register.Set.t), basic_blocks =
-      List.fold_map
-        basic_blocks
-        ~init:available_registers
-        ~f:(fun available_registers { label; code; terminal } ->
-        let available_registers, code =
-          List.fold_map
-            code
-            ~init:available_registers
-            ~f:(fun available_registers instr ->
-            Instr.Nonterminal.fold_map_args
-              instr
-              ~init:available_registers
-              ~f:(fun available_registers value ->
-              Value.fold_map_registers
-                value
-                ~init:available_registers
-                ~f:allocate_register))
-        in
-        available_registers, ({ label; code; terminal } : _ Basic_block.t))
+    let rec loop () =
+      remove_low_degree_vertices ();
+      (* All remaining nodes have degree >= k. While this remains true, spill. *)
+      match
+        pick_a_register_to_spill (Interference_graph.Dfs.start interference_graph)
+      with
+      | reg_to_spill ->
+        Hashtbl.set vertex_states ~key:reg_to_spill ~data:`Spilled;
+        loop ()
+      | exception Exit -> ()
     in
-    basic_blocks
+    loop ();
+    (* Color the trivial nodes. *)
+    let coloring = Virtual_register.Table.create () in
+    let vertex_color (reg : Register.t) =
+      match reg with
+      | Real reg -> Some reg
+      | Virtual virtual_reg -> Hashtbl.find coloring virtual_reg
+    in
+    Stack.iter ignored_stack ~f:(fun virtual_reg ->
+      (* Pick a color. *)
+      let neighbouring_colors =
+        Interference_graph.succ interference_graph (Virtual virtual_reg)
+        |> List.filter_map ~f:vertex_color
+        |> Asm_program.Register.Set.of_list
+      in
+      let color = Set.choose_exn (Set.diff all_available_registers neighbouring_colors) in
+      Hashtbl.add_exn coloring ~key:virtual_reg ~data:color);
+    let spilled_registers =
+      Hashtbl.to_alist vertex_states
+      |> List.filter_map ~f:(fun (virtual_reg, state) ->
+           match state with
+           | `Ignored -> None
+           | `Spilled -> Some virtual_reg)
+    in
+    coloring, spilled_registers
   ;;
 
   let allocate (basic_blocks : Register.t Basic_block.t list) =
@@ -387,8 +393,6 @@ end = struct
             (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
               : (Cfg_node.t * Cfg_node.t) list)];
     let interference_graph = create_interference_graph ~cfg ~basic_blocks in
-    (* FIXME: Check in advance if there is any vertex with degree > N - 1, and pick things
-       to spill before trying to color. *)
     eprint_s
       [%here]
       [%lazy_message
@@ -400,7 +404,29 @@ end = struct
                []
               : (Register.t * Register.t) list)];
     let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
-    color_and_allocate ~basic_blocks ~interference_graph
+    let all_available_registers =
+      Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
+    in
+    let coloring, spilled_registers =
+      color_interference_graph ~interference_graph ~all_available_registers
+    in
+    (* FIXME: Handle spilling *)
+    if not (List.is_empty spilled_registers) then failwith "TODO: register spilling";
+    List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
+      let code =
+        List.map code ~f:(fun instr ->
+          Instr.Nonterminal.map_args instr ~f:(fun value ->
+            Value.map_registers value ~f:(function
+              | Real reg -> reg
+              | Virtual virtual_reg ->
+                (match Hashtbl.find coloring virtual_reg with
+                 | Some reg -> reg
+                 | None ->
+                   (* If a register wasn't in the interference graph, we can safely
+                      pick any register. *)
+                   Set.choose_exn all_available_registers))))
+      in
+      { label; code; terminal })
   ;;
 end
 
