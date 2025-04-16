@@ -774,8 +774,8 @@ let constant_block_for_literal (literal : Literal.t) =
     constant_block
       ~tag:Cnstr_tag.char
       ~len:1
-      ~data_kind:I8
-      (Literal (String (Ustring.of_uchar c)))
+      ~data_kind:I64
+      (Literal (Int (Uchar.to_int c)))
   | String s ->
     let s = Ustring.to_string s in
     let n_chars = String.length s in
