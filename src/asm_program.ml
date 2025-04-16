@@ -360,16 +360,6 @@ module Instr = struct
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of, variants]
 
-    let args = function
-      | Add { dst; src }
-      | And { dst; src }
-      | Sub { dst; src }
-      | Mov { dst; src }
-      | Lea { dst; src } -> [ dst; src ]
-      | Cmp (a, b) | Test (a, b) -> [ a; b ]
-      | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
-    ;;
-
     let map_args t ~f =
       match t with
       | Add { dst; src } ->
@@ -437,6 +427,20 @@ module Instr = struct
         let init, fun_ = f init fun_ ~op:Use in
         init, Call { fun_; call_conv; arity }
     ;;
+
+    let pp fmt t =
+      let args =
+        match t with
+        | Add { dst; src }
+        | And { dst; src }
+        | Sub { dst; src }
+        | Mov { dst; src }
+        | Lea { dst; src } -> [ dst; src ]
+        | Cmp (a, b) | Test (a, b) -> [ a; b ]
+        | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
+      in
+      pp_line fmt (String.lowercase (Variants.to_name t)) args ~f:Value.pp
+    ;;
   end
 
   module Terminal = struct
@@ -450,62 +454,25 @@ module Instr = struct
           }
     [@@deriving sexp_of, variants]
 
-    let name = function
-      | Ret -> "ret"
-      | Jump _ -> "jmp"
-      | Jump_if { cond; _ } ->
-        (match cond with
-         | `Zero -> "jz"
-         | `Nonzero -> "jnz")
-    ;;
-
-    let args : t -> _ Value.t list = function
-      | Jump label | Jump_if { cond = _; then_ = label; else_ = _ } ->
-        [ Global (label, Other) ]
-      | Ret -> []
+    let pp fmt t =
+      let name =
+        match t with
+        | Ret -> "ret"
+        | Jump _ -> "jmp"
+        | Jump_if { cond; _ } ->
+          (match cond with
+           | `Zero -> "jz"
+           | `Nonzero -> "jnz")
+      in
+      let args : _ Value.t list =
+        match t with
+        | Jump label | Jump_if { cond = _; then_ = label; else_ = _ } ->
+          [ Global (label, Other) ]
+        | Ret -> []
+      in
+      pp_line fmt (String.lowercase name) args ~f:Value.pp
     ;;
   end
-
-  type 'reg t =
-    | Terminal of Terminal.t
-    | Nonterminal of 'reg Nonterminal.t
-  [@@deriving sexp_of, variants]
-
-  let pp fmt t =
-    let name, args =
-      match t with
-      | Terminal t -> Terminal.name t, Terminal.args t
-      | Nonterminal t -> Nonterminal.Variants.to_name t, Nonterminal.args t
-    in
-    pp_line fmt (String.lowercase name) args ~f:Value.pp
-  ;;
-
-  (* FIXME: cleanup *)
-  (* let fold_map_args t ~init ~f =
-    let handle_jump init label ~(f : _ -> _ Value.t -> _ * _ Value.t) ~mk =
-      let init, value = f init (Global (label, Other)) in
-      let label =
-        match value with
-        | Global (label, _) -> label
-        | _ ->
-          compiler_bug
-            [%message "Expected label name for jump instruction" (value : _ Value.t)]
-      in
-      init, mk label
-    in
-    match t with
-    | Nonterminal t ->
-      let init, t = Nonterminal.fold_map_args t ~init ~f in
-      init, Nonterminal t
-    | Terminal t ->
-      let init, (t : Terminal.t) =
-        match t with
-        | Jmp label -> handle_jump init label ~f ~mk:Terminal.jmp
-        | Jnz label -> handle_jump init label ~f ~mk:Terminal.jnz
-        | Jz label -> handle_jump init label ~f ~mk:Terminal.jz
-        | Ret -> init, Ret
-      in
-      init, Terminal t *)
 end
 
 module Basic_block = struct
@@ -518,8 +485,8 @@ module Basic_block = struct
 
   let pp fmt { label; code; terminal } =
     pp_label fmt label;
-    List.iter code ~f:(Instr.pp fmt << Instr.nonterminal);
-    Instr.pp fmt (Terminal terminal)
+    List.iter code ~f:(Instr.Nonterminal.pp fmt);
+    Instr.Terminal.pp fmt terminal
   ;;
 end
 

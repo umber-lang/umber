@@ -176,18 +176,6 @@ module Instr : sig
           }
     [@@deriving sexp_of]
   end
-
-  type 'reg t =
-    | Terminal of Terminal.t
-    | Nonterminal of 'reg Nonterminal.t
-  [@@deriving sexp_of]
-
-  (* FIXME: Cleanup. Also, do we even need the [Instr] type? *)
-  (* val fold_map_args
-    :  'r1 t
-    -> init:'acc
-    -> f:('acc -> 'r1 Value.t -> 'acc * 'r2 Value.t)
-    -> 'acc * 'r2 t *)
 end
 
 module Basic_block : sig

@@ -185,6 +185,17 @@ end = struct
      will have a lifetime streching over the call so they'll interfere.
   *)
   (* TODO: Move to Instr module? *)
+  (* FIXME: A move to [r13] is actually a use of r13, not an assignment! There's a hidden
+     "store" operation here which uses it. 
+
+     Let's represent stores/loads explicitly? And do a separate pass where we inline
+     memory references?
+
+     Another idea is to make this logic cleverer around Memory. Basically, when inside
+     memory, register assignments become uses. Register uses are still uses though.
+     
+     Also, there's code duplication of this same bug in Instr.Nonterminal.fold_map_args
+  *)
   let instr_register_ops (instr : _ Instr.Nonterminal.t)
     : (Register_op.t * _ Value.t) list
     =
@@ -552,6 +563,11 @@ end = struct
       let result, basic_blocks = try_find_coloring ~cfg ~basic_blocks in
       match result with
       | Error newly_spilled_registers ->
+        eprint_s
+          [%here]
+          [%lazy_message
+            "Coloring failed, spilling registers"
+              (newly_spilled_registers : Virtual_register.t Nonempty.t)];
         let basic_blocks =
           update_code_to_spill_registers
             ~basic_blocks
@@ -564,6 +580,11 @@ end = struct
         in
         loop ~cfg ~basic_blocks ~spilled_registers
       | Ok coloring ->
+        eprint_s
+          [%here]
+          [%lazy_message
+            "Coloring succeeded"
+              (coloring : Asm_program.Register.t Virtual_register.Table.t)];
         let basic_blocks =
           List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
             let code =
@@ -903,7 +924,6 @@ let mem_offset_value fun_builder value size offset =
 ;;
 
 let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
-  (* FIXME: Handle calling closures *)
   match Function_builder.find_local fun_builder name with
   | Some closure ->
     (* We are calling a closure. Load the function pointer from the first field. *)
@@ -969,6 +989,10 @@ let codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args =
 ;;
 
 let codegen_fun_call t fun_name args ~fun_builder =
+  (* TODO: When [fun_] is a closure, we'll load the function pointer from memory again,
+     but we might already know what it is - we could inline that. If we stored more info
+     other than just [Value.t] in the locals table, [lookup_name_for_fun_call] could do
+     that. *)
   let fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
   codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args
 ;;
