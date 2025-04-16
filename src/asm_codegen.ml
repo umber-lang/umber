@@ -609,8 +609,9 @@ end
 
 module Extern = struct
   type t =
-    | C_function of Label_name.t
-    | Umber_function
+    { label_name : Label_name.t
+    ; call_conv : Call_conv.t option
+    }
 end
 
 module Function_builder : sig
@@ -803,7 +804,7 @@ let to_program
   : Asm_program.t
   =
   let uninitialized_globals = Queue.to_list bss_globals in
-  let externs = Hashtbl.to_alist externs in
+  let externs = Hashtbl.data externs in
   let literals = Hashtbl.to_alist literals in
   let closures = Hashtbl.data closures in
   let functions = Hashtbl.data functions in
@@ -815,11 +816,7 @@ let to_program
               { name = Function_builder.name fun_builder; strength = `Strong })
           @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
               { name; strength = `Weak }))
-  ; externs =
-      List.map externs ~f:(fun (mir_name, extern) ->
-        match extern with
-        | C_function name -> name
-        | Umber_function -> Label_name.of_mir_name mir_name)
+  ; externs = List.map externs ~f:(fun { call_conv = _; label_name } -> label_name)
   ; text_section =
       Function_builder.basic_blocks main_function
       @ List.concat_map functions ~f:Function_builder.basic_blocks
@@ -852,7 +849,7 @@ let int_constant_tag tag : _ Value.t =
 
 let declare_extern_c_function t mir_name label_name =
   ignore
-    (Hashtbl.add t.externs ~key:mir_name ~data:(C_function label_name)
+    (Hashtbl.add t.externs ~key:mir_name ~data:{ label_name; call_conv = Some C }
       : [ `Ok | `Duplicate ])
 ;;
 
@@ -863,30 +860,34 @@ let declare_extern_c_function t mir_name label_name =
 *)
 (* TODO: Amend MIR to treat function pointers and closures differently. *)
 let lookup_name_for_value t name ~fun_builder : _ Value.t =
+  (* FIXME: For everything except locals, we need to create a closure and possibly a
+     wrapper function. We need to treat it as if wrapped in a [Make_block] 
+      
+     For now, treat externs and functions the same. This will break when implementing a
+     proper calling convention besides copying C's.
+  *)
+  let wrapper_closure label_name =
+    let closure =
+      Hashtbl.find_or_add t.closures name ~default:(fun () ->
+        Closure.of_fun_name label_name)
+    in
+    closure.closure_name
+  in
   match Function_builder.find_local fun_builder name with
   | Some value -> value
   | None ->
-    (* FIXME: For everything except locals, we need to create a closure and possibly a
-       wrapper function. We need to treat it as if wrapped in a [Make_block] 
-        
-       For now, treat externs and functions the same. This will break when implementing a
-       proper calling convention besides copying C's.
-    *)
-    let closure =
-      Hashtbl.find_or_add t.closures name ~default:(fun () ->
-        let fun_name =
-          (* FIXME: Code duplication *)
-          match Hashtbl.find t.functions name with
-          | Some fun_builder -> Function_builder.name fun_builder
-          | None ->
-            (match Hashtbl.find t.externs name with
-             | Some (C_function name) -> name
-             | Some Umber_function -> Label_name.of_mir_name name
-             | None -> Label_name.of_mir_name name)
-        in
-        Closure.of_fun_name fun_name)
+    let label_name =
+      match Hashtbl.find t.externs name with
+      | Some { call_conv = None; label_name } -> label_name
+      | Some { call_conv = Some _; label_name } -> wrapper_closure label_name
+      | None ->
+        (match Hashtbl.find t.functions name with
+         | Some fun_builder -> wrapper_closure (Function_builder.name fun_builder)
+         | None ->
+           (* Global values defined in this file reach this case. *)
+           Label_name.of_mir_name name)
     in
-    Global (closure.closure_name, Other)
+    Global (label_name, Other)
 ;;
 
 let mem_or_temporary fun_builder value =
@@ -913,8 +914,9 @@ let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
      | Some fun_builder -> Global (Function_builder.name fun_builder, Other), Umber
      | None ->
        (match Hashtbl.find t.externs name with
-        | Some (C_function name) -> Global (name, Extern_proc), C
-        | Some Umber_function -> Global (Label_name.of_mir_name name, Extern_proc), Umber
+        | Some { call_conv = Some C; label_name } -> Global (label_name, Extern_proc), C
+        | Some { call_conv = Some Umber | None; label_name } ->
+          Global (label_name, Extern_proc), Umber
         | None -> Global (Label_name.of_mir_name name, Other), Umber))
 ;;
 
@@ -1303,11 +1305,18 @@ let codegen_stmt t stmt =
   | Fun_decl { name; arity = _ } ->
     (* TODO: Do we need arity here anymore? Ah, I guess whenever we generate a call we
        know the arity, so I guess not. *)
-    Hashtbl.add_exn t.externs ~key:name ~data:Umber_function
+    Hashtbl.add_exn
+      t.externs
+      ~key:name
+      ~data:{ call_conv = Some Umber; label_name = Label_name.of_mir_name name }
   | Extern_decl { name; extern_name; arity } ->
-    declare_extern_c_function t name (Label_name.of_extern_name extern_name);
-    (* Create a wrapper function for other files to use. *)
-    define_extern_wrapper_function t ~fun_name:name ~extern_name ~arity
+    let label_name = Label_name.of_extern_name extern_name in
+    if arity = 0
+    then Hashtbl.add_exn t.externs ~key:name ~data:{ call_conv = None; label_name }
+    else (
+      declare_extern_c_function t name label_name;
+      (* Create a wrapper function for other files to use. *)
+      define_extern_wrapper_function t ~fun_name:name ~extern_name ~arity)
 ;;
 
 let main_function_name ~(module_path : Module_path.Absolute.t) =
@@ -1354,7 +1363,10 @@ let compile_entry_module ~module_paths ~entry_file =
         (Value_name.Absolute.of_relative_unchecked
            (Value_name.Relative.of_string (Label_name.to_string fun_name)))
     in
-    Hashtbl.add_exn t.externs ~key:mir_name ~data:Umber_function;
+    Hashtbl.add_exn
+      t.externs
+      ~key:mir_name
+      ~data:{ call_conv = Some Umber; label_name = fun_name };
     Function_builder.add_code
       t.main_function
       (Call { fun_ = Global (fun_name, Extern_proc); call_conv = Umber; arity = 0 }));
