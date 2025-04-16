@@ -155,6 +155,21 @@ module Instr : sig
       | Ret
       | Jump of Label_name.t
       | Jump_if of
+          (* FIXME: The [else_] label is basically a meme, the correctness is not actually
+             enforced. We just have to be careful to only use "else" to mean the label
+             following this one...
+             
+             We can either:
+             - Add a check to assert that the else case is the following label
+             - Serialize this as jnz then_ followed by jmp else_, with an extra check to
+               skip the second jump if the next label is the same as else_
+
+             Both options seem pretty messy. 
+
+             Another idea is to remove the else case and have code using it check the next
+             label in the list. That's annoying too though.
+          *)
+          
           { cond : [ `Zero | `Nonzero ]
           ; then_ : Label_name.t
           ; else_ : Label_name.t

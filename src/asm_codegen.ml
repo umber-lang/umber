@@ -441,16 +441,15 @@ end = struct
   let update_code_to_spill_registers
     ~(basic_blocks : Register.t Basic_block.t list)
     ~newly_spilled_registers
-    ~alredy_spilled_count
+    ~already_spilled_count
     ~register_counter
     =
     (* FIXME: Add in the sub/add to rsp later at the end. *)
     let spilled_memory_locations =
       Nonempty.to_list newly_spilled_registers
-      |> List.mapi ~f:(fun i reg : (_ * Register.t Value.t) ->
-           ( reg
-           , Memory
-               (I64, Add (Register (Real Rsp), Offset (8 * (i + alredy_spilled_count)))) ))
+      |> List.mapi ~f:(fun i reg ->
+           let rsp : Register.t Value.memory_expr = Register (Real Rsp) in
+           reg, Value.mem_offset rsp I64 (i + already_spilled_count))
       |> Virtual_register.Map.of_alist_exn
     in
     (* FIXME: Make sure this process doesn't spill things that have already been spilled. *)
@@ -557,7 +556,7 @@ end = struct
           update_code_to_spill_registers
             ~basic_blocks
             ~newly_spilled_registers
-            ~alredy_spilled_count:(List.length spilled_registers)
+            ~already_spilled_count:(List.length spilled_registers)
             ~register_counter
         in
         let spilled_registers =
@@ -1087,6 +1086,14 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
   | Primitive literal -> codegen_literal t literal
   | Name name -> lookup_name_for_value t name ~fun_builder
   | Let (name, expr, body) ->
+    (* TODO: The way [Function_builder.add_local] works means that it kinda effectively
+       inlines any parts of the [expr] that don't result in code immediately getting
+       emitted e.g. any memory references are loaded in all the callers. This just seems a
+       bit suspicious and will produce more loads than we need, though using fewer
+       registers. A quick way to hack around this would be for [add_local] to move into a
+       register if the value is a memory reference. The better long-term approach is
+       probably to represent loads/stores as explicit instructions (needed for ARM
+       support). *)
     let expr = codegen_expr t expr ~fun_builder in
     Function_builder.add_local fun_builder name expr;
     codegen_expr t body ~fun_builder
