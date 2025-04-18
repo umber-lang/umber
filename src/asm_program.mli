@@ -73,7 +73,7 @@ module Global_kind : sig
   [@@deriving sexp_of]
 end
 
-module Value : sig
+module Simple_value : sig
   type 'reg t =
     | Register of 'reg
     | Global of Label_name.t * Global_kind.t
@@ -92,28 +92,28 @@ end
 
 module Memory : sig
   type 'reg expr =
-    | Value of 'reg Value.t
+    | Value of 'reg Simple_value.t
     | Add of 'reg expr * 'reg expr
   [@@deriving sexp_of]
 
   type 'reg t = Size.t * 'reg expr [@@deriving sexp_of]
 
   (** Dereference memory with an offset, with similar semantics to C dereferencing, so if 
-      calling [offset expr size n], the actual byte offset is [Size.n_bytes size * n]. *)
-  val offset : 'reg expr -> Size.t -> int -> 'reg t
+      calling [offset v size n], the actual byte offset is [Size.n_bytes size * n]. *)
+  val offset : 'reg Simple_value.t -> Size.t -> int -> 'reg t
 
-  val fold_values : 'reg t -> init:'acc -> f:('acc -> 'reg Value.t -> 'acc) -> 'acc
+  val fold_simple_values
+    :  'reg t
+    -> init:'acc
+    -> f:('acc -> 'reg Simple_value.t -> 'acc)
+    -> 'acc
 end
 
-(* FIXME: Use Value_or_mem in more places, and maybe call this value and have the other
-   Value be Simple_value or something. *)
-module Value_or_mem : sig
+module Value : sig
   type 'reg t =
-    | Value of 'reg Value.t
+    | Simple_value of 'reg Simple_value.t
     | Memory of 'reg Memory.t
   [@@deriving sexp_of]
-
-  val fold_values : 'reg t -> init:'acc -> f:('acc -> 'reg Value.t -> 'acc) -> 'acc
 end
 
 module Register_op : sig
@@ -139,12 +139,8 @@ module Instr : sig
           ; call_conv : Call_conv.t
           ; arity : int
           }
-      | Cmp of 'reg Value_or_mem.t * 'reg Value.t
+      | Cmp of 'reg Value.t * 'reg Value.t
       | Lea of
-          { dst : 'reg Value.t
-          ; src : 'reg Memory.t
-          }
-      | Load of
           { dst : 'reg Value.t
           ; src : 'reg Memory.t
           }
@@ -156,19 +152,15 @@ module Instr : sig
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
-      | Store of
-          { dst : 'reg Memory.t
-          ; src : 'reg Value.t
-          }
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of]
 
-    val map_args : 'r1 t -> f:('r1 Value.t -> 'r2 Value.t) -> 'r2 t
+    val map_args : 'r1 t -> f:('r1 Simple_value.t -> 'r2 Simple_value.t) -> 'r2 t
 
     val fold_map_args
       :  'r1 t
       -> init:'acc
-      -> f:('acc -> 'r1 Value.t -> op:Register_op.t -> 'acc * 'r2 Value.t)
+      -> f:('acc -> 'r1 Simple_value.t -> op:Register_op.t -> 'acc * 'r2 Simple_value.t)
       -> 'acc * 'r2 t
   end
 

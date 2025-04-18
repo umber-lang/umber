@@ -24,9 +24,9 @@ open struct
   open Asm_program
   module Label_name = Label_name
   module Call_conv = Call_conv
-  module Value = Value
+  module Simple_value = Simple_value
   module Memory = Memory
-  module Value_or_mem = Value_or_mem
+  module Value = Value
   module Register_op = Register_op
   module Instr = Instr
   module Basic_block = Basic_block
@@ -196,48 +196,49 @@ end = struct
      awkward thing is the order needs to be different - this one is the order of the
      semantics, the other one is the order of the args syntactically.
   *)
-  let instr_register_ops (instr : _ Instr.Nonterminal.t)
-    : (Register_op.t * _ Value.t) list
-    =
+  let instr_register_ops (instr : _ Instr.Nonterminal.t) =
     let use_mem =
-      Memory.fold_values ~init:[] ~f:(fun acc v -> (Register_op.Use, v) :: acc)
+      Memory.fold_simple_values ~init:[] ~f:(fun acc v -> (Register_op.Use, v) :: acc)
     in
-    let use_value_or_mem =
-      Value_or_mem.fold_values ~init:[] ~f:(fun acc v -> (Register_op.Use, v) :: acc)
+    let record (value : Register.t Value.t) ~op =
+      match value with
+      | Simple_value value -> [ op, value ]
+      | Memory mem ->
+        (* Memory only uses registers, it can't assign to them. *)
+        use_mem mem
     in
+    let use = record ~op:Use in
+    let assign = record ~op:Assignment in
+    let use_and_assign = record ~op:Use_and_assignment in
     match instr with
-    | Cmp (a, b) -> (Use, b) :: use_value_or_mem a
-    | Test (a, b) -> [ Use, a; Use, b ]
-    | Mov { dst; src } -> [ Use, src; Assignment, dst ]
+    | Cmp (a, b) | Test (a, b) -> use a @ use b
+    | Mov { dst; src } -> use src @ assign dst
     | And { dst; src } | Add { dst; src } | Sub { dst; src } ->
-      [ Use, src; Use_and_assignment, dst ]
-    | Lea { dst; src } | Load { dst; src } -> use_mem src @ [ Assignment, dst ]
-    | Store { dst; src } -> (Use, src) :: use_mem dst
+      use src @ use_and_assign dst
+    | Lea { dst; src } -> use_mem src @ assign dst
     | Call { fun_; call_conv; arity } ->
-      let fun_use : Register_op.t * _ = Use, fun_ in
       let args, clobbered_arg_registers =
         Call_conv.arg_registers call_conv
         |> Nonempty.to_list
         |> Fn.flip List.split_n arity
       in
       let arg_uses =
-        List.map args ~f:(fun reg : (Register_op.t * Register.t Value.t) ->
+        List.map args ~f:(fun reg : (Register_op.t * Register.t Simple_value.t) ->
           Use, Register (Real reg))
       in
       let clobbered_register_assignments, clobbered_register_uses =
         List.map
           (clobbered_arg_registers @ Call_conv.non_arg_caller_save_registers call_conv)
           ~f:(fun reg : ((Register_op.t * _) * (Register_op.t * _)) ->
-            let reg : Register.t Value.t = Register (Real reg) in
+            let reg : Register.t Simple_value.t = Register (Real reg) in
             (Assignment, reg), (Use, reg))
         |> List.unzip
       in
-      (* FIXME: I think return value assignment might not be needed? *)
-      let return_value_assignment : Register_op.t * Register.t Value.t =
+      let return_value_assignment : Register_op.t * Register.t Simple_value.t =
         Assignment, Register (Real (Call_conv.return_value_register call_conv))
       in
       List.concat
-        [ [ fun_use ]
+        [ use fun_
         ; clobbered_register_assignments
         ; arg_uses
         ; clobbered_register_uses
@@ -257,7 +258,9 @@ end = struct
     let graph = Interference_graph.create () in
     let record_register_use live_registers value =
       (* When a variable is used, we know it must be live at this point. *)
-      let live_registers = Value.fold_registers value ~init:live_registers ~f:Set.add in
+      let live_registers =
+        Simple_value.fold_registers value ~init:live_registers ~f:Set.add
+      in
       Set.iter live_registers ~f:(fun reg1 ->
         Set.iter live_registers ~f:(fun reg2 ->
           if not (Register.equal reg1 reg2)
@@ -268,7 +271,7 @@ end = struct
       (* When a variable is assigned to, it doesn't have to be live before this point
          anymore. There is a "hole" in the lifetime between the assignment and the
          previous use where the register isn't needed. *)
-      Value.fold_registers value ~init:live_registers ~f:Set.remove
+      Simple_value.fold_registers value ~init:live_registers ~f:Set.remove
     in
     let (_ : Register.Set.t) =
       fold_cfg_backwards ~cfg ~init:Register.Set.empty ~f:(fun live_registers cfg_node ->
@@ -313,7 +316,10 @@ end = struct
     List.iter basic_blocks ~f:(fun { label = _; code; terminal = _ } ->
       List.iter code ~f:(fun instr ->
         match instr with
-        | Mov { src = Register src_reg; dst = Register dst_reg } ->
+        | Mov
+            { src = Simple_value (Register src_reg)
+            ; dst = Simple_value (Register dst_reg)
+            } ->
           (match src_reg, dst_reg with
            | Real _, Real _ -> ()
            | (Virtual reg_to_coalesce as node), ((Real _ | Virtual _) as other_reg)
@@ -336,7 +342,7 @@ end = struct
           List.filter_map code ~f:(fun instr ->
             let instr =
               Instr.Nonterminal.map_args instr ~f:(fun value ->
-                Value.map_registers value ~f:(fun reg ->
+                Simple_value.map_registers value ~f:(fun reg ->
                   match reg with
                   | Real _ -> reg
                   | Virtual virtual_reg ->
@@ -345,7 +351,10 @@ end = struct
             in
             (* Drop no-op moves which may have appeared due to coalescing. *)
             match instr with
-            | Mov { src = Register src_reg; dst = Register dst_reg }
+            | Mov
+                { src = Simple_value (Register src_reg)
+                ; dst = Simple_value (Register dst_reg)
+                }
               when Register.equal src_reg dst_reg -> None
             | _ -> Some instr)
         in
@@ -503,7 +512,7 @@ end = struct
     let spilled_memory_locations =
       Nonempty.to_list newly_spilled_registers
       |> List.mapi ~f:(fun i reg ->
-           let rsp : Register.t Memory.expr = Value (Register (Real Rsp)) in
+           let rsp : Register.t Simple_value.t = Register (Real Rsp) in
            reg, Memory.offset rsp I64 (i + already_spilled_count))
       |> Virtual_register.Map.of_alist_exn
     in
@@ -513,7 +522,7 @@ end = struct
         List.concat_map code ~f:(fun instr ->
           let (spilled_uses, spilled_assignments), instr =
             Instr.Nonterminal.fold_map_args instr ~init:([], []) ~f:(fun acc value ~op ->
-              Value.fold_map_registers value ~init:acc ~f:(fun acc reg ->
+              Simple_value.fold_map_registers value ~init:acc ~f:(fun acc reg ->
                 match reg with
                 | Real _ -> acc, reg
                 | Virtual vreg ->
@@ -537,12 +546,17 @@ end = struct
              multiple times. That would require reasoning about lifetimes here. *)
           let loads =
             List.map spilled_uses ~f:(fun (reg, tmp) : _ Instr.Nonterminal.t ->
-              Load { src = Map.find_exn spilled_memory_locations reg; dst = Register tmp })
+              Mov
+                { src = Memory (Map.find_exn spilled_memory_locations reg)
+                ; dst = Simple_value (Register tmp)
+                })
           in
           let stores =
             List.map spilled_assignments ~f:(fun (reg, tmp) : _ Instr.Nonterminal.t ->
-              Store
-                { src = Register tmp; dst = Map.find_exn spilled_memory_locations reg })
+              Mov
+                { src = Simple_value (Register tmp)
+                ; dst = Memory (Map.find_exn spilled_memory_locations reg)
+                })
           in
           List.concat [ loads; [ instr ]; stores ])
       in
@@ -559,13 +573,19 @@ end = struct
     else (
       let entry_bb = List.hd_exn basic_blocks in
       let allocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
-        Sub { dst = Register Rsp; src = Constant (Int (8 * spilled_count)) }
+        Sub
+          { dst = Simple_value (Register Rsp)
+          ; src = Simple_value (Constant (Int (8 * spilled_count)))
+          }
       in
       let all_but_last, exit_bb =
         List.split_last basic_blocks |> Option.value_exn ~here:[%here]
       in
       let deallocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
-        Add { dst = Register Rsp; src = Constant (Int (8 * spilled_count)) }
+        Add
+          { dst = Simple_value (Register Rsp)
+          ; src = Simple_value (Constant (Int (8 * spilled_count)))
+          }
       in
       let other_bbs = List.tl all_but_last |> Option.value ~default:[] in
       List.concat
@@ -661,7 +681,7 @@ end = struct
             let code =
               List.map code ~f:(fun instr ->
                 Instr.Nonterminal.map_args instr ~f:(fun value ->
-                  Value.map_registers value ~f:(function
+                  Simple_value.map_registers value ~f:(function
                     | Real reg -> reg
                     | Virtual virtual_reg ->
                       (match Hashtbl.find coloring virtual_reg with
@@ -755,9 +775,25 @@ end = struct
   ;;
 
   let pick_register' t = Virtual_register.Counter.next t.register_counter
-  let pick_register t : Register.t Value.t = Register (Virtual (pick_register' t))
+
+  let pick_register t : Register.t Value.t =
+    Simple_value (Register (Virtual (pick_register' t)))
+  ;;
+
   let get_bb t = Hash_queue.lookup_exn t.basic_blocks t.current_label
-  let add_code t instr = Queue.enqueue (get_bb t).code instr
+
+  let add_code t (instr : _ Instr.Nonterminal.t) =
+    let bb = get_bb t in
+    match instr with
+    | Mov { src = Memory _ as src; dst = Memory _ as dst } ->
+      (* TODO: Might need to do this for other kinds of instructions. Bit hacky to
+         hardcode it for a subset of them but oh well. *)
+      (* Prevent memory-to-memory moves. *)
+      let tmp = pick_register t in
+      Queue.enqueue bb.code (Mov { src; dst = tmp });
+      Queue.enqueue bb.code (Mov { src = tmp; dst })
+    | _ -> Queue.enqueue bb.code instr
+  ;;
 
   let add_terminal t terminal =
     let bb = get_bb t in
@@ -923,7 +959,7 @@ let create ~main_function_name =
 
 let int_constant_tag tag : _ Value.t =
   (* Put the int63 into an int64 and make the bottom bit 1. *)
-  Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1))
+  Simple_value (Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1)))
 ;;
 
 let declare_extern_c_function t mir_name label_name =
@@ -966,51 +1002,42 @@ let lookup_name_for_value t name ~fun_builder : _ Value.t =
            (* Global values defined in this file reach this case. *)
            Label_name.of_mir_name name)
     in
-    Global (label_name, Other)
+    Simple_value (Global (label_name, Other))
 ;;
 
-let load_mem_offset fun_builder value offset =
-  let tmp = Function_builder.pick_register fun_builder in
-  Function_builder.add_code
-    fun_builder
-    (Load
-       { dst = tmp
-       ; src =
-           (* FIXME: IF this is always called with "value" then maybe just have it take
-              value directly. 
-              
-              Although, the fact that it always takes "value" is bad - it means we can
-              never reason about memory locations as values and inline them when doing
-              stores. I'm starting to feel that only letting load/store access memory was
-              a bad idea. It makes it much harder to generate reasonable x86 assembly.
-              And the reg alloc needs to know about whether these memory references can be
-              inlined because it affects whether we need temporary registers or not.
-
-              The problem I was trying to solve was just always treating memory as a Use
-              rather than an assignment. This can easily be done by itself.
-
-              It's not reasonable to not be able to load from a offset to a stored value.
-              We need to be able to reason about memory references, even in ARM.
-            *)
-           Memory.offset (Value value) I64 offset
-       });
-  tmp
+(* FIXME: Won't really work with size != I64 because we only use 64-bit regs. *)
+let load_mem_offset fun_builder (value : _ Value.t) size offset : _ Value.t =
+  let simple_value =
+    match value with
+    | Simple_value v -> v
+    | Memory mem ->
+      let tmp : Register.t Simple_value.t =
+        Register (Virtual (Function_builder.pick_register' fun_builder))
+      in
+      Function_builder.add_code
+        fun_builder
+        (Mov { dst = Simple_value tmp; src = Memory mem });
+      tmp
+  in
+  Memory (Memory.offset simple_value size offset)
 ;;
 
 let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
   match Function_builder.find_local fun_builder name with
   | Some closure ->
     (* We are calling a closure. Load the function pointer from the first field. *)
-    load_mem_offset fun_builder closure 1, Umber
+    load_mem_offset fun_builder closure I64 1, Umber
   | None ->
     (match Hashtbl.find t.functions name with
-     | Some fun_builder -> Global (Function_builder.name fun_builder, Other), Umber
+     | Some fun_builder ->
+       Simple_value (Global (Function_builder.name fun_builder, Other)), Umber
      | None ->
        (match Hashtbl.find t.externs name with
-        | Some { call_conv = Some C; label_name } -> Global (label_name, Extern_proc), C
+        | Some { call_conv = Some C; label_name } ->
+          Simple_value (Global (label_name, Extern_proc)), C
         | Some { call_conv = Some Umber | None; label_name } ->
-          Global (label_name, Extern_proc), Umber
-        | None -> Global (Label_name.of_mir_name name, Other), Umber))
+          Simple_value (Global (label_name, Extern_proc)), Umber
+        | None -> Simple_value (Global (Label_name.of_mir_name name, Other)), Umber))
 ;;
 
 let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list) =
@@ -1036,12 +1063,14 @@ let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list
   List.iter2_exn temporaries_to_move arg_registers ~f:(fun tmp arg_register ->
     Function_builder.add_code
       fun_builder
-      (Mov { src = tmp; dst = Register (Real arg_register) }));
+      (Mov { src = tmp; dst = Simple_value (Register (Real arg_register)) }));
   (* In case we are using any clobbered registers, move from them to new temporary
      registers. Any useless moves will get removed by the register allocator later. *)
   List.iter clobbered_registers ~f:(fun reg ->
     let tmp = Function_builder.pick_register fun_builder in
-    Function_builder.add_code fun_builder (Mov { src = Register (Real reg); dst = tmp }))
+    Function_builder.add_code
+      fun_builder
+      (Mov { src = Simple_value (Register (Real reg)); dst = tmp }))
 ;;
 
 (* FIXME: Have to save and restore any caller-save registers. *)
@@ -1056,8 +1085,8 @@ let codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args =
   Function_builder.add_code
     fun_builder
     (Mov
-       { src = Register (Real (Call_conv.return_value_register call_conv))
-       ; dst = Register (Virtual output_register)
+       { src = Simple_value (Register (Real (Call_conv.return_value_register call_conv)))
+       ; dst = Simple_value (Register (Virtual output_register))
        });
   output_register
 ;;
@@ -1084,22 +1113,29 @@ let box t ~tag ~fields ~fun_builder =
            (Value_name.Relative.of_string umber_gc_alloc))
     in
     declare_extern_c_function t mir_name (Label_name.of_string umber_gc_alloc);
-    codegen_fun_call t mir_name [ Constant (Int allocation_size) ] ~fun_builder
+    codegen_fun_call
+      t
+      mir_name
+      [ Simple_value (Constant (Int allocation_size)) ]
+      ~fun_builder
   in
-  let heap_pointer : Register.t Memory.expr =
-    Value (Register (Virtual heap_pointer_reg))
-  in
+  let heap_pointer : Register.t Simple_value.t = Register (Virtual heap_pointer_reg) in
   Function_builder.add_code
     fun_builder
-    (Store { dst = I16, heap_pointer; src = Constant (Int (Cnstr_tag.to_int tag)) });
+    (Mov
+       { dst = Memory (I16, Value heap_pointer)
+       ; src = Simple_value (Constant (Int (Cnstr_tag.to_int tag)))
+       });
   Function_builder.add_code
     fun_builder
-    (Store
-       { dst = Memory.offset heap_pointer I16 1; src = Constant (Int block_field_num) });
+    (Mov
+       { dst = Memory (Memory.offset heap_pointer I16 1)
+       ; src = Simple_value (Constant (Int block_field_num))
+       });
   Nonempty.iteri fields ~f:(fun i field_value ->
     Function_builder.add_code
       fun_builder
-      (Store { dst = Memory.offset heap_pointer I64 (i + 1); src = field_value }));
+      (Mov { dst = Memory (Memory.offset heap_pointer I64 (i + 1)); src = field_value }));
   heap_pointer_reg
 ;;
 
@@ -1121,20 +1157,20 @@ let codegen_literal t (literal : Literal.t) : _ Value.t =
       in
       Label_name.of_string name)
   in
-  Global (name, Other)
+  Simple_value (Global (name, Other))
 ;;
 
 (* TODO: When loading multiple fields, we could just do the load once rather than loading
    to temporary registers multiple times. Alternatively we could inline the memory
    references with each use, but that would require some way to express that. *)
 let load_block_field fun_builder value index =
-  load_mem_offset fun_builder value (Mir.Block_index.to_int index + 1)
+  load_mem_offset fun_builder value I64 (Mir.Block_index.to_int index + 1)
 ;;
 
 let check_value_is_block fun_builder value =
   (* Check if this value is a pointer to a block. Pointers always have bottom bit 0.
      This is done by checking (in C syntax) `(value & 1) == 0`. *)
-  Function_builder.add_code fun_builder (Test (value, Constant (Int 1)));
+  Function_builder.add_code fun_builder (Test (value, Simple_value (Constant (Int 1))));
   `Zero_flag
 ;;
 
@@ -1148,22 +1184,23 @@ let merge_branches
   =
   let value =
     match value_a, value_b with
-    | Register a, Register b ->
+    | Simple_value (Register a), Simple_value (Register b) ->
       (* FIXME: Unclear if a might be used for something else useful in the b case? *)
       if not (Register.equal a b)
       then (
         Function_builder.position_at_label fun_builder label_b;
         Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
       value_a
-    | Register _, (Global _ | Constant _) ->
+    | Simple_value (Register _), (Simple_value (Global _ | Constant _) | Memory _) ->
       Function_builder.position_at_label fun_builder label_b;
       Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b });
       value_a
-    | (Global _ | Constant _), Register _ ->
+    | (Simple_value (Global _ | Constant _) | Memory _), Simple_value (Register _) ->
       Function_builder.position_at_label fun_builder label_a;
       Function_builder.add_code fun_builder (Mov { dst = value_b; src = value_a });
       value_b
-    | (Global _ | Constant _), (Global _ | Constant _) ->
+    | ( (Simple_value (Global _ | Constant _) | Memory _)
+      , (Simple_value (Global _ | Constant _) | Memory _) ) ->
       let dst = Function_builder.pick_register fun_builder in
       Function_builder.position_at_label fun_builder label_a;
       Function_builder.add_code fun_builder (Mov { dst; src = value_a });
@@ -1205,13 +1242,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     (* TODO: Maybe we could do something cleverer like suggest a good place to put the
        expression value (to reduce the need for moves) *)
     let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) |> Nonempty.to_list in
-    Register (Virtual (codegen_fun_call t fun_name args ~fun_builder))
+    Simple_value (Register (Virtual (codegen_fun_call t fun_name args ~fun_builder)))
   | Make_block { tag; fields } ->
     (match Nonempty.of_list fields with
      | None -> int_constant_tag tag
      | Some fields ->
        let fields = Nonempty.map fields ~f:(codegen_expr t ~fun_builder) in
-       Register (Virtual (box t ~tag ~fields ~fun_builder)))
+       Simple_value (Register (Virtual (box t ~tag ~fields ~fun_builder))))
   | Get_block_field (field_index, block) ->
     let block = codegen_expr t block ~fun_builder in
     load_block_field fun_builder block field_index
@@ -1326,8 +1363,8 @@ and codegen_cond t cond ~fun_builder =
            (either should work, I think)
         *)
         cmp
-          (Memory (Memory.offset (Value value) I16 0))
-          (Constant (Int (Cnstr_tag.to_int tag))))
+          (load_mem_offset fun_builder value I16 0)
+          (Simple_value (Constant (Int (Cnstr_tag.to_int tag)))))
       ~end_label:(Function_builder.create_label fun_builder "non_constant_tag_equals.end")
   | And (cond1, cond2) ->
     codegen_and
@@ -1365,7 +1402,7 @@ let set_global t global expr ~fun_builder =
   let expr_location = codegen_expr t expr ~fun_builder in
   Function_builder.add_code
     fun_builder
-    (Store { dst = I64, Value (Global (global, Other)); src = expr_location })
+    (Mov { dst = Memory (I64, Value (Global (global, Other))); src = expr_location })
 ;;
 
 let define_function t ~fun_name ~args ~body =
@@ -1378,7 +1415,7 @@ let define_function t ~fun_name ~args ~body =
       let virtual_reg = Function_builder.pick_register fun_builder in
       Function_builder.add_code
         fun_builder
-        (Mov { src = Register (Real reg); dst = virtual_reg });
+        (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
       Function_builder.add_local fun_builder arg_name virtual_reg)
   in
   (match result with
@@ -1389,7 +1426,7 @@ let define_function t ~fun_name ~args ~body =
     fun_builder
     (Mov
        { src = return_value
-       ; dst = Register (Real (Call_conv.return_value_register call_conv))
+       ; dst = Simple_value (Register (Real (Call_conv.return_value_register call_conv)))
        });
   Function_builder.add_terminal fun_builder Ret
 ;;
@@ -1408,7 +1445,7 @@ let define_extern_wrapper_function t ~fun_name ~extern_name ~arity =
          let virtual_reg = Function_builder.pick_register fun_builder in
          Function_builder.add_code
            fun_builder
-           (Mov { src = Register (Real reg); dst = virtual_reg });
+           (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
          virtual_reg)
   in
   (* FIXME: Handle using stack for args. *)
@@ -1418,15 +1455,17 @@ let define_extern_wrapper_function t ~fun_name ~extern_name ~arity =
   let return_value =
     codegen_fun_call_internal
       fun_builder
-      ~fun_:(Global (Label_name.of_extern_name extern_name, Extern_proc))
+      ~fun_:(Simple_value (Global (Label_name.of_extern_name extern_name, Extern_proc)))
       ~call_conv:inner_call_conv
       ~args
   in
   Function_builder.add_code
     fun_builder
     (Mov
-       { src = Register (Virtual return_value)
-       ; dst = Register (Real (Call_conv.return_value_register outer_call_conv))
+       { src = Simple_value (Register (Virtual return_value))
+       ; dst =
+           Simple_value
+             (Register (Real (Call_conv.return_value_register outer_call_conv)))
        });
   Function_builder.add_terminal fun_builder Ret
 ;;
@@ -1494,7 +1533,11 @@ let compile_entry_module ~module_paths ~entry_file =
   declare_extern_c_function t umber_gc_init_mir_name umber_gc_init_label;
   Function_builder.add_code
     t.main_function
-    (Call { fun_ = Global (umber_gc_init_label, Extern_proc); call_conv = C; arity = 0 });
+    (Call
+       { fun_ = Simple_value (Global (umber_gc_init_label, Extern_proc))
+       ; call_conv = C
+       ; arity = 0
+       });
   List.iter module_paths ~f:(fun module_path ->
     let fun_name = main_function_name ~module_path in
     let mir_name =
@@ -1508,7 +1551,11 @@ let compile_entry_module ~module_paths ~entry_file =
       ~data:{ call_conv = Some Umber; label_name = fun_name };
     Function_builder.add_code
       t.main_function
-      (Call { fun_ = Global (fun_name, Extern_proc); call_conv = Umber; arity = 0 }));
+      (Call
+         { fun_ = Simple_value (Global (fun_name, Extern_proc))
+         ; call_conv = Umber
+         ; arity = 0
+         }));
   Function_builder.add_terminal t.main_function Ret;
   compile_to_object_file (to_program t) ~output_file:entry_file
 ;;
@@ -1521,11 +1568,12 @@ let%expect_test "hello world" =
         [ { label = Label_name.of_string "main"
           ; code =
               [ Lea
-                  { dst = Register Rdi
+                  { dst = Simple_value (Register Rdi)
                   ; src = I64, Value (Global (Label_name.of_string "message", Other))
                   }
               ; Call
-                  { fun_ = Global (Label_name.of_string "puts", Extern_proc)
+                  { fun_ =
+                      Simple_value (Global (Label_name.of_string "puts", Extern_proc))
                   ; call_conv = C
                   ; arity = 1
                   }

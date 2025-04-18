@@ -188,7 +188,7 @@ module Global_kind = struct
   [@@deriving sexp_of]
 end
 
-module Value = struct
+module Simple_value = struct
   type 'reg t =
     | Register of 'reg
     | Global of Label_name.t * Global_kind.t
@@ -244,58 +244,60 @@ end
 
 module Memory = struct
   type 'reg expr =
-    | Value of 'reg Value.t
+    | Value of 'reg Simple_value.t
     | Add of 'reg expr * 'reg expr
   [@@deriving sexp_of]
 
   type 'reg t = Size.t * 'reg expr [@@deriving sexp_of]
 
-  let offset mem size offset =
+  let offset value size offset =
     if offset = 0
-    then size, mem
-    else size, Add (mem, Value (Constant (Int (Size.n_bytes size * offset))))
+    then size, Value value
+    else size, Add (Value value, Value (Constant (Int (Size.n_bytes size * offset))))
   ;;
 
-  let rec map_values_expr expr ~f =
+  let rec map_simple_values_expr expr ~f =
     match expr with
     | Value value -> Value (f value)
     | Add (lhs, rhs) ->
-      let lhs = map_values_expr lhs ~f in
-      let rhs = map_values_expr rhs ~f in
+      let lhs = map_simple_values_expr lhs ~f in
+      let rhs = map_simple_values_expr rhs ~f in
       Add (lhs, rhs)
   ;;
 
-  let map_values (size, expr) ~f = size, map_values_expr expr ~f
+  let map_simple_values (size, expr) ~f = size, map_simple_values_expr expr ~f
 
-  let rec fold_values_expr expr ~init ~f =
+  let rec fold_simple_values_expr expr ~init ~f =
     match expr with
     | Value value -> f init value
     | Add (lhs, rhs) ->
-      let init = fold_values_expr lhs ~init ~f in
-      fold_values_expr rhs ~init ~f
+      let init = fold_simple_values_expr lhs ~init ~f in
+      fold_simple_values_expr rhs ~init ~f
   ;;
 
-  let fold_values ((_ : Size.t), expr) ~init ~f = fold_values_expr expr ~init ~f
+  let fold_simple_values ((_ : Size.t), expr) ~init ~f =
+    fold_simple_values_expr expr ~init ~f
+  ;;
 
-  let rec fold_map_values_expr expr ~init ~f =
+  let rec fold_map_simple_values_expr expr ~init ~f =
     match expr with
     | Value value ->
       let init, value = f init value in
       init, Value value
     | Add (lhs, rhs) ->
-      let init, lhs = fold_map_values_expr lhs ~init ~f in
-      let init, rhs = fold_map_values_expr rhs ~init ~f in
+      let init, lhs = fold_map_simple_values_expr lhs ~init ~f in
+      let init, rhs = fold_map_simple_values_expr rhs ~init ~f in
       init, Add (lhs, rhs)
   ;;
 
-  let fold_map_values (size, expr) ~init ~f =
-    let init, expr = fold_map_values_expr expr ~init ~f in
+  let fold_map_simple_values (size, expr) ~init ~f =
+    let init, expr = fold_map_simple_values_expr expr ~init ~f in
     init, (size, expr)
   ;;
 
   let rec pp_expr fmt expr =
     match expr with
-    | Value value -> Value.pp fmt value
+    | Value value -> Simple_value.pp fmt value
     | Add (lhs, rhs) ->
       pp_expr fmt lhs;
       Format.pp_print_string fmt " + ";
@@ -316,28 +318,22 @@ module Memory = struct
   ;;
 end
 
-module Value_or_mem = struct
+module Value = struct
   type 'reg t =
-    | Value of 'reg Value.t
+    | Simple_value of 'reg Simple_value.t
     | Memory of 'reg Memory.t
   [@@deriving sexp_of]
 
   let pp fmt t =
     match t with
-    | Value value -> Value.pp fmt value
+    | Simple_value value -> Simple_value.pp fmt value
     | Memory memory -> Memory.pp fmt memory
   ;;
 
-  let map_values t ~f =
+  let map_simple_values t ~f =
     match t with
-    | Value value -> Value (f value)
-    | Memory mem -> Memory (Memory.map_values mem ~f)
-  ;;
-
-  let fold_values t ~init ~f =
-    match t with
-    | Value value -> f init value
-    | Memory mem -> Memory.fold_values mem ~init ~f
+    | Simple_value value -> Simple_value (f value)
+    | Memory mem -> Memory (Memory.map_simple_values mem ~f)
   ;;
 end
 
@@ -369,19 +365,11 @@ module Instr = struct
           ; call_conv : Call_conv.t
           ; arity : int
           }
-      | Cmp of 'reg Value_or_mem.t * 'reg Value.t
+      | Cmp of 'reg Value.t * 'reg Value.t
       | Lea of
           { dst : 'reg Value.t
           ; src : 'reg Memory.t
           }
-      | Load of
-          { dst : 'reg Value.t
-          ; src : 'reg Memory.t
-          }
-        (* FIXME: How will we lower the "abstract" assembly into x86-specific things? Make
-           a separate type? We want to be able to do "mov" directly to and from memory. 
-           For now, let's just say "store" and "load" get serialized as "mov". For other
-           instructions, maybe don't operate on memory? *)
       | Mov of
           { dst : 'reg Value.t
           ; src : 'reg Value.t
@@ -390,131 +378,105 @@ module Instr = struct
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
-      | Store of
-          { dst : 'reg Memory.t
-          ; src : 'reg Value.t
-          }
       | Test of 'reg Value.t * 'reg Value.t
     [@@deriving sexp_of, variants]
 
     let map_args t ~f =
       match t with
       | Add { dst; src } ->
-        let dst = f dst in
-        let src = f src in
+        let dst = Value.map_simple_values dst ~f in
+        let src = Value.map_simple_values src ~f in
         Add { dst; src }
       | And { dst; src } ->
-        let dst = f dst in
-        let src = f src in
+        let dst = Value.map_simple_values dst ~f in
+        let src = Value.map_simple_values src ~f in
         And { dst; src }
       | Mov { dst; src } ->
-        let dst = f dst in
-        let src = f src in
+        let dst = Value.map_simple_values dst ~f in
+        let src = Value.map_simple_values src ~f in
         Mov { dst; src }
       | Lea { dst; src } ->
-        let dst = f dst in
-        let src = Memory.map_values src ~f in
+        let dst = Value.map_simple_values dst ~f in
+        let src = Memory.map_simple_values src ~f in
         Lea { dst; src }
-      | Load { dst; src } ->
-        let dst = f dst in
-        let src = Memory.map_values src ~f in
-        Load { dst; src }
       | Cmp (a, b) ->
-        let a = Value_or_mem.map_values a ~f in
-        let b = f b in
+        let a = Value.map_simple_values a ~f in
+        let b = Value.map_simple_values b ~f in
         Cmp (a, b)
       | Sub { dst; src } ->
-        let dst = f dst in
-        let src = f src in
+        let dst = Value.map_simple_values dst ~f in
+        let src = Value.map_simple_values src ~f in
         Sub { dst; src }
-      | Store { dst; src } ->
-        let dst = Memory.map_values dst ~f in
-        let src = f src in
-        Store { dst; src }
       | Test (a, b) ->
-        let a = f a in
-        let b = f b in
+        let a = Value.map_simple_values a ~f in
+        let b = Value.map_simple_values b ~f in
         Test (a, b)
-      | Call { fun_; call_conv; arity } -> Call { fun_ = f fun_; call_conv; arity }
+      | Call { fun_; call_conv; arity } ->
+        Call { fun_ = Value.map_simple_values fun_ ~f; call_conv; arity }
     ;;
 
     let fold_map_args t ~init ~(f : _ -> _ -> op:Register_op.t -> _) =
-      let fold_map_value_or_mem
-        (value_or_mem : _ Value_or_mem.t)
+      let fold_map_value
+        (value : _ Value.t)
         ~init
         ~(f : _ -> _ -> op:Register_op.t -> _)
         ~op
-        : _ * _ Value_or_mem.t
+        : _ * _ Value.t
         =
-        match value_or_mem with
-        | Value value ->
+        match value with
+        | Simple_value value ->
           let init, value = f init value ~op in
-          init, Value value
+          init, Simple_value value
         | Memory mem ->
           (* Memory references always use registers and can't assign to them. *)
-          let init, mem = Memory.fold_map_values mem ~init ~f:(f ~op:Use) in
+          let init, mem = Memory.fold_map_simple_values mem ~init ~f:(f ~op:Use) in
           init, Memory mem
       in
       match t with
       | Add { dst; src } ->
-        let init, dst = f init dst ~op:Use_and_assignment in
-        let init, src = f init src ~op:Use in
+        let init, dst = fold_map_value dst ~init ~f ~op:Use_and_assignment in
+        let init, src = fold_map_value src ~init ~f ~op:Use in
         init, Add { dst; src }
       | And { dst; src } ->
-        let init, dst = f init dst ~op:Use_and_assignment in
-        let init, src = f init src ~op:Use in
+        let init, dst = fold_map_value dst ~init ~f ~op:Use_and_assignment in
+        let init, src = fold_map_value src ~init ~f ~op:Use in
         init, And { dst; src }
       | Mov { dst; src } ->
-        let init, dst = f init dst ~op:Assignment in
-        let init, src = f init src ~op:Use in
+        let init, dst = fold_map_value dst ~init ~f ~op:Assignment in
+        let init, src = fold_map_value src ~init ~f ~op:Use in
         init, Mov { dst; src }
       | Lea { dst; src } ->
-        let init, dst = f init dst ~op:Assignment in
-        let init, src = Memory.fold_map_values src ~init ~f:(f ~op:Use) in
+        let init, dst = fold_map_value dst ~init ~f ~op:Assignment in
+        let init, src = Memory.fold_map_simple_values src ~init ~f:(f ~op:Use) in
         init, Lea { dst; src }
-      | Load { dst; src } ->
-        let init, dst = f init dst ~op:Assignment in
-        let init, src = Memory.fold_map_values src ~init ~f:(f ~op:Use) in
-        init, Load { dst; src }
       | Cmp (a, b) ->
-        let init, a = fold_map_value_or_mem a ~init ~f ~op:Use in
-        let init, b = f init b ~op:Use in
+        let init, a = fold_map_value a ~init ~f ~op:Use in
+        let init, b = fold_map_value b ~init ~f ~op:Use in
         init, Cmp (a, b)
       | Sub { dst; src } ->
-        let init, dst = f init dst ~op:Use_and_assignment in
-        let init, src = f init src ~op:Use in
+        let init, dst = fold_map_value dst ~init ~f ~op:Use_and_assignment in
+        let init, src = fold_map_value src ~init ~f ~op:Use in
         init, Sub { dst; src }
-      | Store { dst; src } ->
-        let init, dst = Memory.fold_map_values dst ~init ~f:(f ~op:Use) in
-        let init, src = f init src ~op:Use in
-        init, Store { dst; src }
       | Test (a, b) ->
-        let init, a = f init a ~op:Use in
-        let init, b = f init b ~op:Use in
+        let init, a = fold_map_value a ~init ~f ~op:Use in
+        let init, b = fold_map_value b ~init ~f ~op:Use in
         init, Test (a, b)
       | Call { fun_; call_conv; arity } ->
-        let init, fun_ = f init fun_ ~op:Use in
+        let init, fun_ = fold_map_value fun_ ~init ~f ~op:Use in
         init, Call { fun_; call_conv; arity }
     ;;
 
     let pp fmt t =
-      let name =
-        match t with
-        | Load _ | Store _ -> "mov"
-        | Add _ | And _ | Call _ | Cmp _ | Lea _ | Mov _ | Sub _ | Test _ ->
-          String.lowercase (Variants.to_name t)
-      in
-      let args : _ Value_or_mem.t list =
+      let name = String.lowercase (Variants.to_name t) in
+      let args =
         match t with
         | Add { dst; src } | And { dst; src } | Sub { dst; src } | Mov { dst; src } ->
-          [ Value dst; Value src ]
-        | Cmp (a, b) -> [ a; Value b ]
-        | Test (a, b) -> [ Value a; Value b ]
-        | Call { fun_ = x; call_conv = _; arity = _ } -> [ Value x ]
-        | Load { dst; src } | Lea { dst; src } -> [ Value dst; Memory src ]
-        | Store { dst; src } -> [ Memory dst; Value src ]
+          [ dst; src ]
+        | Cmp (a, b) | Test (a, b) -> [ a; b ]
+        | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
+        | Lea { dst; src } -> [ dst; Memory src ]
       in
-      pp_line fmt name args ~f:Value_or_mem.pp
+      pp_line fmt name args ~f:Value.pp
     ;;
   end
 
@@ -539,13 +501,13 @@ module Instr = struct
            | `Zero -> "jz"
            | `Nonzero -> "jnz")
       in
-      let args : _ Value.t list =
+      let args : _ Simple_value.t list =
         match t with
         | Jump label | Jump_if { cond = _; then_ = label; else_ = _ } ->
           [ Global (label, Other) ]
         | Ret -> []
       in
-      pp_line fmt (String.lowercase name) args ~f:Value.pp
+      pp_line fmt (String.lowercase name) args ~f:Simple_value.pp
     ;;
   end
 end
