@@ -193,13 +193,6 @@ module Value = struct
     | Register of 'reg
     | Global of Label_name.t * Global_kind.t
     | Constant of Asm_literal.t
-    | Memory of Size.t * 'reg memory_expr
-
-  and 'reg memory_expr =
-    | Register of 'reg
-    | Global of Label_name.t * Global_kind.t
-    | Offset of int
-    | Add of 'reg memory_expr * 'reg memory_expr
   [@@deriving sexp_of]
 
   let pp_global fmt name (kind : Global_kind.t) =
@@ -210,42 +203,15 @@ module Value = struct
     | Other -> Format.fprintf fmt !"%{Label_name}" name
   ;;
 
-  let rec pp_memory_expr fmt memory_expr =
-    match memory_expr with
-    | Offset i -> Format.fprintf fmt "%d" i
-    | Register reg -> Register.pp fmt reg
-    | Global (name, kind) -> pp_global fmt name kind
-    | Add (lhs, rhs) ->
-      pp_memory_expr fmt lhs;
-      Format.pp_print_string fmt " + ";
-      pp_memory_expr fmt rhs
-  ;;
-
   let pp fmt t =
     match t with
     | Register reg -> Register.pp fmt reg
-    | Memory (size, memory_expr) ->
-      Format.pp_print_string
-        fmt
-        (match size with
-         | I8 -> "byte"
-         | I16 -> "word"
-         | I32 -> "dword"
-         | I64 -> "qword");
-      Format.pp_print_string fmt " [";
-      pp_memory_expr fmt memory_expr;
-      Format.pp_print_string fmt "]"
     | Global (name, kind) -> pp_global fmt name kind
     | Constant literal -> Asm_literal.pp fmt literal
   ;;
 
-  let mem_offset mem size offset =
-    if offset = 0
-    then Memory (size, mem)
-    else Memory (size, Add (mem, Offset (Size.n_bytes size * offset)))
-  ;;
-
-  let mem_of_value (value : _ t) : _ memory_expr option =
+  (* FIXME: Cleanup *)
+  (* let mem_of_value (value : _ t) : _ memory_expr option =
     match value with
     | Register reg -> Some (Register reg)
     | Global (name, kind) -> Some (Global (name, kind))
@@ -253,53 +219,18 @@ module Value = struct
     | Constant (Int i) -> Some (Offset i)
     | Constant (Float _ | String _) ->
       compiler_bug [%message "Invalid memory expression" (value : _ t)]
-  ;;
-
-  let rec map_registers_memory_expr (mem : _ memory_expr) ~f : _ memory_expr =
-    match mem with
-    | Register reg -> Register (f reg)
-    | (Global _ | Offset _) as mem -> mem
-    | Add (lhs, rhs) ->
-      let lhs = map_registers_memory_expr lhs ~f in
-      let rhs = map_registers_memory_expr rhs ~f in
-      Add (lhs, rhs)
-  ;;
+  ;; *)
 
   let map_registers t ~f =
     match t with
     | Register reg -> Register (f reg)
     | (Global _ | Constant _) as t -> t
-    | Memory (size, mem) -> Memory (size, map_registers_memory_expr mem ~f)
-  ;;
-
-  let rec fold_registers_memory_expr (mem : _ memory_expr) ~init ~f =
-    match mem with
-    | Register reg -> f init reg
-    | Global _ | Offset _ -> init
-    | Add (lhs, rhs) ->
-      let init = fold_registers_memory_expr lhs ~init ~f in
-      fold_registers_memory_expr rhs ~init ~f
   ;;
 
   let fold_registers t ~init ~f =
     match t with
     | Register reg -> f init reg
     | Global _ | Constant _ -> init
-    | Memory ((_ : Size.t), mem) -> fold_registers_memory_expr mem ~init ~f
-  ;;
-
-  let rec fold_map_registers_memory_expr (mem : _ memory_expr) ~init ~f
-    : _ * _ memory_expr
-    =
-    match mem with
-    | Register reg ->
-      let init, reg = f init reg in
-      init, Register reg
-    | (Global _ | Offset _) as mem -> init, mem
-    | Add (lhs, rhs) ->
-      let init, lhs = fold_map_registers_memory_expr lhs ~init ~f in
-      let init, rhs = fold_map_registers_memory_expr rhs ~init ~f in
-      init, Add (lhs, rhs)
   ;;
 
   let fold_map_registers t ~init ~f =
@@ -308,9 +239,105 @@ module Value = struct
       let init, reg = f init reg in
       init, Register reg
     | (Global _ | Constant _) as t -> init, t
-    | Memory (size, mem) ->
-      let init, mem = fold_map_registers_memory_expr mem ~init ~f in
-      init, Memory (size, mem)
+  ;;
+end
+
+module Memory = struct
+  type 'reg expr =
+    | Value of 'reg Value.t
+    | Add of 'reg expr * 'reg expr
+  [@@deriving sexp_of]
+
+  type 'reg t = Size.t * 'reg expr [@@deriving sexp_of]
+
+  let offset mem size offset =
+    if offset = 0
+    then size, mem
+    else size, Add (mem, Value (Constant (Int (Size.n_bytes size * offset))))
+  ;;
+
+  let rec map_values_expr expr ~f =
+    match expr with
+    | Value value -> Value (f value)
+    | Add (lhs, rhs) ->
+      let lhs = map_values_expr lhs ~f in
+      let rhs = map_values_expr rhs ~f in
+      Add (lhs, rhs)
+  ;;
+
+  let map_values (size, expr) ~f = size, map_values_expr expr ~f
+
+  let rec fold_values_expr expr ~init ~f =
+    match expr with
+    | Value value -> f init value
+    | Add (lhs, rhs) ->
+      let init = fold_values_expr lhs ~init ~f in
+      fold_values_expr rhs ~init ~f
+  ;;
+
+  let fold_values ((_ : Size.t), expr) ~init ~f = fold_values_expr expr ~init ~f
+
+  let rec fold_map_values_expr expr ~init ~f =
+    match expr with
+    | Value value ->
+      let init, value = f init value in
+      init, Value value
+    | Add (lhs, rhs) ->
+      let init, lhs = fold_map_values_expr lhs ~init ~f in
+      let init, rhs = fold_map_values_expr rhs ~init ~f in
+      init, Add (lhs, rhs)
+  ;;
+
+  let fold_map_values (size, expr) ~init ~f =
+    let init, expr = fold_map_values_expr expr ~init ~f in
+    init, (size, expr)
+  ;;
+
+  let rec pp_expr fmt expr =
+    match expr with
+    | Value value -> Value.pp fmt value
+    | Add (lhs, rhs) ->
+      pp_expr fmt lhs;
+      Format.pp_print_string fmt " + ";
+      pp_expr fmt rhs
+  ;;
+
+  let pp fmt ((size, expr) : _ t) =
+    Format.pp_print_string
+      fmt
+      (match size with
+       | I8 -> "byte"
+       | I16 -> "word"
+       | I32 -> "dword"
+       | I64 -> "qword");
+    Format.pp_print_string fmt " [";
+    pp_expr fmt expr;
+    Format.pp_print_string fmt "]"
+  ;;
+end
+
+module Value_or_mem = struct
+  type 'reg t =
+    | Value of 'reg Value.t
+    | Memory of 'reg Memory.t
+  [@@deriving sexp_of]
+
+  let pp fmt t =
+    match t with
+    | Value value -> Value.pp fmt value
+    | Memory memory -> Memory.pp fmt memory
+  ;;
+
+  let map_values t ~f =
+    match t with
+    | Value value -> Value (f value)
+    | Memory mem -> Memory (Memory.map_values mem ~f)
+  ;;
+
+  let fold_values t ~init ~f =
+    match t with
+    | Value value -> f init value
+    | Memory mem -> Memory.fold_values mem ~init ~f
   ;;
 end
 
@@ -342,19 +369,29 @@ module Instr = struct
           ; call_conv : Call_conv.t
           ; arity : int
           }
-      | Cmp of 'reg Value.t * 'reg Value.t
+      | Cmp of 'reg Value_or_mem.t * 'reg Value.t
       | Lea of
           { dst : 'reg Value.t
-          ; src : 'reg Value.t
+          ; src : 'reg Memory.t
           }
-      (* FIXME: Prevent Mov between two memory locations, it's not allowed. Likely
-         similar constraints for other instructions. *)
+      | Load of
+          { dst : 'reg Value.t
+          ; src : 'reg Memory.t
+          }
+        (* FIXME: How will we lower the "abstract" assembly into x86-specific things? Make
+           a separate type? We want to be able to do "mov" directly to and from memory. 
+           For now, let's just say "store" and "load" get serialized as "mov". For other
+           instructions, maybe don't operate on memory? *)
       | Mov of
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
       | Sub of
           { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Store of
+          { dst : 'reg Memory.t
           ; src : 'reg Value.t
           }
       | Test of 'reg Value.t * 'reg Value.t
@@ -376,16 +413,24 @@ module Instr = struct
         Mov { dst; src }
       | Lea { dst; src } ->
         let dst = f dst in
-        let src = f src in
+        let src = Memory.map_values src ~f in
         Lea { dst; src }
+      | Load { dst; src } ->
+        let dst = f dst in
+        let src = Memory.map_values src ~f in
+        Load { dst; src }
       | Cmp (a, b) ->
-        let a = f a in
+        let a = Value_or_mem.map_values a ~f in
         let b = f b in
         Cmp (a, b)
       | Sub { dst; src } ->
         let dst = f dst in
         let src = f src in
         Sub { dst; src }
+      | Store { dst; src } ->
+        let dst = Memory.map_values dst ~f in
+        let src = f src in
+        Store { dst; src }
       | Test (a, b) ->
         let a = f a in
         let b = f b in
@@ -394,6 +439,22 @@ module Instr = struct
     ;;
 
     let fold_map_args t ~init ~(f : _ -> _ -> op:Register_op.t -> _) =
+      let fold_map_value_or_mem
+        (value_or_mem : _ Value_or_mem.t)
+        ~init
+        ~(f : _ -> _ -> op:Register_op.t -> _)
+        ~op
+        : _ * _ Value_or_mem.t
+        =
+        match value_or_mem with
+        | Value value ->
+          let init, value = f init value ~op in
+          init, Value value
+        | Memory mem ->
+          (* Memory references always use registers and can't assign to them. *)
+          let init, mem = Memory.fold_map_values mem ~init ~f:(f ~op:Use) in
+          init, Memory mem
+      in
       match t with
       | Add { dst; src } ->
         let init, dst = f init dst ~op:Use_and_assignment in
@@ -409,16 +470,24 @@ module Instr = struct
         init, Mov { dst; src }
       | Lea { dst; src } ->
         let init, dst = f init dst ~op:Assignment in
-        let init, src = f init src ~op:Use in
+        let init, src = Memory.fold_map_values src ~init ~f:(f ~op:Use) in
         init, Lea { dst; src }
+      | Load { dst; src } ->
+        let init, dst = f init dst ~op:Assignment in
+        let init, src = Memory.fold_map_values src ~init ~f:(f ~op:Use) in
+        init, Load { dst; src }
       | Cmp (a, b) ->
-        let init, a = f init a ~op:Use in
+        let init, a = fold_map_value_or_mem a ~init ~f ~op:Use in
         let init, b = f init b ~op:Use in
         init, Cmp (a, b)
       | Sub { dst; src } ->
         let init, dst = f init dst ~op:Use_and_assignment in
         let init, src = f init src ~op:Use in
         init, Sub { dst; src }
+      | Store { dst; src } ->
+        let init, dst = Memory.fold_map_values dst ~init ~f:(f ~op:Use) in
+        let init, src = f init src ~op:Use in
+        init, Store { dst; src }
       | Test (a, b) ->
         let init, a = f init a ~op:Use in
         let init, b = f init b ~op:Use in
@@ -429,17 +498,23 @@ module Instr = struct
     ;;
 
     let pp fmt t =
-      let args =
+      let name =
         match t with
-        | Add { dst; src }
-        | And { dst; src }
-        | Sub { dst; src }
-        | Mov { dst; src }
-        | Lea { dst; src } -> [ dst; src ]
-        | Cmp (a, b) | Test (a, b) -> [ a; b ]
-        | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
+        | Load _ | Store _ -> "mov"
+        | Add _ | And _ | Call _ | Cmp _ | Lea _ | Mov _ | Sub _ | Test _ ->
+          String.lowercase (Variants.to_name t)
       in
-      pp_line fmt (String.lowercase (Variants.to_name t)) args ~f:Value.pp
+      let args : _ Value_or_mem.t list =
+        match t with
+        | Add { dst; src } | And { dst; src } | Sub { dst; src } | Mov { dst; src } ->
+          [ Value dst; Value src ]
+        | Cmp (a, b) -> [ a; Value b ]
+        | Test (a, b) -> [ Value a; Value b ]
+        | Call { fun_ = x; call_conv = _; arity = _ } -> [ Value x ]
+        | Load { dst; src } | Lea { dst; src } -> [ Value dst; Memory src ]
+        | Store { dst; src } -> [ Memory dst; Value src ]
+      in
+      pp_line fmt name args ~f:Value_or_mem.pp
     ;;
   end
 

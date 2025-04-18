@@ -78,20 +78,8 @@ module Value : sig
     | Register of 'reg
     | Global of Label_name.t * Global_kind.t
     | Constant of Asm_literal.t
-    | Memory of Size.t * 'reg memory_expr
-
-  and 'reg memory_expr =
-    | Register of 'reg
-    | Global of Label_name.t * Global_kind.t
-    | Offset of int
-    | Add of 'reg memory_expr * 'reg memory_expr
   [@@deriving sexp_of]
 
-  (** Dereference memory with an offset, with similar semantics to C dereferencing, so if 
-      calling [mem_offset t size n], the actual byte offset is [Size.n_bytes size * n]. *)
-  val mem_offset : 'reg memory_expr -> Size.t -> int -> 'reg t
-
-  val mem_of_value : 'reg t -> 'reg memory_expr option
   val map_registers : 'r1 t -> f:('r1 -> 'r2) -> 'r2 t
   val fold_registers : 'reg t -> init:'acc -> f:('acc -> 'reg -> 'acc) -> 'acc
 
@@ -100,6 +88,32 @@ module Value : sig
     -> init:'acc
     -> f:('acc -> 'r1 -> 'acc * 'r2)
     -> 'acc * 'r2 t
+end
+
+module Memory : sig
+  type 'reg expr =
+    | Value of 'reg Value.t
+    | Add of 'reg expr * 'reg expr
+  [@@deriving sexp_of]
+
+  type 'reg t = Size.t * 'reg expr [@@deriving sexp_of]
+
+  (** Dereference memory with an offset, with similar semantics to C dereferencing, so if 
+      calling [offset expr size n], the actual byte offset is [Size.n_bytes size * n]. *)
+  val offset : 'reg expr -> Size.t -> int -> 'reg t
+
+  val fold_values : 'reg t -> init:'acc -> f:('acc -> 'reg Value.t -> 'acc) -> 'acc
+end
+
+(* FIXME: Use Value_or_mem in more places, and maybe call this value and have the other
+   Value be Simple_value or something. *)
+module Value_or_mem : sig
+  type 'reg t =
+    | Value of 'reg Value.t
+    | Memory of 'reg Memory.t
+  [@@deriving sexp_of]
+
+  val fold_values : 'reg t -> init:'acc -> f:('acc -> 'reg Value.t -> 'acc) -> 'acc
 end
 
 module Register_op : sig
@@ -125,10 +139,14 @@ module Instr : sig
           ; call_conv : Call_conv.t
           ; arity : int
           }
-      | Cmp of 'reg Value.t * 'reg Value.t
+      | Cmp of 'reg Value_or_mem.t * 'reg Value.t
       | Lea of
           { dst : 'reg Value.t
-          ; src : 'reg Value.t
+          ; src : 'reg Memory.t
+          }
+      | Load of
+          { dst : 'reg Value.t
+          ; src : 'reg Memory.t
           }
       | Mov of
           { dst : 'reg Value.t
@@ -136,6 +154,10 @@ module Instr : sig
           }
       | Sub of
           { dst : 'reg Value.t
+          ; src : 'reg Value.t
+          }
+      | Store of
+          { dst : 'reg Memory.t
           ; src : 'reg Value.t
           }
       | Test of 'reg Value.t * 'reg Value.t

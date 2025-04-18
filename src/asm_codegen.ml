@@ -25,6 +25,8 @@ open struct
   module Label_name = Label_name
   module Call_conv = Call_conv
   module Value = Value
+  module Memory = Memory
+  module Value_or_mem = Value_or_mem
   module Register_op = Register_op
   module Instr = Instr
   module Basic_block = Basic_block
@@ -136,11 +138,7 @@ end = struct
          | [] -> compiler_bug [%message "Empty cfg component"])
   ;;
 
-  module Interference_graph = struct
-    module G = Graph.Imperative.Graph.Concrete (Register)
-    include G
-    module Dfs = Graph.Traverse.Dfs (G)
-  end
+  module Interference_graph = Graph.Imperative.Graph.Concrete (Register)
 
   (* FIXME: Handle Call properly! 
      It uses the arg registers (for its arity).
@@ -195,14 +193,26 @@ end = struct
      memory, register assignments become uses. Register uses are still uses though.
      
      Also, there's code duplication of this same bug in Instr.Nonterminal.fold_map_args
+     awkward thing is the order needs to be different - this one is the order of the
+     semantics, the other one is the order of the args syntactically.
   *)
   let instr_register_ops (instr : _ Instr.Nonterminal.t)
     : (Register_op.t * _ Value.t) list
     =
+    let use_mem =
+      Memory.fold_values ~init:[] ~f:(fun acc v -> (Register_op.Use, v) :: acc)
+    in
+    let use_value_or_mem =
+      Value_or_mem.fold_values ~init:[] ~f:(fun acc v -> (Register_op.Use, v) :: acc)
+    in
     match instr with
-    | Mov { dst; src } | Lea { dst; src } -> [ Use, src; Assignment, dst ]
+    | Cmp (a, b) -> (Use, b) :: use_value_or_mem a
+    | Test (a, b) -> [ Use, a; Use, b ]
+    | Mov { dst; src } -> [ Use, src; Assignment, dst ]
     | And { dst; src } | Add { dst; src } | Sub { dst; src } ->
       [ Use, src; Use_and_assignment, dst ]
+    | Lea { dst; src } | Load { dst; src } -> use_mem src @ [ Assignment, dst ]
+    | Store { dst; src } -> (Use, src) :: use_mem dst
     | Call { fun_; call_conv; arity } ->
       let fun_use : Register_op.t * _ = Use, fun_ in
       let args, clobbered_arg_registers =
@@ -233,7 +243,6 @@ end = struct
         ; clobbered_register_uses
         ; [ return_value_assignment ]
         ]
-    | Cmp (a, b) | Test (a, b) -> [ Use, a; Use, b ]
   ;;
 
   let create_interference_graph ~cfg ~(basic_blocks : _ Basic_block.t list) =
@@ -270,12 +279,11 @@ end = struct
         match cfg_node with
         | Ret ->
           (* Ret implicitly uses the return register. *)
-          (* FIXME: Decide if it actually matters if we track this or not.  *)
-          (* record_value
+          (* FIXME: Decide if it actually matters if we track this or not. If it does,
+             construct a test case showing it. *)
+          record_register_use
             live_registers
-            Use
-            (Register (Real (Call_conv.return_value_register Umber))) *)
-          live_registers
+            (Register (Real (Call_conv.return_value_register Umber)))
         | Label label ->
           let ({ label = _; code; terminal = _ } : _ Basic_block.t) =
             Hashtbl.find_exn basic_blocks label
@@ -352,12 +360,25 @@ end = struct
     basic_blocks
   ;;
 
-  let color_interference_graph ~interference_graph ~all_available_registers =
+  let color_interference_graph
+    ~interference_graph
+    ~all_available_registers
+    ~already_spilled
+    =
     (* See https://web.eecs.umich.edu/~mahlke/courses/583f12/reading/chaitin82.pdf for
-       a description of the rough algorithm. *)
+       a description of the algorithm we are roughly following. *)
     let k = Set.length all_available_registers in
     let vertex_states = Virtual_register.Table.create () in
     let ignored_stack = Stack.create () in
+    (* FIXME: Maybe this is stil considering vertices that were effectively removed by
+       coalescing? I think we need to remove all the coalesced vertices? Or keep track that
+       they were coalesced? No, I think that's fine actually, we remove them.
+       
+       A real problem is that we interfere with all the clobbered registers that we aren't
+       even using. (??) I thought liveness analysis should have figured out they aren't
+       live... Ah, but we deliberately made them overlap when there's a call, to encode
+       the constraint that you can't use one of those registers over the gap. And we
+       can't just ignore this, it's a real constraint (a register you can't use). *)
     let degree vertex =
       List.count (Interference_graph.succ interference_graph vertex) ~f:(function
         | Real _ -> true
@@ -389,29 +410,50 @@ end = struct
         interference_graph;
       if !any_removed then remove_low_degree_vertices ()
     in
-    (* TODO: Could use some heuristics to pick a register to spill rather than doing it
-       arbitrarily. e.g. picking registers with the highest degree or lowest spill cost. *)
-    let rec pick_a_register_to_spill iter =
-      let continue () = pick_a_register_to_spill (Interference_graph.Dfs.step iter) in
-      match Interference_graph.Dfs.get iter with
-      | Real _ -> continue ()
-      | Virtual virtual_reg as vertex ->
-        (match Hashtbl.find vertex_states virtual_reg with
-         | Some (`Ignored | `Spilled) -> continue ()
-         | None ->
-           assert_or_compiler_bug (degree vertex >= k) ~here:[%here];
-           virtual_reg)
+    (* TODO: Could use better heuristics to pick a register to spill rather, considering
+       the cost of spilling. See how Chaitin did it. *)
+    let pick_a_register_to_spill () =
+      Interference_graph.fold_vertex
+        (fun vertex current_max ->
+          match vertex with
+          | Real _ -> current_max
+          | Virtual virtual_reg as vertex ->
+            (match Hashtbl.find vertex_states virtual_reg with
+             | Some (`Ignored | `Spilled) -> current_max
+             | None ->
+               assert_or_compiler_bug (degree vertex >= k) ~here:[%here];
+               (* Do not spill registers that were already spilled. This is important to avoid
+                a death spiral of nontermination. *)
+               if Hash_set.mem already_spilled virtual_reg
+               then current_max
+               else (
+                 eprint_s
+                   [%here]
+                   [%lazy_message
+                     "Considering spilling"
+                       (virtual_reg : Virtual_register.t)
+                       (current_max : (Virtual_register.t * int) option)];
+                 match current_max with
+                 | None -> Some (virtual_reg, degree vertex)
+                 | Some (_, max_degree) ->
+                   let this_degree = degree vertex in
+                   if this_degree > max_degree
+                   then Some (virtual_reg, max_degree)
+                   else current_max)))
+        interference_graph
+        None
     in
     let rec loop () =
       remove_low_degree_vertices ();
       (* All remaining nodes have degree >= k. While this remains true, spill. *)
-      match
-        pick_a_register_to_spill (Interference_graph.Dfs.start interference_graph)
-      with
-      | reg_to_spill ->
+      match pick_a_register_to_spill () with
+      | Some (reg_to_spill, (_degree : int)) ->
+        eprint_s
+          [%here]
+          [%lazy_message "Decided to spill" (reg_to_spill : Virtual_register.t)];
         Hashtbl.set vertex_states ~key:reg_to_spill ~data:`Spilled;
         loop ()
-      | exception Exit -> ()
+      | None -> ()
     in
     loop ();
     let spilled_registers =
@@ -453,14 +495,16 @@ end = struct
     ~(basic_blocks : Register.t Basic_block.t list)
     ~newly_spilled_registers
     ~already_spilled_count
-    ~register_counter
+    ~create_register
     =
-    (* FIXME: Add in the sub/add to rsp later at the end. *)
+    (* TODO: We don't necessarily need to give each spilled register its own stack slot.
+       If their lifetimes don't overlap, two variables could use the same one. But this is
+       pretty hard to think about. *)
     let spilled_memory_locations =
       Nonempty.to_list newly_spilled_registers
       |> List.mapi ~f:(fun i reg ->
-           let rsp : Register.t Value.memory_expr = Register (Real Rsp) in
-           reg, Value.mem_offset rsp I64 (i + already_spilled_count))
+           let rsp : Register.t Memory.expr = Value (Register (Real Rsp)) in
+           reg, Memory.offset rsp I64 (i + already_spilled_count))
       |> Virtual_register.Map.of_alist_exn
     in
     (* FIXME: Make sure this process doesn't spill things that have already been spilled. *)
@@ -478,9 +522,7 @@ end = struct
                        vreg
                        ~equal:Virtual_register.equal
                   then (
-                    let tmp : Register.t =
-                      Virtual (Virtual_register.Counter.next register_counter)
-                    in
+                    let tmp : Register.t = Virtual (create_register ()) in
                     let spilled_uses, spilled_assignments = acc in
                     match op with
                     | Use -> ((vreg, tmp) :: spilled_uses, spilled_assignments), tmp
@@ -495,11 +537,12 @@ end = struct
              multiple times. That would require reasoning about lifetimes here. *)
           let loads =
             List.map spilled_uses ~f:(fun (reg, tmp) : _ Instr.Nonterminal.t ->
-              Mov { src = Map.find_exn spilled_memory_locations reg; dst = Register tmp })
+              Load { src = Map.find_exn spilled_memory_locations reg; dst = Register tmp })
           in
           let stores =
             List.map spilled_assignments ~f:(fun (reg, tmp) : _ Instr.Nonterminal.t ->
-              Mov { src = Register tmp; dst = Map.find_exn spilled_memory_locations reg })
+              Store
+                { src = Register tmp; dst = Map.find_exn spilled_memory_locations reg })
           in
           List.concat [ loads; [ instr ]; stores ])
       in
@@ -533,11 +576,14 @@ end = struct
   ;;
 
   let allocate ~(basic_blocks : Register.t Basic_block.t list) ~register_counter =
-    eprint_s [%here] [%lazy_message (basic_blocks : Register.t Basic_block.t list)];
+    eprint_s
+      [%here]
+      [%lazy_message
+        "Starting register allocation" (basic_blocks : Register.t Basic_block.t list)];
     let all_available_registers =
       Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
     in
-    let try_find_coloring ~cfg ~basic_blocks =
+    let try_find_coloring ~cfg ~basic_blocks ~already_spilled =
       eprint_s
         [%here]
         [%lazy_message
@@ -557,12 +603,34 @@ end = struct
                  []
                 : (Register.t * Register.t) list)];
       let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
-      color_interference_graph ~interference_graph ~all_available_registers, basic_blocks
+      (* FIXME: Not sure what happened but this interference graph definitely doesn't
+         match the code after coalescing. Broken merge logic? *)
+      let interference_graph = create_interference_graph ~cfg ~basic_blocks in
+      eprint_s
+        [%here]
+        [%lazy_message
+          "Interference graph after coalescing"
+            ~interference_graph:
+              (Interference_graph.fold_edges
+                 (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
+                 interference_graph
+                 []
+                : (Register.t * Register.t) list)];
+      ( color_interference_graph
+          ~interference_graph
+          ~all_available_registers
+          ~already_spilled
+      , basic_blocks )
     in
-    let rec loop ~cfg ~basic_blocks ~spilled_registers =
-      let result, basic_blocks = try_find_coloring ~cfg ~basic_blocks in
+    let new_temp_registers = Virtual_register.Hash_set.create () in
+    let rec loop ~cfg ~basic_blocks ~already_spilled_count =
+      let result, basic_blocks =
+        try_find_coloring ~cfg ~basic_blocks ~already_spilled:new_temp_registers
+      in
       match result with
       | Error newly_spilled_registers ->
+        (* FIXME: This is getting into some kind of death spiral where it tries to spill
+           everything, but it isn't helping. *)
         eprint_s
           [%here]
           [%lazy_message
@@ -572,13 +640,16 @@ end = struct
           update_code_to_spill_registers
             ~basic_blocks
             ~newly_spilled_registers
-            ~already_spilled_count:(List.length spilled_registers)
-            ~register_counter
+            ~already_spilled_count
+            ~create_register:(fun () ->
+            let tmp = Virtual_register.Counter.next register_counter in
+            Hash_set.add new_temp_registers tmp;
+            tmp)
         in
-        let spilled_registers =
-          Nonempty.to_list newly_spilled_registers @ spilled_registers
+        let already_spilled_count =
+          already_spilled_count + Nonempty.length newly_spilled_registers
         in
-        loop ~cfg ~basic_blocks ~spilled_registers
+        loop ~cfg ~basic_blocks ~already_spilled_count
       | Ok coloring ->
         eprint_s
           [%here]
@@ -597,16 +668,16 @@ end = struct
                        | Some reg -> reg
                        | None ->
                          (* If a register wasn't in the interference graph, we can safely
-                      pick any register. *)
+                            pick any register. *)
                          Set.choose_exn all_available_registers))))
             in
             { label; code; terminal })
         in
         add_function_prologue_and_epilogue
           ~basic_blocks
-          ~spilled_count:(List.length spilled_registers)
+          ~spilled_count:already_spilled_count
     in
-    loop ~cfg:(create_cfg ~basic_blocks) ~basic_blocks ~spilled_registers:[]
+    loop ~cfg:(create_cfg ~basic_blocks) ~basic_blocks ~already_spilled_count:0
   ;;
   (* FIXME: Handle spilling: 
        - At first assignment, push the initial value. Keep track of the order of pushes
@@ -675,30 +746,18 @@ end = struct
 
   let name t = t.fun_name
   let current_label t = t.current_label
-  let position_at_label t label_name = t.current_label <- label_name
+
+  let position_at_label t label_name =
+    t.current_label <- label_name;
+    if not (Hash_queue.mem t.basic_blocks label_name)
+    then
+      Hash_queue.enqueue_back_exn t.basic_blocks t.current_label (Block_builder.create ())
+  ;;
+
   let pick_register' t = Virtual_register.Counter.next t.register_counter
   let pick_register t : Register.t Value.t = Register (Virtual (pick_register' t))
-
-  let get_bb t =
-    match Hash_queue.lookup t.basic_blocks t.current_label with
-    | Some bb -> bb
-    | None ->
-      let bb = Block_builder.create () in
-      Hash_queue.enqueue_back_exn t.basic_blocks t.current_label bb;
-      bb
-  ;;
-
-  let add_code t (instr : _ Instr.Nonterminal.t) =
-    let bb = get_bb t in
-    (* Catch memory-to-memory operations and use a temporary register. *)
-    match instr with
-    | Mov { src = Memory (size, _) as src; dst = Memory (size', _) as dst } ->
-      assert_or_compiler_bug (Size.equal size size') ~here:[%here];
-      let tmp = pick_register t in
-      Queue.enqueue bb.code (Mov { src; dst = tmp });
-      Queue.enqueue bb.code (Mov { src = tmp; dst })
-    | _ -> Queue.enqueue bb.code instr
-  ;;
+  let get_bb t = Hash_queue.lookup_exn t.basic_blocks t.current_label
+  let add_code t instr = Queue.enqueue (get_bb t).code instr
 
   let add_terminal t terminal =
     let bb = get_bb t in
@@ -910,24 +969,39 @@ let lookup_name_for_value t name ~fun_builder : _ Value.t =
     Global (label_name, Other)
 ;;
 
-let mem_or_temporary fun_builder value =
-  match Value.mem_of_value value with
-  | Some mem -> mem
-  | None ->
-    let tmp : Register.t = Virtual (Function_builder.pick_register' fun_builder) in
-    Function_builder.add_code fun_builder (Mov { src = value; dst = Register tmp });
-    Register tmp
-;;
+let load_mem_offset fun_builder value offset =
+  let tmp = Function_builder.pick_register fun_builder in
+  Function_builder.add_code
+    fun_builder
+    (Load
+       { dst = tmp
+       ; src =
+           (* FIXME: IF this is always called with "value" then maybe just have it take
+              value directly. 
+              
+              Although, the fact that it always takes "value" is bad - it means we can
+              never reason about memory locations as values and inline them when doing
+              stores. I'm starting to feel that only letting load/store access memory was
+              a bad idea. It makes it much harder to generate reasonable x86 assembly.
+              And the reg alloc needs to know about whether these memory references can be
+              inlined because it affects whether we need temporary registers or not.
 
-let mem_offset_value fun_builder value size offset =
-  Value.mem_offset (mem_or_temporary fun_builder value) size offset
+              The problem I was trying to solve was just always treating memory as a Use
+              rather than an assignment. This can easily be done by itself.
+
+              It's not reasonable to not be able to load from a offset to a stored value.
+              We need to be able to reason about memory references, even in ARM.
+            *)
+           Memory.offset (Value value) I64 offset
+       });
+  tmp
 ;;
 
 let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
   match Function_builder.find_local fun_builder name with
   | Some closure ->
     (* We are calling a closure. Load the function pointer from the first field. *)
-    mem_offset_value fun_builder closure I64 1, Umber
+    load_mem_offset fun_builder closure 1, Umber
   | None ->
     (match Hashtbl.find t.functions name with
      | Some fun_builder -> Global (Function_builder.name fun_builder, Other), Umber
@@ -1012,18 +1086,20 @@ let box t ~tag ~fields ~fun_builder =
     declare_extern_c_function t mir_name (Label_name.of_string umber_gc_alloc);
     codegen_fun_call t mir_name [ Constant (Int allocation_size) ] ~fun_builder
   in
-  let heap_pointer : Register.t Value.memory_expr = Register (Virtual heap_pointer_reg) in
+  let heap_pointer : Register.t Memory.expr =
+    Value (Register (Virtual heap_pointer_reg))
+  in
   Function_builder.add_code
     fun_builder
-    (Mov { dst = Memory (I16, heap_pointer); src = Constant (Int (Cnstr_tag.to_int tag)) });
+    (Store { dst = I16, heap_pointer; src = Constant (Int (Cnstr_tag.to_int tag)) });
   Function_builder.add_code
     fun_builder
-    (Mov
-       { dst = Value.mem_offset heap_pointer I16 1; src = Constant (Int block_field_num) });
+    (Store
+       { dst = Memory.offset heap_pointer I16 1; src = Constant (Int block_field_num) });
   Nonempty.iteri fields ~f:(fun i field_value ->
     Function_builder.add_code
       fun_builder
-      (Mov { dst = Value.mem_offset heap_pointer I64 (i + 1); src = field_value }));
+      (Store { dst = Memory.offset heap_pointer I64 (i + 1); src = field_value }));
   heap_pointer_reg
 ;;
 
@@ -1048,14 +1124,18 @@ let codegen_literal t (literal : Literal.t) : _ Value.t =
   Global (name, Other)
 ;;
 
-let get_block_field fun_builder value index =
-  mem_offset_value fun_builder value I64 (Mir.Block_index.to_int index + 1)
+(* TODO: When loading multiple fields, we could just do the load once rather than loading
+   to temporary registers multiple times. Alternatively we could inline the memory
+   references with each use, but that would require some way to express that. *)
+let load_block_field fun_builder value index =
+  load_mem_offset fun_builder value (Mir.Block_index.to_int index + 1)
 ;;
 
 let check_value_is_block fun_builder value =
   (* Check if this value is a pointer to a block. Pointers always have bottom bit 0.
      This is done by checking (in C syntax) `(value & 1) == 0`. *)
-  Function_builder.add_code fun_builder (Test (value, Constant (Int 1)))
+  Function_builder.add_code fun_builder (Test (value, Constant (Int 1)));
+  `Zero_flag
 ;;
 
 (* FIXME: Simplify with constraints? *)
@@ -1075,15 +1155,15 @@ let merge_branches
         Function_builder.position_at_label fun_builder label_b;
         Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
       value_a
-    | Register _, (Memory _ | Global _ | Constant _) ->
+    | Register _, (Global _ | Constant _) ->
       Function_builder.position_at_label fun_builder label_b;
       Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b });
       value_a
-    | (Memory _ | Global _ | Constant _), Register _ ->
+    | (Global _ | Constant _), Register _ ->
       Function_builder.position_at_label fun_builder label_a;
       Function_builder.add_code fun_builder (Mov { dst = value_b; src = value_a });
       value_b
-    | (Memory _ | Global _ | Constant _), (Memory _ | Global _ | Constant _) ->
+    | (Global _ | Constant _), (Global _ | Constant _) ->
       let dst = Function_builder.pick_register fun_builder in
       Function_builder.position_at_label fun_builder label_a;
       Function_builder.add_code fun_builder (Mov { dst; src = value_a });
@@ -1134,7 +1214,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        Register (Virtual (box t ~tag ~fields ~fun_builder)))
   | Get_block_field (field_index, block) ->
     let block = codegen_expr t block ~fun_builder in
-    get_block_field fun_builder block field_index
+    load_block_field fun_builder block field_index
   | Cond_assign { vars; conds; body; if_none_matched } ->
     (* FIXME: Need a way to mint new label names. Guess a name table isn't awful
        Might be easier to just use a counter or something though
@@ -1169,7 +1249,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
       if i <> 0 then Function_builder.position_at_label fun_builder cond_labels.(i);
-      codegen_cond t cond ~fun_builder;
+      let `Zero_flag = codegen_cond t cond ~fun_builder in
       let next_label =
         if i < n_conds - 1 then cond_labels.(i + 1) else if_none_matched_label
       in
@@ -1200,17 +1280,19 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
 
 and codegen_cond t cond ~fun_builder =
-  let cmp value value' = Function_builder.add_code fun_builder (Cmp (value, value')) in
+  let cmp a b =
+    Function_builder.add_code fun_builder (Cmp (a, b));
+    `Zero_flag
+  in
   match cond with
   | Equals (expr, literal) ->
     let expr_value = codegen_expr t expr ~fun_builder in
     let literal_value = codegen_literal t literal in
-    (* FIXME: Handle conditionally loading values from the stack into registers *)
     let load_expr ~expr_value =
-      get_block_field fun_builder expr_value (Mir.Block_index.of_int 0)
+      load_block_field fun_builder expr_value (Mir.Block_index.of_int 0)
     in
     let load_literal ~literal_value =
-      get_block_field fun_builder literal_value (Mir.Block_index.of_int 0)
+      load_block_field fun_builder literal_value (Mir.Block_index.of_int 0)
     in
     (match literal with
      | Int _ | Char _ -> cmp (load_expr ~expr_value) (load_literal ~literal_value)
@@ -1226,11 +1308,26 @@ and codegen_cond t cond ~fun_builder =
       ~cond2_label:
         (Function_builder.create_label fun_builder "non_constant_tag_equals.is_block")
       ~codegen_cond2:(fun () ->
-        Function_builder.add_code
-          fun_builder
-          (Cmp
-             ( mem_offset_value fun_builder value I16 0
-             , Constant (Int (Cnstr_tag.to_int tag)) )))
+        (* FIXME: We don't use the cmp result here. The intention is that whoever called
+           codegen_cond will use it. But I don't think this composes properly when there
+           are multiple conditions, when we recursively call codegen_cond, maybe?
+           The key is we don't check any conditions before calling codegen_cond1, so
+           right-recursive Ands don't work.
+           
+           The mir should probably be restructured into a list of conditions?
+           
+           The LLVM version had it easier since it just always checked all the conditions.
+           We wouldn't care that much except we need to check for a block before accessing
+           memory. (I think LLVM poison semantics saved us or something with our
+           branchless code.)
+
+           Wait, after reading the code more I think it should be fine...? At least, I
+           can't see the problem. We are using left-recursion anyway and it's fine.
+           (either should work, I think)
+        *)
+        cmp
+          (Memory (Memory.offset (Value value) I16 0))
+          (Constant (Int (Cnstr_tag.to_int tag))))
       ~end_label:(Function_builder.create_label fun_builder "non_constant_tag_equals.end")
   | And (cond1, cond2) ->
     codegen_and
@@ -1242,14 +1339,25 @@ and codegen_cond t cond ~fun_builder =
 
 and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_label =
   (* We use the reasoning that `x and y` is the same as `if x then y else x`. *)
-  codegen_cond1 ();
+  let `Zero_flag = codegen_cond1 () in
+  (* FIXME: This is horrible because of the janky assumption that [else_] has to be the
+     next basic block. Come up with a proper fix for that. Probably need a distinction
+     between "abstract assembly" and the real assembly, with an explicit conversion process
+     that could sort out details like this. *)
+  (* FIXME: This doesn't compose as well as it could. If you have nested Ands, you can
+     exit early as soon as any of them fails. We might want to convert to some
+     intermediate type here? - actually not sure about this *)
+  let mid_label = Function_builder.create_label fun_builder "codegen_and.mid" in
   Function_builder.add_terminal
     fun_builder
-    (Jump_if { cond = `Zero; then_ = cond2_label; else_ = end_label });
-  Function_builder.position_at_label fun_builder cond2_label;
-  codegen_cond2 ();
+    (Jump_if { cond = `Zero; then_ = cond2_label; else_ = mid_label });
+  Function_builder.position_at_label fun_builder mid_label;
   Function_builder.add_terminal fun_builder (Jump end_label);
-  Function_builder.position_at_label fun_builder end_label
+  Function_builder.position_at_label fun_builder cond2_label;
+  let `Zero_flag = codegen_cond2 () in
+  Function_builder.add_terminal fun_builder (Jump end_label);
+  Function_builder.position_at_label fun_builder end_label;
+  `Zero_flag
 ;;
 
 let set_global t global expr ~fun_builder =
@@ -1257,7 +1365,7 @@ let set_global t global expr ~fun_builder =
   let expr_location = codegen_expr t expr ~fun_builder in
   Function_builder.add_code
     fun_builder
-    (Mov { dst = Memory (I64, Global (global, Other)); src = expr_location })
+    (Store { dst = I64, Value (Global (global, Other)); src = expr_location })
 ;;
 
 let define_function t ~fun_name ~args ~body =
@@ -1414,7 +1522,7 @@ let%expect_test "hello world" =
           ; code =
               [ Lea
                   { dst = Register Rdi
-                  ; src = Memory (I64, Global (Label_name.of_string "message", Other))
+                  ; src = I64, Value (Global (Label_name.of_string "message", Other))
                   }
               ; Call
                   { fun_ = Global (Label_name.of_string "puts", Extern_proc)

@@ -720,6 +720,8 @@ module Expr = struct
       if List.is_empty args
       then Some (Constant_tag_equals (input_expr, tag))
       else (
+        (* TODO: We don't need to generate tag checks when there's only one possible tag
+           e.g. for tuples or records. *)
         let tag_cond = Non_constant_tag_equals (input_expr, tag) in
         let conds =
           List.filter_mapi args ~f:(fun i (arg, arg_type) ->
