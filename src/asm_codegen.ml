@@ -1244,11 +1244,24 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) |> Nonempty.to_list in
     Simple_value (Register (Virtual (codegen_fun_call t fun_name args ~fun_builder)))
   | Make_block { tag; fields } ->
-    (match Nonempty.of_list fields with
-     | None -> int_constant_tag tag
-     | Some fields ->
-       let fields = Nonempty.map fields ~f:(codegen_expr t ~fun_builder) in
-       Simple_value (Register (Virtual (box t ~tag ~fields ~fun_builder))))
+    (* TODO: THis is a dirty hack. I think we really should adjust Mir to represent
+       closures and functions differently. But it can wait a bit *)
+    if Cnstr_tag.equal tag Cnstr_tag.closure
+    then (
+      match fields with
+      | Name closure_name :: fields ->
+        let fields : _ Value.t Nonempty.t =
+          Simple_value (Global (Label_name.of_mir_name closure_name, Other))
+          :: List.map fields ~f:(codegen_expr t ~fun_builder)
+        in
+        Simple_value (Register (Virtual (box t ~tag ~fields ~fun_builder)))
+      | _ -> compiler_bug [%message "Unexpected closure representation"])
+    else (
+      match Nonempty.of_list fields with
+      | None -> int_constant_tag tag
+      | Some fields ->
+        let fields = Nonempty.map fields ~f:(codegen_expr t ~fun_builder) in
+        Simple_value (Register (Virtual (box t ~tag ~fields ~fun_builder))))
   | Get_block_field (field_index, block) ->
     let block = codegen_expr t block ~fun_builder in
     load_block_field fun_builder block field_index
