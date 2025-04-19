@@ -1125,32 +1125,32 @@ let lookup_name_for_value t name ~fun_builder : _ Value.t =
      For now, treat externs and functions the same. This will break when implementing a
      proper calling convention besides copying C's.
   *)
-  let wrapper_closure label_name ~arity =
+  let wrapper_closure label_name ~arity : _ Value.t =
     let closure =
       Hashtbl.find_or_add t.closures name ~default:(fun () ->
         Closure.create ~fun_name:label_name ~arity)
     in
-    closure.closure_name
+    Simple_value (Global (closure.closure_name, Other))
   in
   match Function_builder.find_local fun_builder name with
   | Some value -> value
   | None ->
-    let label_name =
-      match Hashtbl.find t.externs name with
-      | Some { fun_info = None; label_name } -> label_name
-      | Some { fun_info = Some ((_ : Call_conv.t), arity); label_name } ->
-        wrapper_closure label_name ~arity
-      | None ->
-        (match Hashtbl.find t.functions name with
-         | Some fun_builder ->
-           wrapper_closure
-             (Function_builder.name fun_builder)
-             ~arity:(Function_builder.arity fun_builder)
-         | None ->
-           (* Global values defined in this file reach this case. *)
-           Label_name.of_mir_name name)
-    in
-    Simple_value (Global (label_name, Other))
+    (match Hashtbl.find t.externs name with
+     | Some { fun_info = None; label_name } ->
+       (* Deference memory to get the value of external global variables. *)
+       Memory (I64, Value (Global (label_name, Other)))
+     | Some { fun_info = Some ((_ : Call_conv.t), arity); label_name } ->
+       wrapper_closure label_name ~arity
+     | None ->
+       (match Hashtbl.find t.functions name with
+        | Some fun_builder ->
+          wrapper_closure
+            (Function_builder.name fun_builder)
+            ~arity:(Function_builder.arity fun_builder)
+        | None ->
+          (* Global values defined in this file reach this case. Dereference memory to get
+             the value. *)
+          Memory (I64, Value (Global (Label_name.of_mir_name name, Other)))))
 ;;
 
 let load_mem_offset fun_builder (value : _ Value.t) size offset : _ Value.t =
@@ -1779,7 +1779,7 @@ let%expect_test "hello world, from MIR" =
 
     umber_main#HelloWorld:
                sub       rsp, 8
-               mov       rdi, string.210886959
+               mov       rax, string.210886959
                call      Std.Prelude.print
                mov       r9, rax
                mov       qword [HelloWorld.#binding.1], r9
@@ -1788,6 +1788,8 @@ let%expect_test "hello world, from MIR" =
 
     Std.Prelude.print:
                sub       rsp, 8
+               mov       r9, rax
+               mov       rdi, r9
                call      umber_print_endline wrt ..plt
                add       rsp, 8
                ret

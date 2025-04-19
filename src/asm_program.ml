@@ -150,22 +150,17 @@ module Call_conv = struct
     | Umber
   [@@deriving sexp_of]
 
-  (* TODO: Decide on an umber calling convention. For now, let's just copy C's calling
-     convention since we have to implement that anyway. We can probably switch to
-     basically copying OCaml's after that. *)
-
   (* TODO: Handle further arguments with the stack *)
   let arg_registers t : Register.t Nonempty.t =
     match t with
-    | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
+    | C -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
+    | Umber -> [ Rax; Rbx; Rdi; Rsi; Rdx; Rcx; R8; R9; R10; R11; R12; R13; R14; R15 ]
   ;;
-
-  (* FIXME: Use this for Umber *)
-  (* [ Rax; Rbx; Rdi; Rsi; Rdx; Rcx; R8; R9; R10; R11; R12; R13; R14; R15 ] *)
 
   let non_arg_caller_save_registers t : Register.t list =
     match t with
-    | C | Umber -> [ Rax; R10; R11 ]
+    | C -> [ Rax; R10; R11 ]
+    | Umber -> []
   ;;
 
   let return_value_register : t -> Register.t = function
