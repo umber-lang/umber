@@ -34,9 +34,8 @@ let no_asm_tests =
   [ "AdventOfCode2024_1"
   ; "AdventOfCode2024_2"
   ; "AdventOfCode2024_3"
-  ; "AsPattern" (* FIXME: extern closure *)
+  ; "AsPattern" (* FIXME: segfault *)
   ; "Basics"
-  ; "Classics" (* FIXME: invalid opcode/operands *)
   ; "Constructors"
   ; "CrossModuleUsage"
   ; "Effects"
@@ -77,7 +76,7 @@ let no_asm_tests =
   ; "Imports"
   ; "Iter"
   ; "Keywords"
-  ; "LetBindingGroups" (* FIXME: extern closure *)
+  ; "LetBindingGroups" (* FIXME: segfault *)
   ; "LetPattern"
   ; "MixTypeAndEffectVars"
   ; "ModuleSig" (* FIXME: segfault *)

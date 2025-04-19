@@ -141,7 +141,7 @@ module Instr : sig
           }
       | Cmp of 'reg Value.t * 'reg Value.t
       | Lea of
-          { dst : 'reg Value.t
+          { dst : 'reg
           ; src : 'reg Memory.t
           }
       | Mov of
@@ -153,7 +153,7 @@ module Instr : sig
           ; src : 'reg Value.t
           }
       | Test of 'reg Value.t * 'reg Value.t
-    [@@deriving sexp_of]
+    [@@deriving sexp_of, variants]
 
     val map_args : 'r1 t -> f:('r1 Simple_value.t -> 'r2 Simple_value.t) -> 'r2 t
 

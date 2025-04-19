@@ -215,7 +215,7 @@ end = struct
     | Mov { dst; src } -> use src @ assign dst
     | And { dst; src } | Add { dst; src } | Sub { dst; src } ->
       use src @ use_and_assign dst
-    | Lea { dst; src } -> use_mem src @ assign dst
+    | Lea { dst; src } -> use_mem src @ assign (Simple_value (Register dst))
     | Call { fun_; call_conv; arity } ->
       let args, clobbered_arg_registers =
         Call_conv.arg_registers call_conv
@@ -736,7 +736,7 @@ end
 module Extern = struct
   type t =
     { label_name : Label_name.t
-    ; call_conv : Call_conv.t option
+    ; fun_info : (Call_conv.t * int) option
     }
 end
 
@@ -800,17 +800,39 @@ end = struct
 
   let get_bb t = Hash_queue.lookup_exn t.basic_blocks t.current_label
 
+  let prevent_memory_to_memory_instr (instr : _ Instr.Nonterminal.t) ~make_tmp =
+    let both_memory (a : _ Value.t) (b : _ Value.t) =
+      match a, b with
+      | Memory _, Memory _ -> true
+      | _ -> false
+    in
+    let dst_src (variant : _ Variant.t) ~dst ~src =
+      if both_memory dst src then variant.constructor ~dst ~src:(make_tmp src) else instr
+    in
+    let a_b (variant : _ Variant.t) a b =
+      if both_memory a b then variant.constructor a (make_tmp b) else instr
+    in
+    Instr.Nonterminal.Variants.map
+      instr
+      ~add:dst_src
+      ~and_:dst_src
+      ~mov:dst_src
+      ~sub:dst_src
+      ~cmp:a_b
+      ~test:a_b
+      ~lea:(fun _ ~dst:(_ : Register.t) ~src:(_ : _ Memory.t) -> instr)
+      ~call:(fun _ ~fun_:_ ~call_conv:_ ~arity:_ -> instr)
+  ;;
+
   let add_code t (instr : _ Instr.Nonterminal.t) =
     let bb = get_bb t in
-    match instr with
-    | Mov { src = Memory _ as src; dst = Memory _ as dst } ->
-      (* TODO: Might need to do this for other kinds of instructions. Bit hacky to
-         hardcode it for a subset of them but oh well. *)
-      (* Prevent memory-to-memory moves. *)
-      let tmp = pick_register t in
-      Queue.enqueue bb.code (Mov { src; dst = tmp });
-      Queue.enqueue bb.code (Mov { src = tmp; dst })
-    | _ -> Queue.enqueue bb.code instr
+    let instr =
+      prevent_memory_to_memory_instr instr ~make_tmp:(fun src ->
+        let tmp = pick_register t in
+        Queue.enqueue bb.code (Mov { src; dst = tmp });
+        tmp)
+    in
+    Queue.enqueue bb.code instr
   ;;
 
   let add_terminal t terminal =
@@ -1045,7 +1067,7 @@ let to_program
               { name = closure_wrapper_fun_name; strength = `Strong })
           @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
               { name; strength = `Weak }))
-  ; externs = List.map externs ~f:(fun { call_conv = _; label_name } -> label_name)
+  ; externs = List.map externs ~f:(fun { fun_info = _; label_name } -> label_name)
   ; text_section =
       Function_builder.basic_blocks main_function
       @ List.concat_map functions ~f:Function_builder.basic_blocks
@@ -1084,9 +1106,9 @@ let int_constant_tag tag : _ Value.t =
   Simple_value (Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1)))
 ;;
 
-let declare_extern_c_function t mir_name label_name =
+let declare_extern_c_function t mir_name label_name ~arity =
   ignore
-    (Hashtbl.add t.externs ~key:mir_name ~data:{ label_name; call_conv = Some C }
+    (Hashtbl.add t.externs ~key:mir_name ~data:{ label_name; fun_info = Some (C, arity) }
       : [ `Ok | `Duplicate ])
 ;;
 
@@ -1115,10 +1137,9 @@ let lookup_name_for_value t name ~fun_builder : _ Value.t =
   | None ->
     let label_name =
       match Hashtbl.find t.externs name with
-      | Some { call_conv = None; label_name } -> label_name
-      | Some { call_conv = Some _; label_name = _ } ->
-        failwith "FIXME: Handle extern functions becoming closures"
-        (* wrapper_closure label_name *)
+      | Some { fun_info = None; label_name } -> label_name
+      | Some { fun_info = Some ((_ : Call_conv.t), arity); label_name } ->
+        wrapper_closure label_name ~arity
       | None ->
         (match Hashtbl.find t.functions name with
          | Some fun_builder ->
@@ -1159,9 +1180,9 @@ let lookup_name_for_fun_call t name ~fun_builder
        `Function, Simple_value (Global (Function_builder.name fun_builder, Other)), Umber
      | None ->
        (match Hashtbl.find t.externs name with
-        | Some { call_conv = Some C; label_name } ->
+        | Some { fun_info = Some (C, _); label_name } ->
           `Function, Simple_value (Global (label_name, Extern_proc)), C
-        | Some { call_conv = Some Umber | None; label_name } ->
+        | Some { fun_info = Some (Umber, _) | None; label_name } ->
           `Function, Simple_value (Global (label_name, Extern_proc)), Umber
         | None ->
           `Function, Simple_value (Global (Label_name.of_mir_name name, Other)), Umber))
@@ -1196,7 +1217,7 @@ let box t ~tag ~fields ~fun_builder =
         (Value_name.Absolute.of_relative_unchecked
            (Value_name.Relative.of_string umber_gc_alloc))
     in
-    declare_extern_c_function t mir_name (Label_name.of_string umber_gc_alloc);
+    declare_extern_c_function t mir_name (Label_name.of_string umber_gc_alloc) ~arity:1;
     codegen_fun_call
       t
       mir_name
@@ -1581,19 +1602,17 @@ let codegen_stmt t stmt =
     (* FIXME: Need a preprocessing step like the llvm codegen to handle mutually
        recursive functions. *)
     define_function t ~fun_name ~args ~body
-  | Fun_decl { name; arity = _ } ->
-    (* TODO: Do we need arity here anymore? Ah, I guess whenever we generate a call we
-       know the arity, so I guess not. *)
+  | Fun_decl { name; arity } ->
     Hashtbl.add_exn
       t.externs
       ~key:name
-      ~data:{ call_conv = Some Umber; label_name = Label_name.of_mir_name name }
+      ~data:{ fun_info = Some (Umber, arity); label_name = Label_name.of_mir_name name }
   | Extern_decl { name; extern_name; arity } ->
     let label_name = Label_name.of_extern_name extern_name in
     if arity = 0
-    then Hashtbl.add_exn t.externs ~key:name ~data:{ call_conv = None; label_name }
+    then Hashtbl.add_exn t.externs ~key:name ~data:{ fun_info = None; label_name }
     else (
-      declare_extern_c_function t name label_name;
+      declare_extern_c_function t name label_name ~arity;
       (* Create a wrapper function for other files to use. *)
       define_extern_wrapper_function t ~fun_name:name ~extern_name ~arity)
 ;;
@@ -1631,7 +1650,7 @@ let compile_entry_module ~module_paths ~entry_file =
       (Value_name.Absolute.of_relative_unchecked
          (Value_name.Relative.of_string umber_gc_init))
   in
-  declare_extern_c_function t umber_gc_init_mir_name umber_gc_init_label;
+  declare_extern_c_function t umber_gc_init_mir_name umber_gc_init_label ~arity:0;
   Function_builder.add_code
     t.main_function
     (Call
@@ -1649,7 +1668,7 @@ let compile_entry_module ~module_paths ~entry_file =
     Hashtbl.add_exn
       t.externs
       ~key:mir_name
-      ~data:{ call_conv = Some Umber; label_name = fun_name };
+      ~data:{ fun_info = Some (Umber, 0); label_name = fun_name };
     Function_builder.add_code
       t.main_function
       (Call
@@ -1675,7 +1694,7 @@ let%expect_test "hello world" =
         [ { label = Label_name.of_string "main"
           ; code =
               [ Lea
-                  { dst = Simple_value (Register Rdi)
+                  { dst = Rdi
                   ; src = I64, Value (Global (Label_name.of_string "message", Other))
                   }
               ; Call

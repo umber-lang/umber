@@ -370,7 +370,7 @@ module Instr = struct
           }
       | Cmp of 'reg Value.t * 'reg Value.t
       | Lea of
-          { dst : 'reg Value.t
+          { dst : 'reg
           ; src : 'reg Memory.t
           }
       | Mov of
@@ -399,7 +399,15 @@ module Instr = struct
         let src = Value.map_simple_values src ~f in
         Mov { dst; src }
       | Lea { dst; src } ->
-        let dst = Value.map_simple_values dst ~f in
+        let dst =
+          match f (Register dst) with
+          | Register reg -> reg
+          | dst ->
+            (* TODO: I think we really only need to expose mapping functions over
+               registers. That would avoid having to raise here. *)
+            compiler_bug
+              [%message "Expected register for lea instr dst" (dst : _ Simple_value.t)]
+        in
         let src = Memory.map_simple_values src ~f in
         Lea { dst; src }
       | Cmp (a, b) ->
@@ -449,7 +457,13 @@ module Instr = struct
         let init, src = fold_map_value src ~init ~f ~op:Use in
         init, Mov { dst; src }
       | Lea { dst; src } ->
-        let init, dst = fold_map_value dst ~init ~f ~op:Assignment in
+        let init, dst =
+          match f init (Register dst) ~op:Assignment with
+          | init, Register reg -> init, reg
+          | _, dst ->
+            compiler_bug
+              [%message "Expected register for lea instr dst" (dst : _ Simple_value.t)]
+        in
         let init, src = Memory.fold_map_simple_values src ~init ~f:(f ~op:Use) in
         init, Lea { dst; src }
       | Cmp (a, b) ->
@@ -477,7 +491,7 @@ module Instr = struct
           [ dst; src ]
         | Cmp (a, b) | Test (a, b) -> [ a; b ]
         | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
-        | Lea { dst; src } -> [ dst; Memory src ]
+        | Lea { dst; src } -> [ Simple_value (Register dst); Memory src ]
       in
       pp_line fmt name args ~f:Value.pp
     ;;
