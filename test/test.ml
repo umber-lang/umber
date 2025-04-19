@@ -35,16 +35,9 @@ let no_asm_tests =
   ; "AdventOfCode2024_2"
   ; "AdventOfCode2024_3"
   ; "AsPattern" (* FIXME: segfault *)
-  ; "CrossModuleUsage"
-  ; "ExternInt"
-  ; "Functions"
-  ; "Generalization"
-  ; "Imports"
-  ; "Keywords"
   ; "LetBindingGroups" (* FIXME: segfault *)
   ; "MutualRecursion" (* FIXME: segfault *)
   ; "Operators" (* FIXME: segfault *)
-  ; "WeirdFunCalls" (* FIXME: invalid combination of opcode and operand *)
   ]
 ;;
 

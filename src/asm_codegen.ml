@@ -23,6 +23,7 @@ open Names
 open struct
   open Asm_program
   module Label_name = Label_name
+  module Asm_literal = Asm_literal
   module Call_conv = Call_conv
   module Simple_value = Simple_value
   module Memory = Memory
@@ -1371,10 +1372,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     let block = codegen_expr t block ~fun_builder in
     load_block_field fun_builder block field_index
   | Cond_assign { vars; conds; body; if_none_matched } ->
-    (* FIXME: Need a way to mint new label names. Guess a name table isn't awful
-       Might be easier to just use a counter or something though
-       We can prefix with . to get namespacing, kinda relying on nasm a lot with that tho
-    *)
     let n_conds = Nonempty.length conds in
     let cond_labels =
       Array.init n_conds ~f:(fun i ->
@@ -1404,16 +1401,25 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
       if i <> 0 then Function_builder.position_at_label fun_builder cond_labels.(i);
-      let `Zero_flag = codegen_cond t cond ~fun_builder in
       let next_label =
         if i < n_conds - 1 then cond_labels.(i + 1) else if_none_matched_label
       in
-      Function_builder.add_terminal
-        fun_builder
-        (Jump_if { cond = `Nonzero; then_ = next_label; else_ = vars_labels.(i) });
-      Function_builder.position_at_label fun_builder vars_labels.(i);
-      (* If we didn't jump, the condition succeeded, so set the variables. *)
-      assign_vars_and_jump_to_body var_exprs);
+      match codegen_cond t cond ~fun_builder with
+      | `Constant true ->
+        (* Unconditonally set the variables. We could also skip generating the rest of the
+           code, but it's not worth the trouble right now. *)
+        assign_vars_and_jump_to_body var_exprs
+      | `Constant false ->
+        (* Don't bother checking a condition which will never succeed, or generating code
+           to run if it passes. Just go to the next condition. *)
+        Function_builder.add_terminal fun_builder (Jump next_label)
+      | `Zero_flag ->
+        Function_builder.add_terminal
+          fun_builder
+          (Jump_if { cond = `Nonzero; then_ = next_label; else_ = vars_labels.(i) });
+        Function_builder.position_at_label fun_builder vars_labels.(i);
+        (* If we didn't jump, the condition succeeded, so set the variables. *)
+        assign_vars_and_jump_to_body var_exprs);
     (match if_none_matched with
      | Use_bindings var_exprs ->
        Function_builder.position_at_label fun_builder if_none_matched_label;
@@ -1435,9 +1441,16 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
 
 and codegen_cond t cond ~fun_builder =
-  let cmp a b =
-    Function_builder.add_code fun_builder (Cmp (a, b));
-    `Zero_flag
+  (* TODO: This just does basic constant folding so we don't generate invalid instructions
+     like `cmp 3, 3` when codegening `if True`. This wouldn't be strictly needed if we
+     had some more sophisticated constant folding. *)
+  let cmp (a : _ Value.t) (b : _ Value.t) =
+    match a, b with
+    | Simple_value (Constant a), Simple_value (Constant b) ->
+      `Constant (Asm_literal.equal a b)
+    | _ ->
+      Function_builder.add_code fun_builder (Cmp (a, b));
+      `Zero_flag
   in
   match cond with
   | Equals (expr, literal) ->
@@ -1494,25 +1507,32 @@ and codegen_cond t cond ~fun_builder =
 
 and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_label =
   (* We use the reasoning that `x and y` is the same as `if x then y else x`. *)
-  let `Zero_flag = codegen_cond1 () in
-  (* FIXME: This is horrible because of the janky assumption that [else_] has to be the
+  (* TODO: Having [codegen_cond] immediately add the code mutably makes this annoying. If
+     it just returned the code to add this logic would be much more straightforward. *)
+  match codegen_cond1 () with
+  | `Constant false as constant -> constant
+  | `Constant true -> codegen_cond2 ()
+  | `Zero_flag ->
+    (* FIXME: This is horrible because of the janky assumption that [else_] has to be the
      next basic block. Come up with a proper fix for that. Probably need a distinction
      between "abstract assembly" and the real assembly, with an explicit conversion process
      that could sort out details like this. *)
-  (* FIXME: This doesn't compose as well as it could. If you have nested Ands, you can
-     exit early as soon as any of them fails. We might want to convert to some
-     intermediate type here? - actually not sure about this *)
-  let mid_label = Function_builder.create_label fun_builder "codegen_and.mid" in
-  Function_builder.add_terminal
-    fun_builder
-    (Jump_if { cond = `Zero; then_ = cond2_label; else_ = mid_label });
-  Function_builder.position_at_label fun_builder mid_label;
-  Function_builder.add_terminal fun_builder (Jump end_label);
-  Function_builder.position_at_label fun_builder cond2_label;
-  let `Zero_flag = codegen_cond2 () in
-  Function_builder.add_terminal fun_builder (Jump end_label);
-  Function_builder.position_at_label fun_builder end_label;
-  `Zero_flag
+    let mid_label = Function_builder.create_label fun_builder "codegen_and.mid" in
+    Function_builder.add_terminal
+      fun_builder
+      (Jump_if { cond = `Zero; then_ = cond2_label; else_ = mid_label });
+    Function_builder.position_at_label fun_builder mid_label;
+    Function_builder.add_terminal fun_builder (Jump end_label);
+    Function_builder.position_at_label fun_builder cond2_label;
+    let cond2_result = codegen_cond2 () in
+    Function_builder.add_terminal fun_builder (Jump end_label);
+    Function_builder.position_at_label fun_builder end_label;
+    (match cond2_result with
+     | `Constant false as constant ->
+       (* TODO: The code we already generated for cond1 is wasted. For now, just
+          unconditionally return false.*)
+       constant
+     | `Constant true | `Zero_flag -> `Zero_flag)
 ;;
 
 let set_global t global expr ~fun_builder =

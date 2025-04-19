@@ -87,7 +87,7 @@ module Asm_literal = struct
     | Int of int
     | Float of float
     | String of Ustring.t
-  [@@deriving sexp_of]
+  [@@deriving sexp_of, equal]
 
   let pp_string_escaped fmt s =
     Format.pp_print_char fmt '`';
