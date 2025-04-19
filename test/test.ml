@@ -29,19 +29,17 @@ let should_make_mir test =
 
 let should_make_llvm test = should_make_mir test
 
+(* FIXME: Reduce this list *)
 let no_asm_tests =
   [ "AdventOfCode2024_1"
   ; "AdventOfCode2024_2"
   ; "AdventOfCode2024_3"
-  ; "AsPattern"
+  ; "AsPattern" (* FIXME: extern closure *)
   ; "Basics"
-  ; "Cat"
-  ; "Classics"
-  ; "Closures"
+  ; "Classics" (* FIXME: invalid opcode/operands *)
   ; "Constructors"
   ; "CrossModuleUsage"
   ; "Effects"
-  ; "Empty"
   ; "ErrorCrossModuleMutualRecursion"
   ; "ErrorCyclicTypeAlias"
   ; "ErrorDuplicateEffectTypeParameter"
@@ -76,20 +74,18 @@ let no_asm_tests =
   ; "ExternInt"
   ; "Functions"
   ; "Generalization"
-  ; "HelloWorld"
   ; "Imports"
   ; "Iter"
   ; "Keywords"
-  ; "LetBindingGroups"
+  ; "LetBindingGroups" (* FIXME: extern closure *)
   ; "LetPattern"
   ; "MixTypeAndEffectVars"
-  ; "ModuleSig"
+  ; "ModuleSig" (* FIXME: segfault *)
   ; "Modules"
   ; "MoreEffectsInSig"
   ; "MutualRecursion"
   ; "NeverAndAny"
   ; "OpSectionLeft"
-  ; "OpSectionRight"
   ; "Operators"
   ; "Option"
   ; "OverlappingImports"
