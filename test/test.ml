@@ -34,7 +34,6 @@ let no_asm_tests =
   [ "AdventOfCode2024_1"
   ; "AdventOfCode2024_2"
   ; "AdventOfCode2024_3"
-  ; "AsPattern" (* FIXME: segfault *)
   ; "LetBindingGroups" (* FIXME: segfault *)
   ; "MutualRecursion" (* FIXME: segfault *)
   ; "Operators" (* FIXME: segfault *)

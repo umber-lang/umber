@@ -1064,8 +1064,13 @@ let to_program
             { name; strength = `Strong })
           @ List.map functions ~f:(fun fun_builder : Global_decl.t ->
               { name = Function_builder.name fun_builder; strength = `Strong })
-          @ List.map closures ~f:(fun { closure_wrapper_fun_name; _ } : Global_decl.t ->
-              { name = closure_wrapper_fun_name; strength = `Strong })
+          @ List.concat_map
+              closures
+              ~f:(fun { closure_name; closure_wrapper_fun_name; _ } : Global_decl.t list
+                 ->
+              [ { name = closure_name; strength = `Weak }
+              ; { name = closure_wrapper_fun_name; strength = `Weak }
+              ])
           @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
               { name; strength = `Weak }))
   ; externs = List.map externs ~f:(fun { fun_info = _; label_name } -> label_name)
@@ -1113,11 +1118,8 @@ let declare_extern_c_function t mir_name label_name ~arity =
       : [ `Ok | `Duplicate ])
 ;;
 
-(* FIXME: Handle file-local functions *)
-(* FIXME: Handle values and function lookups differently (may need a closure)
-   Hmm, except closures are already explicit in MIR, right? Do they actually need
-   special handling? Oh, they do because MIR treats function pointers as reasonable values
-*)
+(* FIXME: This doesn't properly handle [Mir.Value_def] for things with function types.
+   The case I noticed was `let (::) = List.Cons`. It messes up the closures/functions. *)
 (* TODO: Amend MIR to treat function pointers and closures differently. *)
 let lookup_name_for_value t name ~fun_builder : _ Value.t =
   (* FIXME: For everything except locals, we need to create a closure and possibly a
@@ -1626,7 +1628,10 @@ let codegen_stmt t stmt =
     Hashtbl.add_exn
       t.externs
       ~key:name
-      ~data:{ fun_info = Some (Umber, arity); label_name = Label_name.of_mir_name name }
+      ~data:
+        { fun_info = (if arity = 0 then None else Some (Umber, arity))
+        ; label_name = Label_name.of_mir_name name
+        }
   | Extern_decl { name; extern_name; arity } ->
     let label_name = Label_name.of_extern_name extern_name in
     if arity = 0
