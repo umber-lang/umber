@@ -4,7 +4,7 @@ open! Core
    This would hopefully mean we don't see red diffs for later phases when earlier phases
    fail. *)
 
-let test_dirs = [ "tokens"; "ast"; "mir"; "llvm"; "output" ]
+let test_dirs = [ "tokens"; "ast"; "mir"; "asm"; "llvm"; "output" ]
 
 (* TODO: This will stop at the first error instead of propagating them, bad. Maybe try
    "concurrent" or generate separate rules. *)

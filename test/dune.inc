@@ -6,6 +6,7 @@
     (diff? tokens/AdventOfCode2024_1.expected tokens/AdventOfCode2024_1.out)
     (diff? ast/AdventOfCode2024_1.expected ast/AdventOfCode2024_1.out)
     (diff? mir/AdventOfCode2024_1.expected mir/AdventOfCode2024_1.out)
+    (diff? asm/AdventOfCode2024_1.expected asm/AdventOfCode2024_1.out)
     (diff? llvm/AdventOfCode2024_1.expected llvm/AdventOfCode2024_1.out)
     (diff? output/AdventOfCode2024_1.expected output/AdventOfCode2024_1.out)))))
 (rule (alias runtest)
@@ -16,6 +17,7 @@
     (diff? tokens/AdventOfCode2024_2.expected tokens/AdventOfCode2024_2.out)
     (diff? ast/AdventOfCode2024_2.expected ast/AdventOfCode2024_2.out)
     (diff? mir/AdventOfCode2024_2.expected mir/AdventOfCode2024_2.out)
+    (diff? asm/AdventOfCode2024_2.expected asm/AdventOfCode2024_2.out)
     (diff? llvm/AdventOfCode2024_2.expected llvm/AdventOfCode2024_2.out)
     (diff? output/AdventOfCode2024_2.expected output/AdventOfCode2024_2.out)))))
 (rule (alias runtest)
@@ -26,6 +28,7 @@
     (diff? tokens/AdventOfCode2024_3.expected tokens/AdventOfCode2024_3.out)
     (diff? ast/AdventOfCode2024_3.expected ast/AdventOfCode2024_3.out)
     (diff? mir/AdventOfCode2024_3.expected mir/AdventOfCode2024_3.out)
+    (diff? asm/AdventOfCode2024_3.expected asm/AdventOfCode2024_3.out)
     (diff? llvm/AdventOfCode2024_3.expected llvm/AdventOfCode2024_3.out)
     (diff? output/AdventOfCode2024_3.expected output/AdventOfCode2024_3.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/AsPattern.txt))
@@ -34,6 +37,7 @@
    (concurrent (diff? tokens/AsPattern.expected tokens/AsPattern.out)
     (diff? ast/AsPattern.expected ast/AsPattern.out)
     (diff? mir/AsPattern.expected mir/AsPattern.out)
+    (diff? asm/AsPattern.expected asm/AsPattern.out)
     (diff? llvm/AsPattern.expected llvm/AsPattern.out)
     (diff? output/AsPattern.expected output/AsPattern.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Basics.txt))
@@ -42,6 +46,7 @@
    (concurrent (diff? tokens/Basics.expected tokens/Basics.out)
     (diff? ast/Basics.expected ast/Basics.out)
     (diff? mir/Basics.expected mir/Basics.out)
+    (diff? asm/Basics.expected asm/Basics.out)
     (diff? llvm/Basics.expected llvm/Basics.out)
     (diff? output/Basics.expected output/Basics.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Cat.txt))
@@ -49,6 +54,7 @@
   (progn (run %{dep:test.exe} %{dep:examples/Cat.um})
    (concurrent (diff? tokens/Cat.expected tokens/Cat.out)
     (diff? ast/Cat.expected ast/Cat.out) (diff? mir/Cat.expected mir/Cat.out)
+    (diff? asm/Cat.expected asm/Cat.out)
     (diff? llvm/Cat.expected llvm/Cat.out)
     (diff? output/Cat.expected output/Cat.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Classics.txt))
@@ -57,6 +63,7 @@
    (concurrent (diff? tokens/Classics.expected tokens/Classics.out)
     (diff? ast/Classics.expected ast/Classics.out)
     (diff? mir/Classics.expected mir/Classics.out)
+    (diff? asm/Classics.expected asm/Classics.out)
     (diff? llvm/Classics.expected llvm/Classics.out)
     (diff? output/Classics.expected output/Classics.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Closures.txt))
@@ -65,6 +72,7 @@
    (concurrent (diff? tokens/Closures.expected tokens/Closures.out)
     (diff? ast/Closures.expected ast/Closures.out)
     (diff? mir/Closures.expected mir/Closures.out)
+    (diff? asm/Closures.expected asm/Closures.out)
     (diff? llvm/Closures.expected llvm/Closures.out)
     (diff? output/Closures.expected output/Closures.out)))))
 (rule (alias runtest)
@@ -74,6 +82,7 @@
    (concurrent (diff? tokens/Constructors.expected tokens/Constructors.out)
     (diff? ast/Constructors.expected ast/Constructors.out)
     (diff? mir/Constructors.expected mir/Constructors.out)
+    (diff? asm/Constructors.expected asm/Constructors.out)
     (diff? llvm/Constructors.expected llvm/Constructors.out)
     (diff? output/Constructors.expected output/Constructors.out)))))
 (rule (alias runtest)
@@ -84,6 +93,7 @@
     (diff? tokens/CrossModuleUsage.expected tokens/CrossModuleUsage.out)
     (diff? ast/CrossModuleUsage.expected ast/CrossModuleUsage.out)
     (diff? mir/CrossModuleUsage.expected mir/CrossModuleUsage.out)
+    (diff? asm/CrossModuleUsage.expected asm/CrossModuleUsage.out)
     (diff? llvm/CrossModuleUsage.expected llvm/CrossModuleUsage.out)
     (diff? output/CrossModuleUsage.expected output/CrossModuleUsage.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Effects.txt))
@@ -92,6 +102,7 @@
    (concurrent (diff? tokens/Effects.expected tokens/Effects.out)
     (diff? ast/Effects.expected ast/Effects.out)
     (diff? mir/Effects.expected mir/Effects.out)
+    (diff? asm/Effects.expected asm/Effects.out)
     (diff? llvm/Effects.expected llvm/Effects.out)
     (diff? output/Effects.expected output/Effects.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Empty.txt))
@@ -100,6 +111,7 @@
    (concurrent (diff? tokens/Empty.expected tokens/Empty.out)
     (diff? ast/Empty.expected ast/Empty.out)
     (diff? mir/Empty.expected mir/Empty.out)
+    (diff? asm/Empty.expected asm/Empty.out)
     (diff? llvm/Empty.expected llvm/Empty.out)
     (diff? output/Empty.expected output/Empty.out)))))
 (rule (alias runtest)
@@ -115,6 +127,8 @@
      ast/ErrorCrossModuleMutualRecursion.out)
     (diff? mir/ErrorCrossModuleMutualRecursion.expected
      mir/ErrorCrossModuleMutualRecursion.out)
+    (diff? asm/ErrorCrossModuleMutualRecursion.expected
+     asm/ErrorCrossModuleMutualRecursion.out)
     (diff? llvm/ErrorCrossModuleMutualRecursion.expected
      llvm/ErrorCrossModuleMutualRecursion.out)
     (diff? output/ErrorCrossModuleMutualRecursion.expected
@@ -128,6 +142,7 @@
      tokens/ErrorCyclicTypeAlias.out)
     (diff? ast/ErrorCyclicTypeAlias.expected ast/ErrorCyclicTypeAlias.out)
     (diff? mir/ErrorCyclicTypeAlias.expected mir/ErrorCyclicTypeAlias.out)
+    (diff? asm/ErrorCyclicTypeAlias.expected asm/ErrorCyclicTypeAlias.out)
     (diff? llvm/ErrorCyclicTypeAlias.expected llvm/ErrorCyclicTypeAlias.out)
     (diff? output/ErrorCyclicTypeAlias.expected
      output/ErrorCyclicTypeAlias.out)))))
@@ -144,6 +159,8 @@
      ast/ErrorDuplicateEffectTypeParameter.out)
     (diff? mir/ErrorDuplicateEffectTypeParameter.expected
      mir/ErrorDuplicateEffectTypeParameter.out)
+    (diff? asm/ErrorDuplicateEffectTypeParameter.expected
+     asm/ErrorDuplicateEffectTypeParameter.out)
     (diff? llvm/ErrorDuplicateEffectTypeParameter.expected
      llvm/ErrorDuplicateEffectTypeParameter.out)
     (diff? output/ErrorDuplicateEffectTypeParameter.expected
@@ -156,6 +173,7 @@
     (diff? tokens/ErrorDuplicateLet.expected tokens/ErrorDuplicateLet.out)
     (diff? ast/ErrorDuplicateLet.expected ast/ErrorDuplicateLet.out)
     (diff? mir/ErrorDuplicateLet.expected mir/ErrorDuplicateLet.out)
+    (diff? asm/ErrorDuplicateLet.expected asm/ErrorDuplicateLet.out)
     (diff? llvm/ErrorDuplicateLet.expected llvm/ErrorDuplicateLet.out)
     (diff? output/ErrorDuplicateLet.expected output/ErrorDuplicateLet.out)))))
 (rule (alias runtest)
@@ -169,6 +187,8 @@
      ast/ErrorDuplicateNameAsPattern.out)
     (diff? mir/ErrorDuplicateNameAsPattern.expected
      mir/ErrorDuplicateNameAsPattern.out)
+    (diff? asm/ErrorDuplicateNameAsPattern.expected
+     asm/ErrorDuplicateNameAsPattern.out)
     (diff? llvm/ErrorDuplicateNameAsPattern.expected
      llvm/ErrorDuplicateNameAsPattern.out)
     (diff? output/ErrorDuplicateNameAsPattern.expected
@@ -184,6 +204,8 @@
      ast/ErrorDuplicateTypeParameter.out)
     (diff? mir/ErrorDuplicateTypeParameter.expected
      mir/ErrorDuplicateTypeParameter.out)
+    (diff? asm/ErrorDuplicateTypeParameter.expected
+     asm/ErrorDuplicateTypeParameter.out)
     (diff? llvm/ErrorDuplicateTypeParameter.expected
      llvm/ErrorDuplicateTypeParameter.out)
     (diff? output/ErrorDuplicateTypeParameter.expected
@@ -196,6 +218,7 @@
     (diff? tokens/ErrorDuplicateVal.expected tokens/ErrorDuplicateVal.out)
     (diff? ast/ErrorDuplicateVal.expected ast/ErrorDuplicateVal.out)
     (diff? mir/ErrorDuplicateVal.expected mir/ErrorDuplicateVal.out)
+    (diff? asm/ErrorDuplicateVal.expected asm/ErrorDuplicateVal.out)
     (diff? llvm/ErrorDuplicateVal.expected llvm/ErrorDuplicateVal.out)
     (diff? output/ErrorDuplicateVal.expected output/ErrorDuplicateVal.out)))))
 (rule (alias runtest)
@@ -209,6 +232,8 @@
      ast/ErrorEffectOpUnboundParams.out)
     (diff? mir/ErrorEffectOpUnboundParams.expected
      mir/ErrorEffectOpUnboundParams.out)
+    (diff? asm/ErrorEffectOpUnboundParams.expected
+     asm/ErrorEffectOpUnboundParams.out)
     (diff? llvm/ErrorEffectOpUnboundParams.expected
      llvm/ErrorEffectOpUnboundParams.out)
     (diff? output/ErrorEffectOpUnboundParams.expected
@@ -222,6 +247,7 @@
      tokens/ErrorEffectOpValClash.out)
     (diff? ast/ErrorEffectOpValClash.expected ast/ErrorEffectOpValClash.out)
     (diff? mir/ErrorEffectOpValClash.expected mir/ErrorEffectOpValClash.out)
+    (diff? asm/ErrorEffectOpValClash.expected asm/ErrorEffectOpValClash.out)
     (diff? llvm/ErrorEffectOpValClash.expected
      llvm/ErrorEffectOpValClash.out)
     (diff? output/ErrorEffectOpValClash.expected
@@ -235,6 +261,7 @@
      tokens/ErrorEffectSigDefDiff.out)
     (diff? ast/ErrorEffectSigDefDiff.expected ast/ErrorEffectSigDefDiff.out)
     (diff? mir/ErrorEffectSigDefDiff.expected mir/ErrorEffectSigDefDiff.out)
+    (diff? asm/ErrorEffectSigDefDiff.expected asm/ErrorEffectSigDefDiff.out)
     (diff? llvm/ErrorEffectSigDefDiff.expected
      llvm/ErrorEffectSigDefDiff.out)
     (diff? output/ErrorEffectSigDefDiff.expected
@@ -250,6 +277,8 @@
      ast/ErrorEffectsNoValueBranch.out)
     (diff? mir/ErrorEffectsNoValueBranch.expected
      mir/ErrorEffectsNoValueBranch.out)
+    (diff? asm/ErrorEffectsNoValueBranch.expected
+     asm/ErrorEffectsNoValueBranch.out)
     (diff? llvm/ErrorEffectsNoValueBranch.expected
      llvm/ErrorEffectsNoValueBranch.out)
     (diff? output/ErrorEffectsNoValueBranch.expected
@@ -265,6 +294,8 @@
      ast/ErrorHandleNonOperation.out)
     (diff? mir/ErrorHandleNonOperation.expected
      mir/ErrorHandleNonOperation.out)
+    (diff? asm/ErrorHandleNonOperation.expected
+     asm/ErrorHandleNonOperation.out)
     (diff? llvm/ErrorHandleNonOperation.expected
      llvm/ErrorHandleNonOperation.out)
     (diff? output/ErrorHandleNonOperation.expected
@@ -277,6 +308,7 @@
     (diff? tokens/ErrorHangingVal.expected tokens/ErrorHangingVal.out)
     (diff? ast/ErrorHangingVal.expected ast/ErrorHangingVal.out)
     (diff? mir/ErrorHangingVal.expected mir/ErrorHangingVal.out)
+    (diff? asm/ErrorHangingVal.expected asm/ErrorHangingVal.out)
     (diff? llvm/ErrorHangingVal.expected llvm/ErrorHangingVal.out)
     (diff? output/ErrorHangingVal.expected output/ErrorHangingVal.out)))))
 (rule (alias runtest)
@@ -288,6 +320,7 @@
      tokens/ErrorImportOfImport.out)
     (diff? ast/ErrorImportOfImport.expected ast/ErrorImportOfImport.out)
     (diff? mir/ErrorImportOfImport.expected mir/ErrorImportOfImport.out)
+    (diff? asm/ErrorImportOfImport.expected asm/ErrorImportOfImport.out)
     (diff? llvm/ErrorImportOfImport.expected llvm/ErrorImportOfImport.out)
     (diff? output/ErrorImportOfImport.expected
      output/ErrorImportOfImport.out)))))
@@ -300,6 +333,7 @@
      tokens/ErrorIncompatibleSig.out)
     (diff? ast/ErrorIncompatibleSig.expected ast/ErrorIncompatibleSig.out)
     (diff? mir/ErrorIncompatibleSig.expected mir/ErrorIncompatibleSig.out)
+    (diff? asm/ErrorIncompatibleSig.expected asm/ErrorIncompatibleSig.out)
     (diff? llvm/ErrorIncompatibleSig.expected llvm/ErrorIncompatibleSig.out)
     (diff? output/ErrorIncompatibleSig.expected
      output/ErrorIncompatibleSig.out)))))
@@ -314,6 +348,8 @@
      ast/ErrorInexhaustivePattern.out)
     (diff? mir/ErrorInexhaustivePattern.expected
      mir/ErrorInexhaustivePattern.out)
+    (diff? asm/ErrorInexhaustivePattern.expected
+     asm/ErrorInexhaustivePattern.out)
     (diff? llvm/ErrorInexhaustivePattern.expected
      llvm/ErrorInexhaustivePattern.out)
     (diff? output/ErrorInexhaustivePattern.expected
@@ -327,6 +363,7 @@
      tokens/ErrorLetRecExpression.out)
     (diff? ast/ErrorLetRecExpression.expected ast/ErrorLetRecExpression.out)
     (diff? mir/ErrorLetRecExpression.expected mir/ErrorLetRecExpression.out)
+    (diff? asm/ErrorLetRecExpression.expected asm/ErrorLetRecExpression.out)
     (diff? llvm/ErrorLetRecExpression.expected
      llvm/ErrorLetRecExpression.out)
     (diff? output/ErrorLetRecExpression.expected
@@ -340,6 +377,7 @@
      tokens/ErrorNameClashExtern.out)
     (diff? ast/ErrorNameClashExtern.expected ast/ErrorNameClashExtern.out)
     (diff? mir/ErrorNameClashExtern.expected mir/ErrorNameClashExtern.out)
+    (diff? asm/ErrorNameClashExtern.expected asm/ErrorNameClashExtern.out)
     (diff? llvm/ErrorNameClashExtern.expected llvm/ErrorNameClashExtern.out)
     (diff? output/ErrorNameClashExtern.expected
      output/ErrorNameClashExtern.out)))))
@@ -354,6 +392,8 @@
      ast/ErrorNameClashExternVal.out)
     (diff? mir/ErrorNameClashExternVal.expected
      mir/ErrorNameClashExternVal.out)
+    (diff? asm/ErrorNameClashExternVal.expected
+     asm/ErrorNameClashExternVal.out)
     (diff? llvm/ErrorNameClashExternVal.expected
      llvm/ErrorNameClashExternVal.out)
     (diff? output/ErrorNameClashExternVal.expected
@@ -369,6 +409,8 @@
      ast/ErrorNameClashWithImport.out)
     (diff? mir/ErrorNameClashWithImport.expected
      mir/ErrorNameClashWithImport.out)
+    (diff? asm/ErrorNameClashWithImport.expected
+     asm/ErrorNameClashWithImport.out)
     (diff? llvm/ErrorNameClashWithImport.expected
      llvm/ErrorNameClashWithImport.out)
     (diff? output/ErrorNameClashWithImport.expected
@@ -382,6 +424,7 @@
      tokens/ErrorNeverSubtyping.out)
     (diff? ast/ErrorNeverSubtyping.expected ast/ErrorNeverSubtyping.out)
     (diff? mir/ErrorNeverSubtyping.expected mir/ErrorNeverSubtyping.out)
+    (diff? asm/ErrorNeverSubtyping.expected asm/ErrorNeverSubtyping.out)
     (diff? llvm/ErrorNeverSubtyping.expected llvm/ErrorNeverSubtyping.out)
     (diff? output/ErrorNeverSubtyping.expected
      output/ErrorNeverSubtyping.out)))))
@@ -396,6 +439,8 @@
      ast/ErrorPartialApplication.out)
     (diff? mir/ErrorPartialApplication.expected
      mir/ErrorPartialApplication.out)
+    (diff? asm/ErrorPartialApplication.expected
+     asm/ErrorPartialApplication.out)
     (diff? llvm/ErrorPartialApplication.expected
      llvm/ErrorPartialApplication.out)
     (diff? output/ErrorPartialApplication.expected
@@ -411,6 +456,8 @@
      ast/ErrorPatternUnionNameTypes.out)
     (diff? mir/ErrorPatternUnionNameTypes.expected
      mir/ErrorPatternUnionNameTypes.out)
+    (diff? asm/ErrorPatternUnionNameTypes.expected
+     asm/ErrorPatternUnionNameTypes.out)
     (diff? llvm/ErrorPatternUnionNameTypes.expected
      llvm/ErrorPatternUnionNameTypes.out)
     (diff? output/ErrorPatternUnionNameTypes.expected
@@ -426,6 +473,8 @@
      ast/ErrorPolymorphicRecursion.out)
     (diff? mir/ErrorPolymorphicRecursion.expected
      mir/ErrorPolymorphicRecursion.out)
+    (diff? asm/ErrorPolymorphicRecursion.expected
+     asm/ErrorPolymorphicRecursion.out)
     (diff? llvm/ErrorPolymorphicRecursion.expected
      llvm/ErrorPolymorphicRecursion.out)
     (diff? output/ErrorPolymorphicRecursion.expected
@@ -438,6 +487,7 @@
     (diff? tokens/ErrorResumeEffects.expected tokens/ErrorResumeEffects.out)
     (diff? ast/ErrorResumeEffects.expected ast/ErrorResumeEffects.out)
     (diff? mir/ErrorResumeEffects.expected mir/ErrorResumeEffects.out)
+    (diff? asm/ErrorResumeEffects.expected asm/ErrorResumeEffects.out)
     (diff? llvm/ErrorResumeEffects.expected llvm/ErrorResumeEffects.out)
     (diff? output/ErrorResumeEffects.expected output/ErrorResumeEffects.out)))))
 (rule (alias runtest)
@@ -448,6 +498,7 @@
     (diff? tokens/ErrorShadowedBool.expected tokens/ErrorShadowedBool.out)
     (diff? ast/ErrorShadowedBool.expected ast/ErrorShadowedBool.out)
     (diff? mir/ErrorShadowedBool.expected mir/ErrorShadowedBool.out)
+    (diff? asm/ErrorShadowedBool.expected asm/ErrorShadowedBool.out)
     (diff? llvm/ErrorShadowedBool.expected llvm/ErrorShadowedBool.out)
     (diff? output/ErrorShadowedBool.expected output/ErrorShadowedBool.out)))))
 (rule (alias runtest)
@@ -461,6 +512,8 @@
      ast/ErrorSignatureCompatibility.out)
     (diff? mir/ErrorSignatureCompatibility.expected
      mir/ErrorSignatureCompatibility.out)
+    (diff? asm/ErrorSignatureCompatibility.expected
+     asm/ErrorSignatureCompatibility.out)
     (diff? llvm/ErrorSignatureCompatibility.expected
      llvm/ErrorSignatureCompatibility.out)
     (diff? output/ErrorSignatureCompatibility.expected
@@ -476,6 +529,8 @@
      ast/ErrorSubmoduleSignatures.out)
     (diff? mir/ErrorSubmoduleSignatures.expected
      mir/ErrorSubmoduleSignatures.out)
+    (diff? asm/ErrorSubmoduleSignatures.expected
+     asm/ErrorSubmoduleSignatures.out)
     (diff? llvm/ErrorSubmoduleSignatures.expected
      llvm/ErrorSubmoduleSignatures.out)
     (diff? output/ErrorSubmoduleSignatures.expected
@@ -489,6 +544,7 @@
      tokens/ErrorToplevelImport.out)
     (diff? ast/ErrorToplevelImport.expected ast/ErrorToplevelImport.out)
     (diff? mir/ErrorToplevelImport.expected mir/ErrorToplevelImport.out)
+    (diff? asm/ErrorToplevelImport.expected asm/ErrorToplevelImport.out)
     (diff? llvm/ErrorToplevelImport.expected llvm/ErrorToplevelImport.out)
     (diff? output/ErrorToplevelImport.expected
      output/ErrorToplevelImport.out)))))
@@ -503,6 +559,8 @@
      ast/ErrorTypeDeclFreeParams.out)
     (diff? mir/ErrorTypeDeclFreeParams.expected
      mir/ErrorTypeDeclFreeParams.out)
+    (diff? asm/ErrorTypeDeclFreeParams.expected
+     asm/ErrorTypeDeclFreeParams.out)
     (diff? llvm/ErrorTypeDeclFreeParams.expected
      llvm/ErrorTypeDeclFreeParams.out)
     (diff? output/ErrorTypeDeclFreeParams.expected
@@ -520,6 +578,8 @@
      ast/ErrorUnqualifiedUniversalImport.out)
     (diff? mir/ErrorUnqualifiedUniversalImport.expected
      mir/ErrorUnqualifiedUniversalImport.out)
+    (diff? asm/ErrorUnqualifiedUniversalImport.expected
+     asm/ErrorUnqualifiedUniversalImport.out)
     (diff? llvm/ErrorUnqualifiedUniversalImport.expected
      llvm/ErrorUnqualifiedUniversalImport.out)
     (diff? output/ErrorUnqualifiedUniversalImport.expected
@@ -530,6 +590,7 @@
    (concurrent (diff? tokens/ExternInt.expected tokens/ExternInt.out)
     (diff? ast/ExternInt.expected ast/ExternInt.out)
     (diff? mir/ExternInt.expected mir/ExternInt.out)
+    (diff? asm/ExternInt.expected asm/ExternInt.out)
     (diff? llvm/ExternInt.expected llvm/ExternInt.out)
     (diff? output/ExternInt.expected output/ExternInt.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Functions.txt))
@@ -538,6 +599,7 @@
    (concurrent (diff? tokens/Functions.expected tokens/Functions.out)
     (diff? ast/Functions.expected ast/Functions.out)
     (diff? mir/Functions.expected mir/Functions.out)
+    (diff? asm/Functions.expected asm/Functions.out)
     (diff? llvm/Functions.expected llvm/Functions.out)
     (diff? output/Functions.expected output/Functions.out)))))
 (rule (alias runtest)
@@ -548,6 +610,7 @@
     (diff? tokens/Generalization.expected tokens/Generalization.out)
     (diff? ast/Generalization.expected ast/Generalization.out)
     (diff? mir/Generalization.expected mir/Generalization.out)
+    (diff? asm/Generalization.expected asm/Generalization.out)
     (diff? llvm/Generalization.expected llvm/Generalization.out)
     (diff? output/Generalization.expected output/Generalization.out)))))
 (rule (alias runtest)
@@ -557,6 +620,7 @@
    (concurrent (diff? tokens/HelloWorld.expected tokens/HelloWorld.out)
     (diff? ast/HelloWorld.expected ast/HelloWorld.out)
     (diff? mir/HelloWorld.expected mir/HelloWorld.out)
+    (diff? asm/HelloWorld.expected asm/HelloWorld.out)
     (diff? llvm/HelloWorld.expected llvm/HelloWorld.out)
     (diff? output/HelloWorld.expected output/HelloWorld.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Imports.txt))
@@ -565,6 +629,7 @@
    (concurrent (diff? tokens/Imports.expected tokens/Imports.out)
     (diff? ast/Imports.expected ast/Imports.out)
     (diff? mir/Imports.expected mir/Imports.out)
+    (diff? asm/Imports.expected asm/Imports.out)
     (diff? llvm/Imports.expected llvm/Imports.out)
     (diff? output/Imports.expected output/Imports.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Iter.txt))
@@ -573,6 +638,7 @@
    (concurrent (diff? tokens/Iter.expected tokens/Iter.out)
     (diff? ast/Iter.expected ast/Iter.out)
     (diff? mir/Iter.expected mir/Iter.out)
+    (diff? asm/Iter.expected asm/Iter.out)
     (diff? llvm/Iter.expected llvm/Iter.out)
     (diff? output/Iter.expected output/Iter.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Keywords.txt))
@@ -581,6 +647,7 @@
    (concurrent (diff? tokens/Keywords.expected tokens/Keywords.out)
     (diff? ast/Keywords.expected ast/Keywords.out)
     (diff? mir/Keywords.expected mir/Keywords.out)
+    (diff? asm/Keywords.expected asm/Keywords.out)
     (diff? llvm/Keywords.expected llvm/Keywords.out)
     (diff? output/Keywords.expected output/Keywords.out)))))
 (rule (alias runtest)
@@ -591,6 +658,7 @@
     (diff? tokens/LetBindingGroups.expected tokens/LetBindingGroups.out)
     (diff? ast/LetBindingGroups.expected ast/LetBindingGroups.out)
     (diff? mir/LetBindingGroups.expected mir/LetBindingGroups.out)
+    (diff? asm/LetBindingGroups.expected asm/LetBindingGroups.out)
     (diff? llvm/LetBindingGroups.expected llvm/LetBindingGroups.out)
     (diff? output/LetBindingGroups.expected output/LetBindingGroups.out)))))
 (rule (alias runtest)
@@ -600,6 +668,7 @@
    (concurrent (diff? tokens/LetPattern.expected tokens/LetPattern.out)
     (diff? ast/LetPattern.expected ast/LetPattern.out)
     (diff? mir/LetPattern.expected mir/LetPattern.out)
+    (diff? asm/LetPattern.expected asm/LetPattern.out)
     (diff? llvm/LetPattern.expected llvm/LetPattern.out)
     (diff? output/LetPattern.expected output/LetPattern.out)))))
 (rule (alias runtest)
@@ -611,6 +680,7 @@
      tokens/MixTypeAndEffectVars.out)
     (diff? ast/MixTypeAndEffectVars.expected ast/MixTypeAndEffectVars.out)
     (diff? mir/MixTypeAndEffectVars.expected mir/MixTypeAndEffectVars.out)
+    (diff? asm/MixTypeAndEffectVars.expected asm/MixTypeAndEffectVars.out)
     (diff? llvm/MixTypeAndEffectVars.expected llvm/MixTypeAndEffectVars.out)
     (diff? output/MixTypeAndEffectVars.expected
      output/MixTypeAndEffectVars.out)))))
@@ -620,6 +690,7 @@
    (concurrent (diff? tokens/ModuleSig.expected tokens/ModuleSig.out)
     (diff? ast/ModuleSig.expected ast/ModuleSig.out)
     (diff? mir/ModuleSig.expected mir/ModuleSig.out)
+    (diff? asm/ModuleSig.expected asm/ModuleSig.out)
     (diff? llvm/ModuleSig.expected llvm/ModuleSig.out)
     (diff? output/ModuleSig.expected output/ModuleSig.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Modules.txt))
@@ -628,6 +699,7 @@
    (concurrent (diff? tokens/Modules.expected tokens/Modules.out)
     (diff? ast/Modules.expected ast/Modules.out)
     (diff? mir/Modules.expected mir/Modules.out)
+    (diff? asm/Modules.expected asm/Modules.out)
     (diff? llvm/Modules.expected llvm/Modules.out)
     (diff? output/Modules.expected output/Modules.out)))))
 (rule (alias runtest)
@@ -638,6 +710,7 @@
     (diff? tokens/MoreEffectsInSig.expected tokens/MoreEffectsInSig.out)
     (diff? ast/MoreEffectsInSig.expected ast/MoreEffectsInSig.out)
     (diff? mir/MoreEffectsInSig.expected mir/MoreEffectsInSig.out)
+    (diff? asm/MoreEffectsInSig.expected asm/MoreEffectsInSig.out)
     (diff? llvm/MoreEffectsInSig.expected llvm/MoreEffectsInSig.out)
     (diff? output/MoreEffectsInSig.expected output/MoreEffectsInSig.out)))))
 (rule (alias runtest)
@@ -648,6 +721,7 @@
     (diff? tokens/MutualRecursion.expected tokens/MutualRecursion.out)
     (diff? ast/MutualRecursion.expected ast/MutualRecursion.out)
     (diff? mir/MutualRecursion.expected mir/MutualRecursion.out)
+    (diff? asm/MutualRecursion.expected asm/MutualRecursion.out)
     (diff? llvm/MutualRecursion.expected llvm/MutualRecursion.out)
     (diff? output/MutualRecursion.expected output/MutualRecursion.out)))))
 (rule (alias runtest)
@@ -657,6 +731,7 @@
    (concurrent (diff? tokens/NeverAndAny.expected tokens/NeverAndAny.out)
     (diff? ast/NeverAndAny.expected ast/NeverAndAny.out)
     (diff? mir/NeverAndAny.expected mir/NeverAndAny.out)
+    (diff? asm/NeverAndAny.expected asm/NeverAndAny.out)
     (diff? llvm/NeverAndAny.expected llvm/NeverAndAny.out)
     (diff? output/NeverAndAny.expected output/NeverAndAny.out)))))
 (rule (alias runtest)
@@ -666,6 +741,7 @@
    (concurrent (diff? tokens/OpSectionLeft.expected tokens/OpSectionLeft.out)
     (diff? ast/OpSectionLeft.expected ast/OpSectionLeft.out)
     (diff? mir/OpSectionLeft.expected mir/OpSectionLeft.out)
+    (diff? asm/OpSectionLeft.expected asm/OpSectionLeft.out)
     (diff? llvm/OpSectionLeft.expected llvm/OpSectionLeft.out)
     (diff? output/OpSectionLeft.expected output/OpSectionLeft.out)))))
 (rule (alias runtest)
@@ -676,6 +752,7 @@
     (diff? tokens/OpSectionRight.expected tokens/OpSectionRight.out)
     (diff? ast/OpSectionRight.expected ast/OpSectionRight.out)
     (diff? mir/OpSectionRight.expected mir/OpSectionRight.out)
+    (diff? asm/OpSectionRight.expected asm/OpSectionRight.out)
     (diff? llvm/OpSectionRight.expected llvm/OpSectionRight.out)
     (diff? output/OpSectionRight.expected output/OpSectionRight.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Operators.txt))
@@ -684,6 +761,7 @@
    (concurrent (diff? tokens/Operators.expected tokens/Operators.out)
     (diff? ast/Operators.expected ast/Operators.out)
     (diff? mir/Operators.expected mir/Operators.out)
+    (diff? asm/Operators.expected asm/Operators.out)
     (diff? llvm/Operators.expected llvm/Operators.out)
     (diff? output/Operators.expected output/Operators.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Option.txt))
@@ -692,6 +770,7 @@
    (concurrent (diff? tokens/Option.expected tokens/Option.out)
     (diff? ast/Option.expected ast/Option.out)
     (diff? mir/Option.expected mir/Option.out)
+    (diff? asm/Option.expected asm/Option.out)
     (diff? llvm/Option.expected llvm/Option.out)
     (diff? output/Option.expected output/Option.out)))))
 (rule (alias runtest)
@@ -702,6 +781,7 @@
     (diff? tokens/OverlappingImports.expected tokens/OverlappingImports.out)
     (diff? ast/OverlappingImports.expected ast/OverlappingImports.out)
     (diff? mir/OverlappingImports.expected mir/OverlappingImports.out)
+    (diff? asm/OverlappingImports.expected asm/OverlappingImports.out)
     (diff? llvm/OverlappingImports.expected llvm/OverlappingImports.out)
     (diff? output/OverlappingImports.expected output/OverlappingImports.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Paths.txt))
@@ -710,6 +790,7 @@
    (concurrent (diff? tokens/Paths.expected tokens/Paths.out)
     (diff? ast/Paths.expected ast/Paths.out)
     (diff? mir/Paths.expected mir/Paths.out)
+    (diff? asm/Paths.expected asm/Paths.out)
     (diff? llvm/Paths.expected llvm/Paths.out)
     (diff? output/Paths.expected output/Paths.out)))))
 (rule (alias runtest)
@@ -721,6 +802,7 @@
      tokens/RecursiveEffectDecl.out)
     (diff? ast/RecursiveEffectDecl.expected ast/RecursiveEffectDecl.out)
     (diff? mir/RecursiveEffectDecl.expected mir/RecursiveEffectDecl.out)
+    (diff? asm/RecursiveEffectDecl.expected asm/RecursiveEffectDecl.out)
     (diff? llvm/RecursiveEffectDecl.expected llvm/RecursiveEffectDecl.out)
     (diff? output/RecursiveEffectDecl.expected
      output/RecursiveEffectDecl.out)))))
@@ -731,6 +813,7 @@
    (concurrent (diff? tokens/ReraiseExn.expected tokens/ReraiseExn.out)
     (diff? ast/ReraiseExn.expected ast/ReraiseExn.out)
     (diff? mir/ReraiseExn.expected mir/ReraiseExn.out)
+    (diff? asm/ReraiseExn.expected asm/ReraiseExn.out)
     (diff? llvm/ReraiseExn.expected llvm/ReraiseExn.out)
     (diff? output/ReraiseExn.expected output/ReraiseExn.out)))))
 (rule (alias runtest)
@@ -744,6 +827,8 @@
      ast/RestrictiveTypeAnnotation.out)
     (diff? mir/RestrictiveTypeAnnotation.expected
      mir/RestrictiveTypeAnnotation.out)
+    (diff? asm/RestrictiveTypeAnnotation.expected
+     asm/RestrictiveTypeAnnotation.out)
     (diff? llvm/RestrictiveTypeAnnotation.expected
      llvm/RestrictiveTypeAnnotation.out)
     (diff? output/RestrictiveTypeAnnotation.expected
@@ -757,6 +842,7 @@
      tokens/SelfReferentialImport.out)
     (diff? ast/SelfReferentialImport.expected ast/SelfReferentialImport.out)
     (diff? mir/SelfReferentialImport.expected mir/SelfReferentialImport.out)
+    (diff? asm/SelfReferentialImport.expected asm/SelfReferentialImport.out)
     (diff? llvm/SelfReferentialImport.expected
      llvm/SelfReferentialImport.out)
     (diff? output/SelfReferentialImport.expected
@@ -767,6 +853,7 @@
    (concurrent (diff? tokens/State.expected tokens/State.out)
     (diff? ast/State.expected ast/State.out)
     (diff? mir/State.expected mir/State.out)
+    (diff? asm/State.expected asm/State.out)
     (diff? llvm/State.expected llvm/State.out)
     (diff? output/State.expected output/State.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Text.txt))
@@ -775,6 +862,7 @@
    (concurrent (diff? tokens/Text.expected tokens/Text.out)
     (diff? ast/Text.expected ast/Text.out)
     (diff? mir/Text.expected mir/Text.out)
+    (diff? asm/Text.expected asm/Text.out)
     (diff? llvm/Text.expected llvm/Text.out)
     (diff? output/Text.expected output/Text.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Traits.txt))
@@ -783,6 +871,7 @@
    (concurrent (diff? tokens/Traits.expected tokens/Traits.out)
     (diff? ast/Traits.expected ast/Traits.out)
     (diff? mir/Traits.expected mir/Traits.out)
+    (diff? asm/Traits.expected asm/Traits.out)
     (diff? llvm/Traits.expected llvm/Traits.out)
     (diff? output/Traits.expected output/Traits.out)))))
 (rule (alias runtest)
@@ -792,6 +881,7 @@
    (concurrent (diff? tokens/TypeChecking.expected tokens/TypeChecking.out)
     (diff? ast/TypeChecking.expected ast/TypeChecking.out)
     (diff? mir/TypeChecking.expected mir/TypeChecking.out)
+    (diff? asm/TypeChecking.expected asm/TypeChecking.out)
     (diff? llvm/TypeChecking.expected llvm/TypeChecking.out)
     (diff? output/TypeChecking.expected output/TypeChecking.out)))))
 (rule (alias runtest)
@@ -803,6 +893,7 @@
      tokens/TypeModuleNamePunning.out)
     (diff? ast/TypeModuleNamePunning.expected ast/TypeModuleNamePunning.out)
     (diff? mir/TypeModuleNamePunning.expected mir/TypeModuleNamePunning.out)
+    (diff? asm/TypeModuleNamePunning.expected asm/TypeModuleNamePunning.out)
     (diff? llvm/TypeModuleNamePunning.expected
      llvm/TypeModuleNamePunning.out)
     (diff? output/TypeModuleNamePunning.expected
@@ -813,6 +904,7 @@
    (concurrent (diff? tokens/Types.expected tokens/Types.out)
     (diff? ast/Types.expected ast/Types.out)
     (diff? mir/Types.expected mir/Types.out)
+    (diff? asm/Types.expected asm/Types.out)
     (diff? llvm/Types.expected llvm/Types.out)
     (diff? output/Types.expected output/Types.out)))))
 (rule (alias runtest)
@@ -822,5 +914,6 @@
    (concurrent (diff? tokens/WeirdFunCalls.expected tokens/WeirdFunCalls.out)
     (diff? ast/WeirdFunCalls.expected ast/WeirdFunCalls.out)
     (diff? mir/WeirdFunCalls.expected mir/WeirdFunCalls.out)
+    (diff? asm/WeirdFunCalls.expected asm/WeirdFunCalls.out)
     (diff? llvm/WeirdFunCalls.expected llvm/WeirdFunCalls.out)
     (diff? output/WeirdFunCalls.expected output/WeirdFunCalls.out)))))

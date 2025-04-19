@@ -27,16 +27,95 @@ let should_make_mir test =
   should_type_check test && not (List.mem ~equal:String.equal type_only_tests test)
 ;;
 
-let no_llvm_tests = []
+let should_make_llvm test = should_make_mir test
 
-let should_make_llvm test =
-  should_make_mir test && not (List.mem ~equal:String.equal no_llvm_tests test)
+let no_asm_tests =
+  [ "AdventOfCode2024_1"
+  ; "AdventOfCode2024_2"
+  ; "AdventOfCode2024_3"
+  ; "AsPattern"
+  ; "Basics"
+  ; "Cat"
+  ; "Classics"
+  ; "Closures"
+  ; "Constructors"
+  ; "CrossModuleUsage"
+  ; "Effects"
+  ; "Empty"
+  ; "ErrorCrossModuleMutualRecursion"
+  ; "ErrorCyclicTypeAlias"
+  ; "ErrorDuplicateEffectTypeParameter"
+  ; "ErrorDuplicateLet"
+  ; "ErrorDuplicateNameAsPattern"
+  ; "ErrorDuplicateTypeParameter"
+  ; "ErrorDuplicateVal"
+  ; "ErrorEffectOpUnboundParams"
+  ; "ErrorEffectOpValClash"
+  ; "ErrorEffectSigDefDiff"
+  ; "ErrorEffectsNoValueBranch"
+  ; "ErrorHandleNonOperation"
+  ; "ErrorHangingVal"
+  ; "ErrorImportOfImport"
+  ; "ErrorIncompatibleSig"
+  ; "ErrorInexhaustivePattern"
+  ; "ErrorLetRecExpression"
+  ; "ErrorNameClashExtern"
+  ; "ErrorNameClashExternVal"
+  ; "ErrorNameClashWithImport"
+  ; "ErrorNeverSubtyping"
+  ; "ErrorPartialApplication"
+  ; "ErrorPatternUnionNameTypes"
+  ; "ErrorPolymorphicRecursion"
+  ; "ErrorResumeEffects"
+  ; "ErrorShadowedBool"
+  ; "ErrorSignatureCompatibility"
+  ; "ErrorSubmoduleSignatures"
+  ; "ErrorToplevelImport"
+  ; "ErrorTypeDeclFreeParams"
+  ; "ErrorUnqualifiedUniversalImport"
+  ; "ExternInt"
+  ; "Functions"
+  ; "Generalization"
+  ; "HelloWorld"
+  ; "Imports"
+  ; "Iter"
+  ; "Keywords"
+  ; "LetBindingGroups"
+  ; "LetPattern"
+  ; "MixTypeAndEffectVars"
+  ; "ModuleSig"
+  ; "Modules"
+  ; "MoreEffectsInSig"
+  ; "MutualRecursion"
+  ; "NeverAndAny"
+  ; "OpSectionLeft"
+  ; "OpSectionRight"
+  ; "Operators"
+  ; "Option"
+  ; "OverlappingImports"
+  ; "Paths"
+  ; "RecursiveEffectDecl"
+  ; "ReraiseExn"
+  ; "RestrictiveTypeAnnotation"
+  ; "SelfReferentialImport"
+  ; "State"
+  ; "Text"
+  ; "Traits"
+  ; "TypeChecking"
+  ; "TypeModuleNamePunning"
+  ; "Types"
+  ; "WeirdFunCalls"
+  ]
+;;
+
+let should_make_asm test =
+  should_make_mir test && not (List.mem ~equal:String.equal no_asm_tests test)
 ;;
 
 let no_exe_tests = []
 
 let should_make_exe test =
-  should_make_llvm test && not (List.mem ~equal:String.equal no_exe_tests test)
+  should_make_asm test && not (List.mem ~equal:String.equal no_exe_tests test)
 ;;
 
 let print_compilation_error ~out ~filename (error : Compilation_error.t) =
@@ -62,11 +141,14 @@ let test ~in_file =
   let tokens_file = concat_current "tokens" out_filename in
   let ast_file = concat_current "ast" out_filename in
   let mir_file = concat_current "mir" out_filename in
+  let asm_file = concat_current "asm" out_filename in
   let llvm_file = concat_current "llvm" out_filename in
   let output_file = concat_current "output" out_filename in
   let input_file = concat_current "input" (bare_filename ^ ".txt") in
   let tmp_exe_file = Filename_unix.temp_file ("umber_test." ^ filename) "" in
-  List.iter [ tokens_file; ast_file; mir_file; llvm_file; output_file ] ~f:(fun file ->
+  List.iter
+    [ tokens_file; ast_file; mir_file; asm_file; llvm_file; output_file ]
+    ~f:(fun file ->
     (* Touch each file so that we always end up with at least an empty file for every
        target, even if we error out on an earlier case or otherwise don't generate some
        outputs. *)
