@@ -19,11 +19,9 @@
      (body (Fun_call TypeChecking.then_.1 ((Make_block (tag 0)))))
      (if_none_matched
       (Otherwise (Fun_call TypeChecking.else_.1 ((Make_block (tag 0))))))))))
- (Value_def TypeChecking.id_for_chars.1 (Name TypeChecking.id))
  (Fun_def
   ((fun_name TypeChecking.id_for_chars) (args (TypeChecking.#arg0.1))
-   (body
-    (Fun_call TypeChecking.id_for_chars.1 ((Name TypeChecking.#arg0.1))))))
+   (body (Fun_call TypeChecking.id ((Name TypeChecking.#arg0.1))))))
  (Fun_def
   ((fun_name TypeChecking.#fun.1)
    (args (TypeChecking.#closure_env.1 TypeChecking.match.1))

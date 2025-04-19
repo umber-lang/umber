@@ -1400,6 +1400,9 @@ module Stmt = struct
     | Value_def of Mir_name.t * Expr.t
     | Fun_def of Expr.Fun_def.t
     | Fun_decl of Fun_decl.t
+      (* TODO: [Fun_decl] is used to declare things that aren't functions too, which is a
+         bit weird. Maybe rename to just [Decl]? [Extern_decl] also works like this but at
+         least the name is less misleading. *)
     | Extern_decl of Extern_decl.t
   [@@deriving sexp_of, variants]
 end
@@ -1467,15 +1470,24 @@ let handle_let_bindings
            name used for the function must be the original name, which should be a
            proper name from the source (its id should be 0). This lets code in other
            files link with it properly. *)
-        let name' = Context.copy_name ctx name in
         let args =
           Nonempty.init arity ~f:(fun i ->
             snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
         in
-        let body : Expr.t =
-          Fun_call (name', Nonempty.map args ~f:(fun arg -> Expr.Name arg))
-        in
-        Fun_def { fun_name = name; args; body } :: Value_def (name', mir_expr) :: stmts)
+        match mir_expr with
+        | Name name' ->
+          (* If the body is just another name, we can call it directly. *)
+          let body : Expr.t =
+            Fun_call (name', Nonempty.map args ~f:(fun arg -> Expr.Name arg))
+          in
+          Fun_def { fun_name = name; args; body } :: stmts
+        | _ ->
+          (* Otherwise, we need to generate a [Value_def] and then call it. *)
+          let name' = Context.copy_name ctx name in
+          let body : Expr.t =
+            Fun_call (name', Nonempty.map args ~f:(fun arg -> Expr.Name arg))
+          in
+          Fun_def { fun_name = name; args; body } :: Value_def (name', mir_expr) :: stmts)
       else Value_def (name, mir_expr) :: stmts
   in
   let bindings =

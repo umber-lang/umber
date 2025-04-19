@@ -106,12 +106,11 @@
   ((fun_name Operators.left_section) (args (Operators.#arg0.5))
    (body (Fun_call Operators.left_section.1 ((Name Operators.#arg0.5))))))
  (Fun_decl ((name Std.Prelude.Operators..) (arity 3)))
- (Value_def Operators...1 (Name Std.Prelude.Operators..))
  (Fun_def
   ((fun_name Operators..)
    (args (Operators.#arg0.6 Operators.#arg1.4 Operators.#arg2.1))
    (body
-    (Fun_call Operators...1
+    (Fun_call Std.Prelude.Operators..
      ((Name Operators.#arg0.6) (Name Operators.#arg1.4)
       (Name Operators.#arg2.1))))))
  (Value_def Operators.one

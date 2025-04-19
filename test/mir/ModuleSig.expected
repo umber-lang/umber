@@ -32,10 +32,9 @@
   (Fun_call "Std.Prelude.Operators.;"
    ((Fun_call Std.Prelude.print_bool ((Name ModuleSig.is_10_in_range)))
     (Fun_call Std.Prelude.print ((Primitive (String "")))))))
- (Value_def ModuleSig.Range...=.1 (Name ModuleSig.Range.between))
  (Fun_def
   ((fun_name ModuleSig.Range...=)
    (args (ModuleSig.Range.#arg0.1 ModuleSig.Range.#arg1.1))
    (body
-    (Fun_call ModuleSig.Range...=.1
+    (Fun_call ModuleSig.Range.between
      ((Name ModuleSig.Range.#arg0.1) (Name ModuleSig.Range.#arg1.1)))))))

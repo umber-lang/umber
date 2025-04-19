@@ -9,7 +9,6 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 @"TypeChecking.#binding.1" = global %umber_block* null
 @TypeChecking.id_alias = global %umber_block* null
 @TypeChecking.five = global %umber_block* null
-@TypeChecking.id_for_chars.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @TypeChecking.id to %umber_block*)
 @int.5 = linkonce_odr constant %umber_block1 { %umber_header { i16 -32767, i16 1, i32 0 }, [1 x i64] [i64 5] }
 
 define i32 @"umber_main:TypeChecking"() {
@@ -77,8 +76,7 @@ cond_otherwise_merge:                             ; preds = %cond_otherwise, %co
 
 define tailcc %umber_block* @TypeChecking.id_for_chars(%umber_block* %"TypeChecking.#arg0.1") {
 entry:
-  %TypeChecking.id_for_chars.1 = load %umber_block*, %umber_block** @TypeChecking.id_for_chars.1, align 8
-  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %TypeChecking.id_for_chars.1, %umber_block* %"TypeChecking.#arg0.1")
+  %fun_call = tail call tailcc %umber_block* @TypeChecking.id(%umber_block* %"TypeChecking.#arg0.1")
   ret %umber_block* %fun_call
 }
 

@@ -8,7 +8,6 @@ target datalayout = "i32:64-i64:64-p:64:64-f64:64"
 %umber_block8b = type { %umber_header, [8 x i8] }
 
 @LetBindingGroups._.1 = global %umber_block* null
-@LetBindingGroups.bottom.1 = constant %umber_block* bitcast (%umber_block* (%umber_block*)* @LetBindingGroups.bottom_again.1 to %umber_block*)
 @LetBindingGroups.a = constant %umber_block* bitcast (%umber_block1* @int.1 to %umber_block*)
 @Std.Prelude.List.Nil = external global %umber_block*
 @LetBindingGroups._.2 = global %umber_block* null
@@ -80,8 +79,7 @@ entry:
 
 define tailcc %umber_block* @LetBindingGroups.bottom(%umber_block* %"LetBindingGroups.#arg0.1") {
 entry:
-  %LetBindingGroups.bottom.1 = load %umber_block*, %umber_block** @LetBindingGroups.bottom.1, align 8
-  %fun_call = tail call %umber_block* @umber_apply1(%umber_block* %LetBindingGroups.bottom.1, %umber_block* %"LetBindingGroups.#arg0.1")
+  %fun_call = tail call tailcc %umber_block* @LetBindingGroups.bottom_again.1(%umber_block* %"LetBindingGroups.#arg0.1")
   ret %umber_block* %fun_call
 }
 
@@ -109,30 +107,6 @@ declare tailcc %umber_block* @"Std.Prelude.Operators.||"(%umber_block*, %umber_b
 
 declare tailcc %umber_block* @"Std.Prelude.Operators.=="(%umber_block*, %umber_block*)
 
-define linkonce_odr %umber_block* @umber_apply1(%umber_block* %0, %umber_block* %1) {
-entry:
-  %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
-  br i1 %is_on_heap, label %closure_call, label %regular_call
-
-closure_call:                                     ; preds = %entry
-  %closure_gep = getelementptr %umber_block, %umber_block* %0, i32 0, i32 1, i32 0
-  %closure_gep_raw = load i64, i64* %closure_gep, align 8
-  %closure_fun = inttoptr i64 %closure_gep_raw to %umber_block* (%umber_block*, %umber_block*)*
-  %closure_call1 = tail call tailcc %umber_block* %closure_fun(%umber_block* %0, %umber_block* %1)
-  br label %call_phi
-
-regular_call:                                     ; preds = %entry
-  %calling_fun = bitcast %umber_block* %0 to %umber_block* (%umber_block*)*
-  %regular_call2 = tail call tailcc %umber_block* %calling_fun(%umber_block* %1)
-  br label %call_phi
-
-call_phi:                                         ; preds = %regular_call, %closure_call
-  %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
-  ret %umber_block* %call_phi3
-}
-
-declare i1 @umber_gc_is_on_heap(%umber_block*)
-
 define linkonce_odr %umber_block* @umber_apply2(%umber_block* %0, %umber_block* %1, %umber_block* %2) {
 entry:
   %is_on_heap = call i1 @umber_gc_is_on_heap(%umber_block* %0)
@@ -154,4 +128,6 @@ call_phi:                                         ; preds = %regular_call, %clos
   %call_phi3 = phi %umber_block* [ %closure_call1, %closure_call ], [ %regular_call2, %regular_call ]
   ret %umber_block* %call_phi3
 }
+
+declare i1 @umber_gc_is_on_heap(%umber_block*)
 
