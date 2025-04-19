@@ -30,15 +30,7 @@ let should_make_mir test =
 let should_make_llvm test = should_make_mir test
 
 (* FIXME: Reduce this list *)
-let no_asm_tests =
-  [ "AdventOfCode2024_1"
-  ; "AdventOfCode2024_2"
-  ; "AdventOfCode2024_3"
-  ; "LetBindingGroups" (* FIXME: segfault *)
-  ; "MutualRecursion" (* FIXME: segfault *)
-  ; "Operators" (* FIXME: segfault *)
-  ]
-;;
+let no_asm_tests = [ "AdventOfCode2024_1"; "AdventOfCode2024_2"; "AdventOfCode2024_3" ]
 
 let should_make_asm test =
   should_make_mir test && not (List.mem ~equal:String.equal no_asm_tests test)
