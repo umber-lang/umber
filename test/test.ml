@@ -30,9 +30,7 @@ let should_make_mir test =
 let should_make_llvm test = should_make_mir test
 
 let no_asm_tests =
-  [ "AdventOfCode2024_1" (* TODO: Hanging, most likely register allocation too slow. *)
-  ; "AdventOfCode2024_2" (* FIXME: segfault *)
-  ]
+  [ "AdventOfCode2024_1" (* TODO: Hanging, most likely register allocation too slow. *) ]
 ;;
 
 let should_make_asm test =
