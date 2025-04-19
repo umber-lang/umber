@@ -160,6 +160,9 @@ module Call_conv = struct
     | C | Umber -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
   ;;
 
+  (* FIXME: Use this for Umber *)
+  (* [ Rax; Rbx; Rdi; Rsi; Rdx; Rcx; R8; R9; R10; R11; R12; R13; R14; R15 ] *)
+
   let non_arg_caller_save_registers t : Register.t list =
     match t with
     | C | Umber -> [ Rax; R10; R11 ]

@@ -728,7 +728,7 @@ end
 module Function_builder : sig
   type t
 
-  val create : Label_name.t -> t
+  val create : Label_name.t -> arity:int -> t
   val add_code : t -> Register.t Instr.Nonterminal.t -> unit
   val add_terminal : t -> Instr.Terminal.t -> unit
   val add_local : t -> Mir_name.t -> Register.t Value.t -> unit
@@ -739,6 +739,7 @@ module Function_builder : sig
   val pick_register : t -> Register.t Value.t
   val pick_register' : t -> Virtual_register.t
   val name : t -> Label_name.t
+  val arity : t -> int
 
   (* TODO: This could be Nonempty because we always at least have an entry block. *)
   val basic_blocks : t -> Asm_program.Register.t Basic_block.t list
@@ -757,6 +758,7 @@ end = struct
 
   type t =
     { fun_name : Label_name.t
+    ; arity : int
     ; label_counter : Label_id.Counter.t
     ; register_counter : Virtual_register.Counter.t
     ; locals : Register.t Value.t Mir_name.Table.t
@@ -765,6 +767,7 @@ end = struct
     }
 
   let name t = t.fun_name
+  let arity t = t.arity
   let current_label t = t.current_label
 
   let position_at_label t label_name =
@@ -810,10 +813,11 @@ end = struct
             (error : Error.t)]
   ;;
 
-  let create fun_name =
+  let create fun_name ~arity =
     (* FIXME: callee saved registers must be marked Used *)
     let t =
       { fun_name
+      ; arity
       ; label_counter = Label_id.Counter.create ()
       ; register_counter = Virtual_register.Counter.create ()
       ; locals = Mir_name.Table.create ()
@@ -851,11 +855,17 @@ module Closure = struct
   type t =
     { closure_name : Label_name.t
     ; fun_name : Label_name.t
+    ; closure_wrapper_fun_name : Label_name.t
+    ; arity : int
     }
 
-  let of_fun_name fun_name =
+  let create ~fun_name ~arity =
+    let fun_name' = Label_name.to_string fun_name in
     { fun_name
-    ; closure_name = Label_name.of_string [%string "%{fun_name#Label_name}#closure"]
+    ; closure_wrapper_fun_name =
+        Label_name.of_string [%string "%{fun_name'}#closure_wrapper_fun"]
+    ; closure_name = Label_name.of_string [%string "%{fun_name'}#closure"]
+    ; arity
     }
   ;;
 end
@@ -910,136 +920,6 @@ let constant_block_for_literal (literal : Literal.t) =
       (Literal (String (Ustring.of_string_exn padded_s)))
 ;;
 
-let constant_block_for_closure ~fun_name =
-  constant_block ~tag:Cnstr_tag.closure ~len:1 ~data_kind:I64 (Label fun_name)
-;;
-
-let to_program
-  { bss_globals; externs; literals; closures; functions; main_function; name_table = _ }
-  : Asm_program.t
-  =
-  let uninitialized_globals = Queue.to_list bss_globals in
-  let externs = Hashtbl.data externs in
-  let literals = Hashtbl.to_alist literals in
-  let closures = Hashtbl.data closures in
-  let functions = Hashtbl.data functions in
-  { globals =
-      { name = Function_builder.name main_function; strength = `Strong }
-      :: (List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
-            { name; strength = `Strong })
-          @ List.map functions ~f:(fun fun_builder : Global_decl.t ->
-              { name = Function_builder.name fun_builder; strength = `Strong })
-          @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
-              { name; strength = `Weak }))
-  ; externs = List.map externs ~f:(fun { call_conv = _; label_name } -> label_name)
-  ; text_section =
-      Function_builder.basic_blocks main_function
-      @ List.concat_map functions ~f:Function_builder.basic_blocks
-  ; rodata_section =
-      List.map literals ~f:(fun (literal, label) : Data_decl.t ->
-        { label; payloads = constant_block_for_literal literal })
-      @ List.map closures ~f:(fun { fun_name; closure_name } : Data_decl.t ->
-          { label = closure_name; payloads = constant_block_for_closure ~fun_name })
-  ; bss_section =
-      List.map uninitialized_globals ~f:(fun name : Bss_decl.t ->
-        { label = name; kind = `Words; size = 1 })
-  }
-;;
-
-let create ~main_function_name =
-  { name_table = Mir_name.Name_table.create ()
-  ; bss_globals = Queue.create ()
-  ; externs = Mir_name.Table.create ()
-  ; literals = Literal.Table.create ()
-  ; closures = Mir_name.Table.create ()
-  ; functions = Mir_name.Table.create ()
-  ; main_function = Function_builder.create main_function_name
-  }
-;;
-
-let int_constant_tag tag : _ Value.t =
-  (* Put the int63 into an int64 and make the bottom bit 1. *)
-  Simple_value (Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1)))
-;;
-
-let declare_extern_c_function t mir_name label_name =
-  ignore
-    (Hashtbl.add t.externs ~key:mir_name ~data:{ label_name; call_conv = Some C }
-      : [ `Ok | `Duplicate ])
-;;
-
-(* FIXME: Handle file-local functions *)
-(* FIXME: Handle values and function lookups differently (may need a closure)
-   Hmm, except closures are already explicit in MIR, right? Do they actually need
-   special handling? Oh, they do because MIR treats function pointers as reasonable values
-*)
-(* TODO: Amend MIR to treat function pointers and closures differently. *)
-let lookup_name_for_value t name ~fun_builder : _ Value.t =
-  (* FIXME: For everything except locals, we need to create a closure and possibly a
-     wrapper function. We need to treat it as if wrapped in a [Make_block] 
-      
-     For now, treat externs and functions the same. This will break when implementing a
-     proper calling convention besides copying C's.
-  *)
-  let wrapper_closure label_name =
-    let closure =
-      Hashtbl.find_or_add t.closures name ~default:(fun () ->
-        Closure.of_fun_name label_name)
-    in
-    closure.closure_name
-  in
-  match Function_builder.find_local fun_builder name with
-  | Some value -> value
-  | None ->
-    let label_name =
-      match Hashtbl.find t.externs name with
-      | Some { call_conv = None; label_name } -> label_name
-      | Some { call_conv = Some _; label_name } -> wrapper_closure label_name
-      | None ->
-        (match Hashtbl.find t.functions name with
-         | Some fun_builder -> wrapper_closure (Function_builder.name fun_builder)
-         | None ->
-           (* Global values defined in this file reach this case. *)
-           Label_name.of_mir_name name)
-    in
-    Simple_value (Global (label_name, Other))
-;;
-
-(* FIXME: Won't really work with size != I64 because we only use 64-bit regs. *)
-let load_mem_offset fun_builder (value : _ Value.t) size offset : _ Value.t =
-  let simple_value =
-    match value with
-    | Simple_value v -> v
-    | Memory mem ->
-      let tmp : Register.t Simple_value.t =
-        Register (Virtual (Function_builder.pick_register' fun_builder))
-      in
-      Function_builder.add_code
-        fun_builder
-        (Mov { dst = Simple_value tmp; src = Memory mem });
-      tmp
-  in
-  Memory (Memory.offset simple_value size offset)
-;;
-
-let lookup_name_for_fun_call t name ~fun_builder : _ Value.t * Call_conv.t =
-  match Function_builder.find_local fun_builder name with
-  | Some closure ->
-    (* We are calling a closure. Load the function pointer from the first field. *)
-    load_mem_offset fun_builder closure I64 1, Umber
-  | None ->
-    (match Hashtbl.find t.functions name with
-     | Some fun_builder ->
-       Simple_value (Global (Function_builder.name fun_builder, Other)), Umber
-     | None ->
-       (match Hashtbl.find t.externs name with
-        | Some { call_conv = Some C; label_name } ->
-          Simple_value (Global (label_name, Extern_proc)), C
-        | Some { call_conv = Some Umber | None; label_name } ->
-          Simple_value (Global (label_name, Extern_proc)), Umber
-        | None -> Simple_value (Global (Label_name.of_mir_name name, Other)), Umber))
-;;
-
 let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list) =
   let n_args = List.length args in
   let arg_registers, clobbered_arg_registers =
@@ -1091,12 +971,201 @@ let codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args =
   output_register
 ;;
 
+let constant_block_for_closure ~closure_wrapper_fun_name =
+  constant_block
+    ~tag:Cnstr_tag.closure
+    ~len:1
+    ~data_kind:I64
+    (Label closure_wrapper_fun_name)
+;;
+
+(* Define a wrapper that adds an extra argument (the empty closure env) and ignores it. *)
+let define_no_env_closure_wrapper_fun ~closure_wrapper_fun_name ~fun_name ~arity =
+  let fun_builder = Function_builder.create closure_wrapper_fun_name ~arity:(arity + 1) in
+  let args =
+    Call_conv.arg_registers Umber
+    |> Nonempty.tl (* Ignore first arg. *)
+    |> Fn.flip List.take arity
+    |> List.map ~f:(fun reg ->
+         let virtual_reg = Function_builder.pick_register fun_builder in
+         Function_builder.add_code
+           fun_builder
+           (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
+         virtual_reg)
+  in
+  (* FIXME: Handle using stack for args. *)
+  let return_value =
+    codegen_fun_call_internal
+      fun_builder
+      ~fun_:(Simple_value (Global (fun_name, Other)))
+      ~call_conv:Umber
+      ~args
+  in
+  Function_builder.add_code
+    fun_builder
+    (Mov
+       { src = Simple_value (Register (Virtual return_value))
+       ; dst = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
+       });
+  Function_builder.add_terminal fun_builder Ret;
+  Function_builder.basic_blocks fun_builder
+;;
+
+let to_program
+  { bss_globals; externs; literals; closures; functions; main_function; name_table = _ }
+  : Asm_program.t
+  =
+  let uninitialized_globals = Queue.to_list bss_globals in
+  let externs = Hashtbl.data externs in
+  let literals = Hashtbl.to_alist literals in
+  let closures = Hashtbl.data closures in
+  let functions = Hashtbl.data functions in
+  { globals =
+      { name = Function_builder.name main_function; strength = `Strong }
+      :: (List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
+            { name; strength = `Strong })
+          @ List.map functions ~f:(fun fun_builder : Global_decl.t ->
+              { name = Function_builder.name fun_builder; strength = `Strong })
+          @ List.map closures ~f:(fun { closure_wrapper_fun_name; _ } : Global_decl.t ->
+              { name = closure_wrapper_fun_name; strength = `Strong })
+          @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
+              { name; strength = `Weak }))
+  ; externs = List.map externs ~f:(fun { call_conv = _; label_name } -> label_name)
+  ; text_section =
+      Function_builder.basic_blocks main_function
+      @ List.concat_map functions ~f:Function_builder.basic_blocks
+      @ List.concat_map
+          closures
+          ~f:(fun { fun_name; closure_wrapper_fun_name; arity; _ } ->
+          define_no_env_closure_wrapper_fun ~closure_wrapper_fun_name ~fun_name ~arity)
+  ; rodata_section =
+      List.map literals ~f:(fun (literal, label) : Data_decl.t ->
+        { label; payloads = constant_block_for_literal literal })
+      @ List.map
+          closures
+          ~f:(fun { closure_name; closure_wrapper_fun_name; _ } : Data_decl.t ->
+          { label = closure_name
+          ; payloads = constant_block_for_closure ~closure_wrapper_fun_name
+          })
+  ; bss_section =
+      List.map uninitialized_globals ~f:(fun name : Bss_decl.t ->
+        { label = name; kind = `Words; size = 1 })
+  }
+;;
+
+let create ~main_function_name =
+  { name_table = Mir_name.Name_table.create ()
+  ; bss_globals = Queue.create ()
+  ; externs = Mir_name.Table.create ()
+  ; literals = Literal.Table.create ()
+  ; closures = Mir_name.Table.create ()
+  ; functions = Mir_name.Table.create ()
+  ; main_function = Function_builder.create main_function_name ~arity:0
+  }
+;;
+
+let int_constant_tag tag : _ Value.t =
+  (* Put the int63 into an int64 and make the bottom bit 1. *)
+  Simple_value (Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1)))
+;;
+
+let declare_extern_c_function t mir_name label_name =
+  ignore
+    (Hashtbl.add t.externs ~key:mir_name ~data:{ label_name; call_conv = Some C }
+      : [ `Ok | `Duplicate ])
+;;
+
+(* FIXME: Handle file-local functions *)
+(* FIXME: Handle values and function lookups differently (may need a closure)
+   Hmm, except closures are already explicit in MIR, right? Do they actually need
+   special handling? Oh, they do because MIR treats function pointers as reasonable values
+*)
+(* TODO: Amend MIR to treat function pointers and closures differently. *)
+let lookup_name_for_value t name ~fun_builder : _ Value.t =
+  (* FIXME: For everything except locals, we need to create a closure and possibly a
+     wrapper function. We need to treat it as if wrapped in a [Make_block] 
+      
+     For now, treat externs and functions the same. This will break when implementing a
+     proper calling convention besides copying C's.
+  *)
+  let wrapper_closure label_name ~arity =
+    let closure =
+      Hashtbl.find_or_add t.closures name ~default:(fun () ->
+        Closure.create ~fun_name:label_name ~arity)
+    in
+    closure.closure_name
+  in
+  match Function_builder.find_local fun_builder name with
+  | Some value -> value
+  | None ->
+    let label_name =
+      match Hashtbl.find t.externs name with
+      | Some { call_conv = None; label_name } -> label_name
+      | Some { call_conv = Some _; label_name = _ } ->
+        failwith "FIXME: Handle extern functions becoming closures"
+        (* wrapper_closure label_name *)
+      | None ->
+        (match Hashtbl.find t.functions name with
+         | Some fun_builder ->
+           wrapper_closure
+             (Function_builder.name fun_builder)
+             ~arity:(Function_builder.arity fun_builder)
+         | None ->
+           (* Global values defined in this file reach this case. *)
+           Label_name.of_mir_name name)
+    in
+    Simple_value (Global (label_name, Other))
+;;
+
+let load_mem_offset fun_builder (value : _ Value.t) size offset : _ Value.t =
+  let simple_value =
+    match value with
+    | Simple_value v -> v
+    | Memory mem ->
+      let tmp : Register.t Simple_value.t =
+        Register (Virtual (Function_builder.pick_register' fun_builder))
+      in
+      Function_builder.add_code
+        fun_builder
+        (Mov { dst = Simple_value tmp; src = Memory mem });
+      tmp
+  in
+  Memory (Memory.offset simple_value size offset)
+;;
+
+let lookup_name_for_fun_call t name ~fun_builder
+  : [ `Function | `Closure ] * _ Value.t * Call_conv.t
+  =
+  match Function_builder.find_local fun_builder name with
+  | Some closure -> `Closure, closure, Umber
+  | None ->
+    (match Hashtbl.find t.functions name with
+     | Some fun_builder ->
+       `Function, Simple_value (Global (Function_builder.name fun_builder, Other)), Umber
+     | None ->
+       (match Hashtbl.find t.externs name with
+        | Some { call_conv = Some C; label_name } ->
+          `Function, Simple_value (Global (label_name, Extern_proc)), C
+        | Some { call_conv = Some Umber | None; label_name } ->
+          `Function, Simple_value (Global (label_name, Extern_proc)), Umber
+        | None ->
+          `Function, Simple_value (Global (Label_name.of_mir_name name, Other)), Umber))
+;;
+
 let codegen_fun_call t fun_name args ~fun_builder =
   (* TODO: When [fun_] is a closure, we'll load the function pointer from memory again,
      but we might already know what it is - we could inline that. If we stored more info
      other than just [Value.t] in the locals table, [lookup_name_for_fun_call] could do
      that. *)
-  let fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
+  let kind, fun_, call_conv = lookup_name_for_fun_call t fun_name ~fun_builder in
+  let fun_, args =
+    match kind with
+    | `Function -> fun_, args
+    | `Closure ->
+      (* We are calling a closure. Load the function pointer from the first field, and
+         pass the closure itself as the first argument. *)
+      load_mem_offset fun_builder fun_ I64 1, fun_ :: args
+  in
   codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args
 ;;
 
@@ -1421,7 +1490,11 @@ let set_global t global expr ~fun_builder =
 let define_function t ~fun_name ~args ~body =
   (* TODO: Need a function prelude for e.g. the frame pointer *)
   let call_conv : Call_conv.t = Umber in
-  let fun_builder = Function_builder.create (Label_name.of_mir_name fun_name) in
+  let fun_builder =
+    Function_builder.create
+      (Label_name.of_mir_name fun_name)
+      ~arity:(Nonempty.length args)
+  in
   Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
   let result =
     Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
@@ -1448,7 +1521,7 @@ let define_function t ~fun_name ~args ~body =
 let define_extern_wrapper_function t ~fun_name ~extern_name ~arity =
   let outer_call_conv : Call_conv.t = Umber in
   let inner_call_conv : Call_conv.t = C in
-  let fun_builder = Function_builder.create (Label_name.of_mir_name fun_name) in
+  let fun_builder = Function_builder.create (Label_name.of_mir_name fun_name) ~arity in
   Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
   let args =
     Call_conv.arg_registers outer_call_conv
