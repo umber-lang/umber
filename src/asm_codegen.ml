@@ -1657,6 +1657,12 @@ let compile_entry_module ~module_paths ~entry_file =
          ; call_conv = Umber
          ; arity = 0
          }));
+  Function_builder.add_code
+    t.main_function
+    (Mov
+       { dst = Simple_value (Register (Real (Call_conv.return_value_register C)))
+       ; src = Simple_value (Constant (Int 0))
+       });
   Function_builder.add_terminal t.main_function Ret;
   compile_to_object_file (to_program t) ~output_file:entry_file
 ;;
