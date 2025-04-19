@@ -563,36 +563,51 @@ end = struct
       { label; code; terminal })
   ;;
 
-  (* TODO: Could add frame pointer handling here. *)
-  (** Add code to allocate space for stack variables and release it later. *)
-  let add_function_prologue_and_epilogue ~basic_blocks ~spilled_count
-    : _ Basic_block.t list
+  (* TODO: Could add frame pointer handling here (enter/leave). *)
+  (* TODO: It's not required for leaf functions (functions with no calls) to have the
+     stack be 16-byte aligned. We could omit that. We also don't necessarily need to
+     maintain this invariant all the time - it's only needed when calling C functions. *)
+  (** Add code to allocate space for stack variables and release it later. Also ensure
+      that the stack is 16-byte aligned within the function body, which is required for
+      the C calling convention. *)
+  let add_function_prologue_and_epilogue
+    ~(basic_blocks : _ Basic_block.t list)
+    ~spilled_count
     =
-    if spilled_count = 0
-    then basic_blocks
-    else (
-      let entry_bb = List.hd_exn basic_blocks in
+    let stack_space =
+      (* When entering a function, rsp will be misaligned due to the call instruction
+         pushing the return address. So we need to add an odd number of words to it to get
+         back to an even alignment. *)
+      let n = if spilled_count mod 2 = 1 then spilled_count else spilled_count + 1 in
+      8 * n
+    in
+    match basic_blocks with
+    | [] -> compiler_bug [%message "Empty function"]
+    | entry_bb :: all_but_entry ->
       let allocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
         Sub
           { dst = Simple_value (Register Rsp)
-          ; src = Simple_value (Constant (Int (8 * spilled_count)))
+          ; src = Simple_value (Constant (Int stack_space))
           }
-      in
-      let all_but_last, exit_bb =
-        List.split_last basic_blocks |> Option.value_exn ~here:[%here]
       in
       let deallocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
         Add
           { dst = Simple_value (Register Rsp)
-          ; src = Simple_value (Constant (Int (8 * spilled_count)))
+          ; src = Simple_value (Constant (Int stack_space))
           }
       in
-      let other_bbs = List.tl all_but_last |> Option.value ~default:[] in
-      List.concat
-        [ [ { entry_bb with code = allocate_stack :: entry_bb.code } ]
-        ; other_bbs
-        ; [ { exit_bb with code = exit_bb.code @ [ deallocate_stack ] } ]
-        ])
+      (match List.split_last all_but_entry with
+       | None ->
+         [ { entry_bb with
+             code = allocate_stack :: (entry_bb.code @ [ deallocate_stack ])
+           }
+         ]
+       | Some (other_bbs, exit_bb) ->
+         List.concat
+           [ [ { entry_bb with code = allocate_stack :: entry_bb.code } ]
+           ; other_bbs
+           ; [ { exit_bb with code = exit_bb.code @ [ deallocate_stack ] } ]
+           ])
   ;;
 
   let allocate ~(basic_blocks : Register.t Basic_block.t list) ~register_counter =
@@ -1738,13 +1753,18 @@ let%expect_test "hello world, from MIR" =
                section   .text
 
     umber_main#HelloWorld:
+               sub       rsp, 8
                mov       rdi, string.210886959
                call      Std.Prelude.print
-               mov       qword [HelloWorld.#binding.1], rax
+               mov       r9, rax
+               mov       qword [HelloWorld.#binding.1], r9
+               add       rsp, 8
                ret
 
     Std.Prelude.print:
+               sub       rsp, 8
                call      umber_print_endline wrt ..plt
+               add       rsp, 8
                ret
 
                section   .rodata
