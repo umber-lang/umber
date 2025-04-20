@@ -1,0 +1,38 @@
+           default   rel
+           global    umber_main#SelfReferentialImport
+           global    SelfReferentialImport.#binding.1
+           global    SelfReferentialImport.goose
+           global    string.850259642:weak
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#SelfReferentialImport:
+           sub       rsp, 8
+           mov       rax, 1
+           call      SelfReferentialImport.goose
+           mov       r9, rax
+           mov       qword [SelfReferentialImport.#binding.1], r9
+           add       rsp, 8
+           ret       
+
+SelfReferentialImport.goose:
+           sub       rsp, 8
+           mov       rax, string.850259642
+           call      Std.Prelude.print wrt ..plt
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+string.850259642:
+           dw        32772
+           dw        1
+           dd        0
+           db        `Honk!\x0\x0\x2`
+
+           section   .bss
+           sectalign 8
+SelfReferentialImport.#binding.1:
+           resq      1
+

@@ -1,0 +1,107 @@
+           default   rel
+           global    umber_main#ModuleSig
+           global    ModuleSig.my_range
+           global    ModuleSig.is_10_in_range
+           global    ModuleSig.#binding.1
+           global    ModuleSig.Range...__#13270071
+           global    ModuleSig.Range.between
+           global    ModuleSig.Range.elem
+           global    string.0:weak
+           global    int.1:weak
+           global    int.10:weak
+           extern    Std.Prelude.Operators.__#845057057
+           extern    Std.Prelude.print_bool
+           extern    Std.Prelude.Operators.__#506761450
+           extern    umber_gc_alloc
+           extern    Std.Prelude.Operators.__#5678180
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#ModuleSig:
+           sub       rsp, 8
+           mov       rax, int.1
+           mov       rbx, int.10
+           call      ModuleSig.Range.between
+           mov       qword [ModuleSig.my_range], rax
+           mov       rax, int.10
+           mov       rbx, qword [ModuleSig.my_range]
+           call      ModuleSig.Range.elem
+           mov       qword [ModuleSig.is_10_in_range], rax
+           mov       rax, qword [ModuleSig.is_10_in_range]
+           call      Std.Prelude.print_bool wrt ..plt
+           mov       qword [rsp], rax
+           mov       rax, string.0
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       r9, rax
+           mov       qword [ModuleSig.#binding.1], r9
+           add       rsp, 8
+           ret       
+
+ModuleSig.Range...__#13270071:
+           sub       rsp, 8
+           call      ModuleSig.Range.between
+           add       rsp, 8
+           ret       
+
+ModuleSig.Range.between:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], r13
+           mov       qword [rax + 16], rbx
+           add       rsp, 8
+           ret       
+
+ModuleSig.Range.elem:
+           sub       rsp, 24
+           mov       qword [rsp + 16], rax
+           mov       qword [rsp], rbx
+           mov       r9, qword [rsp]
+           mov       rax, qword [r9 + 8]
+           mov       rbx, qword [rsp + 16]
+           call      Std.Prelude.Operators.__#845057057 wrt ..plt
+           mov       qword [rsp + 8], rax
+           mov       r9, qword [rsp]
+           mov       rbx, qword [r9 + 16]
+           mov       rax, qword [rsp + 16]
+           call      Std.Prelude.Operators.__#845057057 wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.Operators.__#5678180 wrt ..plt
+           add       rsp, 24
+           ret       
+
+           section   .rodata
+           sectalign 8
+string.0:
+           dw        32772
+           dw        1
+           dd        0
+           db        `\x0\x0\x0\x0\x0\x0\x0\x7`
+int.1:
+           dw        32769
+           dw        1
+           dd        0
+           dq        1
+int.10:
+           dw        32769
+           dw        1
+           dd        0
+           dq        10
+
+           section   .bss
+           sectalign 8
+ModuleSig.my_range:
+           resq      1
+ModuleSig.is_10_in_range:
+           resq      1
+ModuleSig.#binding.1:
+           resq      1
+

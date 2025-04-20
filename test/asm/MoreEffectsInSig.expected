@@ -1,0 +1,36 @@
+           default   rel
+           global    umber_main#MoreEffectsInSig
+           global    MoreEffectsInSig.equivalent_with_different_vars
+           global    MoreEffectsInSig.more_effects_in_sig
+           extern    Std.Prelude.Operators.__#506761450
+
+           section   .text
+
+umber_main#MoreEffectsInSig:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+MoreEffectsInSig.equivalent_with_different_vars:
+           sub       rsp, 24
+           mov       r9, rax
+           mov       qword [rsp], rbx
+           mov       rax, r9
+           mov       rbx, 1
+           call      qword [r9 + 8]
+           mov       qword [rsp + 8], rax
+           mov       rax, qword [rsp]
+           mov       rbx, 1
+           mov       r9, qword [rsp]
+           call      qword [r9 + 8]
+           mov       rbx, rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 24
+           ret       
+
+MoreEffectsInSig.more_effects_in_sig:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+

@@ -1,0 +1,54 @@
+           default   rel
+           global    umber_main#Constructors
+           global    Constructors.A.Foo
+           global    Constructors.B.Foo
+           global    Constructors.Wrap.my_id
+           global    Constructors.B.of_a
+           global    Constructors.Wrap.Wrap
+           extern    umber_gc_alloc
+
+           section   .text
+
+umber_main#Constructors:
+           sub       rsp, 8
+           mov       qword [Constructors.A.Foo], 1
+           mov       qword [Constructors.B.Foo], 1
+           add       rsp, 8
+           ret       
+
+Constructors.Wrap.my_id:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       r9, qword [r13 + 8]
+           mov       qword [rax + 8], r9
+           add       rsp, 8
+           ret       
+
+Constructors.B.of_a:
+           sub       rsp, 8
+           mov       rax, qword [Constructors.B.Foo]
+           add       rsp, 8
+           ret       
+
+Constructors.Wrap.Wrap:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+
+           section   .bss
+           sectalign 8
+Constructors.A.Foo:
+           resq      1
+Constructors.B.Foo:
+           resq      1
+

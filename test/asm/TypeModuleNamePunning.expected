@@ -1,0 +1,50 @@
+           default   rel
+           global    umber_main#TypeModuleNamePunning
+           global    TypeModuleNamePunning.int
+           global    TypeModuleNamePunning.int__#433785839
+           global    TypeModuleNamePunning.string
+           global    TypeModuleNamePunning.float
+           global    int.5:weak
+           global    string.1010221259:weak
+           global    float.5.000000:weak
+
+           section   .text
+
+umber_main#TypeModuleNamePunning:
+           sub       rsp, 8
+           mov       qword [TypeModuleNamePunning.int], int.5
+           mov       qword [TypeModuleNamePunning.int__#433785839], int.5
+           mov       qword [TypeModuleNamePunning.string], string.1010221259
+           mov       qword [TypeModuleNamePunning.float], float.5.000000
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+int.5:
+           dw        32769
+           dw        1
+           dd        0
+           dq        5
+string.1010221259:
+           dw        32772
+           dw        1
+           dd        0
+           db        `5\x0\x0\x0\x0\x0\x0\x6`
+float.5.000000:
+           dw        32771
+           dw        1
+           dd        0
+           dq        5.000000
+
+           section   .bss
+           sectalign 8
+TypeModuleNamePunning.int:
+           resq      1
+TypeModuleNamePunning.int__#433785839:
+           resq      1
+TypeModuleNamePunning.string:
+           resq      1
+TypeModuleNamePunning.float:
+           resq      1
+

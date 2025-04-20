@@ -1,0 +1,170 @@
+           default   rel
+           global    umber_main#TypeChecking
+           global    TypeChecking.#binding.1
+           global    TypeChecking.id_alias
+           global    TypeChecking.five
+           global    TypeChecking.id_for_chars
+           global    TypeChecking.if_
+           global    TypeChecking.if__#516730556
+           global    TypeChecking.id
+           global    TypeChecking.id_for_floats
+           global    TypeChecking.id_for_bools
+           global    TypeChecking.__#1006111891
+           global    TypeChecking.#fun.1
+           global    TypeChecking.id_for_ints
+           global    TypeChecking.id#closure:weak
+           global    TypeChecking.id#closure_wrapper_fun:weak
+           global    int.5:weak
+           extern    umber_gc_alloc
+
+           section   .text
+
+umber_main#TypeChecking:
+           sub       rsp, 8
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       r9, rax
+           mov       word [r9], 0
+           mov       word [r9 + 2], 2
+           mov       qword [r9 + 8], TypeChecking.id#closure
+           mov       qword [r9 + 16], int.5
+           mov       qword [TypeChecking.#binding.1], r9
+           mov       r9, qword [TypeChecking.#binding.1]
+           mov       r9, qword [r9 + 8]
+           mov       qword [TypeChecking.id_alias], r9
+           mov       r9, qword [TypeChecking.#binding.1]
+           mov       r9, qword [r9 + 16]
+           mov       qword [TypeChecking.five], r9
+           add       rsp, 8
+           ret       
+
+TypeChecking.id_for_chars:
+           sub       rsp, 8
+           call      TypeChecking.id
+           add       rsp, 8
+           ret       
+
+TypeChecking.if_:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 32
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 12289
+           mov       word [rax + 2], 3
+           mov       qword [rax + 8], TypeChecking.#fun.1
+           mov       qword [rax + 16], rbx
+           mov       qword [rax + 24], r13
+           add       rsp, 8
+           ret       
+
+TypeChecking.if__#516730556:
+           sub       rsp, 8
+           mov       qword [rsp], rax
+           mov       r9, rbx
+           cmp       rdi, 3
+           jnz       .cond_assign.if_none_matched#3
+.cond_assign.vars0#1:
+           jmp       .cond_assign.body#2
+.cond_assign.body#2:
+           mov       rax, qword [rsp]
+           mov       rbx, 1
+           mov       r9, qword [rsp]
+           call      qword [r9 + 8]
+           jmp       .cond_assign.merge#4
+.cond_assign.if_none_matched#3:
+           mov       rax, r9
+           mov       rbx, 1
+           call      qword [r9 + 8]
+           jmp       .cond_assign.merge#4
+.cond_assign.merge#4:
+           add       rsp, 8
+           ret       
+
+TypeChecking.id:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+TypeChecking.id_for_floats:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+TypeChecking.id_for_bools:
+           sub       rsp, 8
+           call      TypeChecking.id
+           add       rsp, 8
+           ret       
+
+TypeChecking.__#1006111891:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       r10, r9
+           mov       rbx, rax
+           mov       rax, r10
+           call      qword [r9 + 8]
+           add       rsp, 8
+           ret       
+
+TypeChecking.#fun.1:
+           sub       rsp, 8
+           mov       qword [rsp], rax
+           cmp       rbx, 3
+           jnz       .cond_assign.if_none_matched#3
+.cond_assign.vars0#1:
+           jmp       .cond_assign.body#2
+.cond_assign.body#2:
+           mov       r9, qword [rsp]
+           mov       r10, qword [r9 + 24]
+           mov       r9, qword [rsp]
+           mov       rax, qword [r9 + 24]
+           mov       rbx, 1
+           call      qword [r10 + 8]
+           jmp       .cond_assign.merge#4
+.cond_assign.if_none_matched#3:
+           mov       r9, qword [rsp]
+           mov       r9, qword [r9 + 16]
+           mov       r10, qword [rsp]
+           mov       rax, qword [r10 + 16]
+           mov       rbx, 1
+           call      qword [r9 + 8]
+           jmp       .cond_assign.merge#4
+.cond_assign.merge#4:
+           add       rsp, 8
+           ret       
+
+TypeChecking.id_for_ints:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+TypeChecking.id#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rax, r9
+           call      TypeChecking.id
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+int.5:
+           dw        32769
+           dw        1
+           dd        0
+           dq        5
+TypeChecking.id#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        TypeChecking.id#closure_wrapper_fun
+
+           section   .bss
+           sectalign 8
+TypeChecking.#binding.1:
+           resq      1
+TypeChecking.id_alias:
+           resq      1
+TypeChecking.five:
+           resq      1
+

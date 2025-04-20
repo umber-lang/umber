@@ -1,0 +1,331 @@
+           default   rel
+           global    umber_main#Operators
+           global    Operators.unicode_my_dudes
+           global    Operators._.1
+           global    Operators.right_section.1
+           global    Operators.true
+           global    Operators.four
+           global    Operators.#binding.1
+           global    Operators.left_section.1
+           global    Operators.one
+           global    Operators.#binding.2
+           global    Operators.#fun.1
+           global    Operators.left_section
+           global    Operators.__#765322566
+           global    Operators.right_section
+           global    Operators.#fun.3
+           global    Operators.~~~
+           global    Operators..
+           global    Operators.#fun.2
+           global    Operators.#fun.4
+           global    Operators.#fun.5
+           global    Operators.#fun.3#closure:weak
+           global    Operators.#fun.3#closure_wrapper_fun:weak
+           global    int.5:weak
+           global    string.322759106:weak
+           global    string.82679040:weak
+           global    int.3:weak
+           global    string.602880616:weak
+           global    int.11:weak
+           global    int.4:weak
+           global    string.648563838:weak
+           global    int.2:weak
+           global    string.120385329:weak
+           global    string.455860649:weak
+           global    string.640172348:weak
+           extern    Std.Prelude.Operators.__#358075620
+           extern    Std.Prelude.Int.to_string
+           extern    Std.Prelude.Bool.to_string
+           extern    Std.Prelude.Operators.__#506761450
+           extern    umber_gc_alloc
+           extern    Std.Prelude.Operators.__#411843497
+           extern    Std.Prelude.Operators.__#664800900
+           extern    Std.Prelude.Operators..
+           extern    Std.Prelude.Operators.mod
+           extern    Std.Prelude.Operators.__#294461388
+           extern    Std.Prelude.List.Nil
+           extern    Std.Prelude.Operators.__#1049114386
+           extern    Std.Prelude.List.concat_map
+           extern    Std.Prelude.List.map
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#Operators:
+           sub       rsp, 8
+           mov       rax, string.640172348
+           mov       rbx, qword [Std.Prelude.List.Nil]
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       r9, string.602880616
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       qword [rsp], rax
+           mov       rax, string.120385329
+           mov       rbx, qword [Std.Prelude.List.Nil]
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       r9, string.82679040
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       r9, string.322759106
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Operators.__#765322566
+           mov       qword [Operators.unicode_my_dudes], rax
+           mov       rax, qword [Operators.unicode_my_dudes]
+           mov       rbx, Operators.#fun.3#closure
+           call      Std.Prelude.List.map wrt ..plt
+           mov       qword [Operators._.1], rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 12289
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], Operators.#fun.4
+           mov       qword [rax + 16], int.5
+           mov       qword [Operators.right_section.1], rax
+           mov       rax, int.11
+           mov       rbx, int.3
+           call      Std.Prelude.Operators.mod wrt ..plt
+           mov       r9, int.2
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           mov       rbx, int.4
+           call      Std.Prelude.Operators.__#664800900 wrt ..plt
+           mov       qword [Operators.true], rax
+           mov       rax, int.2
+           mov       rbx, int.2
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           mov       qword [Operators.four], rax
+           mov       rax, qword [Operators.four]
+           call      Std.Prelude.Int.to_string wrt ..plt
+           mov       r9, string.455860649
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           call      Std.Prelude.print wrt ..plt
+           mov       qword [Operators.#binding.1], rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 12289
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], Operators.#fun.5
+           mov       qword [rax + 16], int.2
+           mov       qword [Operators.left_section.1], rax
+           mov       rax, int.5
+           mov       rbx, int.2
+           call      Std.Prelude.Operators.mod wrt ..plt
+           mov       qword [Operators.one], rax
+           mov       rax, qword [Operators.true]
+           call      Std.Prelude.Bool.to_string wrt ..plt
+           mov       r9, string.648563838
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           call      Std.Prelude.print wrt ..plt
+           mov       r9, rax
+           mov       qword [Operators.#binding.2], r9
+           add       rsp, 8
+           ret       
+
+Operators.#fun.1:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 2
+           mov       r9, qword [r13 + 16]
+           mov       qword [rax + 8], r9
+           mov       qword [rax + 16], rbx
+           add       rsp, 8
+           ret       
+
+Operators.left_section:
+           sub       rsp, 8
+           call      Operators.left_section.1
+           add       rsp, 8
+           ret       
+
+Operators.__#765322566:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 12289
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], Operators.#fun.2
+           mov       qword [rax + 16], rbx
+           mov       rbx, rax
+           mov       rax, r13
+           call      Std.Prelude.List.concat_map wrt ..plt
+           add       rsp, 8
+           ret       
+
+Operators.right_section:
+           sub       rsp, 8
+           call      Operators.right_section.1
+           add       rsp, 8
+           ret       
+
+Operators.#fun.3:
+           sub       rsp, 24
+           mov       qword [rsp + 8], rax
+           mov       r9, qword [rsp + 8]
+           mov       rax, qword [r9 + 8]
+           call      Std.Prelude.print wrt ..plt
+           mov       qword [rsp], rax
+           mov       r9, qword [rsp + 8]
+           mov       rax, qword [r9 + 16]
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 24
+           ret       
+
+Operators.~~~:
+           sub       rsp, 8
+           mov       rax, 1
+           add       rsp, 8
+           ret       
+
+Operators..:
+           sub       rsp, 8
+           call      Std.Prelude.Operators.. wrt ..plt
+           add       rsp, 8
+           ret       
+
+Operators.#fun.2:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 12289
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], Operators.#fun.1
+           mov       qword [rax + 16], rbx
+           mov       r9, qword [r13 + 16]
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.List.map wrt ..plt
+           add       rsp, 8
+           ret       
+
+Operators.#fun.4:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rbx, qword [rax + 16]
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           add       rsp, 8
+           ret       
+
+Operators.#fun.5:
+           sub       rsp, 8
+           mov       rax, qword [rax + 16]
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           add       rsp, 8
+           ret       
+
+Operators.#fun.3#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rax, r9
+           call      Operators.#fun.3
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+int.5:
+           dw        32769
+           dw        1
+           dd        0
+           dq        5
+string.322759106:
+           dw        32772
+           dw        2
+           dd        0
+           db        `cartesian\x0\x0\x0\x0\x0\x0\x6`
+string.82679040:
+           dw        32772
+           dw        1
+           dd        0
+           db        `product\x0`
+int.3:
+           dw        32769
+           dw        1
+           dd        0
+           dq        3
+string.602880616:
+           dw        32772
+           dw        1
+           dd        0
+           db        `damn\x0\x0\x0\x3`
+int.11:
+           dw        32769
+           dw        1
+           dd        0
+           dq        11
+int.4:
+           dw        32769
+           dw        1
+           dd        0
+           dq        4
+string.648563838:
+           dw        32772
+           dw        1
+           dd        0
+           db        `true = \x0`
+int.2:
+           dw        32769
+           dw        1
+           dd        0
+           dq        2
+string.120385329:
+           dw        32772
+           dw        1
+           dd        0
+           db        `maybe?\x0\x1`
+string.455860649:
+           dw        32772
+           dw        1
+           dd        0
+           db        `four = \x0`
+string.640172348:
+           dw        32772
+           dw        1
+           dd        0
+           db        `ok\x0\x0\x0\x0\x0\x5`
+Operators.#fun.3#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Operators.#fun.3#closure_wrapper_fun
+
+           section   .bss
+           sectalign 8
+Operators.unicode_my_dudes:
+           resq      1
+Operators._.1:
+           resq      1
+Operators.right_section.1:
+           resq      1
+Operators.true:
+           resq      1
+Operators.four:
+           resq      1
+Operators.#binding.1:
+           resq      1
+Operators.left_section.1:
+           resq      1
+Operators.one:
+           resq      1
+Operators.#binding.2:
+           resq      1
+

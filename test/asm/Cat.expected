@@ -1,0 +1,46 @@
+           default   rel
+           global    umber_main#Cat
+           global    Cat.#binding.1
+           global    string.50738011:weak
+           extern    Std.Prelude.print_string
+           extern    Std.Prelude.read_line
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#Cat:
+           sub       rsp, 8
+           mov       rax, 1
+           call      Std.Prelude.read_line wrt ..plt
+           cmp       rax, 1
+           jnz       .cond_assign.if_none_matched#3
+.cond_assign.vars0#1:
+           jmp       .cond_assign.body#2
+.cond_assign.body#2:
+           mov       rax, string.50738011
+           call      Std.Prelude.print wrt ..plt
+           mov       r9, rax
+           jmp       .cond_assign.merge#4
+.cond_assign.if_none_matched#3:
+           mov       rax, qword [rax + 8]
+           call      Std.Prelude.print_string wrt ..plt
+           mov       r9, rax
+           jmp       .cond_assign.merge#4
+.cond_assign.merge#4:
+           mov       qword [Cat.#binding.1], r9
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+string.50738011:
+           dw        32772
+           dw        1
+           dd        0
+           db        `EOF\x0\x0\x0\x0\x4`
+
+           section   .bss
+           sectalign 8
+Cat.#binding.1:
+           resq      1
+

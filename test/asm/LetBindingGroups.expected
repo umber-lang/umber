@@ -1,0 +1,227 @@
+           default   rel
+           global    umber_main#LetBindingGroups
+           global    LetBindingGroups._.1
+           global    LetBindingGroups.a
+           global    LetBindingGroups._.2
+           global    LetBindingGroups.b
+           global    LetBindingGroups.bottom
+           global    LetBindingGroups.go_right.1
+           global    LetBindingGroups.fun
+           global    LetBindingGroups.bottom_again.1
+           global    LetBindingGroups.go_left.1
+           global    string.104025972:weak
+           global    int.5:weak
+           global    string.103115772:weak
+           global    int.1:weak
+           global    string.0:weak
+           global    int.3:weak
+           global    int.4:weak
+           global    int.2:weak
+           global    string.314114978:weak
+           global    string.273264163:weak
+           global    int.6:weak
+           global    int.17:weak
+           global    int.8:weak
+           extern    Std.Prelude.Operators.__#358075620
+           extern    Std.Prelude.Operators.__#72260286
+           extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.Operators.__#664800900
+           extern    Std.Prelude.Operators.__#294461388
+           extern    Std.Prelude.Operators.__#323999091
+           extern    Std.Prelude.Operators.__#892075468
+           extern    Std.Prelude.List.Nil
+           extern    Std.Prelude.print_int
+           extern    Std.Prelude.Operators.__#1049114386
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#LetBindingGroups:
+           sub       rsp, 40
+           mov       rax, int.5
+           mov       rbx, int.2
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           mov       qword [rsp + 8], rax
+           mov       rax, int.5
+           mov       rbx, int.3
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           mov       qword [rsp], rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.print_int wrt ..plt
+           mov       qword [rsp + 24], rax
+           mov       rax, string.0
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 24]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rsp + 16], rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.print_int wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 16]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [LetBindingGroups._.1], rax
+           mov       qword [LetBindingGroups.a], int.1
+           mov       rax, string.103115772
+           mov       rbx, qword [Std.Prelude.List.Nil]
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       r9, string.314114978
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       r9, string.104025972
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       r9, string.273264163
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       rax, int.1
+           mov       rbx, int.2
+           call      Std.Prelude.Operators.__#664800900 wrt ..plt
+           mov       qword [rsp + 32], rax
+           mov       rax, int.3
+           mov       rbx, int.4
+           call      Std.Prelude.Operators.__#664800900 wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 32]
+           call      Std.Prelude.Operators.__#323999091 wrt ..plt
+           mov       qword [LetBindingGroups._.2], rax
+           mov       rax, qword [LetBindingGroups.a]
+           mov       rbx, int.6
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           mov       r9, rax
+           mov       qword [LetBindingGroups.b], r9
+           add       rsp, 40
+           ret       
+
+LetBindingGroups.bottom:
+           sub       rsp, 8
+           call      LetBindingGroups.bottom_again.1
+           add       rsp, 8
+           ret       
+
+LetBindingGroups.go_right.1:
+           sub       rsp, 8
+           call      LetBindingGroups.go_left.1
+           add       rsp, 8
+           ret       
+
+LetBindingGroups.fun:
+           sub       rsp, 24
+           mov       qword [rsp + 8], rax
+           mov       rax, qword [rsp + 8]
+           mov       rbx, int.2
+           call      Std.Prelude.Operators.__#892075468 wrt ..plt
+           mov       rbx, int.2
+           call      Std.Prelude.Operators.__#72260286 wrt ..plt
+           mov       rbx, qword [rsp + 8]
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           mov       qword [rsp], rax
+           mov       rax, qword [rsp + 8]
+           mov       rbx, int.8
+           call      Std.Prelude.Operators.__#72260286 wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           mov       rbx, int.5
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           add       rsp, 24
+           ret       
+
+LetBindingGroups.bottom_again.1:
+           sub       rsp, 8
+           mov       rax, int.17
+           call      LetBindingGroups.go_left.1
+           add       rsp, 8
+           ret       
+
+LetBindingGroups.go_left.1:
+           sub       rsp, 8
+           call      LetBindingGroups.go_right.1
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+string.104025972:
+           dw        32772
+           dw        1
+           dd        0
+           db        `list\x0\x0\x0\x3`
+int.5:
+           dw        32769
+           dw        1
+           dd        0
+           dq        5
+string.103115772:
+           dw        32772
+           dw        1
+           dd        0
+           db        `words\x0\x0\x2`
+int.1:
+           dw        32769
+           dw        1
+           dd        0
+           dq        1
+string.0:
+           dw        32772
+           dw        1
+           dd        0
+           db        `\x0\x0\x0\x0\x0\x0\x0\x7`
+int.3:
+           dw        32769
+           dw        1
+           dd        0
+           dq        3
+int.4:
+           dw        32769
+           dw        1
+           dd        0
+           dq        4
+int.2:
+           dw        32769
+           dw        1
+           dd        0
+           dq        2
+string.314114978:
+           dw        32772
+           dw        1
+           dd        0
+           db        `of\x0\x0\x0\x0\x0\x5`
+string.273264163:
+           dw        32772
+           dw        1
+           dd        0
+           db        `a\x0\x0\x0\x0\x0\x0\x6`
+int.6:
+           dw        32769
+           dw        1
+           dd        0
+           dq        6
+int.17:
+           dw        32769
+           dw        1
+           dd        0
+           dq        17
+int.8:
+           dw        32769
+           dw        1
+           dd        0
+           dq        8
+
+           section   .bss
+           sectalign 8
+LetBindingGroups._.1:
+           resq      1
+LetBindingGroups.a:
+           resq      1
+LetBindingGroups._.2:
+           resq      1
+LetBindingGroups.b:
+           resq      1
+

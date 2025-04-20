@@ -1,0 +1,30 @@
+           default   rel
+           global    umber_main#Option
+           global    Option.None
+           global    Option.Some
+           extern    umber_gc_alloc
+
+           section   .text
+
+umber_main#Option:
+           sub       rsp, 8
+           mov       qword [Option.None], 1
+           add       rsp, 8
+           ret       
+
+Option.Some:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+
+           section   .bss
+           sectalign 8
+Option.None:
+           resq      1
+

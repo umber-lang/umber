@@ -1,0 +1,35 @@
+           default   rel
+           global    umber_main#Imports
+           global    Imports.Bad_style_though
+           global    Imports.You_can_define_types_in_between_imports
+           extern    umber_gc_alloc
+
+           section   .text
+
+umber_main#Imports:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+Imports.Bad_style_though:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 1
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+
+Imports.You_can_define_types_in_between_imports:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+

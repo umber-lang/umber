@@ -1,0 +1,149 @@
+           default   rel
+           global    umber_main#Classics
+           global    Classics.#binding.1
+           global    Classics.fib
+           global    Classics.fact
+           global    string.1030076252:weak
+           global    int.5:weak
+           global    int.1:weak
+           global    int.2:weak
+           global    int.0:weak
+           global    string.0:weak
+           extern    Std.Prelude.Operators.__#72260286
+           extern    Std.Prelude.Operators.__#294461388
+           extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.print_int
+           extern    Std.Prelude.Operators.__#1049114386
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#Classics:
+           sub       rsp, 24
+           mov       rax, string.1030076252
+           call      Std.Prelude.print wrt ..plt
+           mov       qword [rsp + 8], rax
+           mov       rax, int.5
+           call      Classics.fact
+           call      Std.Prelude.print_int wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rsp], rax
+           mov       rax, string.0
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       r9, rax
+           mov       qword [Classics.#binding.1], r9
+           add       rsp, 24
+           ret       
+
+Classics.fib:
+           sub       rsp, 24
+           mov       qword [rsp + 8], rax
+           mov       r9, qword [int.0 + 8]
+           mov       r10, qword [rsp + 8]
+           cmp       qword [r10 + 8], r9
+           jnz       .cond_assign.cond1#1
+.cond_assign.vars0#2:
+           jmp       .cond_assign.body#4
+.cond_assign.cond1#1:
+           mov       r10, qword [int.1 + 8]
+           mov       r9, qword [rsp + 8]
+           cmp       qword [r9 + 8], r10
+           jnz       .cond_assign.if_none_matched#5
+.cond_assign.vars1#3:
+           jmp       .cond_assign.body#4
+.cond_assign.body#4:
+           mov       rax, int.1
+           jmp       .cond_assign.merge#6
+.cond_assign.if_none_matched#5:
+           mov       rax, qword [rsp + 8]
+           mov       rbx, int.1
+           call      Std.Prelude.Operators.__#72260286 wrt ..plt
+           call      Classics.fib
+           mov       qword [rsp], rax
+           mov       rbx, int.2
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.Operators.__#72260286 wrt ..plt
+           call      Classics.fib
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           jmp       .cond_assign.merge#6
+.cond_assign.merge#6:
+           add       rsp, 24
+           ret       
+
+Classics.fact:
+           sub       rsp, 8
+           mov       qword [rsp], rax
+           mov       r9, qword [int.0 + 8]
+           mov       r10, qword [rsp]
+           cmp       qword [r10 + 8], r9
+           jnz       .cond_assign.cond1#1
+.cond_assign.vars0#2:
+           jmp       .cond_assign.body#4
+.cond_assign.cond1#1:
+           mov       r9, qword [int.1 + 8]
+           mov       r10, qword [rsp]
+           cmp       qword [r10 + 8], r9
+           jnz       .cond_assign.if_none_matched#5
+.cond_assign.vars1#3:
+           jmp       .cond_assign.body#4
+.cond_assign.body#4:
+           mov       rax, int.1
+           jmp       .cond_assign.merge#6
+.cond_assign.if_none_matched#5:
+           mov       rax, qword [rsp]
+           mov       rbx, int.1
+           call      Std.Prelude.Operators.__#72260286 wrt ..plt
+           call      Classics.fact
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           jmp       .cond_assign.merge#6
+.cond_assign.merge#6:
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+string.1030076252:
+           dw        32772
+           dw        1
+           dd        0
+           db        `5! is:\x0\x1`
+int.5:
+           dw        32769
+           dw        1
+           dd        0
+           dq        5
+int.1:
+           dw        32769
+           dw        1
+           dd        0
+           dq        1
+int.2:
+           dw        32769
+           dw        1
+           dd        0
+           dq        2
+int.0:
+           dw        32769
+           dw        1
+           dd        0
+           dq        0
+string.0:
+           dw        32772
+           dw        1
+           dd        0
+           db        `\x0\x0\x0\x0\x0\x0\x0\x7`
+
+           section   .bss
+           sectalign 8
+Classics.#binding.1:
+           resq      1
+

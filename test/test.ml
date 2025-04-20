@@ -89,6 +89,7 @@ let test ~in_file =
       ~init:base_targets
       [ should_make_mir, (Mir, File mir_file : target)
       ; should_make_llvm, (Llvm, File llvm_file)
+      ; should_make_asm, (Asm, File asm_file)
       ; should_make_exe, (Exe, File tmp_exe_file)
       ]
       ~finish:Fn.id
@@ -104,9 +105,7 @@ let test ~in_file =
       | Parsing | Type_checking -> ast_file
       | Generating_mir -> mir_file
       | Generating_llvm -> llvm_file
-      | Generating_asm ->
-        (* TODO: Tests for asm? *)
-        "/dev/null"
+      | Generating_asm -> asm_file
       | Linking -> output_file
     in
     Out_channel.with_file file ~f:(fun out ->

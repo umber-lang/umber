@@ -1,0 +1,79 @@
+           default   rel
+           global    umber_main#CrossModuleUsage
+           global    CrossModuleUsage.source
+           global    CrossModuleUsage.empty
+           global    CrossModuleUsage.A.print_source
+           global    CrossModuleUsage.A.b
+           global    CrossModuleUsage.A.print
+           global    CrossModuleUsage.A.a
+           global    CrossModuleUsage.print_source
+           global    string.211144608:weak
+           extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.List.Nil
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#CrossModuleUsage:
+           sub       rsp, 8
+           mov       qword [CrossModuleUsage.source], string.211144608
+           mov       r9, qword [Std.Prelude.List.Nil]
+           mov       qword [CrossModuleUsage.empty], r9
+           add       rsp, 8
+           ret       
+
+CrossModuleUsage.A.print_source:
+           sub       rsp, 8
+           mov       rax, qword [CrossModuleUsage.source]
+           call      CrossModuleUsage.A.print
+           add       rsp, 8
+           ret       
+
+CrossModuleUsage.A.b:
+           sub       rsp, 8
+           mov       rax, 1
+           call      CrossModuleUsage.A.a
+           add       rsp, 8
+           ret       
+
+CrossModuleUsage.A.print:
+           sub       rsp, 8
+           call      Std.Prelude.print wrt ..plt
+           add       rsp, 8
+           ret       
+
+CrossModuleUsage.A.a:
+           sub       rsp, 8
+           mov       rax, 1
+           call      CrossModuleUsage.A.b
+           add       rsp, 8
+           ret       
+
+CrossModuleUsage.print_source:
+           sub       rsp, 8
+           mov       rax, 1
+           call      CrossModuleUsage.A.print_source
+           mov       qword [rsp], rax
+           mov       rax, qword [CrossModuleUsage.source]
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+string.211144608:
+           dw        32772
+           dw        4
+           dd        0
+           db        `everything depends on me\x0\x0\x0\x0\x0\x0\x0\x7`
+
+           section   .bss
+           sectalign 8
+CrossModuleUsage.source:
+           resq      1
+CrossModuleUsage.empty:
+           resq      1
+

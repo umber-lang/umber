@@ -1,0 +1,187 @@
+           default   rel
+           global    umber_main#AsPattern
+           global    AsPattern.pair
+           global    AsPattern.one
+           global    AsPattern.two
+           global    AsPattern.#binding.1
+           global    AsPattern.#fun.1
+           global    AsPattern.iter_pairs
+           global    AsPattern.#fun.1#closure:weak
+           global    AsPattern.#fun.1#closure_wrapper_fun:weak
+           global    int.1:weak
+           global    string.538056974:weak
+           global    int.2:weak
+           global    string.887054571:weak
+           global    string.135690797:weak
+           extern    Std.Prelude.Operators.__#358075620
+           extern    Std.Prelude.List.Nil
+           extern    Std.Prelude.Operators.__#506761450
+           extern    umber_gc_alloc
+           extern    Std.Prelude.Operators.__#411843497
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#AsPattern:
+           sub       rsp, 8
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       r9, rax
+           mov       word [r9], 0
+           mov       word [r9 + 2], 2
+           mov       qword [r9 + 8], int.1
+           mov       qword [r9 + 16], int.2
+           mov       qword [AsPattern.pair], r9
+           mov       r9, qword [AsPattern.pair]
+           mov       r9, qword [r9 + 8]
+           mov       qword [AsPattern.one], r9
+           mov       r9, qword [AsPattern.pair]
+           mov       r9, qword [r9 + 16]
+           mov       qword [AsPattern.two], r9
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       r13, rax
+           mov       word [r13], 0
+           mov       word [r13 + 2], 2
+           mov       qword [r13 + 8], string.887054571
+           mov       r9, qword [Std.Prelude.List.Nil]
+           mov       qword [r13 + 16], r9
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       r14, rax
+           mov       word [r14], 0
+           mov       word [r14 + 2], 2
+           mov       qword [r14 + 8], string.538056974
+           mov       qword [r14 + 16], r13
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], string.135690797
+           mov       qword [rax + 16], r14
+           mov       r9, AsPattern.#fun.1#closure
+           mov       rbx, rax
+           mov       rax, r9
+           call      AsPattern.iter_pairs
+           mov       r9, rax
+           mov       qword [AsPattern.#binding.1], r9
+           add       rsp, 8
+           ret       
+
+AsPattern.#fun.1:
+           sub       rsp, 8
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           call      Std.Prelude.print wrt ..plt
+           add       rsp, 8
+           ret       
+
+AsPattern.iter_pairs:
+           sub       rsp, 40
+           mov       qword [rsp + 16], rax
+           cmp       rbx, 1
+           jnz       .cond_assign.cond1#1
+.cond_assign.vars0#2:
+           jmp       .cond_assign.body#4
+.cond_assign.cond1#1:
+           test      rbx, 1
+           jz        .non_constant_tag_equals.is_block#9
+.codegen_and.mid#10:
+           jmp       .non_constant_tag_equals.end#8
+.non_constant_tag_equals.is_block#9:
+           cmp       word [rbx], 0
+           jmp       .non_constant_tag_equals.end#8
+.non_constant_tag_equals.end#8:
+           jz        .and.cond2#7
+.codegen_and.mid#11:
+           jmp       .and.end#6
+.and.cond2#7:
+           cmp       qword [rbx + 16], 1
+           jmp       .and.end#6
+.and.end#6:
+           jnz       .cond_assign.if_none_matched#5
+.cond_assign.vars1#3:
+           jmp       .cond_assign.body#4
+.cond_assign.body#4:
+           mov       rax, 1
+           jmp       .cond_assign.merge#12
+.cond_assign.if_none_matched#5:
+           mov       r9, qword [rbx + 16]
+           mov       qword [rsp + 24], r9
+           mov       r9, qword [rbx + 16]
+           mov       qword [rsp + 8], r9
+           mov       rax, qword [rsp + 16]
+           mov       rbx, qword [rbx + 8]
+           mov       r9, qword [rsp + 8]
+           mov       rdi, qword [r9 + 8]
+           mov       r9, qword [rsp + 16]
+           call      qword [r9 + 8]
+           mov       qword [rsp], rax
+           mov       r9, qword [rsp + 8]
+           mov       rax, qword [r9 + 8]
+           mov       r9, qword [rsp + 24]
+           mov       rbx, qword [r9 + 16]
+           call      Std.Prelude.Operators.__#358075620 wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 16]
+           call      AsPattern.iter_pairs
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           jmp       .cond_assign.merge#12
+.cond_assign.merge#12:
+           add       rsp, 40
+           ret       
+
+AsPattern.#fun.1#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rdi
+           mov       rax, rbx
+           mov       rbx, r9
+           call      AsPattern.#fun.1
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+int.1:
+           dw        32769
+           dw        1
+           dd        0
+           dq        1
+string.538056974:
+           dw        32772
+           dw        1
+           dd        0
+           db        `bar\x0\x0\x0\x0\x4`
+int.2:
+           dw        32769
+           dw        1
+           dd        0
+           dq        2
+string.887054571:
+           dw        32772
+           dw        1
+           dd        0
+           db        `baz\x0\x0\x0\x0\x4`
+string.135690797:
+           dw        32772
+           dw        1
+           dd        0
+           db        `foo\x0\x0\x0\x0\x4`
+AsPattern.#fun.1#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        AsPattern.#fun.1#closure_wrapper_fun
+
+           section   .bss
+           sectalign 8
+AsPattern.pair:
+           resq      1
+AsPattern.one:
+           resq      1
+AsPattern.two:
+           resq      1
+AsPattern.#binding.1:
+           resq      1
+

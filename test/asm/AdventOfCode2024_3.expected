@@ -1,0 +1,10 @@
+           default   rel
+           global    umber_main#AdventOfCode2024_3
+
+           section   .text
+
+umber_main#AdventOfCode2024_3:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+

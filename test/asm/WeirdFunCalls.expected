@@ -1,0 +1,155 @@
+           default   rel
+           global    umber_main#WeirdFunCalls
+           global    WeirdFunCalls.#binding.1
+           global    WeirdFunCalls.if_
+           global    WeirdFunCalls.#binding.2
+           global    WeirdFunCalls.#binding.3
+           global    WeirdFunCalls.print_twice
+           global    WeirdFunCalls.fun_call
+           global    WeirdFunCalls.#fun.2
+           global    WeirdFunCalls.print_twice#closure:weak
+           global    WeirdFunCalls.print_twice#closure_wrapper_fun:weak
+           global    WeirdFunCalls.#fun.2#closure:weak
+           global    WeirdFunCalls.#fun.2#closure_wrapper_fun:weak
+           global    Std.Prelude.print#closure:weak
+           global    Std.Prelude.print#closure_wrapper_fun:weak
+           global    string.241208202:weak
+           global    string.37409044:weak
+           global    string.341276961:weak
+           global    string.661034699:weak
+           extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.print
+
+           section   .text
+
+umber_main#WeirdFunCalls:
+           sub       rsp, 8
+           mov       rax, string.661034699
+           call      Std.Prelude.print wrt ..plt
+           mov       qword [WeirdFunCalls.#binding.1], rax
+           jmp       .cond_assign.body#2
+.cond_assign.body#2:
+           mov       r9, WeirdFunCalls.print_twice#closure
+           jmp       .cond_assign.merge#4
+.cond_assign.if_none_matched#3:
+           mov       r9, Std.Prelude.print#closure
+           jmp       .cond_assign.merge#4
+.cond_assign.merge#4:
+           mov       rax, r9
+           mov       rbx, string.241208202
+           call      qword [r9 + 8]
+           mov       qword [WeirdFunCalls.if_], rax
+           mov       rax, string.341276961
+           call      Std.Prelude.print wrt ..plt
+           mov       qword [WeirdFunCalls.#binding.2], rax
+           mov       rax, 1
+           call      WeirdFunCalls.fun_call
+           mov       r9, rax
+           mov       rax, r9
+           mov       rbx, 1
+           call      qword [r9 + 8]
+           mov       r9, rax
+           mov       qword [WeirdFunCalls.#binding.3], r9
+           add       rsp, 8
+           ret       
+
+WeirdFunCalls.print_twice:
+           sub       rsp, 24
+           mov       qword [rsp + 8], rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.print wrt ..plt
+           mov       qword [rsp], rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 24
+           ret       
+
+WeirdFunCalls.fun_call:
+           sub       rsp, 8
+           mov       rax, WeirdFunCalls.#fun.2#closure
+           add       rsp, 8
+           ret       
+
+WeirdFunCalls.#fun.2:
+           sub       rsp, 8
+           mov       rax, string.37409044
+           call      Std.Prelude.print wrt ..plt
+           add       rsp, 8
+           ret       
+
+WeirdFunCalls.print_twice#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rax, r9
+           call      WeirdFunCalls.print_twice
+           add       rsp, 8
+           ret       
+
+WeirdFunCalls.#fun.2#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rax, r9
+           call      WeirdFunCalls.#fun.2
+           add       rsp, 8
+           ret       
+
+Std.Prelude.print#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rax, r9
+           call      Std.Prelude.print
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+string.241208202:
+           dw        32772
+           dw        1
+           dd        0
+           db        `if\x0\x0\x0\x0\x0\x5`
+string.37409044:
+           dw        32772
+           dw        2
+           dd        0
+           db        `fun call\x0\x0\x0\x0\x0\x0\x0\x7`
+string.341276961:
+           dw        32772
+           dw        1
+           dd        0
+           db        `plain\x0\x0\x2`
+string.661034699:
+           dw        32772
+           dw        1
+           dd        0
+           db        `let\x0\x0\x0\x0\x4`
+WeirdFunCalls.print_twice#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        WeirdFunCalls.print_twice#closure_wrapper_fun
+WeirdFunCalls.#fun.2#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        WeirdFunCalls.#fun.2#closure_wrapper_fun
+Std.Prelude.print#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Std.Prelude.print#closure_wrapper_fun
+
+           section   .bss
+           sectalign 8
+WeirdFunCalls.#binding.1:
+           resq      1
+WeirdFunCalls.if_:
+           resq      1
+WeirdFunCalls.#binding.2:
+           resq      1
+WeirdFunCalls.#binding.3:
+           resq      1
+

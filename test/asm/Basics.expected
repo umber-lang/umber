@@ -1,0 +1,141 @@
+           default   rel
+           global    umber_main#Basics
+           global    Basics.Red
+           global    Basics.Blue
+           global    Basics.Green
+           global    Basics.Yellow
+           global    Basics.Purple
+           global    Basics.false
+           global    Basics.true
+           global    Basics.xyz
+           global    Basics._.1
+           global    Basics.Expanded
+           global    Basics.Regular
+           global    Basics.Point3
+           global    int.1:weak
+           global    int.2:weak
+           global    float.2.500000:weak
+           global    int.3:weak
+           global    float.1.000000:weak
+           extern    umber_gc_alloc
+
+           section   .text
+
+umber_main#Basics:
+           sub       rsp, 8
+           mov       qword [Basics.Red], 1
+           mov       qword [Basics.Blue], 3
+           mov       qword [Basics.Green], 1
+           mov       qword [Basics.Yellow], 3
+           mov       qword [Basics.Purple], 5
+           mov       qword [Basics.false], 1
+           mov       qword [Basics.true], 3
+           mov       rdi, 32
+           call      umber_gc_alloc wrt ..plt
+           mov       r9, rax
+           mov       word [r9], 0
+           mov       word [r9 + 2], 3
+           mov       qword [r9 + 8], int.1
+           mov       qword [r9 + 16], int.2
+           mov       qword [r9 + 24], int.3
+           mov       qword [Basics.xyz], r9
+           cmp       qword [Basics.false], 3
+           jnz       .cond_assign.if_none_matched#3
+.cond_assign.vars0#1:
+           jmp       .cond_assign.body#2
+.cond_assign.body#2:
+           mov       r9, float.1.000000
+           jmp       .cond_assign.merge#4
+.cond_assign.if_none_matched#3:
+           mov       r9, float.2.500000
+           jmp       .cond_assign.merge#4
+.cond_assign.merge#4:
+           mov       qword [Basics._.1], r9
+           add       rsp, 8
+           ret       
+
+Basics.Expanded:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 1
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+
+Basics.Regular:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+
+Basics.Point3:
+           sub       rsp, 8
+           mov       r14, rax
+           mov       r13, rdi
+           mov       rdi, 32
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 3
+           mov       qword [rax + 8], r14
+           mov       qword [rax + 16], rbx
+           mov       qword [rax + 24], r13
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+int.1:
+           dw        32769
+           dw        1
+           dd        0
+           dq        1
+int.2:
+           dw        32769
+           dw        1
+           dd        0
+           dq        2
+float.2.500000:
+           dw        32771
+           dw        1
+           dd        0
+           dq        2.500000
+int.3:
+           dw        32769
+           dw        1
+           dd        0
+           dq        3
+float.1.000000:
+           dw        32771
+           dw        1
+           dd        0
+           dq        1.000000
+
+           section   .bss
+           sectalign 8
+Basics.Red:
+           resq      1
+Basics.Blue:
+           resq      1
+Basics.Green:
+           resq      1
+Basics.Yellow:
+           resq      1
+Basics.Purple:
+           resq      1
+Basics.false:
+           resq      1
+Basics.true:
+           resq      1
+Basics.xyz:
+           resq      1
+Basics._.1:
+           resq      1
+

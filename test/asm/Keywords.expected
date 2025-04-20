@@ -1,0 +1,64 @@
+           default   rel
+           global    umber_main#Keywords
+           global    Keywords.__#705098952
+           global    Keywords.__#373726558
+           global    Keywords.__?#967420102
+           global    Keywords.left
+           global    Keywords.middle
+           global    Keywords.right
+           global    Keywords.let__s_go#117710912
+           global    Keywords.let__s_go#117710912#closure:weak
+           global    Keywords.let__s_go#117710912#closure_wrapper_fun:weak
+
+           section   .text
+
+umber_main#Keywords:
+           sub       rsp, 8
+           mov       qword [Keywords.__#705098952], 1
+           mov       qword [Keywords.__#373726558], 1
+           mov       qword [Keywords.__?#967420102], 1
+           mov       qword [Keywords.left], 1
+           mov       qword [Keywords.middle], 1
+           mov       qword [Keywords.right], 1
+           add       rsp, 8
+           ret       
+
+Keywords.let__s_go#117710912:
+           sub       rsp, 8
+           mov       rax, Keywords.let__s_go#117710912#closure
+           mov       rbx, 1
+           call      qword [Keywords.let__s_go#117710912#closure + 8]
+           add       rsp, 8
+           ret       
+
+Keywords.let__s_go#117710912#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rax, r9
+           call      Keywords.let__s_go#117710912
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+Keywords.let__s_go#117710912#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Keywords.let__s_go#117710912#closure_wrapper_fun
+
+           section   .bss
+           sectalign 8
+Keywords.__#705098952:
+           resq      1
+Keywords.__#373726558:
+           resq      1
+Keywords.__?#967420102:
+           resq      1
+Keywords.left:
+           resq      1
+Keywords.middle:
+           resq      1
+Keywords.right:
+           resq      1
+

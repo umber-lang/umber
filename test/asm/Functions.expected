@@ -1,0 +1,167 @@
+           default   rel
+           global    umber_main#Functions
+           global    Functions.#binding.1
+           global    Functions._trailing_lambda
+           global    Functions.zero
+           global    Functions.still_zero_wow
+           global    Functions.lots_of_args
+           global    Functions.id
+           global    Functions.#fun.1
+           global    Functions.sqr
+           global    Functions.#fun.1#closure:weak
+           global    Functions.#fun.1#closure_wrapper_fun:weak
+           global    int.5:weak
+           global    int.__89#116887268:weak
+           global    int.1:weak
+           global    char.99:weak
+           global    int.3:weak
+           global    float.0.000000:weak
+           global    int.4:weak
+           global    int.2:weak
+           global    string.122142436:weak
+           global    int.9999:weak
+           global    float.10000000000000.000000:weak
+           extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.Operators.__#294461388
+
+           section   .text
+
+umber_main#Functions:
+           sub       rsp, 8
+           mov       rax, int.5
+           mov       rbx, float.10000000000000.000000
+           mov       rdi, int.__89#116887268
+           mov       rsi, string.122142436
+           mov       rdx, char.99
+           call      Functions.lots_of_args
+           mov       qword [Functions.#binding.1], rax
+           mov       rax, int.1
+           mov       rbx, int.2
+           mov       rdi, int.3
+           mov       rsi, int.4
+           mov       rdx, Functions.#fun.1#closure
+           call      Functions.lots_of_args
+           mov       qword [Functions._trailing_lambda], rax
+           mov       qword [Functions.zero], float.0.000000
+           mov       rax, qword [Functions.zero]
+           call      Functions.id
+           mov       r9, rax
+           mov       qword [Functions.still_zero_wow], r9
+           add       rsp, 8
+           ret       
+
+Functions.lots_of_args:
+           sub       rsp, 8
+           mov       rax, 1
+           add       rsp, 8
+           ret       
+
+Functions.id:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+Functions.#fun.1:
+           sub       rsp, 8
+           mov       rax, int.9999
+           call      Functions.sqr
+           mov       r9, 1
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 8
+           ret       
+
+Functions.sqr:
+           sub       rsp, 8
+           mov       r9, rax
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           add       rsp, 8
+           ret       
+
+Functions.#fun.1#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rsi
+           mov       rax, rbx
+           mov       rbx, rdi
+           mov       rdi, r9
+           call      Functions.#fun.1
+           add       rsp, 8
+           ret       
+
+           section   .rodata
+           sectalign 8
+int.5:
+           dw        32769
+           dw        1
+           dd        0
+           dq        5
+int.__89#116887268:
+           dw        32769
+           dw        1
+           dd        0
+           dq        -89
+int.1:
+           dw        32769
+           dw        1
+           dd        0
+           dq        1
+char.99:
+           dw        32770
+           dw        1
+           dd        0
+           dq        99
+int.3:
+           dw        32769
+           dw        1
+           dd        0
+           dq        3
+float.0.000000:
+           dw        32771
+           dw        1
+           dd        0
+           dq        0.000000
+int.4:
+           dw        32769
+           dw        1
+           dd        0
+           dq        4
+int.2:
+           dw        32769
+           dw        1
+           dd        0
+           dq        2
+string.122142436:
+           dw        32772
+           dw        1
+           dd        0
+           db        `huh\x0\x0\x0\x0\x4`
+int.9999:
+           dw        32769
+           dw        1
+           dd        0
+           dq        9999
+float.10000000000000.000000:
+           dw        32771
+           dw        1
+           dd        0
+           dq        10000000000000.000000
+Functions.#fun.1#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Functions.#fun.1#closure_wrapper_fun
+
+           section   .bss
+           sectalign 8
+Functions.#binding.1:
+           resq      1
+Functions._trailing_lambda:
+           resq      1
+Functions.zero:
+           resq      1
+Functions.still_zero_wow:
+           resq      1
+
