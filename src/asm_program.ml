@@ -174,7 +174,6 @@ module Call_conv = struct
   ;;
 
   let all_available_registers t =
-    (* FIXME: Handle caller vs callee saved registers. *)
     List.filter Register.all ~f:(not << register_is_reserved t)
   ;;
 end
@@ -207,17 +206,6 @@ module Simple_value = struct
     | Global (name, kind) -> pp_global fmt name kind
     | Constant literal -> Asm_literal.pp fmt literal
   ;;
-
-  (* FIXME: Cleanup *)
-  (* let mem_of_value (value : _ t) : _ memory_expr option =
-    match value with
-    | Register reg -> Some (Register reg)
-    | Global (name, kind) -> Some (Global (name, kind))
-    | Memory _ -> None
-    | Constant (Int i) -> Some (Offset i)
-    | Constant (Float _ | String _) ->
-      compiler_bug [%message "Invalid memory expression" (value : _ t)]
-  ;; *)
 
   let map_registers t ~f =
     match t with

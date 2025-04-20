@@ -312,15 +312,6 @@ end = struct
     let k = Set.length all_available_registers in
     let vertex_states = Virtual_register.Table.create () in
     let ignored_stack = Stack.create () in
-    (* FIXME: Maybe this is stil considering vertices that were effectively removed by
-       coalescing? I think we need to remove all the coalesced vertices? Or keep track that
-       they were coalesced? No, I think that's fine actually, we remove them.
-       
-       A real problem is that we interfere with all the clobbered registers that we aren't
-       even using. (??) I thought liveness analysis should have figured out they aren't
-       live... Ah, but we deliberately made them overlap when there's a call, to encode
-       the constraint that you can't use one of those registers over the gap. And we
-       can't just ignore this, it's a real constraint (a register you can't use). *)
     let degree vertex =
       List.count (Interference_graph.succ interference_graph vertex) ~f:(function
         | Real _ -> true
@@ -449,7 +440,6 @@ end = struct
            reg, Memory.offset rsp I64 (i + already_spilled_count))
       |> Virtual_register.Map.of_alist_exn
     in
-    (* FIXME: Make sure this process doesn't spill things that have already been spilled. *)
     List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
         List.concat_map code ~f:(fun instr ->
@@ -645,23 +635,6 @@ end = struct
     in
     loop ~cfg:(create_cfg ~basic_blocks) ~basic_blocks ~already_spilled_count:0
   ;;
-  (* FIXME: Handle spilling: 
-       - At first assignment, push the initial value. Keep track of the order of pushes
-         inserted so we know what the address is (hmmm...?) If this is annoying we could
-         also push initial values at function start.
-       - Assignments and uses after that refer to memory like [rsp+offset] 
-       - After the last use but before returning, we have to pop, and pick a register to
-         pop into. Any caller-save register will do. Or I guess you can just call add
-         on rsp directly?
-
-       Other ideas:
-       - Can use rbp (frame pointer)
-       - Directly add/sub to rsp at function start and end
-       - When calling functions, sometimes we have to use the stack also. They can use
-         push/pop around the call for simplicitity. If things are already in memory then
-         pushing will mess up the offsets though. Could give offsets relative to rbp to
-         make this a little easier?
-    *)
 end
 
 module Function_builder : sig
@@ -836,8 +809,6 @@ module Global = struct
     type t =
       | Global_variable of Label_name.t
       | Function of Function_builder.t
-    (* FIXME: Constants and closures won't have mir names. Maybe don't belong? *)
-    (* | Closure of Closure.t *)
     [@@deriving sexp_of]
 
     let label_name = function
@@ -957,9 +928,6 @@ let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list
       (Mov { src = Simple_value (Register (Real reg)); dst = tmp }))
 ;;
 
-(* FIXME: Have to save and restore any caller-save registers. *)
-(* FIXME: Depending on the calling convention, we might need to have the stack pointer be
-   aligned to 16 bytes or something. *)
 let codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args =
   move_values_for_call fun_builder ~call_conv ~args;
   Function_builder.add_code
@@ -1109,11 +1077,6 @@ let declare_extern_c_function ?local_wrapper_function t mir_name label_name ~ari
       : [ `Ok | `Duplicate ])
 ;;
 
-(* FIXME: Having separate tables for everything that we have to look up individually is a
-   complete mess for handling codegen logic. Combine into one table. The names have to be
-   unique and this would better enforce that. *)
-(* FIXME: This doesn't properly handle [Mir.Value_def] for things with function types.
-   The case I noticed was `let (::) = List.Cons`. It messes up the closures/functions. *)
 (* TODO: Amend MIR to treat function pointers and closures differently. *)
 let lookup_name_for_value t name ~fun_builder : _ Value.t =
   let wrapper_closure fun_name ~arity : _ Value.t =
@@ -1459,23 +1422,6 @@ and codegen_cond t cond ~fun_builder =
       ~cond2_label:
         (Function_builder.create_label fun_builder "non_constant_tag_equals.is_block")
       ~codegen_cond2:(fun () ->
-        (* FIXME: We don't use the cmp result here. The intention is that whoever called
-           codegen_cond will use it. But I don't think this composes properly when there
-           are multiple conditions, when we recursively call codegen_cond, maybe?
-           The key is we don't check any conditions before calling codegen_cond1, so
-           right-recursive Ands don't work.
-           
-           The mir should probably be restructured into a list of conditions?
-           
-           The LLVM version had it easier since it just always checked all the conditions.
-           We wouldn't care that much except we need to check for a block before accessing
-           memory. (I think LLVM poison semantics saved us or something with our
-           branchless code.)
-
-           Wait, after reading the code more I think it should be fine...? At least, I
-           can't see the problem. We are using left-recursion anyway and it's fine.
-           (either should work, I think)
-        *)
         cmp
           (load_mem_offset fun_builder value I16 0)
           (Simple_value (Constant (Int (Cnstr_tag.to_int tag)))))
@@ -1513,7 +1459,7 @@ and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_lab
     (match cond2_result with
      | `Constant false as constant ->
        (* TODO: The code we already generated for cond1 is wasted. For now, just
-          unconditionally return false.*)
+          unconditionally return false. *)
        constant
      | `Constant true | `Zero_flag -> `Zero_flag)
 ;;
