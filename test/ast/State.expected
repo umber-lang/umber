@@ -7,9 +7,9 @@ effect State a = {
 let handle_state : a, (() -> <State a, b> c) -> <b> (a, c) =
   \init f ->
     ((handle f () : f
-    | x -> (\(s : g) -> (s, x)) : g -> <d> (g, h)
-    | <get ()> -> \s -> (resume s : g -> <d> (g, h)) s : (g, h)
-    | <set s> -> \_ -> (resume () : g -> <d> (g, h)) s : (g, h))
-      : g -> <d> (g, h))
+    | x -> (\(s : h) -> (s, x)) : h -> <d> (h, g)
+    | <get ()> -> \s -> (resume s : h -> <d> (h, g)) s : (h, g)
+    | <set s> -> \_ -> (resume () : h -> <d> (h, g)) s : (h, g))
+      : h -> <d> (h, g))
       init
       : (a, c)

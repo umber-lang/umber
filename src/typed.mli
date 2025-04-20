@@ -25,6 +25,15 @@ module Effect_pattern : sig
   [@@deriving equal, sexp]
 end
 
+module Effect_branch : sig
+  type 'typ t =
+    { effect_pattern : 'typ Effect_pattern.t
+    ; arg_types : 'typ Nonempty.t
+    ; resume_type : 'typ
+    }
+  [@@deriving sexp]
+end
+
 module Expr : sig
   type 'typ t =
     | Literal of Literal.t
@@ -35,8 +44,8 @@ module Expr : sig
     | Handle of
         { expr : 'typ t Node.t
         ; expr_type : 'typ
-        ; value_branch : ('typ Pattern.t Node.t * 'typ t Node.t) option
-        ; effect_branches : ('typ Effect_pattern.t Node.t * 'typ t Node.t) list
+        ; value_branch : (('typ Pattern.t * 'typ) Node.t * 'typ t Node.t) option
+        ; effect_branches : ('typ Effect_branch.t Node.t * 'typ t Node.t) list
         }
     | Let of ('typ Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t Node.t list

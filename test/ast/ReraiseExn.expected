@@ -46,9 +46,9 @@ let catch : (() -> <Exn, a> b), (String -> <a> b) -> <a> b =
   \f exn_handler ->
     (match
       (handle f () : d
-      | x -> Ok x : Result e String
+      | x -> Ok x : Result f String
       | <raise exn> -> Error exn)
-        : Result e String
+        : Result f String
     | Ok x -> x
     | Error exn -> exn_handler exn)
       : b

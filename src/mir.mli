@@ -8,6 +8,12 @@ module Block_index : sig
   val to_int : t -> int
 end
 
+module Effect_op_id : sig
+  type t
+
+  val to_int : t -> int
+end
+
 module Expr : sig
   type t =
     | Primitive of Literal.t
@@ -24,6 +30,15 @@ module Expr : sig
         ; conds : (cond * t list) Nonempty.t
         ; body : t
         ; if_none_matched : cond_if_none_matched
+        }
+    | Handle_effects of
+        { handlers : (Effect_op_id.t * t) Nonempty.t
+        ; expr : t
+        }
+    | Perform_effect of
+        { effect_op : Effect_op_id.t
+        ; arg : t
+        ; resume : t
         }
 
   and cond =

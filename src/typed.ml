@@ -300,6 +300,15 @@ module Effect_pattern = struct
   let map_types { operation; args } ~f =
     { operation; args = Nonempty.map args ~f:(Pattern.map_types ~f) }
   ;;
+end
+
+module Effect_branch = struct
+  type 'typ t =
+    { effect_pattern : 'typ Effect_pattern.t
+    ; arg_types : 'typ Nonempty.t
+    ; resume_type : 'typ
+    }
+  [@@deriving sexp]
 
   let of_untyped_with_names
     ~names
@@ -322,17 +331,21 @@ module Effect_pattern = struct
       Name_bindings.Name_entry.type_ operation_name_entry
       |> Type_bindings.instantiate_type_or_scheme ~names ~types
     in
-    let pat_names, args =
+    let pat_names, args_with_types =
       Nonempty.fold_map args ~init:pat_names ~f:(fun pat_names arg ->
-        Pattern.of_untyped_with_names ~names ~types pat_names arg ~fixity:None)
+        let arg_names, (arg, arg_type) =
+          Pattern.of_untyped_with_names ~names ~types Pattern_names.empty arg ~fixity:None
+        in
+        ( Pattern_names.merge pat_names arg_names ~combine:(fun ~key:_ _ x -> x)
+        , (arg, (arg_type, arg_names)) ))
     in
-    let args, arg_types = Nonempty.unzip args in
+    let args, arg_types = Nonempty.unzip args_with_types in
     let operation_effects, operation_result_type =
       Pattern.check_cnstr_application
         ~names
         ~types
         ~cnstr_type:operation_type
-        ~arg_types:(Nonempty.to_list arg_types)
+        ~arg_types:(Nonempty.to_list arg_types |> List.map ~f:fst)
     in
     let operation_effects =
       let error () =
@@ -348,15 +361,26 @@ module Effect_pattern = struct
          | _ -> error ())
       | Some { effects = _; effect_var = Some _ } | None -> error ()
     in
-    let pat_names =
+    let resume_type : Internal_type.t =
+      Function ([ operation_result_type ], result_effects, result_type)
+    in
+    let resume_pat_names =
       Pattern_names.add_name
-        pat_names
+        Pattern_names.empty
         Value_name.resume_keyword
-        (Function ([ operation_result_type ], result_effects, result_type))
+        resume_type
         ~type_source:Placeholder
         ~fixity:None
     in
-    pat_names, ({ operation; args }, operation_effects)
+    let pat_names =
+      Pattern_names.merge pat_names resume_pat_names ~combine:(fun ~key:_ _ x -> x)
+    in
+    ( pat_names
+    , ( { effect_pattern = { operation; args }
+        ; arg_types
+        ; resume_type = resume_type, resume_pat_names
+        }
+      , operation_effects ) )
   ;;
 
   let of_untyped_into ~names ~types ~result_effects ~result_type effect_pattern =
@@ -387,8 +411,8 @@ module Expr = struct
     | Handle of
         { expr : 'typ t Node.t
         ; expr_type : 'typ
-        ; value_branch : ('typ Pattern.t Node.t * 'typ t Node.t) option [@sexp.option]
-        ; effect_branches : ('typ Effect_pattern.t Node.t * 'typ t Node.t) list
+        ; value_branch : (('typ Pattern.t * 'typ) Node.t * 'typ t Node.t) option
+        ; effect_branches : ('typ Effect_branch.t Node.t * 'typ t Node.t) list
         }
     | Let of ('typ Pattern.t * 'typ, 'typ t) Let_binding.t
     | Tuple of 'typ t Node.t list
@@ -633,7 +657,7 @@ module Expr = struct
                 let pattern_span = Node.span pattern in
                 match Node.with_value pattern ~f:Fn.id with
                 | `Value pattern ->
-                  let names, ((_ : Pattern_names.t), (pattern, pattern_type)) =
+                  let names, (pattern_names, (pattern, pattern_type)) =
                     Pattern.of_untyped_into ~names ~types pattern ~fixity:None
                   in
                   Type_bindings.constrain
@@ -650,20 +674,22 @@ module Expr = struct
                     ~subtype:branch_type
                     ~supertype:result_type;
                   Queue.enqueue all_branch_effects branch_effects;
-                  First (Node.create pattern pattern_span, branch_expr)
+                  First
+                    ( Node.create (pattern, (pattern_type, pattern_names)) pattern_span
+                    , branch_expr )
                 | `Effect effect_pattern ->
                   let ( names
                       , ( (_ : Pattern_names.t)
-                        , (effect_pattern, (effect_name, effect_args)) ) )
+                        , (effect_branch, (effect_name, effect_args)) ) )
                     =
-                    Effect_pattern.of_untyped_into
+                    Effect_branch.of_untyped_into
                       ~names
                       ~types
                       ~result_effects
                       ~result_type
                       effect_pattern
                   in
-                  let operation_name = snd effect_pattern.operation in
+                  let operation_name = snd effect_branch.effect_pattern.operation in
                   Hashtbl.update handled_effects effect_name ~f:(function
                     | None -> [ effect_args ], Value_name.Set.singleton operation_name
                     | Some (existing_args, existing_operations) ->
@@ -686,7 +712,7 @@ module Expr = struct
                     ~subtype:branch_type
                     ~supertype:result_type;
                   Queue.enqueue all_branch_effects branch_effects;
-                  Second (Node.create effect_pattern pattern_span, branch_expr))
+                  Second (Node.create effect_branch pattern_span, branch_expr))
             in
             let value_branch =
               match value_branches with
@@ -708,7 +734,9 @@ module Expr = struct
                     [%message
                       "Multiple value branches in handle expression are not supported"
                         (value_branches
-                          : (_ Pattern.t Node.t
+                          : (((Internal_type.t * Pattern_names.t) Pattern.t
+                             * (Internal_type.t * Pattern_names.t))
+                             Node.t
                             * (Internal_type.t * Pattern_names.t) t Node.t)
                             list)]
             in
@@ -978,7 +1006,11 @@ module Expr = struct
     type_recursive_let_bindings ~f_name:(fun _ _ -> ())
   ;;
 
-  let rec map expr ~f ~f_type =
+  let rec map :
+            'a 'b.
+            'a t -> f:('a t -> ('a t, 'b t) Map_action.t) -> f_type:('a -> 'b) -> 'b t
+    =
+   fun expr ~f ~f_type ->
     match (f expr : _ Map_action.t) with
     | Halt expr -> expr
     | Retry expr -> map ~f ~f_type expr
@@ -1025,16 +1057,29 @@ module Expr = struct
          let expr = map' expr ~f ~f_type in
          let expr_type = f_type expr_type in
          let value_branch =
-           Option.map value_branch ~f:(fun (pat, expr) ->
-             let pat = Node.map pat ~f:(Pattern.map_types ~f:f_type) in
+           Option.map value_branch ~f:(fun (pat_and_type, expr) ->
+             let pat_and_type =
+               Node.map pat_and_type ~f:(fun (pat, typ) ->
+                 let pat = Pattern.map_types pat ~f:f_type in
+                 let typ = f_type typ in
+                 pat, typ)
+             in
              let expr = map' expr ~f ~f_type in
-             pat, expr)
+             pat_and_type, expr)
          in
          let effect_branches =
-           List.map effect_branches ~f:(fun (effect_pattern, expr) ->
-             let pat = Node.map effect_pattern ~f:(Effect_pattern.map_types ~f:f_type) in
+           List.map effect_branches ~f:(fun (effect_branch, expr) ->
+             let effect_branch =
+               Node.map
+                 effect_branch
+                 ~f:(fun { effect_pattern; arg_types; resume_type } : _ Effect_branch.t ->
+                 let effect_pattern = Effect_pattern.map_types effect_pattern ~f:f_type in
+                 let arg_types = Nonempty.map arg_types ~f:f_type in
+                 let resume_type = f_type resume_type in
+                 { effect_pattern; arg_types; resume_type })
+             in
              let expr = map' expr ~f ~f_type in
-             pat, expr)
+             effect_branch, expr)
          in
          Handle { expr; expr_type; value_branch; effect_branches }
        | Tuple fields -> Tuple (List.map fields ~f:(map' ~f ~f_type))

@@ -1385,6 +1385,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          (body_end_label, body_value)
          (otherwise_end_label, otherwise_value)
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
+  | Handle_effects _ | Perform_effect _ -> failwith "TODO: effects in asm"
 
 and codegen_cond t cond ~fun_builder =
   (* TODO: This just does basic constant folding so we don't generate invalid instructions

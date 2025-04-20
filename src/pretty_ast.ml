@@ -171,7 +171,7 @@ module Typed_to_untyped = struct
     | Handle { expr; expr_type; value_branch; effect_branches } ->
       let branches =
         List.map effect_branches ~f:(fun (effect_pattern, branch) ->
-          ( Node.map effect_pattern ~f:(fun { operation; args } ->
+          ( Node.map effect_pattern ~f:(fun { effect_pattern = { operation; args }; _ } ->
               `Effect
                 { Untyped.Effect_pattern.operation =
                     relativize_value_name ~names operation
@@ -183,7 +183,8 @@ module Typed_to_untyped = struct
         match value_branch with
         | Some (pattern, branch) ->
           let value_branch =
-            ( Node.map pattern ~f:(fun pattern ->
+            ( Node.map pattern ~f:(fun (pattern, _type_) ->
+                (* TODO: Use the type here in an annotation *)
                 `Value (relativize_pattern ~names pattern))
             , Node.map branch ~f:(convert_expr ~names ~type_) )
           in
@@ -403,6 +404,8 @@ let format_to_document
     | Empty -> Empty
     | _ -> Indent (indent_size, prefix ^^ Group doc)
   in
+  (* TODO: Consider adding an [Indent (1, _)] here to align parenthesized multiline
+     expressions. *)
   let parens doc = Text "(" ^^ doc ^^ Text ")" in
   let comma_separated = separated ~sep:(Text "," ^^ Break) in
   (* TODO: How to express "two line breaks between multi-line elements, and only one

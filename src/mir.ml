@@ -147,6 +147,27 @@ let rec arity_of_type ~names (type_ : Module_path.absolute Type_scheme.type_) =
              (type_arities : int list)])
 ;;
 
+module Effect_op_id : sig
+  type t [@@deriving sexp_of]
+
+  val create : effect_operation_name:Value_name.Absolute.t -> t
+  val to_int : t -> int
+end = struct
+  type t =
+    { name : Value_name.Absolute.t
+    ; hash : int
+    }
+  [@@deriving sexp_of]
+
+  let create ~effect_operation_name =
+    { name = effect_operation_name
+    ; hash = Value_name.Absolute.hash effect_operation_name
+    }
+  ;;
+
+  let to_int t = t.hash
+end
+
 module Context : sig
   type t [@@deriving sexp_of]
 
@@ -154,15 +175,18 @@ module Context : sig
   val add_value_name : t -> Value_name.t -> t * Mir_name.t
   val copy_name : t -> Mir_name.t -> Mir_name.t
 
-  module Extern_info : sig
+  module Name_kind : sig
+    (* TODO: Should we unify this with cnstr information? It seems to have a similar
+       flavour, and having one place to store "what this binding is" seems helpful. *)
     type t =
       | Local
       | External of { arity : int }
+      | Effect_op of Effect_op_id.t
       | Bool_intrinsic of { tag : Cnstr_tag.t }
     [@@deriving sexp_of]
   end
 
-  val find_value_name : t -> Value_name.Absolute.t -> Mir_name.t * Extern_info.t
+  val find_value_name : t -> Value_name.Absolute.t -> Mir_name.t * Name_kind.t
   val find_value_name_assert_local : t -> Value_name.t -> Mir_name.t
   val find_value_name_assert_external : t -> Value_name.t -> Mir_name.t
   val peek_value_name : t -> Value_name.Absolute.t -> Mir_name.t option
@@ -181,17 +205,18 @@ module Context : sig
     -> follow_aliases:bool
     -> Cnstr_info.t option
 end = struct
-  module Extern_info = struct
+  module Name_kind = struct
     type t =
       | Local
       | External of { arity : int }
+      | Effect_op of Effect_op_id.t
       | Bool_intrinsic of { tag : Cnstr_tag.t }
     [@@deriving sexp_of]
   end
 
   type t =
     { expr_local_names : Mir_name.t Value_name.Absolute.Map.t
-    ; toplevel_names : (Mir_name.t * Extern_info.t) Value_name.Absolute.Table.t
+    ; toplevel_names : (Mir_name.t * Name_kind.t) Value_name.Absolute.Table.t
     ; module_path : Module_path.Absolute.t
     ; name_bindings : (Name_bindings.t[@sexp.opaque])
     ; name_table : (Mir_name.Name_table.t[@sexp.opaque])
@@ -223,7 +248,7 @@ end = struct
   let lookup_toplevel_name t ((path, _) as name) =
     let entry = Name_bindings.find_absolute_entry t.name_bindings name in
     let extern_name = Name_bindings.Name_entry.extern_name entry in
-    let fallback_to_external () : Extern_info.t =
+    let fallback_to_external () : Name_kind.t =
       let scheme =
         match Name_bindings.Name_entry.type_ entry with
         | Scheme scheme -> scheme
@@ -236,14 +261,18 @@ end = struct
       in
       External { arity = arity_of_type ~names:t.name_bindings (fst scheme) }
     in
-    let extern_info : Extern_info.t =
+    let name_kind : Name_kind.t =
       match extern_name with
       | None ->
         (* TODO: The thing we actually care about is "is this defined in the same file?"
            If we allow submodules to be defined in different files, this won't work.
            Also, being defined in the same file, and being `extern`, seem orthogonal. *)
         if Module_path.is_prefix path ~prefix:t.module_path
-        then Local
+        then (
+          match Name_bindings.Name_entry.type_source entry with
+          | Effect_operation ->
+            Effect_op (Effect_op_id.create ~effect_operation_name:name)
+          | _ -> Local)
         else fallback_to_external ()
       | Some extern_name ->
         (* TODO: I don't think there's any good reason we need to special-case Bool in MIR
@@ -255,7 +284,7 @@ end = struct
          | _ -> fallback_to_external ())
     in
     let mir_name = Mir_name.create_exportable_name name in
-    mir_name, extern_info
+    mir_name, name_kind
   ;;
 
   let peek_toplevel_name_internal t name =
@@ -267,7 +296,7 @@ end = struct
     | Compilation_error.Compilation_error { kind = Name_error; _ } -> None
   ;;
 
-  let peek_value_name_internal t name : (Mir_name.t * Extern_info.t) option =
+  let peek_value_name_internal t name : (Mir_name.t * Name_kind.t) option =
     match Map.find t.expr_local_names name with
     | Some mir_name -> Some (mir_name, Local)
     | None -> peek_toplevel_name_internal t name
@@ -281,7 +310,7 @@ end = struct
     , mir_name )
   ;;
 
-  let find_value_name t name : Mir_name.t * Extern_info.t =
+  let find_value_name t name : Mir_name.t * Name_kind.t =
     match peek_value_name_internal t name with
     | Some ((name', _) as entry) ->
       (match t.find_override name name' with
@@ -294,31 +323,31 @@ end = struct
 
   let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
 
-  let find_value_name_assert_internal t name ~extern_info_matches ~expected =
-    let name, extern_info =
+  let find_value_name_assert_internal t name ~name_kind_matches ~expected =
+    let name, name_kind =
       find_value_name t (Name_bindings.current_path t.name_bindings, name)
     in
-    if not (extern_info_matches extern_info)
+    if not (name_kind_matches name_kind)
     then
       compiler_bug
         [%message
-          "Unexpected extern info value"
+          "Unexpected name kind value"
             (name : Mir_name.t)
-            (extern_info : Extern_info.t)
+            (name_kind : Name_kind.t)
             (expected : string)];
     name
   ;;
 
   let find_value_name_assert_local =
-    find_value_name_assert_internal ~expected:"local" ~extern_info_matches:(function
-      | Local | Bool_intrinsic _ -> true
+    find_value_name_assert_internal ~expected:"local" ~name_kind_matches:(function
+      | Local | Bool_intrinsic _ | Effect_op _ -> true
       | External _ -> false)
   ;;
 
   let find_value_name_assert_external =
-    find_value_name_assert_internal ~expected:"external" ~extern_info_matches:(function
+    find_value_name_assert_internal ~expected:"external" ~name_kind_matches:(function
       | External _ | Bool_intrinsic _ -> true
-      | Local -> false)
+      | Local | Effect_op _ -> false)
   ;;
 
   let with_find_override t ~f =
@@ -614,6 +643,15 @@ module Expr = struct
         ; body : t
         ; if_none_matched : cond_if_none_matched
         }
+    | Handle_effects of
+        { handlers : (Effect_op_id.t * t) Nonempty.t
+        ; expr : t
+        }
+    | Perform_effect of
+        { effect_op : Effect_op_id.t
+        ; arg : t
+        ; resume : t
+        }
 
   and cond =
     (* TODO: In practice, the expressions in conditions have to be simple names. Maybe we
@@ -649,7 +687,14 @@ module Expr = struct
                (match if_none_matched with
                 | Otherwise t -> Otherwise (map t ~f)
                 | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map ~f)))
-           })
+           }
+       | Handle_effects { handlers; expr } ->
+         Handle_effects
+           { handlers = Nonempty.map handlers ~f:(Tuple2.map_snd ~f:(map ~f))
+           ; expr = map ~f expr
+           }
+       | Perform_effect { effect_op; arg; resume } ->
+         Perform_effect { effect_op; arg = map ~f arg; resume = map ~f resume })
   ;;
 
   module Fun_def = struct
@@ -667,8 +712,9 @@ module Expr = struct
   let is_atomic : t -> bool = function
     | Primitive _ | Name _ | Make_block { tag = _; fields = [] } | Get_block_field _ ->
       true
-    | Fun_call _ | Let _ | Make_block { tag = _; fields = _ :: _ } | Cond_assign _ ->
-      false
+    | Fun_call _ | Let _
+    | Make_block { tag = _; fields = _ :: _ }
+    | Cond_assign _ | Handle_effects _ | Perform_effect _ -> false
   ;;
 
   (* TODO: consider merging making bindings with making conditions. If we extended
@@ -981,9 +1027,9 @@ module Expr = struct
       with
       | Literal lit, _ -> Primitive lit
       | Name name, _ ->
-        let name, extern_info = Context.find_value_name ctx name in
-        (match extern_info with
-         | Local -> Name name
+        let name, name_kind = Context.find_value_name ctx name in
+        (match name_kind with
+         | Local | Effect_op _ -> Name name
          | External { arity } ->
            add_fun_decl { name; arity };
            Name name
@@ -1016,7 +1062,7 @@ module Expr = struct
              | Let _ | Fun_call _ | Get_block_field _ | Cond_assign _ ->
                let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
                Let (fun_name, fun_, Fun_call (fun_name, args))
-             | Primitive _ | Make_block _ ->
+             | Primitive _ | Make_block _ | Handle_effects _ | Perform_effect _ ->
                compiler_bug [%message "Invalid function expression" (fun_ : t)]
            in
            Node.with_value fun_ ~f:(fun fun_ ->
@@ -1053,7 +1099,71 @@ module Expr = struct
             handle_match_arms ~ctx ~input_expr ~input_type ~output_type arms
           in
           Let (match_expr_name, input_expr, body))
-      | Handle _, _ -> failwith "Handle in MIR"
+      | ( Handle
+            { expr = input_expr; expr_type = input_type; value_branch; effect_branches }
+        , output_type ) ->
+        (* FIXME: Is this the correct semantics? I think we want effects here to be
+           handled by the handler as well, right? Either way, it needs to be consistent
+           with the typing. *)
+        let input_expr =
+          (* Desugar the value branch to a let binding. *)
+          match value_branch with
+          | None -> input_expr
+          | Some (pat, value_branch_expr) ->
+            let span = Span.combine (Node.span pat) (Node.span value_branch_expr) in
+            Node.create
+              (Typed.Expr.Let
+                 { rec_ = false
+                 ; bindings = [ pat, None, input_expr ]
+                 ; body = value_branch_expr
+                 })
+              span
+        in
+        let input_expr =
+          Node.with_value input_expr ~f:(fun expr ->
+            of_typed_expr ~ctx expr (fst input_type))
+        in
+        (match Nonempty.of_list effect_branches with
+         | None -> input_expr
+         | Some effect_branches ->
+           let handlers =
+             Nonempty.map effect_branches ~f:(fun (effect_pattern, expr) ->
+               Node.with_value2
+                 effect_pattern
+                 expr
+                 ~f:(fun
+                      { effect_pattern = { operation; args }; arg_types; resume_type }
+                      body
+                    ->
+                 let effect_op = Effect_op_id.create ~effect_operation_name:operation in
+                 let handler_fun =
+                   (* FIXME: Get a proper span on these args and the expr *)
+                   (* FIXME: I think this actually needs to take 1 argument as a tuple,
+                      based on how we're implementing the runtime. *)
+                   add_lambda
+                     ~ctx
+                     ~args:
+                       (Nonempty.append
+                          (Nonempty.map args ~f:(Fn.flip Node.create (Node.span expr)))
+                          [ Node.dummy_span
+                              (Typed.Pattern.catch_all (Some Value_name.resume_keyword))
+                          ])
+                     ~arg_types:
+                       (Nonempty.map
+                          (Nonempty.append arg_types [ resume_type ])
+                          ~f:(fun (type_, constraints) ->
+                          if not (List.is_empty constraints)
+                          then
+                            compiler_bug
+                              [%message "Type constraints in effect operation args"];
+                          type_))
+                     ~body:(Node.dummy_span body)
+                     ~body_type:output_type
+                     ~just_bound:None
+                 in
+                 effect_op, handler_fun))
+           in
+           Handle_effects { handlers; expr = input_expr })
       | Let { rec_; bindings; body }, body_type ->
         let ctx_for_body, bindings =
           Nonempty.fold_map
@@ -1544,6 +1654,50 @@ let generate_variant_constructor_values ~ctx ~stmts decl =
         stmt :: stmts)
 ;;
 
+let generate_effect_operation_values ~ctx ~stmts ({ operations; params = _ } : _ Effect.t)
+  =
+  Option.fold operations ~init:stmts ~f:(fun stmts operations ->
+    List.fold operations ~init:stmts ~f:(fun stmts { name; args; result = _ } ->
+      let fun_name, name_kind =
+        Context.find_value_name ctx (Context.current_path ctx, name)
+      in
+      let effect_op =
+        match name_kind with
+        | Effect_op id -> id
+        | _ ->
+          compiler_bug
+            [%message
+              "Unexpected name kind for effect op"
+                (name : Value_name.t)
+                (name_kind : Context.Name_kind.t)]
+      in
+      let args =
+        Nonempty.mapi args ~f:(fun i (_ : _ Type_scheme.type_) ->
+          snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
+      in
+      let ctx, resume = Context.add_value_name ctx Value_name.resume_keyword in
+      let body : Expr.t =
+        match args with
+        | [ arg ] -> Perform_effect { effect_op; arg = Name arg; resume = Name resume }
+        | _ :: _ ->
+          let (_ : Context.t), arg =
+            Context.add_value_name ctx Constant_names.lambda_arg
+          in
+          (* FIXME: Why the let binding? We could just inline the arg expr, right? *)
+          Let
+            ( arg
+            , Make_block
+                { tag = Cnstr_tag.default
+                ; fields = List.map (Nonempty.to_list args) ~f:(fun arg -> Expr.Name arg)
+                }
+            , Perform_effect { effect_op; arg = Name arg; resume = Name resume } )
+      in
+      let stmt : Stmt.t =
+        Fun_def { fun_name; args = Nonempty.append args [ resume ]; body }
+      in
+      stmt :: stmts))
+;;
+
 let of_typed_module =
   let rec loop
     ~ctx
@@ -1572,7 +1726,9 @@ let of_typed_module =
             , ( Extern_decl { name; extern_name; arity = arity_of_type ~names (fst type_) }
                 :: stmts
               , let_bindings ) )
-          | Common_def (Effect _ | Import _) -> ctx, (stmts, let_bindings)))
+          | Common_def (Effect ((_ : Effect_name.t), effect_decl)) ->
+            ctx, (generate_effect_operation_values ~ctx ~stmts effect_decl, let_bindings)
+          | Common_def (Import _) -> ctx, (stmts, let_bindings)))
   in
   fun ~names ((module_name, _sigs, defs) : Typed.Module.t) ->
     let names = Name_bindings.into_module names module_name ~place:`Def in

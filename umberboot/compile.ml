@@ -307,9 +307,7 @@ let on_error_raise ~filename stage error =
 ;;
 
 let compile ?(no_std = false) ?parent ?on_error ~filename targets =
-  let on_error =
-    Option.value_or_thunk on_error ~default:(fun () -> on_error_raise ~filename)
-  in
+  let on_error = Option.value on_error ~default:(on_error_raise ~filename) in
   compile_internal ~no_std ~parent ~on_error ~filename ~output:(Output.create targets)
 ;;
 
