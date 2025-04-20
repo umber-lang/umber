@@ -285,6 +285,17 @@
                                (Effect_union ())
                                (Type_app Std.Prelude.List.List ((Var a))))
                               ()))))))
+                        (filter
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function
+                               ((Type_app Std.Prelude.List.List ((Var a)))
+                                (Function ((Var a)) (Effect_union ())
+                                 (Type_app Bool ())))
+                               (Effect_union ())
+                               (Type_app Std.Prelude.List.List ((Var a))))
+                              ()))))))
                         (length
                          (Local
                           ((type_
@@ -456,12 +467,26 @@
                                (Type_app Std.Prelude.List.List
                                 ((Type_app String ()))))
                               ()))))))
+                        (length
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app String ()))
+                               (Effect_union ()) (Type_app Int ()))
+                              ()))))))
                         (of_char
                          (Local
                           ((type_
                             (Scheme
                              ((Function ((Type_app Char ()))
                                (Effect_union ()) (Type_app String ()))
+                              ()))))))
+                        (is_empty
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app String ()))
+                               (Effect_union ()) (Type_app Bool ()))
                               ()))))))))
                       (types ((String ((Imported String))))) (effects ())
                       (modules ())))))
@@ -991,12 +1016,12 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var g)))
+                              ((Type_app Std.Prelude.List.List ((Var e)))
                                (Type_app Int ()))
                               (Effect_union ())
                               (Tuple
-                               ((Type_app Std.Prelude.List.List ((Var g)))
-                                (Type_app Std.Prelude.List.List ((Var g))))))
+                               ((Type_app Std.Prelude.List.List ((Var e)))
+                                (Type_app Std.Prelude.List.List ((Var e))))))
                              ())))
                           (type_source Let_inferred))))
                        (unzip
@@ -1021,6 +1046,18 @@
                                (Type_app Std.Prelude.List.List ((Var a))))
                               (Effect_union ())
                               (Type_app Std.Prelude.List.List ((Var a))))
+                             ())))
+                          (type_source Let_inferred))))
+                       (filter
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app Std.Prelude.List.List ((Var g)))
+                               (Function ((Var g)) (Effect_var c)
+                                (Type_app Bool ())))
+                              (Effect_var c)
+                              (Type_app Std.Prelude.List.List ((Var g))))
                              ())))
                           (type_source Let_inferred))))
                        (length
@@ -1222,12 +1259,29 @@
                                ((Type_app String ()))))
                              ())))
                           (type_source Let_inferred))))
+                       (length
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app String ()))
+                              (Effect_union ()) (Type_app Int ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_string_len))))
                        (of_char
                         (Local
                          ((type_
                            (Scheme
                             ((Function ((Type_app Char ())) (Effect_union ())
                               (Type_app String ()))
+                             ())))
+                          (type_source Let_inferred))))
+                       (is_empty
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app String ()))
+                              (Effect_union ()) (Type_app Bool ()))
                              ())))
                           (type_source Let_inferred))))))
                      (types ((String ((Imported String))))) (effects ())

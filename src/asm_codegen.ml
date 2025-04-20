@@ -1118,6 +1118,9 @@ let declare_extern_c_function t mir_name label_name ~arity =
       : [ `Ok | `Duplicate ])
 ;;
 
+(* FIXME: Having separate tables for everything that we have to look up individually is a
+   complete mess for handling codegen logic. Combine into one table. The names have to be
+   unique and this would better enforce that. *)
 (* FIXME: This doesn't properly handle [Mir.Value_def] for things with function types.
    The case I noticed was `let (::) = List.Cons`. It messes up the closures/functions. *)
 (* TODO: Amend MIR to treat function pointers and closures differently. *)
@@ -1151,6 +1154,7 @@ let lookup_name_for_value t name ~fun_builder : _ Value.t =
             (Function_builder.name fun_builder)
             ~arity:(Function_builder.arity fun_builder)
         | None ->
+          (* FIXME: Shouldn't make assumptions here. It's fragile. *)
           (* Global values defined in this file reach this case. Dereference memory to get
              the value. *)
           Memory (I64, Value (Global (Label_name.of_mir_name name, Other)))))
@@ -1185,10 +1189,15 @@ let lookup_name_for_fun_call t name ~fun_builder
        (match Hashtbl.find t.externs name with
         | Some { fun_info = Some (C, _); label_name } ->
           `Function, Simple_value (Global (label_name, Extern_proc)), C
-        | Some { fun_info = Some (Umber, _) | None; label_name } ->
+        | Some { fun_info = Some (Umber, _); label_name } ->
           `Function, Simple_value (Global (label_name, Extern_proc)), Umber
+        | Some { fun_info = None; label_name } ->
+          `Closure, Memory (I64, Value (Global (label_name, Other))), Umber
         | None ->
-          `Function, Simple_value (Global (Label_name.of_mir_name name, Other)), Umber))
+          (* FIXME: Shouldn't make assumptions here. It's fragile. *)
+          ( `Closure
+          , Memory (I64, Value (Global (Label_name.of_mir_name name, Other)))
+          , Umber )))
 ;;
 
 let codegen_fun_call t fun_name args ~fun_builder =
@@ -1537,23 +1546,13 @@ and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_lab
      | `Constant true | `Zero_flag -> `Zero_flag)
 ;;
 
-let set_global t global expr ~fun_builder =
-  Queue.enqueue t.bss_globals global;
-  let expr_location = codegen_expr t expr ~fun_builder in
-  Function_builder.add_code
-    fun_builder
-    (Mov { dst = Memory (I64, Value (Global (global, Other))); src = expr_location })
-;;
-
 let define_function t ~fun_name ~args ~body =
   (* TODO: Need a function prelude for e.g. the frame pointer *)
   let call_conv : Call_conv.t = Umber in
   let fun_builder =
-    Function_builder.create
-      (Label_name.of_mir_name fun_name)
-      ~arity:(Nonempty.length args)
+    (* The function should have been declared already. *)
+    Hashtbl.find_exn t.functions fun_name
   in
-  Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
   let result =
     Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
       let virtual_reg = Function_builder.pick_register fun_builder in
@@ -1614,16 +1613,19 @@ let define_extern_wrapper_function t ~fun_name ~extern_name ~arity =
   Function_builder.add_terminal fun_builder Ret
 ;;
 
-let codegen_stmt t stmt =
-  match (stmt : Mir.Stmt.t) with
-  | Value_def (name, expr) ->
+let preprocess_stmt t (stmt : Mir.Stmt.t) =
+  match stmt with
+  | Value_def (name, (_ : Mir.Expr.t)) ->
     (* TODO: We could recognize constant expressions in globals (and locals too) and not
        have to do runtime initialization, instead just keeping them in rodata. *)
-    set_global t (Label_name.of_mir_name name) expr ~fun_builder:t.main_function
-  | Fun_def { fun_name; args; body } ->
-    (* FIXME: Need a preprocessing step like the llvm codegen to handle mutually
-       recursive functions. *)
-    define_function t ~fun_name ~args ~body
+    Queue.enqueue t.bss_globals (Label_name.of_mir_name name)
+  | Fun_def { fun_name; args; body = _ } ->
+    let fun_builder =
+      Function_builder.create
+        (Label_name.of_mir_name fun_name)
+        ~arity:(Nonempty.length args)
+    in
+    Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder
   | Fun_decl { name; arity } ->
     Hashtbl.add_exn
       t.externs
@@ -1642,12 +1644,27 @@ let codegen_stmt t stmt =
       define_extern_wrapper_function t ~fun_name:name ~extern_name ~arity)
 ;;
 
+let codegen_stmt t (stmt : Mir.Stmt.t) =
+  match stmt with
+  | Value_def (name, expr) ->
+    (* TODO: We could recognize constant expressions in globals (and locals too) and not
+       have to do runtime initialization, instead just keeping them in rodata. *)
+    let name = Label_name.of_mir_name name in
+    let expr_location = codegen_expr t expr ~fun_builder:t.main_function in
+    Function_builder.add_code
+      t.main_function
+      (Mov { dst = Memory (I64, Value (Global (name, Other))); src = expr_location })
+  | Fun_def { fun_name; args; body } -> define_function t ~fun_name ~args ~body
+  | Fun_decl _ | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
+;;
+
 let main_function_name ~(module_path : Module_path.Absolute.t) =
   Label_name.of_string [%string "umber_main#%{module_path#Module_path}"]
 ;;
 
 let convert_mir ~module_path mir =
   let t = create ~main_function_name:(main_function_name ~module_path) in
+  List.iter mir ~f:(preprocess_stmt t);
   List.iter mir ~f:(codegen_stmt t);
   Function_builder.add_terminal t.main_function Ret;
   to_program t

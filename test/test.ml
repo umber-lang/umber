@@ -28,10 +28,7 @@ let should_make_mir test =
 ;;
 
 let should_make_llvm test = should_make_mir test
-
-let no_asm_tests =
-  [ "AdventOfCode2024_1" (* TODO: Hanging, most likely register allocation too slow. *) ]
-;;
+let no_asm_tests = []
 
 let should_make_asm test =
   should_make_mir test && not (List.mem ~equal:String.equal no_asm_tests test)
@@ -115,7 +112,10 @@ let test ~in_file =
     let redirected_stdin =
       if Sys_unix.file_exists_exn input_file then " < " ^ input_file else ""
     in
-    Shell.sh "%s > %s 2>&1%s" tmp_exe_file output_file redirected_stdin)
+    try Shell.sh "%s > %s 2>&1%s" tmp_exe_file output_file redirected_stdin with
+    | exn ->
+      Out_channel.with_file output_file ~append:true ~f:(fun out ->
+        Out_channel.output_string out (Exn.to_string exn)))
 ;;
 
 let command =

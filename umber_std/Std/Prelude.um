@@ -10,6 +10,7 @@ module : {
     val reverse : List a -> List a
     val append : List a, List a -> List a
     val map : List a, (a -> b) -> List b
+    val filter : List a, (a -> Bool) -> List a
     val concat_map : List a, (a -> List b) -> List b
     val fold : List a, acc, (acc, a -> acc) -> acc
 
@@ -81,6 +82,8 @@ module : {
 
     val make : Int, Char -> String
     val of_char : Char -> String
+    val length : String -> Int
+    val is_empty : String -> Bool
     val fold : String, acc, (acc, Char -> acc) -> acc
     val split : String, Char -> List String
   }
@@ -218,6 +221,9 @@ module String = {
 
   extern make : Int, Char -> String = "umber_string_make"
   extern fold : String, acc, (acc, Char -> acc) -> acc = "umber_string_fold"
+  extern length : String -> Int = "umber_string_len"
+
+  let is_empty str = length str == 0
 
   let of_char c = make 1 c
 
@@ -265,6 +271,14 @@ module List = {
       match xs
       | Nil -> reverse acc
       | Cons x xs -> loop (f x :: acc) xs f
+    in
+    loop Nil xs f
+
+  let filter xs f =
+    let loop acc xs f =
+      match xs
+      | Nil -> reverse acc
+      | Cons x xs -> loop (if f x then x :: acc else acc) xs f
     in
     loop Nil xs f
 

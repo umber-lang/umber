@@ -70,6 +70,11 @@ pub extern "C" fn umber_string_make(n_chars: BlockPtr, c: BlockPtr) -> BlockPtr 
 }
 
 #[no_mangle]
+pub extern "C" fn umber_string_len(s: BlockPtr) -> BlockPtr {
+    BlockPtr::new_int(s.as_block().string_len() as i64)
+}
+
+#[no_mangle]
 pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     let (x, y) = (x.as_str(), y.as_str());
     unsafe {

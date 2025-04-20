@@ -147,7 +147,11 @@ Operators.#fun.1:
 
 Operators.left_section:
            sub       rsp, 8
-           call      Operators.left_section.1
+           mov       r9, qword [Operators.left_section.1]
+           mov       r10, qword [Operators.left_section.1]
+           mov       rbx, rax
+           mov       rax, r10
+           call      qword [r9 + 8]
            add       rsp, 8
            ret       
 
@@ -168,7 +172,11 @@ Operators.__#765322566:
 
 Operators.right_section:
            sub       rsp, 8
-           call      Operators.right_section.1
+           mov       r9, qword [Operators.right_section.1]
+           mov       r10, qword [Operators.right_section.1]
+           mov       rbx, rax
+           mov       rax, r10
+           call      qword [r9 + 8]
            add       rsp, 8
            ret       
 
