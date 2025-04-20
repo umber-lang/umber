@@ -1,14 +1,14 @@
            default   rel
            global    umber_main#Text
-           global    Text.#binding.1
-           global    Text.a
-           global    Text.b
+           global    Text.spacing
+           global    Text.c
            global    Text._UNICODE_WORKS_TOO
            global    Text._.1
-           global    Text.c
            global    Text.hello
+           global    Text.a
+           global    Text.#binding.1
            global    Text.dec_code_exclam
-           global    Text.spacing
+           global    Text.b
            global    string.900478420:weak
            global    string.178290272:weak
            global    string.0:weak
@@ -18,8 +18,8 @@
            global    char.97:weak
            global    string.100624750:weak
            global    string.566536425:weak
-           extern    Std.Prelude.Operators.__#411843497
            extern    umber_gc_alloc
+           extern    Std.Prelude.Operators.__#411843497
 
            section   .text
 
@@ -101,22 +101,22 @@ string.566536425:
 
            section   .bss
            sectalign 8
-Text.#binding.1:
+Text.spacing:
            resq      1
-Text.a:
-           resq      1
-Text.b:
+Text.c:
            resq      1
 Text._UNICODE_WORKS_TOO:
            resq      1
 Text._.1:
            resq      1
-Text.c:
-           resq      1
 Text.hello:
+           resq      1
+Text.a:
+           resq      1
+Text.#binding.1:
            resq      1
 Text.dec_code_exclam:
            resq      1
-Text.spacing:
+Text.b:
            resq      1
 

@@ -1,8 +1,8 @@
            default   rel
            global    umber_main#RestrictiveTypeAnnotation
            global    RestrictiveTypeAnnotation.map
-           extern    Std.Prelude.List.Nil
            extern    umber_gc_alloc
+           extern    Std.Prelude.List.Nil
 
            section   .text
 

@@ -1,8 +1,8 @@
            default   rel
            global    umber_main#OpSectionRight
-           global    OpSectionRight.#binding.1
-           global    OpSectionRight.#fun.1
            global    OpSectionRight.~__~#114261348
+           global    OpSectionRight.#fun.1
+           global    OpSectionRight.#binding.1
            global    string.901559560:weak
            global    int.5:weak
            global    string.51739196:weak
@@ -48,19 +48,19 @@ umber_main#OpSectionRight:
            add       rsp, 24
            ret       
 
+OpSectionRight.~__~#114261348:
+           sub       rsp, 8
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           call      Std.Prelude.print_int wrt ..plt
+           add       rsp, 8
+           ret       
+
 OpSectionRight.#fun.1:
            sub       rsp, 8
            mov       r9, rbx
            mov       rbx, qword [rax + 16]
            mov       rax, r9
            call      OpSectionRight.~__~#114261348
-           add       rsp, 8
-           ret       
-
-OpSectionRight.~__~#114261348:
-           sub       rsp, 8
-           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
-           call      Std.Prelude.print_int wrt ..plt
            add       rsp, 8
            ret       
 

@@ -1,8 +1,8 @@
            default   rel
            global    umber_main#Closures
-           global    Closures.#binding.1
-           global    Closures.count_up
            global    Closures.#fun.1
+           global    Closures.count_up
+           global    Closures.#binding.1
            global    int.5:weak
            global    int.2:weak
            global    int.0:weak
@@ -22,24 +22,6 @@ umber_main#Closures:
            call      Std.Prelude.print_int wrt ..plt
            mov       r9, rax
            mov       qword [Closures.#binding.1], r9
-           add       rsp, 8
-           ret       
-
-Closures.count_up:
-           sub       rsp, 8
-           mov       r13, rax
-           mov       r14, rdi
-           mov       rdi, 32
-           call      umber_gc_alloc wrt ..plt
-           mov       r9, rax
-           mov       word [r9], 12289
-           mov       word [r9 + 2], 3
-           mov       qword [r9 + 8], Closures.#fun.1
-           mov       qword [r9 + 16], rbx
-           mov       qword [r9 + 24], r14
-           mov       rax, r9
-           mov       rbx, r13
-           call      qword [r9 + 8]
            add       rsp, 8
            ret       
 
@@ -69,6 +51,24 @@ Closures.#fun.1:
            jmp       .cond_assign.merge#4
 .cond_assign.merge#4:
            add       rsp, 24
+           ret       
+
+Closures.count_up:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       r14, rdi
+           mov       rdi, 32
+           call      umber_gc_alloc wrt ..plt
+           mov       r9, rax
+           mov       word [r9], 12289
+           mov       word [r9 + 2], 3
+           mov       qword [r9 + 8], Closures.#fun.1
+           mov       qword [r9 + 16], rbx
+           mov       qword [r9 + 24], r14
+           mov       rax, r9
+           mov       rbx, r13
+           call      qword [r9 + 8]
+           add       rsp, 8
            ret       
 
            section   .rodata

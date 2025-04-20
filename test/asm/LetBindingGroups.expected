@@ -1,14 +1,14 @@
            default   rel
            global    umber_main#LetBindingGroups
-           global    LetBindingGroups._.1
-           global    LetBindingGroups.a
-           global    LetBindingGroups._.2
-           global    LetBindingGroups.b
-           global    LetBindingGroups.bottom
-           global    LetBindingGroups.go_right.1
-           global    LetBindingGroups.fun
            global    LetBindingGroups.bottom_again.1
+           global    LetBindingGroups._.2
            global    LetBindingGroups.go_left.1
+           global    LetBindingGroups._.1
+           global    LetBindingGroups.bottom
+           global    LetBindingGroups.fun
+           global    LetBindingGroups.b
+           global    LetBindingGroups.a
+           global    LetBindingGroups.go_right.1
            global    string.104025972:weak
            global    int.5:weak
            global    string.103115772:weak
@@ -23,16 +23,16 @@
            global    int.17:weak
            global    int.8:weak
            extern    Std.Prelude.Operators.__#358075620
+           extern    Std.Prelude.Operators.__#323999091
+           extern    Std.Prelude.Operators.__#892075468
+           extern    Std.Prelude.List.Nil
+           extern    Std.Prelude.Operators.__#1049114386
+           extern    Std.Prelude.print
            extern    Std.Prelude.Operators.__#72260286
            extern    Std.Prelude.Operators.__#506761450
            extern    Std.Prelude.Operators.__#664800900
            extern    Std.Prelude.Operators.__#294461388
-           extern    Std.Prelude.Operators.__#323999091
-           extern    Std.Prelude.Operators.__#892075468
-           extern    Std.Prelude.List.Nil
            extern    Std.Prelude.print_int
-           extern    Std.Prelude.Operators.__#1049114386
-           extern    Std.Prelude.print
 
            section   .text
 
@@ -96,15 +96,22 @@ umber_main#LetBindingGroups:
            add       rsp, 40
            ret       
 
-LetBindingGroups.bottom:
+LetBindingGroups.bottom_again.1:
            sub       rsp, 8
-           call      LetBindingGroups.bottom_again.1
+           mov       rax, int.17
+           call      LetBindingGroups.go_left.1
            add       rsp, 8
            ret       
 
-LetBindingGroups.go_right.1:
+LetBindingGroups.go_left.1:
            sub       rsp, 8
-           call      LetBindingGroups.go_left.1
+           call      LetBindingGroups.go_right.1
+           add       rsp, 8
+           ret       
+
+LetBindingGroups.bottom:
+           sub       rsp, 8
+           call      LetBindingGroups.bottom_again.1
            add       rsp, 8
            ret       
 
@@ -133,16 +140,9 @@ LetBindingGroups.fun:
            add       rsp, 24
            ret       
 
-LetBindingGroups.bottom_again.1:
+LetBindingGroups.go_right.1:
            sub       rsp, 8
-           mov       rax, int.17
            call      LetBindingGroups.go_left.1
-           add       rsp, 8
-           ret       
-
-LetBindingGroups.go_left.1:
-           sub       rsp, 8
-           call      LetBindingGroups.go_right.1
            add       rsp, 8
            ret       
 
@@ -216,12 +216,12 @@ int.8:
 
            section   .bss
            sectalign 8
-LetBindingGroups._.1:
-           resq      1
-LetBindingGroups.a:
-           resq      1
 LetBindingGroups._.2:
            resq      1
+LetBindingGroups._.1:
+           resq      1
 LetBindingGroups.b:
+           resq      1
+LetBindingGroups.a:
            resq      1
 

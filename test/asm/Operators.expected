@@ -1,24 +1,24 @@
            default   rel
            global    umber_main#Operators
            global    Operators.unicode_my_dudes
-           global    Operators._.1
-           global    Operators.right_section.1
-           global    Operators.true
-           global    Operators.four
-           global    Operators.#binding.1
-           global    Operators.left_section.1
-           global    Operators.one
-           global    Operators.#binding.2
            global    Operators.#fun.1
-           global    Operators.left_section
            global    Operators.__#765322566
-           global    Operators.right_section
-           global    Operators.#fun.3
+           global    Operators._.1
+           global    Operators.left_section.1
            global    Operators.~~~
-           global    Operators..
-           global    Operators.#fun.2
            global    Operators.#fun.4
+           global    Operators.four
+           global    Operators.left_section
+           global    Operators.right_section
            global    Operators.#fun.5
+           global    Operators.#binding.2
+           global    Operators.right_section.1
+           global    Operators.#binding.1
+           global    Operators.#fun.2
+           global    Operators.#fun.3
+           global    Operators..
+           global    Operators.true
+           global    Operators.one
            global    Operators.#fun.3#closure:weak
            global    Operators.#fun.3#closure_wrapper_fun:weak
            global    int.5:weak
@@ -33,21 +33,21 @@
            global    string.120385329:weak
            global    string.455860649:weak
            global    string.640172348:weak
-           extern    Std.Prelude.Operators.__#358075620
-           extern    Std.Prelude.Int.to_string
-           extern    Std.Prelude.Bool.to_string
-           extern    Std.Prelude.Operators.__#506761450
-           extern    umber_gc_alloc
            extern    Std.Prelude.Operators.__#411843497
-           extern    Std.Prelude.Operators.__#664800900
-           extern    Std.Prelude.Operators..
-           extern    Std.Prelude.Operators.mod
-           extern    Std.Prelude.Operators.__#294461388
            extern    Std.Prelude.List.Nil
            extern    Std.Prelude.Operators.__#1049114386
-           extern    Std.Prelude.List.concat_map
            extern    Std.Prelude.List.map
+           extern    Std.Prelude.Bool.to_string
+           extern    Std.Prelude.Operators.__#294461388
+           extern    Std.Prelude.Operators.__#358075620
+           extern    umber_gc_alloc
+           extern    Std.Prelude.Operators.mod
            extern    Std.Prelude.print
+           extern    Std.Prelude.Int.to_string
+           extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.Operators.__#664800900
+           extern    Std.Prelude.Operators..
+           extern    Std.Prelude.List.concat_map
 
            section   .text
 
@@ -145,16 +145,6 @@ Operators.#fun.1:
            add       rsp, 8
            ret       
 
-Operators.left_section:
-           sub       rsp, 8
-           mov       r9, qword [Operators.left_section.1]
-           mov       r10, qword [Operators.left_section.1]
-           mov       rbx, rax
-           mov       rax, r10
-           call      qword [r9 + 8]
-           add       rsp, 8
-           ret       
-
 Operators.__#765322566:
            sub       rsp, 8
            mov       r13, rax
@@ -170,6 +160,31 @@ Operators.__#765322566:
            add       rsp, 8
            ret       
 
+Operators.~~~:
+           sub       rsp, 8
+           mov       rax, 1
+           add       rsp, 8
+           ret       
+
+Operators.#fun.4:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rbx, qword [rax + 16]
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           add       rsp, 8
+           ret       
+
+Operators.left_section:
+           sub       rsp, 8
+           mov       r9, qword [Operators.left_section.1]
+           mov       r10, qword [Operators.left_section.1]
+           mov       rbx, rax
+           mov       rax, r10
+           call      qword [r9 + 8]
+           add       rsp, 8
+           ret       
+
 Operators.right_section:
            sub       rsp, 8
            mov       r9, qword [Operators.right_section.1]
@@ -180,31 +195,10 @@ Operators.right_section:
            add       rsp, 8
            ret       
 
-Operators.#fun.3:
-           sub       rsp, 24
-           mov       qword [rsp + 8], rax
-           mov       r9, qword [rsp + 8]
-           mov       rax, qword [r9 + 8]
-           call      Std.Prelude.print wrt ..plt
-           mov       qword [rsp], rax
-           mov       r9, qword [rsp + 8]
-           mov       rax, qword [r9 + 16]
-           call      Std.Prelude.print wrt ..plt
-           mov       rbx, rax
-           mov       rax, qword [rsp]
-           call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           add       rsp, 24
-           ret       
-
-Operators.~~~:
+Operators.#fun.5:
            sub       rsp, 8
-           mov       rax, 1
-           add       rsp, 8
-           ret       
-
-Operators..:
-           sub       rsp, 8
-           call      Std.Prelude.Operators.. wrt ..plt
+           mov       rax, qword [rax + 16]
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
            add       rsp, 8
            ret       
 
@@ -224,19 +218,25 @@ Operators.#fun.2:
            add       rsp, 8
            ret       
 
-Operators.#fun.4:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rbx, qword [rax + 16]
-           mov       rax, r9
-           call      Std.Prelude.Operators.__#294461388 wrt ..plt
-           add       rsp, 8
+Operators.#fun.3:
+           sub       rsp, 24
+           mov       qword [rsp + 8], rax
+           mov       r9, qword [rsp + 8]
+           mov       rax, qword [r9 + 8]
+           call      Std.Prelude.print wrt ..plt
+           mov       qword [rsp], rax
+           mov       r9, qword [rsp + 8]
+           mov       rax, qword [r9 + 16]
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 24
            ret       
 
-Operators.#fun.5:
+Operators..:
            sub       rsp, 8
-           mov       rax, qword [rax + 16]
-           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           call      Std.Prelude.Operators.. wrt ..plt
            add       rsp, 8
            ret       
 
@@ -322,18 +322,18 @@ Operators.unicode_my_dudes:
            resq      1
 Operators._.1:
            resq      1
-Operators.right_section.1:
-           resq      1
-Operators.true:
+Operators.left_section.1:
            resq      1
 Operators.four:
            resq      1
+Operators.#binding.2:
+           resq      1
+Operators.right_section.1:
+           resq      1
 Operators.#binding.1:
            resq      1
-Operators.left_section.1:
+Operators.true:
            resq      1
 Operators.one:
-           resq      1
-Operators.#binding.2:
            resq      1
 

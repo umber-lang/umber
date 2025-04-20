@@ -1,12 +1,12 @@
            default   rel
            global    umber_main#Keywords
            global    Keywords.__#705098952
-           global    Keywords.__#373726558
-           global    Keywords.__?#967420102
-           global    Keywords.left
-           global    Keywords.middle
            global    Keywords.right
            global    Keywords.let__s_go#117710912
+           global    Keywords.middle
+           global    Keywords.left
+           global    Keywords.__?#967420102
+           global    Keywords.__#373726558
            global    Keywords.let__s_go#117710912#closure:weak
            global    Keywords.let__s_go#117710912#closure_wrapper_fun:weak
 
@@ -51,14 +51,14 @@ Keywords.let__s_go#117710912#closure:
            sectalign 8
 Keywords.__#705098952:
            resq      1
-Keywords.__#373726558:
-           resq      1
-Keywords.__?#967420102:
-           resq      1
-Keywords.left:
+Keywords.right:
            resq      1
 Keywords.middle:
            resq      1
-Keywords.right:
+Keywords.left:
+           resq      1
+Keywords.__?#967420102:
+           resq      1
+Keywords.__#373726558:
            resq      1
 

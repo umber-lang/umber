@@ -239,4 +239,5 @@ type t =
   ; bss_section : Bss_decl.t list
   }
 
+val empty : t
 val pp : Format.formatter -> t -> unit

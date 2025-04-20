@@ -1,54 +1,54 @@
            default   rel
            global    umber_main#AdventOfCode2024_1
+           global    AdventOfCode2024_1.sum
+           global    AdventOfCode2024_1.#fun.6
+           global    AdventOfCode2024_1.#fun.3
            global    AdventOfCode2024_1.input
            global    AdventOfCode2024_1.#binding.3
-           global    AdventOfCode2024_1.#fun.6
-           global    AdventOfCode2024_1.solve_part_1
-           global    AdventOfCode2024_1.loop.1
-           global    AdventOfCode2024_1.sum
            global    AdventOfCode2024_1.solve_part_2
            global    AdventOfCode2024_1.#fun.5
            global    AdventOfCode2024_1.#fun.4
-           global    AdventOfCode2024_1.#fun.3
-           global    Std.Prelude.Operators.not#closure:weak
-           global    Std.Prelude.Operators.not#closure_wrapper_fun:weak
-           global    Std.Prelude.String.is_empty#closure:weak
-           global    Std.Prelude.String.is_empty#closure_wrapper_fun:weak
-           global    Std.Prelude.Int.of_string#closure:weak
-           global    Std.Prelude.Int.of_string#closure_wrapper_fun:weak
-           global    Std.Prelude.Operators.__#1049114386#closure:weak
-           global    Std.Prelude.Operators.__#1049114386#closure_wrapper_fun:weak
-           global    AdventOfCode2024_1.#fun.4#closure:weak
-           global    AdventOfCode2024_1.#fun.4#closure_wrapper_fun:weak
+           global    AdventOfCode2024_1.loop.1
+           global    AdventOfCode2024_1.solve_part_1
            global    Std.Prelude.Operators..#closure:weak
            global    Std.Prelude.Operators..#closure_wrapper_fun:weak
+           global    AdventOfCode2024_1.#fun.4#closure:weak
+           global    AdventOfCode2024_1.#fun.4#closure_wrapper_fun:weak
+           global    Std.Prelude.Operators.not#closure:weak
+           global    Std.Prelude.Operators.not#closure_wrapper_fun:weak
+           global    Std.Prelude.Operators.__#1049114386#closure:weak
+           global    Std.Prelude.Operators.__#1049114386#closure_wrapper_fun:weak
+           global    Std.Prelude.Int.of_string#closure:weak
+           global    Std.Prelude.Int.of_string#closure_wrapper_fun:weak
+           global    Std.Prelude.String.is_empty#closure:weak
+           global    Std.Prelude.String.is_empty#closure_wrapper_fun:weak
            global    string.615481279:weak
            global    int.0:weak
            global    string.0:weak
            global    string.307328105:weak
            global    char.32:weak
-           extern    Std.Prelude.Operators.__#358075620
-           extern    Std.Prelude.Operators.not
-           extern    Std.Prelude.List.fold
-           extern    umber_gc_alloc
-           extern    Std.Prelude.print_string
            extern    Std.Prelude.List.unzip
            extern    Std.Prelude.List.Nil
            extern    Std.Prelude.Int.of_string
            extern    Std.Prelude.Operators.__#1049114386
            extern    Std.Prelude.List.map
            extern    Std.Prelude.read_line
+           extern    Std.Prelude.Operators.__#72260286
+           extern    Std.Prelude.List.sort
+           extern    Std.Prelude.Operators.__#294461388
+           extern    Std.Prelude.List.reverse
+           extern    Std.Prelude.Operators.__#358075620
+           extern    Std.Prelude.Operators.not
+           extern    Std.Prelude.List.fold
+           extern    umber_gc_alloc
+           extern    Std.Prelude.print_string
            extern    Std.Prelude.print
            extern    Std.Prelude.List.filter
-           extern    Std.Prelude.Operators.__#72260286
            extern    Std.Prelude.String.split
-           extern    Std.Prelude.List.sort
            extern    Std.Prelude.Operators.__#506761450
            extern    Std.Prelude.Operators.__#664800900
            extern    Std.Prelude.Operators..
-           extern    Std.Prelude.Operators.__#294461388
            extern    Std.Prelude.Int.abs
-           extern    Std.Prelude.List.reverse
            extern    Std.Prelude.List.count
            extern    Std.Prelude.String.is_empty
            extern    Std.Prelude.print_int
@@ -94,6 +94,14 @@ umber_main#AdventOfCode2024_1:
            add       rsp, 40
            ret       
 
+AdventOfCode2024_1.sum:
+           sub       rsp, 8
+           mov       rbx, int.0
+           mov       rdi, Std.Prelude.Operators.__#1049114386#closure
+           call      Std.Prelude.List.fold wrt ..plt
+           add       rsp, 8
+           ret       
+
 AdventOfCode2024_1.#fun.6:
            sub       rsp, 24
            mov       r13, rax
@@ -119,24 +127,55 @@ AdventOfCode2024_1.#fun.6:
            add       rsp, 24
            ret       
 
-AdventOfCode2024_1.solve_part_1:
-           sub       rsp, 24
+AdventOfCode2024_1.#fun.3:
+           sub       rsp, 8
+           mov       r10, qword [rax + 16]
+           mov       r11, qword [rax + 16]
+           mov       r9, qword [rax + 24]
+           mov       rdi, qword [rax + 32]
+           mov       rsi, rbx
+           mov       rax, r11
+           mov       rbx, r9
+           call      qword [r10 + 8]
+           add       rsp, 8
+           ret       
+
+AdventOfCode2024_1.solve_part_2:
+           sub       rsp, 8
            call      Std.Prelude.List.unzip wrt ..plt
-           mov       qword [rsp + 8], rax
-           mov       r9, qword [rsp + 8]
-           mov       rax, qword [r9 + 8]
-           call      Std.Prelude.List.sort wrt ..plt
-           mov       qword [rsp], rax
-           mov       r9, qword [rsp + 8]
-           mov       rax, qword [r9 + 16]
-           call      Std.Prelude.List.sort wrt ..plt
-           mov       rbx, rax
-           mov       rax, qword [rsp]
-           call      Std.Prelude.List.zip_shortest wrt ..plt
-           mov       rbx, AdventOfCode2024_1.#fun.4#closure
-           call      Std.Prelude.List.map wrt ..plt
-           call      AdventOfCode2024_1.sum
-           add       rsp, 24
+           mov       r13, rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 12289
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], AdventOfCode2024_1.#fun.6
+           mov       r9, qword [r13 + 16]
+           mov       qword [rax + 16], r9
+           mov       r9, qword [r13 + 8]
+           mov       rbx, int.0
+           mov       rdi, rax
+           mov       rax, r9
+           call      Std.Prelude.List.fold wrt ..plt
+           add       rsp, 8
+           ret       
+
+AdventOfCode2024_1.#fun.5:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rbx, qword [rax + 16]
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#664800900 wrt ..plt
+           add       rsp, 8
+           ret       
+
+AdventOfCode2024_1.#fun.4:
+           sub       rsp, 8
+           mov       r9, qword [rax + 8]
+           mov       rbx, qword [rax + 16]
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#72260286 wrt ..plt
+           call      Std.Prelude.Int.abs wrt ..plt
+           add       rsp, 8
            ret       
 
 AdventOfCode2024_1.loop.1:
@@ -235,62 +274,41 @@ AdventOfCode2024_1.loop.1:
            add       rsp, 24
            ret       
 
-AdventOfCode2024_1.sum:
-           sub       rsp, 8
-           mov       rbx, int.0
-           mov       rdi, Std.Prelude.Operators.__#1049114386#closure
-           call      Std.Prelude.List.fold wrt ..plt
-           add       rsp, 8
-           ret       
-
-AdventOfCode2024_1.solve_part_2:
-           sub       rsp, 8
+AdventOfCode2024_1.solve_part_1:
+           sub       rsp, 24
            call      Std.Prelude.List.unzip wrt ..plt
-           mov       r13, rax
-           mov       rdi, 24
-           call      umber_gc_alloc wrt ..plt
-           mov       word [rax], 12289
-           mov       word [rax + 2], 2
-           mov       qword [rax + 8], AdventOfCode2024_1.#fun.6
-           mov       r9, qword [r13 + 16]
-           mov       qword [rax + 16], r9
-           mov       r9, qword [r13 + 8]
-           mov       rbx, int.0
-           mov       rdi, rax
-           mov       rax, r9
-           call      Std.Prelude.List.fold wrt ..plt
+           mov       qword [rsp + 8], rax
+           mov       r9, qword [rsp + 8]
+           mov       rax, qword [r9 + 8]
+           call      Std.Prelude.List.sort wrt ..plt
+           mov       qword [rsp], rax
+           mov       r9, qword [rsp + 8]
+           mov       rax, qword [r9 + 16]
+           call      Std.Prelude.List.sort wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.List.zip_shortest wrt ..plt
+           mov       rbx, AdventOfCode2024_1.#fun.4#closure
+           call      Std.Prelude.List.map wrt ..plt
+           call      AdventOfCode2024_1.sum
+           add       rsp, 24
+           ret       
+
+Std.Prelude.Operators..#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rsi
+           mov       rax, rbx
+           mov       rbx, rdi
+           mov       rdi, r9
+           call      Std.Prelude.Operators..
            add       rsp, 8
            ret       
 
-AdventOfCode2024_1.#fun.5:
+AdventOfCode2024_1.#fun.4#closure_wrapper_fun:
            sub       rsp, 8
            mov       r9, rbx
-           mov       rbx, qword [rax + 16]
            mov       rax, r9
-           call      Std.Prelude.Operators.__#664800900 wrt ..plt
-           add       rsp, 8
-           ret       
-
-AdventOfCode2024_1.#fun.4:
-           sub       rsp, 8
-           mov       r9, qword [rax + 8]
-           mov       rbx, qword [rax + 16]
-           mov       rax, r9
-           call      Std.Prelude.Operators.__#72260286 wrt ..plt
-           call      Std.Prelude.Int.abs wrt ..plt
-           add       rsp, 8
-           ret       
-
-AdventOfCode2024_1.#fun.3:
-           sub       rsp, 8
-           mov       r10, qword [rax + 16]
-           mov       r11, qword [rax + 16]
-           mov       r9, qword [rax + 24]
-           mov       rdi, qword [rax + 32]
-           mov       rsi, rbx
-           mov       rax, r11
-           mov       rbx, r9
-           call      qword [r10 + 8]
+           call      AdventOfCode2024_1.#fun.4
            add       rsp, 8
            ret       
 
@@ -299,22 +317,6 @@ Std.Prelude.Operators.not#closure_wrapper_fun:
            mov       r9, rbx
            mov       rax, r9
            call      Std.Prelude.Operators.not
-           add       rsp, 8
-           ret       
-
-Std.Prelude.String.is_empty#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
-           call      Std.Prelude.String.is_empty
-           add       rsp, 8
-           ret       
-
-Std.Prelude.Int.of_string#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
-           call      Std.Prelude.Int.of_string
            add       rsp, 8
            ret       
 
@@ -327,21 +329,19 @@ Std.Prelude.Operators.__#1049114386#closure_wrapper_fun:
            add       rsp, 8
            ret       
 
-AdventOfCode2024_1.#fun.4#closure_wrapper_fun:
+Std.Prelude.Int.of_string#closure_wrapper_fun:
            sub       rsp, 8
            mov       r9, rbx
            mov       rax, r9
-           call      AdventOfCode2024_1.#fun.4
+           call      Std.Prelude.Int.of_string
            add       rsp, 8
            ret       
 
-Std.Prelude.Operators..#closure_wrapper_fun:
+Std.Prelude.String.is_empty#closure_wrapper_fun:
            sub       rsp, 8
-           mov       r9, rsi
-           mov       rax, rbx
-           mov       rbx, rdi
-           mov       rdi, r9
-           call      Std.Prelude.Operators..
+           mov       r9, rbx
+           mov       rax, r9
+           call      Std.Prelude.String.is_empty
            add       rsp, 8
            ret       
 
@@ -372,36 +372,36 @@ char.32:
            dw        1
            dd        0
            dq        32
-Std.Prelude.Operators.not#closure:
-           dw        12289
-           dw        1
-           dd        0
-           dq        Std.Prelude.Operators.not#closure_wrapper_fun
-Std.Prelude.String.is_empty#closure:
-           dw        12289
-           dw        1
-           dd        0
-           dq        Std.Prelude.String.is_empty#closure_wrapper_fun
-Std.Prelude.Int.of_string#closure:
-           dw        12289
-           dw        1
-           dd        0
-           dq        Std.Prelude.Int.of_string#closure_wrapper_fun
-Std.Prelude.Operators.__#1049114386#closure:
-           dw        12289
-           dw        1
-           dd        0
-           dq        Std.Prelude.Operators.__#1049114386#closure_wrapper_fun
-AdventOfCode2024_1.#fun.4#closure:
-           dw        12289
-           dw        1
-           dd        0
-           dq        AdventOfCode2024_1.#fun.4#closure_wrapper_fun
 Std.Prelude.Operators..#closure:
            dw        12289
            dw        1
            dd        0
            dq        Std.Prelude.Operators..#closure_wrapper_fun
+AdventOfCode2024_1.#fun.4#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        AdventOfCode2024_1.#fun.4#closure_wrapper_fun
+Std.Prelude.Operators.not#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Std.Prelude.Operators.not#closure_wrapper_fun
+Std.Prelude.Operators.__#1049114386#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Std.Prelude.Operators.__#1049114386#closure_wrapper_fun
+Std.Prelude.Int.of_string#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Std.Prelude.Int.of_string#closure_wrapper_fun
+Std.Prelude.String.is_empty#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        Std.Prelude.String.is_empty#closure_wrapper_fun
 
            section   .bss
            sectalign 8

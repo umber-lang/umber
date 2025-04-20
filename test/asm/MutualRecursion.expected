@@ -1,13 +1,13 @@
            default   rel
            global    umber_main#MutualRecursion
-           global    MutualRecursion.Leaf
            global    MutualRecursion.number
+           global    MutualRecursion.Leaf
            global    MutualRecursion.f
-           global    MutualRecursion.#binding.1
+           global    MutualRecursion.Node
            global    MutualRecursion.even
            global    MutualRecursion.loop.1
            global    MutualRecursion.odd
-           global    MutualRecursion.Node
+           global    MutualRecursion.#binding.1
            global    MutualRecursion.sum_tree
            global    MutualRecursion.sum_forest
            global    int.5:weak
@@ -15,11 +15,11 @@
            global    int.17:weak
            global    int.0:weak
            extern    Std.Prelude.Operators.__#72260286
+           extern    umber_gc_alloc
+           extern    Std.Prelude.Operators.__#664800900
            extern    Std.Prelude.List.Nil
            extern    Std.Prelude.print_int
            extern    Std.Prelude.Operators.__#1049114386
-           extern    umber_gc_alloc
-           extern    Std.Prelude.Operators.__#664800900
 
            section   .text
 
@@ -67,6 +67,18 @@ umber_main#MutualRecursion:
            call      Std.Prelude.print_int wrt ..plt
            mov       r9, rax
            mov       qword [MutualRecursion.#binding.1], r9
+           add       rsp, 8
+           ret       
+
+MutualRecursion.Node:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 2
+           mov       qword [rax + 8], r13
+           mov       qword [rax + 16], rbx
            add       rsp, 8
            ret       
 
@@ -144,18 +156,6 @@ MutualRecursion.odd:
            add       rsp, 8
            ret       
 
-MutualRecursion.Node:
-           sub       rsp, 8
-           mov       r13, rax
-           mov       rdi, 24
-           call      umber_gc_alloc wrt ..plt
-           mov       word [rax], 0
-           mov       word [rax + 2], 2
-           mov       qword [rax + 8], r13
-           mov       qword [rax + 16], rbx
-           add       rsp, 8
-           ret       
-
 MutualRecursion.sum_tree:
            sub       rsp, 8
            mov       qword [rsp], rax
@@ -215,9 +215,9 @@ int.0:
 
            section   .bss
            sectalign 8
-MutualRecursion.Leaf:
-           resq      1
 MutualRecursion.number:
+           resq      1
+MutualRecursion.Leaf:
            resq      1
 MutualRecursion.f:
            resq      1

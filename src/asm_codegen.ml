@@ -47,7 +47,7 @@ module Unique_counter () : sig
 
   module Counter : sig
     type id := t
-    type t
+    type t [@@deriving sexp_of]
 
     val create : unit -> t
     val next : t -> id
@@ -56,7 +56,7 @@ end = struct
   include Int
 
   module Counter = struct
-    type t = int ref
+    type t = int ref [@@deriving sexp_of]
 
     let create () = ref 0
 
@@ -89,18 +89,6 @@ module Reg_alloc : sig
     -> register_counter:Virtual_register.Counter.t
     -> Asm_program.Register.t Basic_block.t list
 end = struct
-  (* TODO: Handle spilling. Per https://en.wikipedia.org/wiki/Brooks%27_theorem, 
-     it's sufficient to check that no node has degree >= # of usable registers. *)
-
-  (* FIXME: Let's just do something very dumb - never reuse any registers within a given
-     function. Trying to be clever and re-use registers by handling lifetimes can wait
-     until later. It's not clear to me the best way to structure the code, though it feels
-     very painful to do without SSA form letting me compute a CFG to then get the
-     interference graph.
-     
-     Ok, this can't work - it means we can never call another function!
-   *)
-
   module Cfg_node = struct
     type t =
       | Label of Label_name.t
@@ -141,62 +129,6 @@ end = struct
 
   module Interference_graph = Graph.Imperative.Graph.Concrete (Register)
 
-  (* FIXME: Handle Call properly! 
-     It uses the arg registers (for its arity).
-     It assigns to the return register.
-     It may assign to other caller-saved registers (they are clobbered)
-     => I guess that counts as an assignment but we need extra handling to maintain the
-        correct register state afterward
-
-     We need to know the calling convention and arity of the function being called.
-
-     If we see one of the caller-saved registers is lived right after a call (except rax)
-     we know that something has gone wrong. Some options:
-     - Reg alloc could notice this and insert moves before and after the call to fresh
-       virtual registers. Would need to somehow pass through the virtual register counter
-       though which is a tiny bit annoying. Reg alloc also hadn't inserted any
-       instructions up to this point (though it'll have to do that later for stack spilling!)
-       We have the same problem as below where we need to keep track of the instructions
-       to add and add them later.
-     - Instruction selection could add moves for all affected registers in advance. These
-       will be useless if the value isn't in use or used later. Reg alloc could notice
-       assignments to values that aren't needed to be live and remove them. This seems
-       trickier tbh, it's unclear how to keep track of the liveness information properly
-       while iterating over the cfg. We'd have to put the location of the useless moves
-       somewhere to schedule their remmoval or something. I guess label + index is ok
-       but awkward to think about indexes while removing instructions.
-       => Actually, wait, we already handle removing useless moves by coalescing virtual
-          registers, maybe adding the moves should work?
-       => Unclear if blindly moving all registers would work, even if they aren't used.
-          I think that'd make them interfere with every preceding register if they were
-          never assigned to? (since lifetime analysis will think they then live for the
-          whole function) Maybe we could remove the moves if the values aren't used? Bit
-          sketchy, easy to write bugs that silently do weird things. I think function
-          builder can keep track of all registers that have been used at some point maybe?
-          Hmm, but the register would not interfere with the one it was moved from, so it
-          should coalesce actually and be fine.
-
-     There's a bigger problem here: we need to make sure reg alloc doesn't start using
-     these registers before the call and then not save them. So we need to encode the
-     clobbering in the interference graph. The clobbered registers need to interfere with
-     ....? At least all the other arguments. You could maybe treat it like all the args
-     getting assigned to, then the clobbered args getting used. Any of the virtual regs
-     will have a lifetime streching over the call so they'll interfere.
-  *)
-  (* TODO: Move to Instr module? *)
-  (* FIXME: A move to [r13] is actually a use of r13, not an assignment! There's a hidden
-     "store" operation here which uses it. 
-
-     Let's represent stores/loads explicitly? And do a separate pass where we inline
-     memory references?
-
-     Another idea is to make this logic cleverer around Memory. Basically, when inside
-     memory, register assignments become uses. Register uses are still uses though.
-     
-     Also, there's code duplication of this same bug in Instr.Nonterminal.fold_map_args
-     awkward thing is the order needs to be different - this one is the order of the
-     semantics, the other one is the order of the args syntactically.
-  *)
   let instr_register_ops (instr : _ Instr.Nonterminal.t) =
     let use_mem =
       Memory.fold_simple_values ~init:[] ~f:(fun acc v -> (Register_op.Use, v) :: acc)
@@ -665,8 +597,6 @@ end = struct
       in
       match result with
       | Error newly_spilled_registers ->
-        (* FIXME: This is getting into some kind of death spiral where it tries to spill
-           everything, but it isn't helping. *)
         eprint_s
           [%here]
           [%lazy_message
@@ -734,15 +664,8 @@ end = struct
     *)
 end
 
-module Extern = struct
-  type t =
-    { label_name : Label_name.t
-    ; fun_info : (Call_conv.t * int) option
-    }
-end
-
 module Function_builder : sig
-  type t
+  type t [@@deriving sexp_of]
 
   val create : Label_name.t -> arity:int -> t
   val add_code : t -> Register.t Instr.Nonterminal.t -> unit
@@ -781,6 +704,7 @@ end = struct
     ; basic_blocks : Block_builder.t Label_name.Hash_queue.t
     ; mutable current_label : Label_name.t
     }
+  [@@deriving sexp_of]
 
   let name t = t.fun_name
   let arity t = t.arity
@@ -852,7 +776,6 @@ end = struct
   ;;
 
   let create fun_name ~arity =
-    (* FIXME: callee saved registers must be marked Used *)
     let t =
       { fun_name
       ; arity
@@ -896,26 +819,69 @@ module Closure = struct
     ; closure_wrapper_fun_name : Label_name.t
     ; arity : int
     }
+  [@@deriving sexp_of]
 
   let create ~fun_name ~arity =
-    let fun_name' = Label_name.to_string fun_name in
     { fun_name
     ; closure_wrapper_fun_name =
-        Label_name.of_string [%string "%{fun_name'}#closure_wrapper_fun"]
-    ; closure_name = Label_name.of_string [%string "%{fun_name'}#closure"]
+        Label_name.of_string [%string "%{fun_name#Label_name}#closure_wrapper_fun"]
+    ; closure_name = Label_name.of_string [%string "%{fun_name#Label_name}#closure"]
     ; arity
     }
   ;;
 end
 
+module Global = struct
+  module This_file = struct
+    type t =
+      | Global_variable of Label_name.t
+      | Function of Function_builder.t
+    (* FIXME: Constants and closures won't have mir names. Maybe don't belong? *)
+    (* | Closure of Closure.t *)
+    [@@deriving sexp_of]
+
+    let label_name = function
+      | Global_variable label -> label
+      | Function fun_builder -> Function_builder.name fun_builder
+    ;;
+  end
+
+  module Other_file = struct
+    type t =
+      | Global_variable of Label_name.t
+      | Umber_function of
+          { label_name : Label_name.t
+          ; arity : int
+          }
+      | C_function of
+          { label_name : Label_name.t
+          ; arity : int
+          ; local_wrapper_function : Function_builder.t option
+          }
+    [@@deriving sexp_of]
+
+    let label_name = function
+      | Global_variable label_name
+      | Umber_function { label_name; _ }
+      | C_function { label_name; _ } -> label_name
+    ;;
+  end
+
+  type t =
+    | This_file of This_file.t
+    | Other_file of Other_file.t
+  [@@deriving sexp_of]
+
+  let label_name = function
+    | This_file this -> This_file.label_name this
+    | Other_file other -> Other_file.label_name other
+  ;;
+end
+
 type t =
-  { (* FIXME: name_table is unused *)
-    name_table : Mir_name.Name_table.t
-  ; bss_globals : Label_name.t Queue.t
-  ; externs : Extern.t Mir_name.Table.t
+  { globals : Global.t Mir_name.Table.t
   ; literals : Label_name.t Literal.Table.t
-  ; closures : Closure.t Mir_name.Table.t
-  ; functions : Function_builder.t Mir_name.Table.t
+  ; closures : Closure.t Label_name.Table.t
   ; main_function : Function_builder.t
   }
 
@@ -1049,21 +1015,50 @@ let define_no_env_closure_wrapper_fun ~closure_wrapper_fun_name ~fun_name ~arity
   Function_builder.basic_blocks fun_builder
 ;;
 
-let to_program
-  { bss_globals; externs; literals; closures; functions; main_function; name_table = _ }
-  : Asm_program.t
-  =
-  let uninitialized_globals = Queue.to_list bss_globals in
-  let externs = Hashtbl.data externs in
+let to_program { globals; literals; closures; main_function } : Asm_program.t =
+  let program =
+    Hashtbl.fold globals ~init:Asm_program.empty ~f:(fun ~key:_ ~data:global program ->
+      let label_name = Global.label_name global in
+      match global with
+      | This_file this_file ->
+        let program =
+          match this_file with
+          | Global_variable label_name ->
+            { program with
+              bss_section =
+                { label = label_name; kind = `Words; size = 1 } :: program.bss_section
+            }
+          | Function fun_builder ->
+            { program with
+              text_section =
+                Function_builder.basic_blocks fun_builder @ program.text_section
+            }
+        in
+        { program with
+          globals = { name = label_name; strength = `Strong } :: program.globals
+        }
+      | Other_file other_file ->
+        let program =
+          match other_file with
+          | C_function { local_wrapper_function = Some fun_builder; _ } ->
+            { program with
+              globals =
+                { name = Function_builder.name fun_builder; strength = `Weak }
+                :: program.globals
+            ; text_section =
+                Function_builder.basic_blocks fun_builder @ program.text_section
+            }
+          | C_function { local_wrapper_function = None; _ }
+          | Global_variable _ | Umber_function _ -> program
+        in
+        { program with externs = label_name :: program.externs })
+  in
   let literals = Hashtbl.to_alist literals in
   let closures = Hashtbl.data closures in
-  let functions = Hashtbl.data functions in
-  { globals =
+  { program with
+    globals =
       { name = Function_builder.name main_function; strength = `Strong }
-      :: (List.map uninitialized_globals ~f:(fun name : Global_decl.t ->
-            { name; strength = `Strong })
-          @ List.map functions ~f:(fun fun_builder : Global_decl.t ->
-              { name = Function_builder.name fun_builder; strength = `Strong })
+      :: (program.globals
           @ List.concat_map
               closures
               ~f:(fun { closure_name; closure_wrapper_fun_name; _ } : Global_decl.t list
@@ -1073,10 +1068,9 @@ let to_program
               ])
           @ List.map literals ~f:(fun ((_ : Literal.t), name) : Global_decl.t ->
               { name; strength = `Weak }))
-  ; externs = List.map externs ~f:(fun { fun_info = _; label_name } -> label_name)
   ; text_section =
       Function_builder.basic_blocks main_function
-      @ List.concat_map functions ~f:Function_builder.basic_blocks
+      @ program.text_section
       @ List.concat_map
           closures
           ~f:(fun { fun_name; closure_wrapper_fun_name; arity; _ } ->
@@ -1090,19 +1084,13 @@ let to_program
           { label = closure_name
           ; payloads = constant_block_for_closure ~closure_wrapper_fun_name
           })
-  ; bss_section =
-      List.map uninitialized_globals ~f:(fun name : Bss_decl.t ->
-        { label = name; kind = `Words; size = 1 })
   }
 ;;
 
 let create ~main_function_name =
-  { name_table = Mir_name.Name_table.create ()
-  ; bss_globals = Queue.create ()
-  ; externs = Mir_name.Table.create ()
+  { globals = Mir_name.Table.create ()
   ; literals = Literal.Table.create ()
-  ; closures = Mir_name.Table.create ()
-  ; functions = Mir_name.Table.create ()
+  ; closures = Label_name.Table.create ()
   ; main_function = Function_builder.create main_function_name ~arity:0
   }
 ;;
@@ -1112,9 +1100,12 @@ let int_constant_tag tag : _ Value.t =
   Simple_value (Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1)))
 ;;
 
-let declare_extern_c_function t mir_name label_name ~arity =
+let declare_extern_c_function ?local_wrapper_function t mir_name label_name ~arity =
   ignore
-    (Hashtbl.add t.externs ~key:mir_name ~data:{ label_name; fun_info = Some (C, arity) }
+    (Hashtbl.add
+       t.globals
+       ~key:mir_name
+       ~data:(Other_file (C_function { label_name; arity; local_wrapper_function }))
       : [ `Ok | `Duplicate ])
 ;;
 
@@ -1125,39 +1116,27 @@ let declare_extern_c_function t mir_name label_name ~arity =
    The case I noticed was `let (::) = List.Cons`. It messes up the closures/functions. *)
 (* TODO: Amend MIR to treat function pointers and closures differently. *)
 let lookup_name_for_value t name ~fun_builder : _ Value.t =
-  (* FIXME: For everything except locals, we need to create a closure and possibly a
-     wrapper function. We need to treat it as if wrapped in a [Make_block] 
-      
-     For now, treat externs and functions the same. This will break when implementing a
-     proper calling convention besides copying C's.
-  *)
-  let wrapper_closure label_name ~arity : _ Value.t =
+  let wrapper_closure fun_name ~arity : _ Value.t =
     let closure =
-      Hashtbl.find_or_add t.closures name ~default:(fun () ->
-        Closure.create ~fun_name:label_name ~arity)
+      Hashtbl.find_or_add t.closures fun_name ~default:(fun () ->
+        Closure.create ~fun_name ~arity)
     in
     Simple_value (Global (closure.closure_name, Other))
   in
   match Function_builder.find_local fun_builder name with
   | Some value -> value
   | None ->
-    (match Hashtbl.find t.externs name with
-     | Some { fun_info = None; label_name } ->
-       (* Deference memory to get the value of external global variables. *)
+    (match Hashtbl.find_exn t.globals name with
+     | This_file (Global_variable label_name) | Other_file (Global_variable label_name) ->
+       (* Deference memory to get the value of global variables. *)
        Memory (I64, Value (Global (label_name, Other)))
-     | Some { fun_info = Some ((_ : Call_conv.t), arity); label_name } ->
-       wrapper_closure label_name ~arity
-     | None ->
-       (match Hashtbl.find t.functions name with
-        | Some fun_builder ->
-          wrapper_closure
-            (Function_builder.name fun_builder)
-            ~arity:(Function_builder.arity fun_builder)
-        | None ->
-          (* FIXME: Shouldn't make assumptions here. It's fragile. *)
-          (* Global values defined in this file reach this case. Dereference memory to get
-             the value. *)
-          Memory (I64, Value (Global (Label_name.of_mir_name name, Other)))))
+     | This_file (Function fun_builder) ->
+       wrapper_closure
+         (Function_builder.name fun_builder)
+         ~arity:(Function_builder.arity fun_builder)
+     | Other_file
+         (Umber_function { label_name; arity } | C_function { label_name; arity; _ }) ->
+       wrapper_closure label_name ~arity)
 ;;
 
 let load_mem_offset fun_builder (value : _ Value.t) size offset : _ Value.t =
@@ -1177,27 +1156,20 @@ let load_mem_offset fun_builder (value : _ Value.t) size offset : _ Value.t =
 ;;
 
 let lookup_name_for_fun_call t name ~fun_builder
-  : [ `Function | `Closure ] * _ Value.t * Call_conv.t
+  : [ `Closure | `Function ] * _ Value.t * Call_conv.t
   =
   match Function_builder.find_local fun_builder name with
   | Some closure -> `Closure, closure, Umber
   | None ->
-    (match Hashtbl.find t.functions name with
-     | Some fun_builder ->
+    (match Hashtbl.find_exn t.globals name with
+     | This_file (Function fun_builder) ->
        `Function, Simple_value (Global (Function_builder.name fun_builder, Other)), Umber
-     | None ->
-       (match Hashtbl.find t.externs name with
-        | Some { fun_info = Some (C, _); label_name } ->
-          `Function, Simple_value (Global (label_name, Extern_proc)), C
-        | Some { fun_info = Some (Umber, _); label_name } ->
-          `Function, Simple_value (Global (label_name, Extern_proc)), Umber
-        | Some { fun_info = None; label_name } ->
-          `Closure, Memory (I64, Value (Global (label_name, Other))), Umber
-        | None ->
-          (* FIXME: Shouldn't make assumptions here. It's fragile. *)
-          ( `Closure
-          , Memory (I64, Value (Global (Label_name.of_mir_name name, Other)))
-          , Umber )))
+     | Other_file (Umber_function { label_name; _ }) ->
+       `Function, Simple_value (Global (label_name, Extern_proc)), Umber
+     | Other_file (C_function { label_name; _ }) ->
+       `Function, Simple_value (Global (label_name, Extern_proc)), C
+     | This_file (Global_variable label_name) | Other_file (Global_variable label_name) ->
+       `Closure, Memory (I64, Value (Global (label_name, Other))), Umber)
 ;;
 
 let codegen_fun_call t fun_name args ~fun_builder =
@@ -1550,8 +1522,11 @@ let define_function t ~fun_name ~args ~body =
   (* TODO: Need a function prelude for e.g. the frame pointer *)
   let call_conv : Call_conv.t = Umber in
   let fun_builder =
-    (* The function should have been declared already. *)
-    Hashtbl.find_exn t.functions fun_name
+    match Hashtbl.find t.globals fun_name with
+    | Some (This_file (Function fun_builder)) -> fun_builder
+    | global ->
+      compiler_bug
+        [%message "Expected existing function builder" (global : Global.t option)]
   in
   let result =
     Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
@@ -1575,11 +1550,13 @@ let define_function t ~fun_name ~args ~body =
 ;;
 
 (* TODO: Share code with [define_function]? *)
-let define_extern_wrapper_function t ~fun_name ~extern_name ~arity =
+(* TODO: Mir doesn't say whether we export a function or not. If we don't, this is isn't
+   needed. A simple public/private distinction of "is this in the mli" should do. *)
+(** Create a wrapper function for other files to use, if we export this extern. *)
+let define_extern_wrapper_function ~fun_name ~extern_name ~arity =
   let outer_call_conv : Call_conv.t = Umber in
   let inner_call_conv : Call_conv.t = C in
   let fun_builder = Function_builder.create (Label_name.of_mir_name fun_name) ~arity in
-  Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder;
   let args =
     Call_conv.arg_registers outer_call_conv
     |> Nonempty.to_list
@@ -1610,7 +1587,8 @@ let define_extern_wrapper_function t ~fun_name ~extern_name ~arity =
            Simple_value
              (Register (Real (Call_conv.return_value_register outer_call_conv)))
        });
-  Function_builder.add_terminal fun_builder Ret
+  Function_builder.add_terminal fun_builder Ret;
+  fun_builder
 ;;
 
 let preprocess_stmt t (stmt : Mir.Stmt.t) =
@@ -1618,30 +1596,35 @@ let preprocess_stmt t (stmt : Mir.Stmt.t) =
   | Value_def (name, (_ : Mir.Expr.t)) ->
     (* TODO: We could recognize constant expressions in globals (and locals too) and not
        have to do runtime initialization, instead just keeping them in rodata. *)
-    Queue.enqueue t.bss_globals (Label_name.of_mir_name name)
+    Hashtbl.add_exn
+      t.globals
+      ~key:name
+      ~data:(This_file (Global_variable (Label_name.of_mir_name name)))
   | Fun_def { fun_name; args; body = _ } ->
     let fun_builder =
       Function_builder.create
         (Label_name.of_mir_name fun_name)
         ~arity:(Nonempty.length args)
     in
-    Hashtbl.add_exn t.functions ~key:fun_name ~data:fun_builder
+    Hashtbl.add_exn t.globals ~key:fun_name ~data:(This_file (Function fun_builder))
   | Fun_decl { name; arity } ->
-    Hashtbl.add_exn
-      t.externs
-      ~key:name
-      ~data:
-        { fun_info = (if arity = 0 then None else Some (Umber, arity))
-        ; label_name = Label_name.of_mir_name name
-        }
+    let label_name = Label_name.of_mir_name name in
+    let decl : Global.Other_file.t =
+      if arity = 0
+      then Global_variable label_name
+      else Umber_function { label_name; arity }
+    in
+    Hashtbl.add_exn t.globals ~key:name ~data:(Other_file decl)
   | Extern_decl { name; extern_name; arity } ->
     let label_name = Label_name.of_extern_name extern_name in
     if arity = 0
-    then Hashtbl.add_exn t.externs ~key:name ~data:{ fun_info = None; label_name }
+    then
+      Hashtbl.add_exn t.globals ~key:name ~data:(Other_file (Global_variable label_name))
     else (
-      declare_extern_c_function t name label_name ~arity;
-      (* Create a wrapper function for other files to use. *)
-      define_extern_wrapper_function t ~fun_name:name ~extern_name ~arity)
+      let local_wrapper_function =
+        define_extern_wrapper_function ~fun_name:name ~extern_name ~arity
+      in
+      declare_extern_c_function t name label_name ~arity ~local_wrapper_function)
 ;;
 
 let codegen_stmt t (stmt : Mir.Stmt.t) =
@@ -1708,9 +1691,9 @@ let compile_entry_module ~module_paths ~entry_file =
            (Value_name.Relative.of_string (Label_name.to_string fun_name)))
     in
     Hashtbl.add_exn
-      t.externs
+      t.globals
       ~key:mir_name
-      ~data:{ fun_info = Some (Umber, 0); label_name = fun_name };
+      ~data:(Other_file (Umber_function { label_name = fun_name; arity = 0 }));
     Function_builder.add_code
       t.main_function
       (Call
@@ -1813,7 +1796,7 @@ let%expect_test "hello world, from MIR" =
                default   rel
                global    umber_main#HelloWorld
                global    HelloWorld.#binding.1
-               global    Std.Prelude.print
+               global    Std.Prelude.print:weak
                global    string.210886959:weak
                extern    umber_print_endline
 
@@ -1821,8 +1804,8 @@ let%expect_test "hello world, from MIR" =
 
     umber_main#HelloWorld:
                sub       rsp, 8
-               mov       rax, string.210886959
-               call      Std.Prelude.print
+               mov       rdi, string.210886959
+               call      umber_print_endline wrt ..plt
                mov       r9, rax
                mov       qword [HelloWorld.#binding.1], r9
                add       rsp, 8

@@ -1,18 +1,18 @@
            default   rel
            global    umber_main#ModuleSig
-           global    ModuleSig.my_range
-           global    ModuleSig.is_10_in_range
-           global    ModuleSig.#binding.1
            global    ModuleSig.Range...__#13270071
            global    ModuleSig.Range.between
+           global    ModuleSig.my_range
            global    ModuleSig.Range.elem
+           global    ModuleSig.is_10_in_range
+           global    ModuleSig.#binding.1
            global    string.0:weak
            global    int.1:weak
            global    int.10:weak
            extern    Std.Prelude.Operators.__#845057057
-           extern    Std.Prelude.print_bool
            extern    Std.Prelude.Operators.__#506761450
            extern    umber_gc_alloc
+           extern    Std.Prelude.print_bool
            extern    Std.Prelude.Operators.__#5678180
            extern    Std.Prelude.print
 

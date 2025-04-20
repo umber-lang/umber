@@ -1,7 +1,7 @@
            default   rel
            global    umber_main#Option
-           global    Option.None
            global    Option.Some
+           global    Option.None
            extern    umber_gc_alloc
 
            section   .text

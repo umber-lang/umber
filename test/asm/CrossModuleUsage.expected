@@ -1,12 +1,12 @@
            default   rel
            global    umber_main#CrossModuleUsage
-           global    CrossModuleUsage.source
-           global    CrossModuleUsage.empty
-           global    CrossModuleUsage.A.print_source
            global    CrossModuleUsage.A.b
-           global    CrossModuleUsage.A.print
+           global    CrossModuleUsage.source
            global    CrossModuleUsage.A.a
            global    CrossModuleUsage.print_source
+           global    CrossModuleUsage.A.print_source
+           global    CrossModuleUsage.A.print
+           global    CrossModuleUsage.empty
            global    string.211144608:weak
            extern    Std.Prelude.Operators.__#506761450
            extern    Std.Prelude.List.Nil
@@ -22,23 +22,10 @@ umber_main#CrossModuleUsage:
            add       rsp, 8
            ret       
 
-CrossModuleUsage.A.print_source:
-           sub       rsp, 8
-           mov       rax, qword [CrossModuleUsage.source]
-           call      CrossModuleUsage.A.print
-           add       rsp, 8
-           ret       
-
 CrossModuleUsage.A.b:
            sub       rsp, 8
            mov       rax, 1
            call      CrossModuleUsage.A.a
-           add       rsp, 8
-           ret       
-
-CrossModuleUsage.A.print:
-           sub       rsp, 8
-           call      Std.Prelude.print wrt ..plt
            add       rsp, 8
            ret       
 
@@ -59,6 +46,19 @@ CrossModuleUsage.print_source:
            mov       rbx, rax
            mov       rax, qword [rsp]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 8
+           ret       
+
+CrossModuleUsage.A.print_source:
+           sub       rsp, 8
+           mov       rax, qword [CrossModuleUsage.source]
+           call      CrossModuleUsage.A.print
+           add       rsp, 8
+           ret       
+
+CrossModuleUsage.A.print:
+           sub       rsp, 8
+           call      Std.Prelude.print wrt ..plt
            add       rsp, 8
            ret       
 

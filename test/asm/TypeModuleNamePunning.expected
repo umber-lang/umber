@@ -1,9 +1,9 @@
            default   rel
            global    umber_main#TypeModuleNamePunning
            global    TypeModuleNamePunning.int
-           global    TypeModuleNamePunning.int__#433785839
-           global    TypeModuleNamePunning.string
            global    TypeModuleNamePunning.float
+           global    TypeModuleNamePunning.string
+           global    TypeModuleNamePunning.int__#433785839
            global    int.5:weak
            global    string.1010221259:weak
            global    float.5.000000:weak
@@ -41,10 +41,10 @@ float.5.000000:
            sectalign 8
 TypeModuleNamePunning.int:
            resq      1
-TypeModuleNamePunning.int__#433785839:
+TypeModuleNamePunning.float:
            resq      1
 TypeModuleNamePunning.string:
            resq      1
-TypeModuleNamePunning.float:
+TypeModuleNamePunning.int__#433785839:
            resq      1
 

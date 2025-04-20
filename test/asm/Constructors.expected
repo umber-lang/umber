@@ -1,10 +1,10 @@
            default   rel
            global    umber_main#Constructors
-           global    Constructors.A.Foo
-           global    Constructors.B.Foo
            global    Constructors.Wrap.my_id
            global    Constructors.B.of_a
+           global    Constructors.B.Foo
            global    Constructors.Wrap.Wrap
+           global    Constructors.A.Foo
            extern    umber_gc_alloc
 
            section   .text
@@ -47,8 +47,8 @@ Constructors.Wrap.Wrap:
 
            section   .bss
            sectalign 8
-Constructors.A.Foo:
-           resq      1
 Constructors.B.Foo:
+           resq      1
+Constructors.A.Foo:
            resq      1
 

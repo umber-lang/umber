@@ -1,13 +1,13 @@
            default   rel
            global    umber_main#Functions
            global    Functions.#binding.1
-           global    Functions._trailing_lambda
-           global    Functions.zero
-           global    Functions.still_zero_wow
-           global    Functions.lots_of_args
            global    Functions.id
+           global    Functions._trailing_lambda
            global    Functions.#fun.1
            global    Functions.sqr
+           global    Functions.lots_of_args
+           global    Functions.zero
+           global    Functions.still_zero_wow
            global    Functions.#fun.1#closure:weak
            global    Functions.#fun.1#closure_wrapper_fun:weak
            global    int.5:weak
@@ -50,12 +50,6 @@ umber_main#Functions:
            add       rsp, 8
            ret       
 
-Functions.lots_of_args:
-           sub       rsp, 8
-           mov       rax, 1
-           add       rsp, 8
-           ret       
-
 Functions.id:
            sub       rsp, 8
            add       rsp, 8
@@ -78,6 +72,12 @@ Functions.sqr:
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.Operators.__#294461388 wrt ..plt
+           add       rsp, 8
+           ret       
+
+Functions.lots_of_args:
+           sub       rsp, 8
+           mov       rax, 1
            add       rsp, 8
            ret       
 

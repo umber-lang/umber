@@ -1,17 +1,17 @@
            default   rel
            global    umber_main#Basics
-           global    Basics.Red
-           global    Basics.Blue
-           global    Basics.Green
-           global    Basics.Yellow
            global    Basics.Purple
-           global    Basics.false
-           global    Basics.true
-           global    Basics.xyz
+           global    Basics.Green
            global    Basics._.1
-           global    Basics.Expanded
-           global    Basics.Regular
            global    Basics.Point3
+           global    Basics.Yellow
+           global    Basics.Blue
+           global    Basics.false
+           global    Basics.Red
+           global    Basics.Expanded
+           global    Basics.true
+           global    Basics.Regular
+           global    Basics.xyz
            global    int.1:weak
            global    int.2:weak
            global    float.2.500000:weak
@@ -54,6 +54,20 @@ umber_main#Basics:
            add       rsp, 8
            ret       
 
+Basics.Point3:
+           sub       rsp, 8
+           mov       r14, rax
+           mov       r13, rdi
+           mov       rdi, 32
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 3
+           mov       qword [rax + 8], r14
+           mov       qword [rax + 16], rbx
+           mov       qword [rax + 24], r13
+           add       rsp, 8
+           ret       
+
 Basics.Expanded:
            sub       rsp, 8
            mov       r13, rax
@@ -73,20 +87,6 @@ Basics.Regular:
            mov       word [rax], 0
            mov       word [rax + 2], 1
            mov       qword [rax + 8], r13
-           add       rsp, 8
-           ret       
-
-Basics.Point3:
-           sub       rsp, 8
-           mov       r14, rax
-           mov       r13, rdi
-           mov       rdi, 32
-           call      umber_gc_alloc wrt ..plt
-           mov       word [rax], 0
-           mov       word [rax + 2], 3
-           mov       qword [rax + 8], r14
-           mov       qword [rax + 16], rbx
-           mov       qword [rax + 24], r13
            add       rsp, 8
            ret       
 
@@ -120,22 +120,22 @@ float.1.000000:
 
            section   .bss
            sectalign 8
-Basics.Red:
-           resq      1
-Basics.Blue:
+Basics.Purple:
            resq      1
 Basics.Green:
            resq      1
+Basics._.1:
+           resq      1
 Basics.Yellow:
            resq      1
-Basics.Purple:
+Basics.Blue:
            resq      1
 Basics.false:
+           resq      1
+Basics.Red:
            resq      1
 Basics.true:
            resq      1
 Basics.xyz:
-           resq      1
-Basics._.1:
            resq      1
 

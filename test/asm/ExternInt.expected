@@ -1,6 +1,6 @@
            default   rel
            global    umber_main#ExternInt
-           global    ExternInt.plus
+           global    ExternInt.plus:weak
            extern    umber_int_add
 
            section   .text

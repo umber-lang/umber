@@ -1,18 +1,18 @@
            default   rel
            global    umber_main#WeirdFunCalls
-           global    WeirdFunCalls.#binding.1
-           global    WeirdFunCalls.if_
-           global    WeirdFunCalls.#binding.2
            global    WeirdFunCalls.#binding.3
-           global    WeirdFunCalls.print_twice
+           global    WeirdFunCalls.if_
            global    WeirdFunCalls.fun_call
+           global    WeirdFunCalls.#binding.2
            global    WeirdFunCalls.#fun.2
+           global    WeirdFunCalls.print_twice
+           global    WeirdFunCalls.#binding.1
            global    WeirdFunCalls.print_twice#closure:weak
            global    WeirdFunCalls.print_twice#closure_wrapper_fun:weak
-           global    WeirdFunCalls.#fun.2#closure:weak
-           global    WeirdFunCalls.#fun.2#closure_wrapper_fun:weak
            global    Std.Prelude.print#closure:weak
            global    Std.Prelude.print#closure_wrapper_fun:weak
+           global    WeirdFunCalls.#fun.2#closure:weak
+           global    WeirdFunCalls.#fun.2#closure_wrapper_fun:weak
            global    string.241208202:weak
            global    string.37409044:weak
            global    string.341276961:weak
@@ -53,6 +53,19 @@ umber_main#WeirdFunCalls:
            add       rsp, 8
            ret       
 
+WeirdFunCalls.fun_call:
+           sub       rsp, 8
+           mov       rax, WeirdFunCalls.#fun.2#closure
+           add       rsp, 8
+           ret       
+
+WeirdFunCalls.#fun.2:
+           sub       rsp, 8
+           mov       rax, string.37409044
+           call      Std.Prelude.print wrt ..plt
+           add       rsp, 8
+           ret       
+
 WeirdFunCalls.print_twice:
            sub       rsp, 24
            mov       qword [rsp + 8], rax
@@ -67,19 +80,6 @@ WeirdFunCalls.print_twice:
            add       rsp, 24
            ret       
 
-WeirdFunCalls.fun_call:
-           sub       rsp, 8
-           mov       rax, WeirdFunCalls.#fun.2#closure
-           add       rsp, 8
-           ret       
-
-WeirdFunCalls.#fun.2:
-           sub       rsp, 8
-           mov       rax, string.37409044
-           call      Std.Prelude.print wrt ..plt
-           add       rsp, 8
-           ret       
-
 WeirdFunCalls.print_twice#closure_wrapper_fun:
            sub       rsp, 8
            mov       r9, rbx
@@ -88,19 +88,19 @@ WeirdFunCalls.print_twice#closure_wrapper_fun:
            add       rsp, 8
            ret       
 
-WeirdFunCalls.#fun.2#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
-           call      WeirdFunCalls.#fun.2
-           add       rsp, 8
-           ret       
-
 Std.Prelude.print#closure_wrapper_fun:
            sub       rsp, 8
            mov       r9, rbx
            mov       rax, r9
            call      Std.Prelude.print
+           add       rsp, 8
+           ret       
+
+WeirdFunCalls.#fun.2#closure_wrapper_fun:
+           sub       rsp, 8
+           mov       r9, rbx
+           mov       rax, r9
+           call      WeirdFunCalls.#fun.2
            add       rsp, 8
            ret       
 
@@ -131,25 +131,25 @@ WeirdFunCalls.print_twice#closure:
            dw        1
            dd        0
            dq        WeirdFunCalls.print_twice#closure_wrapper_fun
-WeirdFunCalls.#fun.2#closure:
-           dw        12289
-           dw        1
-           dd        0
-           dq        WeirdFunCalls.#fun.2#closure_wrapper_fun
 Std.Prelude.print#closure:
            dw        12289
            dw        1
            dd        0
            dq        Std.Prelude.print#closure_wrapper_fun
+WeirdFunCalls.#fun.2#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        WeirdFunCalls.#fun.2#closure_wrapper_fun
 
            section   .bss
            sectalign 8
-WeirdFunCalls.#binding.1:
+WeirdFunCalls.#binding.3:
            resq      1
 WeirdFunCalls.if_:
            resq      1
 WeirdFunCalls.#binding.2:
            resq      1
-WeirdFunCalls.#binding.3:
+WeirdFunCalls.#binding.1:
            resq      1
 

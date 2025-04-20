@@ -1,8 +1,5 @@
            default   rel
            global    umber_main#TypeChecking
-           global    TypeChecking.#binding.1
-           global    TypeChecking.id_alias
-           global    TypeChecking.five
            global    TypeChecking.id_for_chars
            global    TypeChecking.if_
            global    TypeChecking.if__#516730556
@@ -11,6 +8,9 @@
            global    TypeChecking.id_for_bools
            global    TypeChecking.__#1006111891
            global    TypeChecking.#fun.1
+           global    TypeChecking.five
+           global    TypeChecking.id_alias
+           global    TypeChecking.#binding.1
            global    TypeChecking.id_for_ints
            global    TypeChecking.id#closure:weak
            global    TypeChecking.id#closure_wrapper_fun:weak
@@ -161,10 +161,10 @@ TypeChecking.id#closure:
 
            section   .bss
            sectalign 8
-TypeChecking.#binding.1:
+TypeChecking.five:
            resq      1
 TypeChecking.id_alias:
            resq      1
-TypeChecking.five:
+TypeChecking.#binding.1:
            resq      1
 

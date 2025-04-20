@@ -1,7 +1,7 @@
            default   rel
            global    umber_main#Classics
-           global    Classics.#binding.1
            global    Classics.fib
+           global    Classics.#binding.1
            global    Classics.fact
            global    string.1030076252:weak
            global    int.5:weak
@@ -10,8 +10,8 @@
            global    int.0:weak
            global    string.0:weak
            extern    Std.Prelude.Operators.__#72260286
-           extern    Std.Prelude.Operators.__#294461388
            extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.Operators.__#294461388
            extern    Std.Prelude.print_int
            extern    Std.Prelude.Operators.__#1049114386
            extern    Std.Prelude.print

@@ -1,11 +1,11 @@
            default   rel
            global    umber_main#AsPattern
-           global    AsPattern.pair
-           global    AsPattern.one
-           global    AsPattern.two
-           global    AsPattern.#binding.1
            global    AsPattern.#fun.1
+           global    AsPattern.two
+           global    AsPattern.one
+           global    AsPattern.pair
            global    AsPattern.iter_pairs
+           global    AsPattern.#binding.1
            global    AsPattern.#fun.1#closure:weak
            global    AsPattern.#fun.1#closure_wrapper_fun:weak
            global    int.1:weak
@@ -14,10 +14,10 @@
            global    string.887054571:weak
            global    string.135690797:weak
            extern    Std.Prelude.Operators.__#358075620
-           extern    Std.Prelude.List.Nil
            extern    Std.Prelude.Operators.__#506761450
            extern    umber_gc_alloc
            extern    Std.Prelude.Operators.__#411843497
+           extern    Std.Prelude.List.Nil
            extern    Std.Prelude.print
 
            section   .text
@@ -176,11 +176,11 @@ AsPattern.#fun.1#closure:
 
            section   .bss
            sectalign 8
-AsPattern.pair:
+AsPattern.two:
            resq      1
 AsPattern.one:
            resq      1
-AsPattern.two:
+AsPattern.pair:
            resq      1
 AsPattern.#binding.1:
            resq      1

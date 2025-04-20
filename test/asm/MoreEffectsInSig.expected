@@ -1,12 +1,17 @@
            default   rel
            global    umber_main#MoreEffectsInSig
-           global    MoreEffectsInSig.equivalent_with_different_vars
            global    MoreEffectsInSig.more_effects_in_sig
+           global    MoreEffectsInSig.equivalent_with_different_vars
            extern    Std.Prelude.Operators.__#506761450
 
            section   .text
 
 umber_main#MoreEffectsInSig:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+MoreEffectsInSig.more_effects_in_sig:
            sub       rsp, 8
            add       rsp, 8
            ret       
@@ -27,10 +32,5 @@ MoreEffectsInSig.equivalent_with_different_vars:
            mov       rax, qword [rsp + 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            add       rsp, 24
-           ret       
-
-MoreEffectsInSig.more_effects_in_sig:
-           sub       rsp, 8
-           add       rsp, 8
            ret       
 

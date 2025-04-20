@@ -611,6 +611,10 @@ type t =
   ; bss_section : Bss_decl.t list
   }
 
+let empty =
+  { globals = []; externs = []; text_section = []; rodata_section = []; bss_section = [] }
+;;
+
 let pp_section fmt name contents ~align ~f =
   if not (List.is_empty contents)
   then (

@@ -1,8 +1,8 @@
            default   rel
            global    umber_main#OpSectionLeft
-           global    OpSectionLeft.#binding.1
            global    OpSectionLeft.apply
            global    OpSectionLeft.__#892202222
+           global    OpSectionLeft.#binding.1
            global    OpSectionLeft.#fun.1
            global    OpSectionLeft.__#892202222#closure:weak
            global    OpSectionLeft.__#892202222#closure_wrapper_fun:weak

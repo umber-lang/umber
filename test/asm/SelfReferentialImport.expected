@@ -1,7 +1,7 @@
            default   rel
            global    umber_main#SelfReferentialImport
-           global    SelfReferentialImport.#binding.1
            global    SelfReferentialImport.goose
+           global    SelfReferentialImport.#binding.1
            global    string.850259642:weak
            extern    Std.Prelude.print
 
