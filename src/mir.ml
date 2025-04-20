@@ -1102,9 +1102,6 @@ module Expr = struct
       | ( Handle
             { expr = input_expr; expr_type = input_type; value_branch; effect_branches }
         , output_type ) ->
-        (* FIXME: Is this the correct semantics? I think we want effects here to be
-           handled by the handler as well, right? Either way, it needs to be consistent
-           with the typing. *)
         let input_expr =
           (* Desugar the value branch to a let binding. *)
           match value_branch with
@@ -1140,6 +1137,10 @@ module Expr = struct
                    (* FIXME: Get a proper span on these args and the expr *)
                    (* FIXME: I think this actually needs to take 1 argument as a tuple,
                       based on how we're implementing the runtime. *)
+                   (* FIXME: Do we actually need to create a closure? I think the handlers
+                      must follow a stack discipline. I think we could ensure that all the
+                      arguments are present on the stack, and it's not possible for a
+                      handler to escape since they are second-class. *)
                    add_lambda
                      ~ctx
                      ~args:
