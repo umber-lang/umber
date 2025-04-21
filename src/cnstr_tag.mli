@@ -23,3 +23,4 @@ val int : t
 val char : t
 val float : t
 val string : t
+val continuation : t

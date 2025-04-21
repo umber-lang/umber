@@ -109,7 +109,14 @@ end = struct
       let other_nodes : Cfg_node.t list =
         match terminal with
         | Ret -> [ Ret ]
-        | Jump label -> [ Label label ]
+        | Jump jump_target ->
+          (match jump_target with
+           | Simple_value (Global (label, _)) -> [ Label label ]
+           | _ ->
+             (* Indirect jumps are used for performing effects. We can treat them
+                similarly to calls in that understanding their control flow isn't needed
+                for register allocation. *)
+             [])
         | Jump_if { cond = _; then_; else_ } -> [ Label then_; Label else_ ]
       in
       List.iter other_nodes ~f:(fun node -> Cfg.add_edge cfg (Label label) node));
@@ -613,21 +620,16 @@ end = struct
             "Coloring succeeded"
               (coloring : Asm_program.Register.t Virtual_register.Table.t)];
         let basic_blocks =
-          List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
-            let code =
-              List.map code ~f:(fun instr ->
-                Instr.Nonterminal.map_args instr ~f:(fun value ->
-                  Simple_value.map_registers value ~f:(function
-                    | Real reg -> reg
-                    | Virtual virtual_reg ->
-                      (match Hashtbl.find coloring virtual_reg with
-                       | Some reg -> reg
-                       | None ->
-                         (* If a register wasn't in the interference graph, we can safely
-                            pick any register. *)
-                         Set.choose_exn all_available_registers))))
-            in
-            { label; code; terminal })
+          List.map basic_blocks ~f:(fun bb ->
+            Basic_block.map_registers bb ~f:(function
+              | Real reg -> reg
+              | Virtual virtual_reg ->
+                (match Hashtbl.find coloring virtual_reg with
+                 | Some reg -> reg
+                 | None ->
+                   (* If a register wasn't in the interference graph, we can safely pick
+                      any register. *)
+                   Set.choose_exn all_available_registers)))
         in
         add_function_prologue_and_epilogue
           ~basic_blocks
@@ -642,7 +644,7 @@ module Function_builder : sig
 
   val create : Label_name.t -> arity:int -> t
   val add_code : t -> Register.t Instr.Nonterminal.t -> unit
-  val add_terminal : t -> Instr.Terminal.t -> unit
+  val add_terminal : t -> Register.t Instr.Terminal.t -> unit
   val add_local : t -> Mir_name.t -> Register.t Value.t -> unit
   val find_local : t -> Mir_name.t -> Register.t Value.t option
   val current_label : t -> Label_name.t
@@ -659,7 +661,7 @@ end = struct
   module Block_builder = struct
     type t =
       { code : Register.t Instr.Nonterminal.t Queue.t
-      ; terminal : Instr.Terminal.t Set_once.t
+      ; terminal : Register.t Instr.Terminal.t Set_once.t
       }
     [@@deriving sexp_of]
 
@@ -741,8 +743,8 @@ end = struct
       compiler_bug
         [%message
           "Tried to add multiple terminals to a block"
-            ~new_terminal:(terminal : Instr.Terminal.t)
-            ~existing_terminal:(bb.terminal : Instr.Terminal.t Set_once.t)
+            ~new_terminal:(terminal : Register.t Instr.Terminal.t)
+            ~existing_terminal:(bb.terminal : Register.t Instr.Terminal.t Set_once.t)
             ~current_label:(t.current_label : Label_name.t)
             (bb : Block_builder.t)
             (error : Error.t)]
@@ -1068,15 +1070,6 @@ let int_constant_tag tag : _ Value.t =
   Simple_value (Constant (Int (Int.shift_left (Cnstr_tag.to_int tag) 1 + 1)))
 ;;
 
-let declare_extern_c_function ?local_wrapper_function t mir_name label_name ~arity =
-  ignore
-    (Hashtbl.add
-       t.globals
-       ~key:mir_name
-       ~data:(Other_file (C_function { label_name; arity; local_wrapper_function }))
-      : [ `Ok | `Duplicate ])
-;;
-
 (* TODO: Amend MIR to treat function pointers and closures differently. *)
 let lookup_name_for_value t name ~fun_builder : _ Value.t =
   let wrapper_closure fun_name ~arity : _ Value.t =
@@ -1152,24 +1145,36 @@ let codegen_fun_call t fun_name args ~fun_builder =
   codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args
 ;;
 
+let declare_and_call_extern_c_function t ~fun_builder ~fun_name:label_name ~args =
+  let arity = List.length args in
+  let mir_name =
+    Mir_name.create_exportable_name
+      (Value_name.Absolute.of_relative_unchecked
+         (Value_name.Relative.of_string (Label_name.to_string label_name)))
+  in
+  ignore
+    (Hashtbl.add
+       t.globals
+       ~key:mir_name
+       ~data:
+         (Other_file (C_function { label_name; arity; local_wrapper_function = None }))
+      : [ `Ok | `Duplicate ]);
+  codegen_fun_call_internal
+    fun_builder
+    ~fun_:(Simple_value (Global (label_name, Extern_proc)))
+    ~call_conv:C
+    ~args
+;;
+
 let box t ~tag ~fields ~fun_builder =
   let block_field_num = Nonempty.length fields in
   let heap_pointer_reg =
     let allocation_size = 8 * (block_field_num + 1) in
-    let umber_gc_alloc = "umber_gc_alloc" in
-    (* FIXME: Can you have an extern name as a mir name? Write a test for calling an
-       extern declared in the same file. *)
-    let mir_name =
-      Mir_name.create_exportable_name
-        (Value_name.Absolute.of_relative_unchecked
-           (Value_name.Relative.of_string umber_gc_alloc))
-    in
-    declare_extern_c_function t mir_name (Label_name.of_string umber_gc_alloc) ~arity:1;
-    codegen_fun_call
+    declare_and_call_extern_c_function
       t
-      mir_name
-      [ Simple_value (Constant (Int allocation_size)) ]
       ~fun_builder
+      ~fun_name:(Label_name.of_string "umber_gc_alloc")
+      ~args:[ Simple_value (Constant (Int allocation_size)) ]
   in
   let heap_pointer : Register.t Simple_value.t = Register (Virtual heap_pointer_reg) in
   Function_builder.add_code
@@ -1267,11 +1272,56 @@ let merge_branches
      just contains "Ret". We could try to avoid doing this or add an extra pass to optimize
      these. Unclear if it's worth much. *)
   Function_builder.position_at_label fun_builder label_a;
-  Function_builder.add_terminal fun_builder (Jump merge_label);
+  Function_builder.add_terminal
+    fun_builder
+    (Jump (Simple_value (Global (merge_label, Other))));
   Function_builder.position_at_label fun_builder label_b;
-  Function_builder.add_terminal fun_builder (Jump merge_label);
+  Function_builder.add_terminal
+    fun_builder
+    (Jump (Simple_value (Global (merge_label, Other))));
   Function_builder.position_at_label fun_builder merge_label;
   value
+;;
+
+let current_fiber : Register.t Simple_value.t =
+  Register (Real Call_conv.Umber.fiber_register)
+;;
+
+(* FIXME: Stack variables can't live across this point - how can we prevent this? *)
+let enter_fiber ~fun_builder ~new_fiber =
+  let new_fiber : Register.t Simple_value.t = Register (Virtual new_fiber) in
+  Function_builder.add_code
+    fun_builder
+    (Mov { dst = Simple_value current_fiber; src = Simple_value new_fiber });
+  let fiber_size = Function_builder.pick_register' fun_builder in
+  Function_builder.add_code
+    fun_builder
+    (Mov
+       { dst = Simple_value (Register (Virtual fiber_size))
+       ; src = Memory (Memory.offset new_fiber I64 1)
+       });
+  Function_builder.add_code
+    fun_builder
+    (Lea
+       { dst = Real Rsp
+       ; src =
+           ( I8
+           , Add
+               ( Value (Register (Virtual fiber_size))
+               , Value (Register (Virtual fiber_size)) ) )
+       })
+;;
+
+(* FIXME: Linear search for handler, then try parents if not found
+  
+   Or maybe I can just use inline asm on the Rust side to set R14? Nah, sus.
+*)
+let codegen_find_handler t ~fun_builder ~effect_op =
+  declare_and_call_extern_c_function
+    t
+    ~fun_builder
+    ~fun_name:(Label_name.of_string "umber_find_handler")
+    ~args:[ Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op))) ]
 ;;
 
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
@@ -1343,7 +1393,9 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         (* Move to a register which is consistent in all branches. This is important for
            the correctness of [add_local], which will be used for all future branches. *)
         Function_builder.add_code fun_builder (Mov { src = var_value; dst = var }));
-      Function_builder.add_terminal fun_builder (Jump body_label)
+      Function_builder.add_terminal
+        fun_builder
+        (Jump (Simple_value (Global (body_label, Other))))
     in
     Nonempty.iteri conds ~f:(fun i (cond, var_exprs) ->
       if i <> 0 then Function_builder.position_at_label fun_builder cond_labels.(i);
@@ -1358,7 +1410,9 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       | `Constant false ->
         (* Don't bother checking a condition which will never succeed, or generating code
            to run if it passes. Just go to the next condition. *)
-        Function_builder.add_terminal fun_builder (Jump next_label)
+        Function_builder.add_terminal
+          fun_builder
+          (Jump (Simple_value (Global (next_label, Other))))
       | `Zero_flag ->
         Function_builder.add_terminal
           fun_builder
@@ -1385,7 +1439,130 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          (body_end_label, body_value)
          (otherwise_end_label, otherwise_value)
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
-  | Handle_effects _ | Perform_effect _ -> failwith "TODO: effects in asm"
+  | Handle_effects { handlers; expr } ->
+    (* FIXME: Make sure the new stack ends up 16-byte aligned. Ah, I think we'll actually
+       be fine because each handler takes up 16 bytes. *)
+    (* FIXME: Need to add function prologues to check for stack overflow. *)
+    (* Create a new fiber with the effect handlers, then run the expression there. *)
+    let new_fiber =
+      declare_and_call_extern_c_function
+        t
+        ~fun_builder
+        ~fun_name:(Label_name.of_string "umber_fiber_create")
+        ~args:[ Simple_value (Register (Real Call_conv.Umber.fiber_register)) ]
+    in
+    enter_fiber ~fun_builder ~new_fiber;
+    let handler_count = Nonempty.length handlers in
+    let handler_labels =
+      Array.init handler_count ~f:(fun i ->
+        Function_builder.create_label fun_builder "handle_effects.handler%d" i)
+    in
+    let end_label = Function_builder.create_label fun_builder "handle_effects.end" in
+    Function_builder.add_code
+      fun_builder
+      (Mov
+         { dst = Memory (Memory.offset current_fiber I64 2)
+         ; src = Simple_value (Constant (Int handler_count))
+         });
+    Nonempty.iteri handlers ~f:(fun i (effect_op_id, (_ : Mir.Expr.t)) ->
+      Function_builder.add_code
+        fun_builder
+        (Mov
+           { dst = Memory (Memory.offset current_fiber I64 ((2 * i) + 3))
+           ; src = Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op_id)))
+           });
+      Function_builder.add_code
+        fun_builder
+        (Mov
+           { dst = Memory (Memory.offset current_fiber I64 ((2 * i) + 4))
+           ; src = Simple_value (Global (handler_labels.(i), Other))
+           }));
+    (* Use the return value register to store the final result. It needs to be in a
+       register since we're going to tear down the new stack when we're done. *)
+    let final_result = Function_builder.pick_register fun_builder in
+    let expr_value = codegen_expr t expr ~fun_builder in
+    Function_builder.add_code fun_builder (Mov { dst = final_result; src = expr_value });
+    Function_builder.add_terminal
+      fun_builder
+      (Jump (Simple_value (Global (end_label, Other))));
+    Nonempty.iteri handlers ~f:(fun i ((_ : Mir.Effect_op_id.t), handler_expr) ->
+      (* FIXME: Read arguments from arg registers. Resume keyword is the last one. *)
+      Function_builder.position_at_label fun_builder handler_labels.(i);
+      let handler_value = codegen_expr t handler_expr ~fun_builder in
+      Function_builder.add_code
+        fun_builder
+        (Mov { dst = final_result; src = handler_value });
+      Function_builder.add_terminal
+        fun_builder
+        (Jump (Simple_value (Global (end_label, Other)))));
+    (* FIXME: Is it possible any continuations escaped? Hmmm. I think so? *)
+    (* Once we're done, we need to tear down the created fiber. *)
+    (* FIXME: We need to tear down the fiber after we're done. *)
+    (* let (_ : Virtual_register.t) =
+      declare_and_call_extern_c_function
+        t
+        ~fun_builder
+        ~fun_name:(Label_name.of_string "umber_fiber_destroy")
+        ~args:[Simple_value (Register (Real Call_conv.Umber.fiber_register))]
+    in *)
+    final_result
+  | Perform_effect { effect_op; args } ->
+    (* Evaluate the arguments before doing anything. *)
+    let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) in
+    (* Linear search the current fiber's header for a matching handler. *)
+    (* FIXME: We also need the rsp of the fiber to set to, annoying to return from this
+       function. Maybe we just codegen this... *)
+    let handler_fiber, handler = codegen_find_handler t ~fun_builder ~effect_op in
+    (* Once a handler is found, put args in the arg registers and jump to it. We don't use
+       a "Call" instruction since we don't want to put the return address on the stack. *)
+    let continuation_label =
+      Function_builder.create_label fun_builder "perform_effect.resume_here"
+    in
+    (* FIXME: continuations are first-class, and are coercible to functions. So they need
+       closures. The closures can be constant though. 
+       
+       Another problem is that calling a continuation isn't the same as calling a regular
+       function. Maybe we need wrapper functions.
+
+       Alternatively, we could identify when [resume] escapes and only allocate the
+       closure then. But that seems tricky.
+       
+       Ah, resume also needs a pointer to the source fiber - store that in the
+       contiuation. This is dynamic so they need to be dynamically allocated and created.
+       There should be some flag we set in the continuation to prevent it getting called
+       again. (Panic in that case).
+    *)
+    let continuation =
+      box
+        t
+        ~fun_builder
+        ~tag:Cnstr_tag.continuation
+        ~fields:
+          [ Simple_value (Global (continuation_label, Other))
+          ; Simple_value current_fiber
+          ]
+    in
+    let args = Nonempty.append args [ Simple_value (Register (Virtual continuation)) ] in
+    (* FIXME: Stack arguments won't work with the updated rsp *)
+    move_values_for_call fun_builder ~call_conv:Umber ~args:(Nonempty.to_list args);
+    enter_fiber ~fun_builder ~new_fiber:handler_fiber;
+    Function_builder.add_terminal
+      fun_builder
+      (Jump (Simple_value (Register (Virtual handler))));
+    Function_builder.position_at_label fun_builder continuation_label;
+    let output_register = Function_builder.pick_register fun_builder in
+    Function_builder.add_code
+      fun_builder
+      (Mov
+         { src = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
+         ; dst = output_register
+         });
+    output_register
+  | Resume _ ->
+    (* FIXME: I don't think there's much point in [Resume] being special since it needs to
+       be callable like a regular closure anyway. I guess maybe it lets the backend decide
+       the representation? *)
+    failwith "TODO: resume in asm"
 
 and codegen_cond t cond ~fun_builder =
   (* TODO: This just does basic constant folding so we don't generate invalid instructions
@@ -1452,10 +1629,14 @@ and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_lab
       fun_builder
       (Jump_if { cond = `Zero; then_ = cond2_label; else_ = mid_label });
     Function_builder.position_at_label fun_builder mid_label;
-    Function_builder.add_terminal fun_builder (Jump end_label);
+    Function_builder.add_terminal
+      fun_builder
+      (Jump (Simple_value (Global (end_label, Other))));
     Function_builder.position_at_label fun_builder cond2_label;
     let cond2_result = codegen_cond2 () in
-    Function_builder.add_terminal fun_builder (Jump end_label);
+    Function_builder.add_terminal
+      fun_builder
+      (Jump (Simple_value (Global (end_label, Other))));
     Function_builder.position_at_label fun_builder end_label;
     (match cond2_result with
      | `Constant false as constant ->
@@ -1556,12 +1737,12 @@ let preprocess_stmt t (stmt : Mir.Stmt.t) =
     Hashtbl.add_exn t.globals ~key:fun_name ~data:(This_file (Function fun_builder))
   | Fun_decl { name; arity } ->
     let label_name = Label_name.of_mir_name name in
-    let decl : Global.Other_file.t =
+    let global : Global.Other_file.t =
       if arity = 0
       then Global_variable label_name
       else Umber_function { label_name; arity }
     in
-    Hashtbl.add_exn t.globals ~key:name ~data:(Other_file decl)
+    Hashtbl.add_exn t.globals ~key:name ~data:(Other_file global)
   | Extern_decl { name; extern_name; arity } ->
     let label_name = Label_name.of_extern_name extern_name in
     if arity = 0
@@ -1571,7 +1752,11 @@ let preprocess_stmt t (stmt : Mir.Stmt.t) =
       let local_wrapper_function =
         define_extern_wrapper_function ~fun_name:name ~extern_name ~arity
       in
-      declare_extern_c_function t name label_name ~arity ~local_wrapper_function)
+      let global : Global.Other_file.t =
+        C_function
+          { label_name; arity; local_wrapper_function = Some local_wrapper_function }
+      in
+      Hashtbl.add_exn t.globals ~key:name ~data:(Other_file global))
 ;;
 
 let codegen_stmt t (stmt : Mir.Stmt.t) =
@@ -1615,21 +1800,13 @@ let compile_to_object_file program ~output_file =
 
 let compile_entry_module ~module_paths ~entry_file =
   let t = create ~main_function_name:(Label_name.of_string "main") in
-  let umber_gc_init = "umber_gc_init" in
-  let umber_gc_init_label = Label_name.of_string umber_gc_init in
-  let umber_gc_init_mir_name =
-    Mir_name.create_exportable_name
-      (Value_name.Absolute.of_relative_unchecked
-         (Value_name.Relative.of_string umber_gc_init))
-  in
-  declare_extern_c_function t umber_gc_init_mir_name umber_gc_init_label ~arity:0;
-  Function_builder.add_code
-    t.main_function
-    (Call
-       { fun_ = Simple_value (Global (umber_gc_init_label, Extern_proc))
-       ; call_conv = C
-       ; arity = 0
-       });
+  ignore
+    (declare_and_call_extern_c_function
+       t
+       ~fun_builder:t.main_function
+       ~fun_name:(Label_name.of_string "umber_gc_init")
+       ~args:[]
+      : Virtual_register.t);
   List.iter module_paths ~f:(fun module_path ->
     let fun_name = main_function_name ~module_path in
     let mir_name =

@@ -649,8 +649,11 @@ module Expr = struct
         }
     | Perform_effect of
         { effect_op : Effect_op_id.t
+        ; args : t Nonempty.t
+        }
+    | Resume of
+        { continuation : t
         ; arg : t
-        ; resume : t
         }
 
   and cond =
@@ -693,8 +696,10 @@ module Expr = struct
            { handlers = Nonempty.map handlers ~f:(Tuple2.map_snd ~f:(map ~f))
            ; expr = map ~f expr
            }
-       | Perform_effect { effect_op; arg; resume } ->
-         Perform_effect { effect_op; arg = map ~f arg; resume = map ~f resume })
+       | Perform_effect { effect_op; args } ->
+         Perform_effect { effect_op; args = Nonempty.map args ~f:(map ~f) }
+       | Resume { continuation; arg } ->
+         Resume { continuation = map ~f continuation; arg = map ~f arg })
   ;;
 
   module Fun_def = struct
@@ -714,7 +719,7 @@ module Expr = struct
       true
     | Fun_call _ | Let _
     | Make_block { tag = _; fields = _ :: _ }
-    | Cond_assign _ | Handle_effects _ | Perform_effect _ -> false
+    | Cond_assign _ | Handle_effects _ | Perform_effect _ | Resume _ -> false
   ;;
 
   (* TODO: consider merging making bindings with making conditions. If we extended
@@ -1059,10 +1064,16 @@ module Expr = struct
              in
              match fun_ with
              | Name fun_name -> Fun_call (fun_name, args)
-             | Let _ | Fun_call _ | Get_block_field _ | Cond_assign _ ->
+             | Let _
+             | Fun_call _
+             | Get_block_field _
+             | Cond_assign _
+             | Handle_effects _
+             | Perform_effect _
+             | Resume _ ->
                let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
                Let (fun_name, fun_, Fun_call (fun_name, args))
-             | Primitive _ | Make_block _ | Handle_effects _ | Perform_effect _ ->
+             | Primitive _ | Make_block _ ->
                compiler_bug [%message "Invalid function expression" (fun_ : t)]
            in
            Node.with_value fun_ ~f:(fun fun_ ->
@@ -1676,26 +1687,11 @@ let generate_effect_operation_values ~ctx ~stmts ({ operations; params = _ } : _
         Nonempty.mapi args ~f:(fun i (_ : _ Type_scheme.type_) ->
           snd (Context.add_value_name ctx (Constant_names.synthetic_arg i)))
       in
-      let ctx, resume = Context.add_value_name ctx Value_name.resume_keyword in
       let body : Expr.t =
-        match args with
-        | [ arg ] -> Perform_effect { effect_op; arg = Name arg; resume = Name resume }
-        | _ :: _ ->
-          let (_ : Context.t), arg =
-            Context.add_value_name ctx Constant_names.lambda_arg
-          in
-          (* FIXME: Why the let binding? We could just inline the arg expr, right? *)
-          Let
-            ( arg
-            , Make_block
-                { tag = Cnstr_tag.default
-                ; fields = List.map (Nonempty.to_list args) ~f:(fun arg -> Expr.Name arg)
-                }
-            , Perform_effect { effect_op; arg = Name arg; resume = Name resume } )
+        Perform_effect
+          { effect_op; args = Nonempty.map args ~f:(fun arg -> Expr.Name arg) }
       in
-      let stmt : Stmt.t =
-        Fun_def { fun_name; args = Nonempty.append args [ resume ]; body }
-      in
+      let stmt : Stmt.t = Fun_def { fun_name; args; body } in
       stmt :: stmts))
 ;;
 

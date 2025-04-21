@@ -37,8 +37,11 @@ module Expr : sig
         }
     | Perform_effect of
         { effect_op : Effect_op_id.t
+        ; args : t Nonempty.t
+        }
+    | Resume of
+        { continuation : t
         ; arg : t
-        ; resume : t
         }
 
   and cond =

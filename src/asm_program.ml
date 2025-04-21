@@ -154,7 +154,7 @@ module Call_conv = struct
   let arg_registers t : Register.t Nonempty.t =
     match t with
     | C -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
-    | Umber -> [ Rax; Rbx; Rdi; Rsi; Rdx; Rcx; R8; R9; R10; R11; R12; R13; R14; R15 ]
+    | Umber -> [ Rax; Rbx; Rdi; Rsi; Rdx; Rcx; R8; R9; R10; R11; R12; R13; R15 ]
   ;;
 
   let non_arg_caller_save_registers t : Register.t list =
@@ -169,13 +169,18 @@ module Call_conv = struct
 
   let register_is_reserved t (reg : Register.t) =
     match t, reg with
-    | (C | Umber), (Rsp (* Stack pointer *) | Rbp (* Frame pointer *)) -> true
+    | (C | Umber), (Rsp (* Stack pointer *) | Rbp (* Frame pointer *))
+    | Umber, R14 (* Current fiber *) -> true
     | _ -> false
   ;;
 
   let all_available_registers t =
     List.filter Register.all ~f:(not << register_is_reserved t)
   ;;
+
+  module Umber = struct
+    let fiber_register : Register.t = R14
+  end
 end
 
 module Global_kind = struct
@@ -229,6 +234,10 @@ module Simple_value = struct
 end
 
 module Memory = struct
+  (* TODO: The actual form of memory expressions is [base + scale * index + displacement]
+     where [scale] and [displacement] are constant integers and [base] and [index] are
+     registers. That would be simpler than this type, and more precise. We should avoid
+     the [map_simple_values] functions and only allow mapping over registers. *)
   type 'reg expr =
     | Value of 'reg Simple_value.t
     | Add of 'reg expr * 'reg expr
@@ -481,15 +490,22 @@ module Instr = struct
   end
 
   module Terminal = struct
-    type t =
+    type 'reg t =
       | Ret
-      | Jump of Label_name.t
+      | Jump of 'reg Value.t
       | Jump_if of
           { cond : [ `Zero | `Nonzero ]
           ; then_ : Label_name.t
           ; else_ : Label_name.t
           }
     [@@deriving sexp_of, variants]
+
+    let map_registers t ~f =
+      match t with
+      | Jump value ->
+        Jump (Value.map_simple_values value ~f:(Simple_value.map_registers ~f))
+      | (Jump_if _ | Ret) as t -> t
+    ;;
 
     let pp fmt t =
       let name =
@@ -501,13 +517,14 @@ module Instr = struct
            | `Zero -> "jz"
            | `Nonzero -> "jnz")
       in
-      let args : _ Simple_value.t list =
+      let args : _ Value.t list =
         match t with
-        | Jump label | Jump_if { cond = _; then_ = label; else_ = _ } ->
-          [ Global (label, Other) ]
+        | Jump target -> [ target ]
+        | Jump_if { cond = _; then_ = label; else_ = _ } ->
+          [ Simple_value (Global (label, Other)) ]
         | Ret -> []
       in
-      pp_line fmt (String.lowercase name) args ~f:Simple_value.pp
+      pp_line fmt (String.lowercase name) args ~f:Value.pp
     ;;
   end
 end
@@ -516,9 +533,17 @@ module Basic_block = struct
   type 'reg t =
     { label : Label_name.t
     ; code : 'reg Instr.Nonterminal.t list
-    ; terminal : Instr.Terminal.t
+    ; terminal : 'reg Instr.Terminal.t
     }
   [@@deriving sexp_of]
+
+  let map_registers { label; code; terminal } ~f =
+    let code =
+      List.map code ~f:(Instr.Nonterminal.map_args ~f:(Simple_value.map_registers ~f))
+    in
+    let terminal = Instr.Terminal.map_registers terminal ~f in
+    { label; code; terminal }
+  ;;
 
   let pp fmt { label; code; terminal } =
     pp_label fmt label;

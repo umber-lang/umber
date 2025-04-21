@@ -2,6 +2,19 @@
 #![feature(lang_items)]
 #![no_std]
 
+mod block;
+mod bool;
+mod char;
+mod closure;
+mod effects;
+mod float;
+mod gc;
+mod int;
+mod io;
+mod poly;
+mod stdlib;
+mod string;
+
 #[cfg(not(test))]
 mod no_std_setup {
     use core::panic::PanicInfo;
@@ -18,14 +31,5 @@ mod no_std_setup {
     extern "C" fn eh_personality() {}
 }
 
-mod block;
-mod bool;
-mod char;
-mod closure;
-mod float;
-mod gc;
-mod int;
-mod io;
-mod poly;
-mod stdlib;
-mod string;
+// The runtime only works on 64-bit
+const _: () = assert!(size_of::<u64>() == size_of::<usize>());

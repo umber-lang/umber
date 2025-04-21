@@ -64,6 +64,10 @@ module Call_conv : sig
   val return_value_register : t -> Register.t
   val register_is_reserved : t -> Register.t -> bool
   val all_available_registers : t -> Register.t list
+
+  module Umber : sig
+    val fiber_register : Register.t
+  end
 end
 
 module Global_kind : sig
@@ -164,10 +168,11 @@ module Instr : sig
       -> 'acc * 'r2 t
   end
 
+  (* FIXME: Terminal instructions now contain registers and need reg alloc. *)
   module Terminal : sig
-    type t =
+    type 'reg t =
       | Ret
-      | Jump of Label_name.t
+      | Jump of 'reg Value.t
       | Jump_if of
           (* FIXME: The [else_] label is basically a meme, the correctness is not actually
              enforced. We just have to be careful to only use "else" to mean the label
@@ -196,9 +201,11 @@ module Basic_block : sig
   type 'reg t =
     { label : Label_name.t
     ; code : 'reg Instr.Nonterminal.t list
-    ; terminal : Instr.Terminal.t
+    ; terminal : 'reg Instr.Terminal.t
     }
   [@@deriving sexp_of]
+
+  val map_registers : 'r1 t -> f:('r1 -> 'r2) -> 'r2 t
 end
 
 module Data_decl : sig
