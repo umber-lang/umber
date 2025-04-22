@@ -293,12 +293,12 @@ end
 module Effect_pattern = struct
   type 'typ t =
     { operation : Value_name.Absolute.t
-    ; args : 'typ Pattern.t Nonempty.t
+    ; args : 'typ Pattern.t Node.t Nonempty.t
     }
   [@@deriving equal, sexp]
 
   let map_types { operation; args } ~f =
-    { operation; args = Nonempty.map args ~f:(Pattern.map_types ~f) }
+    { operation; args = Nonempty.map args ~f:(Node.map ~f:(Pattern.map_types ~f)) }
   ;;
 end
 
@@ -333,11 +333,18 @@ module Effect_branch = struct
     in
     let pat_names, args_with_types =
       Nonempty.fold_map args ~init:pat_names ~f:(fun pat_names arg ->
+        let arg_span = Node.span arg in
         let arg_names, (arg, arg_type) =
-          Pattern.of_untyped_with_names ~names ~types Pattern_names.empty arg ~fixity:None
+          Node.with_value arg ~f:(fun arg ->
+            Pattern.of_untyped_with_names
+              ~names
+              ~types
+              Pattern_names.empty
+              arg
+              ~fixity:None)
         in
         ( Pattern_names.merge pat_names arg_names ~combine:(fun ~key:_ _ x -> x)
-        , (arg, (arg_type, arg_names)) ))
+        , (Node.create arg arg_span, (arg_type, arg_names)) ))
     in
     let args, arg_types = Nonempty.unzip args_with_types in
     let operation_effects, operation_result_type =

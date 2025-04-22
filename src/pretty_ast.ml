@@ -175,7 +175,7 @@ module Typed_to_untyped = struct
               `Effect
                 { Untyped.Effect_pattern.operation =
                     relativize_value_name ~names operation
-                ; args = Nonempty.map args ~f:(relativize_pattern ~names)
+                ; args = Nonempty.map args ~f:(Node.map ~f:(relativize_pattern ~names))
                 })
           , Node.map branch ~f:(convert_expr ~names ~type_ ~should_annotate:false) ))
       in
@@ -746,7 +746,7 @@ let format_to_document
         Text "<"
         ^^ format_application
              (format_qualified operation ~f:format_value_name)
-             (List.map (Nonempty.to_list args) ~f:format_pattern)
+             (List.map (Nonempty.to_list args) ~f:(Node.with_value ~f:format_pattern))
         ^^ Text ">")
   and format_let_binding
     ~rec_

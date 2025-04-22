@@ -195,11 +195,11 @@ type 'a nonterminal = 'a Parser.MenhirInterpreter.nonterminal =
   | N_operator : (Ustring.t list * Ustring.t) nonterminal
   | N_op_section : Untyped.Expr.t nonterminal
   | N_nonempty_list_with_loc_pattern_term__ : Untyped.Pattern.t Node.t list nonterminal
+  | N_nonempty_list_with_loc_pattern__ : Untyped.Pattern.t Node.t list nonterminal
   | N_nonempty_list_with_loc_expr_term__ : Untyped.Expr.t Node.t list nonterminal
   | N_nonempty_list_type_term_
       : Parser_scope.Module_path.relative Type_scheme.type_ list nonterminal
   | N_nonempty_list_pattern_term_ : Untyped.Pattern.t list nonterminal
-  | N_nonempty_list_pattern_ : Untyped.Pattern.t list nonterminal
   | N_nonempty_list_LOWER_NAME_ : Ustring.t list nonterminal
   | N_n_periods : int nonterminal
   | N_match_branches

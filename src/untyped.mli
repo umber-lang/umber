@@ -19,7 +19,7 @@ end
 module Effect_pattern : sig
   type t =
     { operation : Value_name.Relative.t
-    ; args : Pattern.t Nonempty.t
+    ; args : Pattern.t Node.t Nonempty.t
     }
   [@@deriving equal, sexp]
 end

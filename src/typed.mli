@@ -20,7 +20,7 @@ end
 module Effect_pattern : sig
   type 'typ t =
     { operation : Value_name.Absolute.t
-    ; args : 'typ Pattern.t Nonempty.t
+    ; args : 'typ Pattern.t Node.t Nonempty.t
     }
   [@@deriving equal, sexp]
 end

@@ -1324,6 +1324,20 @@ let codegen_find_handler t ~fun_builder ~effect_op =
     ~args:[ Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op))) ]
 ;;
 
+let process_arguments ~fun_builder ~call_conv ~args =
+  let result =
+    Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
+      let virtual_reg = Function_builder.pick_register fun_builder in
+      Function_builder.add_code
+        fun_builder
+        (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
+      Function_builder.add_local fun_builder arg_name virtual_reg)
+  in
+  match result with
+  | Same_length | Right_trailing _ -> ()
+  | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"
+;;
+
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
   match expr with
   | Primitive literal -> codegen_literal t literal
@@ -1452,6 +1466,11 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~args:[ Simple_value (Register (Real Call_conv.Umber.fiber_register)) ]
     in
     enter_fiber ~fun_builder ~new_fiber;
+    (* FIXME: Stack variables are invalidated after this point, because rsp has changed.
+       How can we get the codegen to understand this? Technically the stack variables are
+       still accessible, we just need to find the old rsp. Maybe we could put in a special
+       instruction to make the code load from a parent fiber? Or to not hold variables in
+       the stack across this point? *)
     let handler_count = Nonempty.length handlers in
     let handler_labels =
       Array.init handler_count ~f:(fun i ->
@@ -1464,7 +1483,9 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          { dst = Memory (Memory.offset current_fiber I64 2)
          ; src = Simple_value (Constant (Int handler_count))
          });
-    Nonempty.iteri handlers ~f:(fun i (effect_op_id, (_ : Mir.Expr.t)) ->
+    Nonempty.iteri
+      handlers
+      ~f:(fun i (effect_op_id, (_ : Mir_name.t Nonempty.t), (_ : Mir.Expr.t)) ->
       Function_builder.add_code
         fun_builder
         (Mov
@@ -1482,22 +1503,11 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     let final_result = Function_builder.pick_register fun_builder in
     let expr_value = codegen_expr t expr ~fun_builder in
     Function_builder.add_code fun_builder (Mov { dst = final_result; src = expr_value });
-    Function_builder.add_terminal
-      fun_builder
-      (Jump (Simple_value (Global (end_label, Other))));
-    Nonempty.iteri handlers ~f:(fun i ((_ : Mir.Effect_op_id.t), handler_expr) ->
-      (* FIXME: Read arguments from arg registers. Resume keyword is the last one. *)
-      Function_builder.position_at_label fun_builder handler_labels.(i);
-      let handler_value = codegen_expr t handler_expr ~fun_builder in
-      Function_builder.add_code
-        fun_builder
-        (Mov { dst = final_result; src = handler_value });
-      Function_builder.add_terminal
-        fun_builder
-        (Jump (Simple_value (Global (end_label, Other)))));
-    (* FIXME: Is it possible any continuations escaped? Hmmm. I think so? *)
-    (* Once we're done, we need to tear down the created fiber. *)
-    (* FIXME: We need to tear down the fiber after we're done. *)
+    (* FIXME: We could free the fiber at this point. If we just put the continuation
+       somewhere and never call it again, the fiber will be leaked. I think we could have
+       the GC free the fiber as a finalizer upon freeing the continuation. We even treat
+       fibers as regular blocks with a header for the gc. It'd still be safe to free them
+       early if we ensure continuations are not called more than once. *)
     (* let (_ : Virtual_register.t) =
       declare_and_call_extern_c_function
         t
@@ -1505,6 +1515,19 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~fun_name:(Label_name.of_string "umber_fiber_destroy")
         ~args:[Simple_value (Register (Real Call_conv.Umber.fiber_register))]
     in *)
+    Function_builder.add_terminal
+      fun_builder
+      (Jump (Simple_value (Global (end_label, Other))));
+    Nonempty.iteri handlers ~f:(fun i ((_ : Mir.Effect_op_id.t), args, handler_expr) ->
+      Function_builder.position_at_label fun_builder handler_labels.(i);
+      process_arguments ~fun_builder ~args ~call_conv:Umber;
+      let handler_value = codegen_expr t handler_expr ~fun_builder in
+      Function_builder.add_code
+        fun_builder
+        (Mov { dst = final_result; src = handler_value });
+      Function_builder.add_terminal
+        fun_builder
+        (Jump (Simple_value (Global (end_label, Other)))));
     final_result
   | Perform_effect { effect_op; args } ->
     (* Evaluate the arguments before doing anything. *)
@@ -1656,17 +1679,7 @@ let define_function t ~fun_name ~args ~body =
       compiler_bug
         [%message "Expected existing function builder" (global : Global.t option)]
   in
-  let result =
-    Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
-      let virtual_reg = Function_builder.pick_register fun_builder in
-      Function_builder.add_code
-        fun_builder
-        (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
-      Function_builder.add_local fun_builder arg_name virtual_reg)
-  in
-  (match result with
-   | Same_length | Right_trailing _ -> ()
-   | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack");
+  process_arguments ~fun_builder ~call_conv ~args;
   let return_value = codegen_expr t body ~fun_builder in
   Function_builder.add_code
     fun_builder

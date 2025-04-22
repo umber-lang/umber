@@ -644,7 +644,7 @@ module Expr = struct
         ; if_none_matched : cond_if_none_matched
         }
     | Handle_effects of
-        { handlers : (Effect_op_id.t * t) Nonempty.t
+        { handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
         ; expr : t
         }
     | Perform_effect of
@@ -693,7 +693,9 @@ module Expr = struct
            }
        | Handle_effects { handlers; expr } ->
          Handle_effects
-           { handlers = Nonempty.map handlers ~f:(Tuple2.map_snd ~f:(map ~f))
+           { handlers =
+               Nonempty.map handlers ~f:(fun (effect_op, args, handler) ->
+                 effect_op, args, map handler ~f)
            ; expr = map ~f expr
            }
        | Perform_effect { effect_op; args } ->
@@ -1010,6 +1012,35 @@ module Expr = struct
          `Rewritten_partial_application expr_as_lambda)
   ;;
 
+  let process_arguments ~ctx ~args ~arg_types =
+    Nonempty.zip_exn args arg_types
+    |> Nonempty.fold_map ~init:(ctx, []) ~f:(fun (ctx, bindings) (arg, arg_type) ->
+         Node.with_value arg ~f:(fun arg ->
+           let arg =
+             Simple_pattern.flatten_typed_pattern_no_unions arg ~label:"argument patterns"
+           in
+           match arg with
+           | Catch_all (Some arg_name) ->
+             (* Special-case named catch-all patterns (the dominant case) to skip the
+                    [lambda_arg] step and use the name directly. *)
+             let ctx, arg_name = Context.add_value_name ctx arg_name in
+             (ctx, bindings), arg_name
+           | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
+             let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
+             let add_let acc name mir_expr = (name, mir_expr) :: acc in
+             let ctx, bindings =
+               fold_pattern_bindings
+                 ~ctx
+                 arg
+                 (Name arg_name)
+                 arg_type
+                 ~init:bindings
+                 ~add_let
+                 ~add_name:Context.add_value_name
+             in
+             (ctx, bindings), arg_name))
+  ;;
+
   let of_typed_expr
     ~just_bound:outer_just_bound
     ~ctx:outer_ctx
@@ -1135,30 +1166,25 @@ module Expr = struct
          | None -> input_expr
          | Some effect_branches ->
            let handlers =
-             Nonempty.map effect_branches ~f:(fun (effect_pattern, expr) ->
+             Nonempty.map effect_branches ~f:(fun (effect_branch, handler_expr) ->
                Node.with_value2
-                 effect_pattern
-                 expr
+                 effect_branch
+                 handler_expr
                  ~f:(fun
                       { effect_pattern = { operation; args }; arg_types; resume_type }
-                      body
+                      handler_expr
                     ->
                  let effect_op = Effect_op_id.create ~effect_operation_name:operation in
-                 let handler_fun =
-                   (* FIXME: Get a proper span on these args and the expr *)
-                   (* FIXME: I think this actually needs to take 1 argument as a tuple,
-                      based on how we're implementing the runtime. *)
-                   (* FIXME: Do we actually need to create a closure? I think the handlers
-                      must follow a stack discipline. I think we could ensure that all the
-                      arguments are present on the stack, and it's not possible for a
-                      handler to escape since they are second-class. *)
-                   add_lambda
+                 let (ctx, bindings), args =
+                   process_arguments
                      ~ctx
+                       (* TODO: Get a proper span on the resume keyword. Maybe the whole
+                        effect pattern would do. *)
                      ~args:
                        (Nonempty.append
-                          (Nonempty.map args ~f:(Fn.flip Node.create (Node.span expr)))
+                          args
                           [ Node.dummy_span
-                              (Typed.Pattern.catch_all (Some Value_name.resume_keyword))
+                              (Typed.Pattern.Catch_all (Some Value_name.resume_keyword))
                           ])
                      ~arg_types:
                        (Nonempty.map
@@ -1169,11 +1195,13 @@ module Expr = struct
                             compiler_bug
                               [%message "Type constraints in effect operation args"];
                           type_))
-                     ~body:(Node.dummy_span body)
-                     ~body_type:output_type
-                     ~just_bound:None
                  in
-                 effect_op, handler_fun))
+                 let handler_expr =
+                   add_let_bindings
+                     ~bindings
+                     ~body:(of_typed_expr ~ctx handler_expr output_type)
+                 in
+                 effect_op, args, handler_expr))
            in
            Handle_effects { handlers; expr = input_expr })
       | Let { rec_; bindings; body }, body_type ->
@@ -1246,38 +1274,7 @@ module Expr = struct
       (* Keep track of the parent context before binding any variables. This lets us
          check which variables are captured by closures later on. *)
       let parent_ctx = ctx in
-      let (ctx, bindings), args =
-        Nonempty.zip_exn args arg_types
-        |> Nonempty.fold_map ~init:(ctx, []) ~f:(fun (ctx, bindings) (arg, arg_type) ->
-             Node.with_value arg ~f:(fun arg ->
-               let arg =
-                 Simple_pattern.flatten_typed_pattern_no_unions
-                   arg
-                   ~label:"function argument patterns"
-               in
-               match arg with
-               | Catch_all (Some arg_name) ->
-                 (* Special-case named catch-all patterns (the dominant case) to skip the
-                    [lambda_arg] step and use the name directly. *)
-                 let ctx, arg_name = Context.add_value_name ctx arg_name in
-                 (ctx, bindings), arg_name
-               | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
-                 let ctx, arg_name =
-                   Context.add_value_name ctx Constant_names.lambda_arg
-                 in
-                 let add_let acc name mir_expr = (name, mir_expr) :: acc in
-                 let ctx, bindings =
-                   fold_pattern_bindings
-                     ~ctx
-                     arg
-                     (Name arg_name)
-                     arg_type
-                     ~init:bindings
-                     ~add_let
-                     ~add_name:Context.add_value_name
-                 in
-                 (ctx, bindings), arg_name))
-      in
+      let (ctx, bindings), args = process_arguments ~ctx ~args ~arg_types in
       let recursively_bound_names =
         match just_bound with
         | Some (Rec { this_name; other_names }) -> Set.add other_names this_name

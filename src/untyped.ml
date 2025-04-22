@@ -38,7 +38,7 @@ end
 module Effect_pattern = struct
   type t =
     { operation : Value_name.Relative.t
-    ; args : Pattern.t Nonempty.t
+    ; args : Pattern.t Node.t Nonempty.t
     }
   [@@deriving equal, sexp]
 end
@@ -125,7 +125,10 @@ module Expr = struct
           let locals =
             Node.with_value effect_pattern ~f:(function
               | `Effect { operation = _; args } ->
-                let locals = Nonempty.fold args ~init:locals ~f:add_locals in
+                let locals =
+                  Nonempty.fold args ~init:locals ~f:(fun locals arg ->
+                    Node.with_value arg ~f:(add_locals locals))
+                in
                 Set.add locals Value_name.resume_keyword
               | `Value pattern -> add_locals locals pattern)
           in

@@ -186,7 +186,8 @@ match_branches:
   | PIPE; branches = separated_nonempty(PIPE, match_branch) { branches }
 
 effect_pattern_:
-  | LESS_THAN; operation = qualified(LOWER_NAME); args = nonempty(pattern); GREATER_THAN
+  | LESS_THAN; operation = qualified(LOWER_NAME); args = nonempty(with_loc(pattern));
+    GREATER_THAN
     { let operation =  Value_name.Relative.of_ustrings_unchecked operation in
       `Effect { Effect_pattern.operation; args } }
   | pattern = pattern { `Value pattern }
