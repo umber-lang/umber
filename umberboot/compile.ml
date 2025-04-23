@@ -8,8 +8,8 @@ module Stage = struct
       | Parsing
       | Type_checking
       | Generating_mir
-      | Generating_llvm
       | Generating_asm
+      | Generating_llvm
       | Linking
     [@@deriving compare, variants, sexp]
   end
@@ -241,20 +241,20 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
                (Option.to_list parent @ [ Ast.Module.module_name ast ])
            in
            module_path, mir))
-      ~generating_llvm:
+      ~generating_asm:
         (run_stage ~f:(fun (module_path, mir) ->
+           let asm = Asm_codegen.convert_mir ~module_path mir in
+           maybe_output Asm ~f:(fun out ->
+             Asm_program.pp (Stdlib.Format.formatter_of_out_channel out) asm);
+           Ok (module_path, mir, asm)))
+      ~generating_llvm:
+        (run_stage ~f:(fun (module_path, mir, asm) ->
            let%map.Result codegen =
              Codegen.of_mir ~module_path ~source_filename:filename mir
            in
            maybe_output Llvm ~f:(fun out ->
              fprintf out "%s\n" (Codegen.to_string codegen));
-           module_path, mir, codegen))
-      ~generating_asm:
-        (run_stage ~f:(fun (module_path, mir, (_ : Codegen.t)) ->
-           let asm = Asm_codegen.convert_mir ~module_path mir in
-           maybe_output Asm ~f:(fun out ->
-             Asm_program.pp (Stdlib.Format.formatter_of_out_channel out) asm);
-           Ok (module_path, asm)))
+           module_path, asm))
       ~linking:
         (run_stage ~f:(fun (module_path, asm) ->
            match Output.find_target output Exe with

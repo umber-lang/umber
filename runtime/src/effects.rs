@@ -1,4 +1,4 @@
-use core::ffi::c_void;
+use core::{ffi::c_void, ptr};
 use libc::{free, malloc};
 
 /* FIXME: Consider the fiber state.
@@ -33,48 +33,44 @@ use libc::{free, malloc};
 //
 // Actually I'm confused why it'd be better to use a pinned register vs a static address.
 
-// FIXME: cleanup
-//#[repr(transparent)]
-//#[derive(Copy, Clone, PartialEq, Eq)]
-//struct EffectOpId(u64);
+#[repr(transparent)]
+#[derive(Copy, Clone, PartialEq, Eq)]
+struct EffectOpId(u64);
 
-// #[repr(transparent)]
-// #[derive(Copy, Clone)]
-// struct Handler(*const c_void);
+#[repr(transparent)]
+#[derive(Copy, Clone)]
+struct Handler(*const c_void);
 
 #[repr(C, align(16))]
 struct Fiber {
-    parent: *const Fiber,
+    parent: *mut Fiber,
+    saved_rsp: *const c_void,
     total_size: u64,
     handler_count: u64,
 }
 
-// FIXME: cleanup
-// unsafe fn get_handler(fiber: *const Fiber, i: usize) -> (EffectOpId, Handler) {
-//     let effect_op_id = fiber.add(size_of::<Fiber>() + 2 * i) as *const EffectOpId;
-//     let handler = fiber.add(size_of::<Fiber>() + 2 * i) as *const Handler;
-//     (*effect_op_id, *handler)
-// }
+unsafe fn get_handler(fiber: *mut Fiber, i: usize) -> (EffectOpId, Handler) {
+    let effect_op_id = fiber.add(size_of::<Fiber>() + 2 * i) as *const EffectOpId;
+    let handler = fiber.add(size_of::<Fiber>() + 2 * i) as *const Handler;
+    (*effect_op_id, *handler)
+}
 
-// unsafe fn search_fiber_for_handler(
-//     fiber: *const Fiber,
-//     effect_op_id: EffectOpId,
-// ) -> Option<Handler> {
-//     let mut i: u64 = 0;
-//     while i < (*fiber).handler_count {
-//         let (handler_op_id, handler) = get_handler(fiber, i as usize);
-//         if handler_op_id == effect_op_id {
-//             return Some(handler);
-//         }
-//         i += 1;
-//     }
-//     None
-// }
+unsafe fn search_fiber_for_handler(fiber: *mut Fiber, effect_op_id: EffectOpId) -> Option<Handler> {
+    let mut i: u64 = 0;
+    while i < (*fiber).handler_count {
+        let (handler_op_id, handler) = get_handler(fiber, i as usize);
+        if handler_op_id == effect_op_id {
+            return Some(handler);
+        }
+        i += 1;
+    }
+    None
+}
 
 const DEFAULT_FIBER_SIZE: usize = 256 * 8 * 2;
 
 #[no_mangle]
-unsafe extern "C" fn umber_fiber_create(parent: *const Fiber) -> *mut Fiber {
+unsafe extern "C" fn umber_fiber_create(parent: *mut Fiber) -> *mut Fiber {
     let fiber = malloc(DEFAULT_FIBER_SIZE) as *mut Fiber;
     // FIXME: Is there some way we can guarantee this? Maybe malloc will always give us
     // aligned data, as long as the fiber size is a multiple of 16?
@@ -91,14 +87,34 @@ unsafe extern "C" fn umber_fiber_destroy(fiber: *mut Fiber) {
     free(fiber as *mut c_void);
 }
 
-// FIXME: cleanup
-// #[no_mangle]
-// unsafe extern "C" fn umber_find_handler(effect_op_id: EffectOpId) -> Handler {
-//     let mut fiber = CURRENT_FIBER as *const Fiber;
-//     loop {
-//         match search_fiber_for_handler(fiber, effect_op_id) {
-//             Some(handler) => return handler,
-//             None => fiber = (*fiber).parent,
-//         }
-//     }
-// }
+#[no_mangle]
+unsafe extern "C" fn umber_find_handler(
+    mut current_fiber: *mut Fiber,
+    effect_op_id: EffectOpId,
+    handling_fiber: *mut *mut Fiber,
+) -> Handler {
+    loop {
+        match search_fiber_for_handler(current_fiber, effect_op_id) {
+            Some(handler) => {
+                (*current_fiber).parent = ptr::null_mut();
+                (*handling_fiber) = current_fiber;
+                return handler;
+            }
+            None => current_fiber = (*current_fiber).parent,
+        }
+    }
+}
+
+#[no_mangle]
+unsafe extern "C" fn umber_fiber_reparent(
+    mut current_fiber: *mut Fiber,
+    new_parent_fiber: *mut Fiber,
+) {
+    loop {
+        if (*current_fiber).parent.is_null() {
+            (*current_fiber).parent = new_parent_fiber;
+            return;
+        }
+        current_fiber = (*current_fiber).parent;
+    }
+}

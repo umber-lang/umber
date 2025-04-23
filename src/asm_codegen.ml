@@ -856,6 +856,7 @@ type t =
   ; literals : Label_name.t Literal.Table.t
   ; closures : Closure.t Label_name.Table.t
   ; main_function : Function_builder.t
+  ; mutable umber_resume_wrapper : Function_builder.t option
   }
 
 let constant_block ~tag ~len ~data_kind data : (Size.t * Data_decl.Payload.t) list =
@@ -985,7 +986,9 @@ let define_no_env_closure_wrapper_fun ~closure_wrapper_fun_name ~fun_name ~arity
   Function_builder.basic_blocks fun_builder
 ;;
 
-let to_program { globals; literals; closures; main_function } : Asm_program.t =
+let to_program { globals; literals; closures; main_function; umber_resume_wrapper }
+  : Asm_program.t
+  =
   let program =
     Hashtbl.fold globals ~init:Asm_program.empty ~f:(fun ~key:_ ~data:global program ->
       let label_name = Global.label_name global in
@@ -1028,7 +1031,10 @@ let to_program { globals; literals; closures; main_function } : Asm_program.t =
   { program with
     globals =
       { name = Function_builder.name main_function; strength = `Strong }
-      :: (program.globals
+      :: (Option.to_list
+            (Option.map umber_resume_wrapper ~f:(fun fun_builder : Global_decl.t ->
+               { name = Function_builder.name fun_builder; strength = `Weak }))
+          @ program.globals
           @ List.concat_map
               closures
               ~f:(fun { closure_name; closure_wrapper_fun_name; _ } : Global_decl.t list
@@ -1045,6 +1051,7 @@ let to_program { globals; literals; closures; main_function } : Asm_program.t =
           closures
           ~f:(fun { fun_name; closure_wrapper_fun_name; arity; _ } ->
           define_no_env_closure_wrapper_fun ~closure_wrapper_fun_name ~fun_name ~arity)
+      @ Option.value_map umber_resume_wrapper ~f:Function_builder.basic_blocks ~default:[]
   ; rodata_section =
       List.map literals ~f:(fun (literal, label) : Data_decl.t ->
         { label; payloads = constant_block_for_literal literal })
@@ -1062,6 +1069,7 @@ let create ~main_function_name =
   ; literals = Literal.Table.create ()
   ; closures = Label_name.Table.create ()
   ; main_function = Function_builder.create main_function_name ~arity:0
+  ; umber_resume_wrapper = None
   }
 ;;
 
@@ -1283,45 +1291,66 @@ let merge_branches
   value
 ;;
 
-let current_fiber : Register.t Simple_value.t =
-  Register (Real Call_conv.Umber.fiber_register)
-;;
+(** This needs to be kept in sync with the definition of [Fiber] in [effects.rs]*)
+module Current_fiber : sig
+  val value : Register.t Simple_value.t
+  val parent : Register.t Memory.t
+  val saved_rsp : Register.t Memory.t
+  val total_size : Register.t Memory.t
+  val handler_count : Register.t Memory.t
+  val get_handler_effect_op_id : int -> Register.t Memory.t
+  val get_handler_pointer : int -> Register.t Memory.t
+end = struct
+  let value : Register.t Simple_value.t = Register (Real Call_conv.Umber.fiber_register)
+  let get_field i = Memory.offset value I64 i
+  let parent = get_field 0
+  let saved_rsp = get_field 1
+  let total_size = get_field 2
+  let handler_count = get_field 3
+  let number_of_header_fields = 4
+  let get_handler_effect_op_id i = get_field (number_of_header_fields + (2 * i))
+  let get_handler_pointer i = get_field (number_of_header_fields + (2 * i) + 1)
+end
 
-(* FIXME: Stack variables can't live across this point - how can we prevent this? *)
-let enter_fiber ~fun_builder ~new_fiber =
-  let new_fiber : Register.t Simple_value.t = Register (Virtual new_fiber) in
-  Function_builder.add_code
-    fun_builder
-    (Mov { dst = Simple_value current_fiber; src = Simple_value new_fiber });
+let set_rsp_for_fiber_just_created ~fun_builder =
   let fiber_size = Function_builder.pick_register' fun_builder in
   Function_builder.add_code
     fun_builder
     (Mov
        { dst = Simple_value (Register (Virtual fiber_size))
-       ; src = Memory (Memory.offset new_fiber I64 1)
+       ; src = Memory Current_fiber.total_size
        });
   Function_builder.add_code
     fun_builder
     (Lea
        { dst = Real Rsp
-       ; src =
-           ( I8
-           , Add
-               ( Value (Register (Virtual fiber_size))
-               , Value (Register (Virtual fiber_size)) ) )
+       ; src = I8, Add (Value Current_fiber.value, Value (Register (Virtual fiber_size)))
        })
 ;;
 
-(* FIXME: Linear search for handler, then try parents if not found
-  
-   Or maybe I can just use inline asm on the Rust side to set R14? Nah, sus.
-*)
-let codegen_find_handler t ~fun_builder ~effect_op =
-  declare_and_call_extern_c_function
-    t
-    ~fun_builder
-    ~fun_name:(Label_name.of_string "umber_find_handler")
-    ~args:[ Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op))) ]
+(* FIXME: Stack variables can't live across this point - how can we prevent this? *)
+let switch_to_fiber ~fun_builder ~new_fiber ~just_created =
+  (* Save the stack pointer of the current fiber. *)
+  Function_builder.add_code
+    fun_builder
+    (Mov
+       { dst = Memory Current_fiber.saved_rsp; src = Simple_value (Register (Real Rsp)) });
+  (* Switch to the new fiber. *)
+  Function_builder.add_code
+    fun_builder
+    (Mov { dst = Simple_value Current_fiber.value; src = new_fiber });
+  if just_created
+  then
+    (* For newly created fibers, set the stack pointer to the end of the fiber. *)
+    set_rsp_for_fiber_just_created ~fun_builder
+  else
+    (* For resuming existing fibers, load the previously saved stack pointer. *)
+    Function_builder.add_code
+      fun_builder
+      (Mov
+         { dst = Simple_value (Register (Real Rsp))
+         ; src = Memory Current_fiber.saved_rsp
+         })
 ;;
 
 let process_arguments ~fun_builder ~call_conv ~args =
@@ -1336,6 +1365,65 @@ let process_arguments ~fun_builder ~call_conv ~args =
   match result with
   | Same_length | Right_trailing _ -> ()
   | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"
+;;
+
+(* TODO: It might make more sense for MIR to take on the responsibility for representing
+   continuations as blocks. *)
+let define_umber_resume_wrapper t =
+  match t.umber_resume_wrapper with
+  | Some fun_builder -> Function_builder.name fun_builder
+  | None ->
+    let arity = 2 in
+    let fun_builder =
+      Function_builder.create (Label_name.of_string "umber_resume_wrapper") ~arity
+    in
+    (* TODO: code duplication with process_arguments and extern c wrapper generation *)
+    let args =
+      Call_conv.arg_registers Umber
+      |> Nonempty.to_list
+      |> Fn.flip List.take arity
+      |> List.map ~f:(fun reg ->
+           let virtual_reg = Function_builder.pick_register fun_builder in
+           Function_builder.add_code
+             fun_builder
+             (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
+           virtual_reg)
+    in
+    let continuation, arg =
+      match args with
+      | [ continuation; arg ] -> continuation, arg
+      | _ -> compiler_bug [%message "Resumptions should have 2 args"]
+    in
+    (* TODO: Centralize logic for continuation representation somewhere. *)
+    let fiber_to_resume =
+      load_block_field fun_builder continuation (Mir.Block_index.of_int 2)
+    in
+    let resume_address =
+      load_block_field fun_builder continuation (Mir.Block_index.of_int 3)
+    in
+    let new_parent_fiber = Current_fiber.value in
+    let (_ : Virtual_register.t) =
+      declare_and_call_extern_c_function
+        t
+        ~fun_builder
+        ~fun_name:(Label_name.of_string "umber_fiber_reparent")
+        ~args:[ Simple_value Current_fiber.value; Simple_value new_parent_fiber ]
+    in
+    (* FIXME: What about the return address of the resumption? If we don't perform any
+     effects, we need to somehow end up back here. How? Ah, I think reparenting the fibers
+     should do it. One problem - when a function returns normally, we need to make sure it
+     correctly goes back to the parent fiber. Check for fiber stack underflow? Maybe
+     just store the correct return addresses on the stack? *)
+    switch_to_fiber ~fun_builder ~new_fiber:fiber_to_resume ~just_created:false;
+    Function_builder.add_code
+      fun_builder
+      (Mov
+         { dst = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
+         ; src = arg
+         });
+    Function_builder.add_terminal fun_builder (Jump resume_address);
+    t.umber_resume_wrapper <- Some fun_builder;
+    Function_builder.name fun_builder
 ;;
 
 let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
@@ -1465,12 +1553,17 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~fun_name:(Label_name.of_string "umber_fiber_create")
         ~args:[ Simple_value (Register (Real Call_conv.Umber.fiber_register)) ]
     in
-    enter_fiber ~fun_builder ~new_fiber;
+    switch_to_fiber
+      ~fun_builder
+      ~new_fiber:(Simple_value (Register (Virtual new_fiber)))
+      ~just_created:true;
     (* FIXME: Stack variables are invalidated after this point, because rsp has changed.
        How can we get the codegen to understand this? Technically the stack variables are
        still accessible, we just need to find the old rsp. Maybe we could put in a special
        instruction to make the code load from a parent fiber? Or to not hold variables in
        the stack across this point? *)
+    (* [parent] and [total_size] are set by the runtime. We need to set [handler_count]
+       and [parent_rsp]. *)
     let handler_count = Nonempty.length handlers in
     let handler_labels =
       Array.init handler_count ~f:(fun i ->
@@ -1480,7 +1573,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     Function_builder.add_code
       fun_builder
       (Mov
-         { dst = Memory (Memory.offset current_fiber I64 2)
+         { dst = Memory Current_fiber.handler_count
          ; src = Simple_value (Constant (Int handler_count))
          });
     Nonempty.iteri
@@ -1489,13 +1582,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       Function_builder.add_code
         fun_builder
         (Mov
-           { dst = Memory (Memory.offset current_fiber I64 ((2 * i) + 3))
+           { dst = Memory (Current_fiber.get_handler_effect_op_id i)
            ; src = Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op_id)))
            });
       Function_builder.add_code
         fun_builder
         (Mov
-           { dst = Memory (Memory.offset current_fiber I64 ((2 * i) + 4))
+           { dst = Memory (Current_fiber.get_handler_pointer i)
            ; src = Simple_value (Global (handler_labels.(i), Other))
            }));
     (* Use the return value register to store the final result. It needs to be in a
@@ -1528,14 +1621,47 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       Function_builder.add_terminal
         fun_builder
         (Jump (Simple_value (Global (end_label, Other)))));
+    (* After the handler expression finishes, switch back to the parent fiber. *)
+    Function_builder.position_at_label fun_builder end_label;
+    switch_to_fiber
+      ~fun_builder
+      ~new_fiber:(Memory Current_fiber.parent)
+      ~just_created:false;
     final_result
   | Perform_effect { effect_op; args } ->
     (* Evaluate the arguments before doing anything. *)
     let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) in
-    (* Linear search the current fiber's header for a matching handler. *)
-    (* FIXME: We also need the rsp of the fiber to set to, annoying to return from this
-       function. Maybe we just codegen this... *)
-    let handler_fiber, handler = codegen_find_handler t ~fun_builder ~effect_op in
+    (* Search for a matching handler, and detach the list of fibers traversed. We mess
+       with the stack here, so it's important that the following call doesn't use the
+       stack for any other arguments. We need to subtract 16 to avoid misaligning the
+       stack. (Needs to be 16-byte aligned for a C call.) *)
+    Function_builder.add_code
+      fun_builder
+      (Sub
+         { dst = Simple_value (Register (Real Rsp))
+         ; src = Simple_value (Constant (Int 16))
+         });
+    let handler =
+      declare_and_call_extern_c_function
+        t
+        ~fun_builder
+        ~fun_name:(Label_name.of_string "umber_find_handler")
+        ~args:
+          [ Simple_value Current_fiber.value
+          ; Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op)))
+          ; Simple_value (Register (Real Rsp))
+          ]
+    in
+    let handling_fiber = Function_builder.pick_register fun_builder in
+    Function_builder.add_code
+      fun_builder
+      (Mov { dst = handling_fiber; src = Memory (I64, Value (Register (Real Rsp))) });
+    Function_builder.add_code
+      fun_builder
+      (Add
+         { dst = Simple_value (Register (Real Rsp))
+         ; src = Simple_value (Constant (Int 16))
+         });
     (* Once a handler is found, put args in the arg registers and jump to it. We don't use
        a "Call" instruction since we don't want to put the return address on the stack. *)
     let continuation_label =
@@ -1554,6 +1680,8 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        contiuation. This is dynamic so they need to be dynamically allocated and created.
        There should be some flag we set in the continuation to prevent it getting called
        again. (Panic in that case).
+
+       I think we need a proper wrapper function to do the nontrivial resumption logic.
     *)
     let continuation =
       box
@@ -1561,17 +1689,26 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~fun_builder
         ~tag:Cnstr_tag.continuation
         ~fields:
-          [ Simple_value (Global (continuation_label, Other))
-          ; Simple_value current_fiber
+          [ Simple_value (Global (define_umber_resume_wrapper t, Other))
+          ; Simple_value Current_fiber.value
+          ; Simple_value (Global (continuation_label, Other))
           ]
     in
     let args = Nonempty.append args [ Simple_value (Register (Virtual continuation)) ] in
-    (* FIXME: Stack arguments won't work with the updated rsp *)
+    (* FIXME: Stack arguments won't work with the updated rsp. Maybe reg alloc could
+       notice when we set rsp and then adjust later spills to look up the parent stack? *)
     move_values_for_call fun_builder ~call_conv:Umber ~args:(Nonempty.to_list args);
-    enter_fiber ~fun_builder ~new_fiber:handler_fiber;
+    switch_to_fiber ~fun_builder ~new_fiber:handling_fiber ~just_created:false;
+    (* FIXME: This value got allocated to a nonsense register and somehow the move was
+       deleted. Very sus. Maybe coalescing went wrong? *)
     Function_builder.add_terminal
       fun_builder
       (Jump (Simple_value (Register (Virtual handler))));
+    (* Set up the logic to run upon resuming. *)
+    (* FIXME: Resumption needs to reparent the fiber list. Make a function to do this.
+       Also, the continuation needs to be effectively a separate function - calling it
+       needs to work. I think the logic will always be the same, so it could be shared and
+       put in a weak symbol. *)
     Function_builder.position_at_label fun_builder continuation_label;
     let output_register = Function_builder.pick_register fun_builder in
     Function_builder.add_code
@@ -1813,6 +1950,21 @@ let compile_to_object_file program ~output_file =
 
 let compile_entry_module ~module_paths ~entry_file =
   let t = create ~main_function_name:(Label_name.of_string "main") in
+  (* Set up the main fiber. *)
+  let main_fiber =
+    declare_and_call_extern_c_function
+      t
+      ~fun_builder:t.main_function
+      ~fun_name:(Label_name.of_string "umber_fiber_create")
+      ~args:[ Simple_value (Constant (Int 0)) ]
+  in
+  Function_builder.add_code
+    t.main_function
+    (Mov
+       { dst = Simple_value Current_fiber.value
+       ; src = Simple_value (Register (Virtual main_fiber))
+       });
+  set_rsp_for_fiber_just_created ~fun_builder:t.main_function;
   ignore
     (declare_and_call_extern_c_function
        t
@@ -1820,6 +1972,7 @@ let compile_entry_module ~module_paths ~entry_file =
        ~fun_name:(Label_name.of_string "umber_gc_init")
        ~args:[]
       : Virtual_register.t);
+  (* Call the main functions of all linked modules. *)
   List.iter module_paths ~f:(fun module_path ->
     let fun_name = main_function_name ~module_path in
     let mir_name =

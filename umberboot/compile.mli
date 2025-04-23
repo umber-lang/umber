@@ -9,8 +9,8 @@ module Stage : sig
     | Parsing
     | Type_checking
     | Generating_mir
-    | Generating_llvm
     | Generating_asm
+    | Generating_llvm
     | Linking
   [@@deriving compare, variants, sexp]
 end
