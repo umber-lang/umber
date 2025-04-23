@@ -136,55 +136,66 @@ end = struct
 
   module Interference_graph = Graph.Imperative.Graph.Concrete (Register)
 
-  let instr_register_ops (instr : _ Instr.Nonterminal.t) =
+  module Instr_register_ops = struct
     let use_mem =
       Memory.fold_simple_values ~init:[] ~f:(fun acc v -> (Register_op.Use, v) :: acc)
-    in
+    ;;
+
     let record (value : Register.t Value.t) ~op =
       match value with
       | Simple_value value -> [ op, value ]
       | Memory mem ->
         (* Memory only uses registers, it can't assign to them. *)
         use_mem mem
-    in
-    let use = record ~op:Use in
-    let assign = record ~op:Assignment in
-    let use_and_assign = record ~op:Use_and_assignment in
-    match instr with
-    | Cmp (a, b) | Test (a, b) -> use a @ use b
-    | Mov { dst; src } -> use src @ assign dst
-    | And { dst; src } | Add { dst; src } | Sub { dst; src } ->
-      use src @ use_and_assign dst
-    | Lea { dst; src } -> use_mem src @ assign (Simple_value (Register dst))
-    | Call { fun_; call_conv; arity } ->
-      let args, clobbered_arg_registers =
-        Call_conv.arg_registers call_conv
-        |> Nonempty.to_list
-        |> Fn.flip List.split_n arity
-      in
-      let arg_uses =
-        List.map args ~f:(fun reg : (Register_op.t * Register.t Simple_value.t) ->
-          Use, Register (Real reg))
-      in
-      let clobbered_register_assignments, clobbered_register_uses =
-        List.map
-          (clobbered_arg_registers @ Call_conv.non_arg_caller_save_registers call_conv)
-          ~f:(fun reg : ((Register_op.t * _) * (Register_op.t * _)) ->
-            let reg : Register.t Simple_value.t = Register (Real reg) in
-            (Assignment, reg), (Use, reg))
-        |> List.unzip
-      in
-      let return_value_assignment : Register_op.t * Register.t Simple_value.t =
-        Assignment, Register (Real (Call_conv.return_value_register call_conv))
-      in
-      List.concat
-        [ use fun_
-        ; clobbered_register_assignments
-        ; arg_uses
-        ; clobbered_register_uses
-        ; [ return_value_assignment ]
-        ]
-  ;;
+    ;;
+
+    let use = record ~op:Use
+    let assign = record ~op:Assignment
+    let use_and_assign = record ~op:Use_and_assignment
+
+    let of_nonterminal (instr : _ Instr.Nonterminal.t) =
+      match instr with
+      | Cmp (a, b) | Test (a, b) -> use a @ use b
+      | Mov { dst; src } -> use src @ assign dst
+      | And { dst; src } | Add { dst; src } | Sub { dst; src } ->
+        use src @ use_and_assign dst
+      | Lea { dst; src } -> use_mem src @ assign (Simple_value (Register dst))
+      | Call { fun_; call_conv; arity } ->
+        let args, clobbered_arg_registers =
+          Call_conv.arg_registers call_conv
+          |> Nonempty.to_list
+          |> Fn.flip List.split_n arity
+        in
+        let arg_uses =
+          List.map args ~f:(fun reg : (Register_op.t * Register.t Simple_value.t) ->
+            Use, Register (Real reg))
+        in
+        let clobbered_register_assignments, clobbered_register_uses =
+          List.map
+            (clobbered_arg_registers @ Call_conv.non_arg_caller_save_registers call_conv)
+            ~f:(fun reg : ((Register_op.t * _) * (Register_op.t * _)) ->
+              let reg : Register.t Simple_value.t = Register (Real reg) in
+              (Assignment, reg), (Use, reg))
+          |> List.unzip
+        in
+        let return_value_assignment : Register_op.t * Register.t Simple_value.t =
+          Assignment, Register (Real (Call_conv.return_value_register call_conv))
+        in
+        List.concat
+          [ use fun_
+          ; clobbered_register_assignments
+          ; arg_uses
+          ; clobbered_register_uses
+          ; [ return_value_assignment ]
+          ]
+    ;;
+
+    let of_terminal (instr : _ Instr.Terminal.t) =
+      match instr with
+      | Jump target -> use target
+      | Jump_if { cond = _; then_ = _; else_ = _ } | Ret -> []
+    ;;
+  end
 
   let create_interference_graph ~cfg ~(basic_blocks : _ Basic_block.t list) =
     (* To create a lifetime interference graph from a control-flow graph (CFG), we have
@@ -228,20 +239,23 @@ end = struct
             live_registers
             (Register (Real (Call_conv.return_value_register Umber)))
         | Label label ->
-          let ({ label = _; code; terminal = _ } : _ Basic_block.t) =
+          let ({ label = _; code; terminal } : _ Basic_block.t) =
             Hashtbl.find_exn basic_blocks label
           in
-          List.fold_right code ~init:live_registers ~f:(fun instr live_registers ->
-            List.fold_right
-              (instr_register_ops instr)
-              ~init:live_registers
-              ~f:(fun (op, value) live_registers ->
-              match op with
+          let record_register_ops live_registers ops =
+            List.fold_right ops ~init:live_registers ~f:(fun (op, value) live_registers ->
+              match (op : Register_op.t) with
               | Use -> record_register_use live_registers value
               | Assignment -> record_register_assignment live_registers value
               | Use_and_assignment ->
                 let live_registers = record_register_assignment live_registers value in
-                record_register_use live_registers value)))
+                record_register_use live_registers value)
+          in
+          let live_registers =
+            record_register_ops live_registers (Instr_register_ops.of_terminal terminal)
+          in
+          List.fold_right code ~init:live_registers ~f:(fun instr live_registers ->
+            record_register_ops live_registers (Instr_register_ops.of_nonterminal instr)))
     in
     graph
   ;;
@@ -1396,18 +1410,17 @@ let define_umber_resume_wrapper t =
     in
     (* TODO: Centralize logic for continuation representation somewhere. *)
     let fiber_to_resume =
-      load_block_field fun_builder continuation (Mir.Block_index.of_int 2)
+      load_block_field fun_builder continuation (Mir.Block_index.of_int 1)
     in
     let resume_address =
-      load_block_field fun_builder continuation (Mir.Block_index.of_int 3)
+      load_block_field fun_builder continuation (Mir.Block_index.of_int 2)
     in
-    let new_parent_fiber = Current_fiber.value in
     let (_ : Virtual_register.t) =
       declare_and_call_extern_c_function
         t
         ~fun_builder
         ~fun_name:(Label_name.of_string "umber_fiber_reparent")
-        ~args:[ Simple_value Current_fiber.value; Simple_value new_parent_fiber ]
+        ~args:[ fiber_to_resume; Simple_value Current_fiber.value ]
     in
     (* FIXME: What about the return address of the resumption? If we don't perform any
      effects, we need to somehow end up back here. How? Ah, I think reparenting the fibers
@@ -1421,6 +1434,8 @@ let define_umber_resume_wrapper t =
          { dst = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
          ; src = arg
          });
+    (* FIXME: We never ret or add to rsp at the end of this function - where exactly are
+       we jumping back to? I think there might just be wasted stack space here. *)
     Function_builder.add_terminal fun_builder (Jump resume_address);
     t.umber_resume_wrapper <- Some fun_builder;
     Function_builder.name fun_builder
@@ -1621,6 +1636,11 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       Function_builder.add_terminal
         fun_builder
         (Jump (Simple_value (Global (end_label, Other)))));
+    (* FIXME: All this messing around with rsp doesn't work properly. e.g. we do
+       `sub rsp, 8` at function start, then save/load it when switching fibers, then
+       `add rsp, 8` at function end. This doesn't sync up, and it makes the stack get
+       kinda messed up and then `ret` jumps to somewhere garbage. Need to properly think
+       about how this should work. *)
     (* After the handler expression finishes, switch back to the parent fiber. *)
     Function_builder.position_at_label fun_builder end_label;
     switch_to_fiber
@@ -2122,3 +2142,93 @@ let%expect_test "hello world, from MIR" =
     HelloWorld.#binding.1:
                resq      1 |}]
 ;;
+
+(* FIXME: Cleanup *)
+(* let compile_entry_module_edited ~module_paths =
+  let t = create ~main_function_name:(Label_name.of_string "main") in
+  (* Set up the main fiber. *)
+  let main_fiber =
+    declare_and_call_extern_c_function
+      t
+      ~fun_builder:t.main_function
+      ~fun_name:(Label_name.of_string "umber_fiber_create")
+      ~args:[ Simple_value (Constant (Int 0)) ]
+  in
+  Function_builder.add_code
+    t.main_function
+    (Mov
+       { dst = Simple_value Current_fiber.value
+       ; src = Simple_value (Register (Virtual main_fiber))
+       });
+  set_rsp_for_fiber_just_created ~fun_builder:t.main_function;
+  ignore
+    (declare_and_call_extern_c_function
+       t
+       ~fun_builder:t.main_function
+       ~fun_name:(Label_name.of_string "umber_gc_init")
+       ~args:[]
+      : Virtual_register.t);
+  (* Call the main functions of all linked modules. *)
+  List.iter module_paths ~f:(fun module_path ->
+    let fun_name = main_function_name ~module_path in
+    let mir_name =
+      Mir_name.create_exportable_name
+        (Value_name.Absolute.of_relative_unchecked
+           (Value_name.Relative.of_string (Label_name.to_string fun_name)))
+    in
+    Hashtbl.add_exn
+      t.globals
+      ~key:mir_name
+      ~data:(Other_file (Umber_function { label_name = fun_name; arity = 0 }));
+    Function_builder.add_code
+      t.main_function
+      (Call
+         { fun_ = Simple_value (Global (fun_name, Extern_proc))
+         ; call_conv = Umber
+         ; arity = 0
+         }));
+  Function_builder.add_code
+    t.main_function
+    (Mov
+       { dst = Simple_value (Register (Real (Call_conv.return_value_register C)))
+       ; src = Simple_value (Constant (Int 0))
+       });
+  Function_builder.add_terminal t.main_function Ret;
+  to_program t |> Asm_program.pp Format.std_formatter
+;;
+
+let%expect_test "entry module" =
+  let prelude_module_path =
+    Module_path.of_module_names_unchecked
+      [ Module_name.of_string_unchecked "Std"; Module_name.of_string_unchecked "Prelude" ]
+  in
+  compile_entry_module_edited
+    ~module_paths:
+      [ prelude_module_path
+      ; Module_path.of_module_names_unchecked [ Module_name.of_string_unchecked "Read" ]
+      ];
+  [%expect
+    {|
+               default   rel
+               global    main
+               extern    umber_main#Std.Prelude
+               extern    umber_main#Read
+               extern    umber_fiber_create
+               extern    umber_gc_init
+
+               section   .text
+
+    main:
+               sub       rsp, 8
+               mov       rdi, 0
+               call      umber_fiber_create wrt ..plt
+               mov       r14, rax
+               mov       r9, qword [r14 + 16]
+               lea       rsp, byte [r14 + r9]
+               call      umber_gc_init wrt ..plt
+               call      umber_main#Std.Prelude wrt ..plt
+               call      umber_main#Read wrt ..plt
+               mov       rax, 0
+               add       rsp, 8
+               ret |}]
+;; *)

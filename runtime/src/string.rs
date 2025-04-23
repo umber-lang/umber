@@ -85,6 +85,10 @@ pub extern "C" fn umber_string_append(x: BlockPtr, y: BlockPtr) -> BlockPtr {
     }
 }
 
+// FIXME: The current design of the effects runtime can't handle external calls back into
+// Umber code. It's unclear if it's worth supporting that. I think I can figure out an API
+// that doesn't need it for string iteration and save a bunch of headaches. e.g. represent
+// the byte index we are at and just make sure we always advance one utf8 char at a time.
 #[no_mangle]
 pub unsafe extern "C" fn umber_string_fold(s: BlockPtr, init: BlockPtr, fun: Closure) -> BlockPtr {
     s.as_str()
