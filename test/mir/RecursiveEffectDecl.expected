@@ -1,8 +1,6 @@
 ((Fun_def
-  ((fun_name RecursiveEffectDecl.go)
-   (args (RecursiveEffectDecl.#arg0.1 RecursiveEffectDecl.resume.1))
+  ((fun_name RecursiveEffectDecl.go) (args (RecursiveEffectDecl.#arg0.1))
    (body
     (Perform_effect
      (effect_op ((name RecursiveEffectDecl.go) (hash 984085721)))
-     (arg (Name RecursiveEffectDecl.#arg0.1))
-     (resume (Name RecursiveEffectDecl.resume.1)))))))
+     (args ((Name RecursiveEffectDecl.#arg0.1))))))))

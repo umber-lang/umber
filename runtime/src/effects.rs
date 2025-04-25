@@ -85,16 +85,16 @@ unsafe fn search_fiber_for_handler(fiber: *mut Fiber, effect_op_id: EffectOpId) 
     None
 }
 
-const DEFAULT_FIBER_SIZE: usize = 256 * 8 * 2;
+// TODO: This needs to be divisble by 16. Pick a big number here so we always have enough
+// and don't have to implement stack overflow checks and reallocation yet. Should do that
+// properly eventually.
+const DEFAULT_FIBER_SIZE: usize = 256 * 8 * 2 * 16;
 
 #[no_mangle]
 unsafe extern "C" fn umber_fiber_create(parent: *mut Fiber) -> *mut Fiber {
+    // Malloc will always give us 16-byte aligned data as long as the size requested is at
+    // least 16 bytes.
     let fiber = malloc(DEFAULT_FIBER_SIZE) as *mut Fiber;
-    // FIXME: Is there some way we can guarantee this? Maybe malloc will always give us
-    // aligned data, as long as the fiber size is a multiple of 16?
-    if fiber as u64 % 16 != 0 {
-        panic!("Fiber address not aligned!")
-    }
     (*fiber).parent = parent;
     (*fiber).total_size = DEFAULT_FIBER_SIZE as u64;
     fiber
