@@ -644,7 +644,8 @@ module Expr = struct
         ; if_none_matched : cond_if_none_matched
         }
     | Handle_effects of
-        { handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
+        { vars : (Mir_name.t * Mir_name.t) list
+        ; handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
         ; expr : t
         }
     | Perform_effect of
@@ -691,9 +692,10 @@ module Expr = struct
                 | Otherwise t -> Otherwise (map t ~f)
                 | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map ~f)))
            }
-       | Handle_effects { handlers; expr } ->
+       | Handle_effects { vars; handlers; expr } ->
          Handle_effects
-           { handlers =
+           { vars
+           ; handlers =
                Nonempty.map handlers ~f:(fun (effect_op, args, handler) ->
                  effect_op, args, map handler ~f)
            ; expr = map ~f expr
@@ -1144,7 +1146,17 @@ module Expr = struct
       | ( Handle
             { expr = input_expr; expr_type = input_type; value_branch; effect_branches }
         , output_type ) ->
+        let ctx_for_input_expr, closed_over, (_close_over_name : Mir_name.t -> Mir_name.t)
+          =
+          find_closed_over_names
+            ~ctx
+            ~parent_ctx:ctx
+            ~recursively_bound_names:Mir_name.Set.empty
+        in
         let input_expr =
+          (* FIXME: This doesn't seem right. e.g. if we let a continuation escape and then
+             call it, it shouldn't call back into the value branch here. The value branch
+             is part of the handler. *)
           (* Desugar the value branch to a let binding. *)
           match value_branch with
           | None -> input_expr
@@ -1160,11 +1172,12 @@ module Expr = struct
         in
         let input_expr =
           Node.with_value input_expr ~f:(fun expr ->
-            of_typed_expr ~ctx expr (fst input_type))
+            of_typed_expr ~ctx:ctx_for_input_expr expr (fst input_type))
         in
         (match Nonempty.of_list effect_branches with
          | None -> input_expr
          | Some effect_branches ->
+           let closed_over = !closed_over in
            let handlers =
              Nonempty.map effect_branches ~f:(fun (effect_branch, handler_expr) ->
                Node.with_value2
@@ -1203,7 +1216,7 @@ module Expr = struct
                  in
                  effect_op, args, handler_expr))
            in
-           Handle_effects { handlers; expr = input_expr })
+           Handle_effects { vars = Map.to_alist closed_over; handlers; expr = input_expr })
       | Let { rec_; bindings; body }, body_type ->
         let ctx_for_body, bindings =
           Nonempty.fold_map
@@ -1280,34 +1293,8 @@ module Expr = struct
         | Some (Rec { this_name; other_names }) -> Set.add other_names this_name
         | Some (Nonrec _) | None -> Mir_name.Set.empty
       in
-      let closed_over = ref Mir_name.Map.empty in
-      let close_over_name mir_name =
-        match Map.find !closed_over mir_name with
-        | Some name -> name
-        | None ->
-          let new_name = Context.copy_name ctx mir_name in
-          closed_over := Map.set !closed_over ~key:mir_name ~data:new_name;
-          new_name
-      in
-      let ctx =
-        let from_which_context name mir_name =
-          let in_context ctx =
-            Context.peek_value_name ctx name
-            |> Option.value_map ~default:false ~f:(Mir_name.equal mir_name)
-          in
-          if in_context outer_ctx || is_local_fun_def mir_name
-          then `From_toplevel
-          else if Set.mem recursively_bound_names mir_name
-          then `Recursively_bound
-          else if in_context parent_ctx
-          then `Closed_over_from_parent
-          else `Newly_bound
-        in
-        (* Determine if names looked up were closed over from the parent context. *)
-        Context.with_find_override ctx ~f:(fun name mir_name ->
-          match from_which_context name mir_name with
-          | `Newly_bound | `Recursively_bound | `From_toplevel -> None
-          | `Closed_over_from_parent -> Some (close_over_name mir_name))
+      let ctx, closed_over, close_over_name =
+        find_closed_over_names ~ctx ~parent_ctx ~recursively_bound_names
       in
       let body =
         Node.with_value body ~f:(fun body -> of_typed_expr ~ctx body body_type)
@@ -1366,6 +1353,37 @@ module Expr = struct
       in
       add_fun_def fun_def;
       fun_or_closure
+    and find_closed_over_names ~ctx ~parent_ctx ~recursively_bound_names =
+      let closed_over = ref Mir_name.Map.empty in
+      let close_over_name mir_name =
+        match Map.find !closed_over mir_name with
+        | Some name -> name
+        | None ->
+          let new_name = Context.copy_name ctx mir_name in
+          closed_over := Map.set !closed_over ~key:mir_name ~data:new_name;
+          new_name
+      in
+      let from_which_context name mir_name =
+        let in_context ctx =
+          Context.peek_value_name ctx name
+          |> Option.value_map ~default:false ~f:(Mir_name.equal mir_name)
+        in
+        if in_context outer_ctx || is_local_fun_def mir_name
+        then `From_toplevel
+        else if Set.mem recursively_bound_names mir_name
+        then `Recursively_bound
+        else if in_context parent_ctx
+        then `Closed_over_from_parent
+        else `Newly_bound
+      in
+      (* Determine if names looked up were closed over from the parent context. *)
+      let ctx =
+        Context.with_find_override ctx ~f:(fun name mir_name ->
+          match from_which_context name mir_name with
+          | `Newly_bound | `Recursively_bound | `From_toplevel -> None
+          | `Closed_over_from_parent -> Some (close_over_name mir_name))
+      in
+      ctx, closed_over, close_over_name
     and make_block ~ctx ~tag ~fields ~field_types =
       let fields =
         List.map2_exn fields field_types ~f:(fun field_expr field_type ->

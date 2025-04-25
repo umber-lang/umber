@@ -368,6 +368,56 @@ module Effect_branch = struct
          | _ -> error ())
       | Some { effects = _; effect_var = Some _ } | None -> error ()
     in
+    (* FIXME: Giving resume the result type and result effects doesn't work if the
+       continuation escapes. It implies that the continuation would always call back into
+       this same handler, which is not the case. If the continuation escapes, it should
+       just have the type and effects of the inner expression.
+       
+       The problem is that resume has a different meaning when called inside or outside
+       the handler. Inside the handler 
+
+       If this is too tricky maybe we can decide to not support first-class continuations,
+       but that would be sad e.g. async wouldn't work.
+
+       Oh, maybe the problem is that we aren't thinking about the value branch properly
+       - ah, no
+
+       Ok - deep handlers are just like this - they implicitly resume under the same handler,
+       so you can't sub in another handler for the same effects.
+
+       Now I'm thinking - do we really want deep handlers? "Re-raising" the same effect
+       is a common pattern for exceptions or for iterators, which should be a lot of the
+       effects use-cases. Shallow handlers would be better there? What do we want deep
+       handlers for?
+
+       Effects use-cases:
+       - Panic/exception (yield value, never resume)
+         - Unintuitive for exception handlers to also catch the exceptions in the handler
+         - Also, bug prone
+         - Often want to re-raise exceptions
+       - Iteration (yield value, resume with unit)
+         - Often want to map over some values, which might look like yield and then resume 
+         - The yield part should not be handled by us
+         - But the resume part should be handled by us. Notably, having to re-install the
+           handler to resume is pretty weird. Most of the time if you're going to resume
+           it's with the same handler. Ok I think masking with deep handlers should be
+           sufficient. Just have to think about how to implement masking in the type
+           system and the runtime.
+       - State (for get, resume with value, for set, yield value and resume with unit)
+         - This one likes deep handlers I think
+
+       Maybe a way to mask effects might be good enough to not need shallow handlers.
+
+       Let's seriously take a look at iteration in particular to figure out what we want
+       the code to look like before implementing anything else. No point in getting deep
+       handlers to work if it turns out that shallow handlers are better.
+
+       Effect masks: make this effect skip one handler and go to the next one.
+       - Might have to allow duplicate effects like koka does.
+       - Then masking basically adds an extra duplicate effect, causing it to skip
+       - In the runtime.... need to record some handler state that says "skip the next one"
+         Pretty awkward to have to create a fiber to do that though...
+    *)
     let resume_type : Internal_type.t =
       Function ([ operation_result_type ], result_effects, result_type)
     in

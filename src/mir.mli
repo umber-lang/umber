@@ -32,7 +32,8 @@ module Expr : sig
         ; if_none_matched : cond_if_none_matched
         }
     | Handle_effects of
-        { handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
+        { vars : (Mir_name.t * Mir_name.t) list
+        ; handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
         ; expr : t
         }
     | Perform_effect of

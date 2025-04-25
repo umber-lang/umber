@@ -41,6 +41,24 @@ struct EffectOpId(u64);
 #[derive(Copy, Clone)]
 struct Handler(*const c_void);
 
+// TODO: Consider representing fibers as a kind of block and manage them with the gc. If
+// the continuation is not called (e.g. with an exception), they will just be leaked. We
+// could have the continuation keep them alive. A problem with this is that fibers contain
+// code setting up resources which might need to run to avoid leaking said resources.
+//
+// OCaml solves this by expecting you to explicitly continue or discontinue (continue
+// with exception) all your continuations. I think the best way to solve this properly is
+// with linear types:
+//
+// - Continuations should have a linear type so they normally must be resumed exactly once
+//   (this also helps enforce that they aren't resumed more than once)
+// - Resources also have linear types and we need to prove that they get released
+// - Continuations which are never resumed (e.g. exceptions) can be identified and then
+//   we need some mechanism of registering basically destructors (Rust-style drop RAII?)
+//   => you would be forced to "drop" the continuation which would execute the drop logic
+//      for the remaining unreleased resources (we'd need drop glue code for each
+//      "perform" position in the program.)
+
 #[repr(C, align(16))]
 struct Fiber {
     parent: *mut Fiber,

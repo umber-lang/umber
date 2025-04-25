@@ -219,6 +219,9 @@ end = struct
       live_registers
     in
     let record_register_assignment live_registers value =
+      (* TODO: We should identify when a non-live variable is assigned to. That means the
+         assignment is useless or we have some other bug. Either raise or remove the
+         assignment. *)
       (* When a variable is assigned to, it doesn't have to be live before this point
          anymore. There is a "hole" in the lifetime between the assignment and the
          previous use where the register isn't needed. *)
@@ -663,7 +666,7 @@ module Function_builder : sig
   val find_local : t -> Mir_name.t -> Register.t Value.t option
   val current_label : t -> Label_name.t
   val position_at_label : t -> Label_name.t -> unit
-  val create_label : t -> ('a, unit, string, Label_name.t) format4 -> 'a
+  val create_label : ?global:bool -> t -> ('a, unit, string, Label_name.t) format4 -> 'a
   val pick_register : t -> Register.t Value.t
   val pick_register' : t -> Virtual_register.t
   val name : t -> Label_name.t
@@ -782,9 +785,12 @@ end = struct
   let add_local t name value = Hashtbl.add_exn t.locals ~key:name ~data:value
   let find_local t name = Hashtbl.find t.locals name
 
-  let create_label t format =
+  let create_label ?(global = false) t format =
+    let prefix = if global then Label_name.to_string t.fun_name else "" in
     let id = Label_id.Counter.next t.label_counter in
-    ksprintf (fun s -> Label_name.of_string [%string ".%{s}#%{id#Label_id}"]) format
+    ksprintf
+      (fun s -> Label_name.of_string [%string "%{prefix}.%{s}#%{id#Label_id}"])
+      format
   ;;
 
   let basic_blocks t =
@@ -1343,21 +1349,27 @@ let set_rsp_for_fiber_just_created ~fun_builder =
 ;;
 
 (* FIXME: Stack variables can't live across this point - how can we prevent this? *)
-let switch_to_fiber ~fun_builder ~new_fiber ~just_created =
-  (* Save the stack pointer of the current fiber. *)
-  Function_builder.add_code
-    fun_builder
-    (Mov
-       { dst = Memory Current_fiber.saved_rsp; src = Simple_value (Register (Real Rsp)) });
+(* FIXME: Need to push the return instruction pointer. *)
+let switch_to_fiber ~fun_builder ~new_fiber ~operation =
+  (* Save the stack pointer of the current fiber, unless it's about to be destroyed. *)
+  (match operation with
+   | `Create_child | `Normal_switch ->
+     Function_builder.add_code
+       fun_builder
+       (Mov
+          { dst = Memory Current_fiber.saved_rsp
+          ; src = Simple_value (Register (Real Rsp))
+          })
+   | `Destroy_child -> ());
   (* Switch to the new fiber. *)
   Function_builder.add_code
     fun_builder
     (Mov { dst = Simple_value Current_fiber.value; src = new_fiber });
-  if just_created
-  then
+  match operation with
+  | `Create_child ->
     (* For newly created fibers, set the stack pointer to the end of the fiber. *)
     set_rsp_for_fiber_just_created ~fun_builder
-  else
+  | `Destroy_child | `Normal_switch ->
     (* For resuming existing fibers, load the previously saved stack pointer. *)
     Function_builder.add_code
       fun_builder
@@ -1367,18 +1379,21 @@ let switch_to_fiber ~fun_builder ~new_fiber ~just_created =
          })
 ;;
 
-let process_arguments ~fun_builder ~call_conv ~args =
-  let result =
-    Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
-      let virtual_reg = Function_builder.pick_register fun_builder in
-      Function_builder.add_code
-        fun_builder
-        (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
-      Function_builder.add_local fun_builder arg_name virtual_reg)
-  in
-  match result with
-  | Same_length | Right_trailing _ -> ()
-  | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"
+let retrieve_arguments ~fun_builder ~call_conv ~args =
+  match Nonempty.of_list args with
+  | None -> ()
+  | Some args ->
+    let result =
+      Nonempty.iter2 args (Call_conv.arg_registers call_conv) ~f:(fun arg_name reg ->
+        let virtual_reg = Function_builder.pick_register fun_builder in
+        Function_builder.add_code
+          fun_builder
+          (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
+        Function_builder.add_local fun_builder arg_name virtual_reg)
+    in
+    (match result with
+     | Same_length | Right_trailing _ -> ()
+     | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack")
 ;;
 
 (* TODO: It might make more sense for MIR to take on the responsibility for representing
@@ -1427,7 +1442,7 @@ let define_umber_resume_wrapper t =
      should do it. One problem - when a function returns normally, we need to make sure it
      correctly goes back to the parent fiber. Check for fiber stack underflow? Maybe
      just store the correct return addresses on the stack? *)
-    switch_to_fiber ~fun_builder ~new_fiber:fiber_to_resume ~just_created:false;
+    switch_to_fiber ~fun_builder ~new_fiber:fiber_to_resume ~operation:`Normal_switch;
     Function_builder.add_code
       fun_builder
       (Mov
@@ -1556,11 +1571,11 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          (body_end_label, body_value)
          (otherwise_end_label, otherwise_value)
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
-  | Handle_effects { handlers; expr } ->
+  | Handle_effects { vars; handlers; expr = inner_expr } ->
     (* FIXME: Make sure the new stack ends up 16-byte aligned. Ah, I think we'll actually
        be fine because each handler takes up 16 bytes. *)
     (* FIXME: Need to add function prologues to check for stack overflow. *)
-    (* Create a new fiber with the effect handlers, then run the expression there. *)
+    (* Allocate a new fiber, with its parent set to the current fiber. *)
     let new_fiber =
       declare_and_call_extern_c_function
         t
@@ -1568,15 +1583,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~fun_name:(Label_name.of_string "umber_fiber_create")
         ~args:[ Simple_value (Register (Real Call_conv.Umber.fiber_register)) ]
     in
-    switch_to_fiber
-      ~fun_builder
-      ~new_fiber:(Simple_value (Register (Virtual new_fiber)))
-      ~just_created:true;
-    (* FIXME: Stack variables are invalidated after this point, because rsp has changed.
-       How can we get the codegen to understand this? Technically the stack variables are
-       still accessible, we just need to find the old rsp. Maybe we could put in a special
-       instruction to make the code load from a parent fiber? Or to not hold variables in
-       the stack across this point? *)
     (* [parent] and [total_size] are set by the runtime. We need to set [handler_count]
        and [parent_rsp]. *)
     let handler_count = Nonempty.length handlers in
@@ -1585,6 +1591,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         Function_builder.create_label fun_builder "handle_effects.handler%d" i)
     in
     let end_label = Function_builder.create_label fun_builder "handle_effects.end" in
+    (* Set up the handlers. *)
     Function_builder.add_code
       fun_builder
       (Mov
@@ -1606,29 +1613,110 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
            { dst = Memory (Current_fiber.get_handler_pointer i)
            ; src = Simple_value (Global (handler_labels.(i), Other))
            }));
-    (* Use the return value register to store the final result. It needs to be in a
-       register since we're going to tear down the new stack when we're done. *)
+    (* Set up the arguments to pass to the inner expression. It's important that we move
+       the values *before* switching fibers so any references to the stack are correct. *)
+    let args_for_call, args_for_inner =
+      List.map vars ~f:(fun (original_var, new_var) ->
+        lookup_name_for_value t original_var ~fun_builder, new_var)
+      |> List.unzip
+    in
+    move_values_for_call fun_builder ~call_conv:Umber ~args:args_for_call;
+    (* Generate a function to wrap the inner expression. *)
+    let inner_label =
+      Function_builder.create_label fun_builder ~global:true "handle_effects.inner"
+    in
+    let inner_fun_name =
+      Mir_name.create_exportable_name
+        (Value_name.Absolute.of_relative_unchecked
+           (Value_name.Relative.of_string (Label_name.to_string inner_label)))
+    in
+    let inner_fun_builder =
+      Function_builder.create inner_label ~arity:(List.length args_for_inner)
+    in
+    Hashtbl.add_exn
+      t.globals
+      ~key:inner_fun_name
+      ~data:(This_file (Function inner_fun_builder));
+    (* TODO: When handling stack arguments, this won't work correctly because it needs to
+       use rsp relative to the parent fiber.*)
+    define_function t ~fun_name:inner_fun_name ~args:args_for_inner ~body:inner_expr;
+    (* Switch to the newly created fiber. *)
+    switch_to_fiber
+      ~fun_builder
+      ~new_fiber:(Simple_value (Register (Virtual new_fiber)))
+      ~operation:`Create_child;
+    (* Call the function for the inner expression we just defined. *)
+    Function_builder.add_code
+      fun_builder
+      (Call
+         { fun_ = Simple_value (Global (inner_label, Other))
+         ; call_conv = Umber
+         ; arity = List.length args_for_inner
+         });
     let final_result = Function_builder.pick_register fun_builder in
-    let expr_value = codegen_expr t expr ~fun_builder in
-    Function_builder.add_code fun_builder (Mov { dst = final_result; src = expr_value });
-    (* FIXME: We could free the fiber at this point. If we just put the continuation
-       somewhere and never call it again, the fiber will be leaked. I think we could have
-       the GC free the fiber as a finalizer upon freeing the continuation. We even treat
-       fibers as regular blocks with a header for the gc. It'd still be safe to free them
-       early if we ensure continuations are not called more than once. *)
-    (* let (_ : Virtual_register.t) =
+    Function_builder.add_code
+      fun_builder
+      (Mov
+         { src = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
+         ; dst = final_result
+         });
+    (* At this point, since the inner function has returned a regular value, it won't be
+       resumed again. Destroy the fiber and switch back to the parent fiber. *)
+    (* FIXME: Also have to insert this cleanup code in the resume wrapper. *)
+    let (_ : Virtual_register.t) =
       declare_and_call_extern_c_function
         t
         ~fun_builder
         ~fun_name:(Label_name.of_string "umber_fiber_destroy")
-        ~args:[Simple_value (Register (Real Call_conv.Umber.fiber_register))]
-    in *)
+        ~args:[ Simple_value Current_fiber.value ]
+    in
+    switch_to_fiber
+      ~fun_builder
+      ~new_fiber:(Memory Current_fiber.parent)
+      ~operation:`Destroy_child;
     Function_builder.add_terminal
       fun_builder
       (Jump (Simple_value (Global (end_label, Other))));
+    (* FIXME: Stack variables are invalidated after this point, because rsp has changed.
+       How can we get the codegen to understand this? Technically the stack variables are
+       still accessible, we just need to find the old rsp. Maybe we could put in a special
+       instruction to make the code load from a parent fiber? Or to not hold variables in
+       the stack across this point?
+       
+       Oh, we should treat creating a new fiber like calling a function!
+       - Have a set calling convention for passing arguments (?)
+       - That means we'd have to identify all the variables needed to pass...
+       - Variables passed on the stack would be a bit tricky - I guess we could copy them
+         to the new fiber stack? Or in the child fiber, we could rewrite the memory
+         accesses to first load the parent's rsp (seems maybe better)
+       - A regular call wouldn't quite work though, since we need to put the return address
+         on the new stack.
+
+       So, Handle_effects: [requires seeing all captured variables]
+       - Allocate new fiber
+       - Set fiber's parent to this fiber
+       - Set up arguments for function call
+       - Switch to new fiber (save rsp, set r14, set rsp)
+       - Call inner expr ()
+       - In the inner expr, when loading stack arguments, first load from the parent's
+         saved rsp
+       - (After inner expr return) destroy the fiber, switch to parent (load rsp, set r14)
+
+       Normal return:
+       - Normal function return leads back to the correct place
+
+       One problem: shouldn't the return address change if you call the continuation from
+       somewhere else?
+       - Maybe we need to edit the return address when reparenting?
+       - Hmm, the resume wrapper could edit it? That's the place that should be returned to
+       - reparenting could do it if we pass in a label to return to
+     *)
+    (* FIXME: This is wrong! We don't know where we'll jump back to, since the fiber might
+       have been reparented so then we'd need to return somewhere else. e.g. if a
+       continuation gets called and just returns a value, we need to return back to it. *)
     Nonempty.iteri handlers ~f:(fun i ((_ : Mir.Effect_op_id.t), args, handler_expr) ->
       Function_builder.position_at_label fun_builder handler_labels.(i);
-      process_arguments ~fun_builder ~args ~call_conv:Umber;
+      retrieve_arguments ~fun_builder ~args:(Nonempty.to_list args) ~call_conv:Umber;
       let handler_value = codegen_expr t handler_expr ~fun_builder in
       Function_builder.add_code
         fun_builder
@@ -1640,13 +1728,22 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        `sub rsp, 8` at function start, then save/load it when switching fibers, then
        `add rsp, 8` at function end. This doesn't sync up, and it makes the stack get
        kinda messed up and then `ret` jumps to somewhere garbage. Need to properly think
-       about how this should work. *)
+       about how this should work.
+       
+       The rsp we save needs to be an appropriate place to reload from. One thing is we
+       need to ensure proper 16-byte alignment. That's relatively easy. The main problem
+       is that we maintain the invariant by adding to rsp at function end. If we switch to
+       another fiber I think we also need to reset that state - we aren't ever going to
+       jump back to the same instruction location. 
+       
+       Ah, we should put the pc to return to on the fiber stack so ret between fibers works.
+       *)
     (* After the handler expression finishes, switch back to the parent fiber. *)
     Function_builder.position_at_label fun_builder end_label;
     switch_to_fiber
       ~fun_builder
       ~new_fiber:(Memory Current_fiber.parent)
-      ~just_created:false;
+      ~operation:`Destroy_child;
     final_result
   | Perform_effect { effect_op; args } ->
     (* Evaluate the arguments before doing anything. *)
@@ -1718,7 +1815,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     (* FIXME: Stack arguments won't work with the updated rsp. Maybe reg alloc could
        notice when we set rsp and then adjust later spills to look up the parent stack? *)
     move_values_for_call fun_builder ~call_conv:Umber ~args:(Nonempty.to_list args);
-    switch_to_fiber ~fun_builder ~new_fiber:handling_fiber ~just_created:false;
+    switch_to_fiber ~fun_builder ~new_fiber:handling_fiber ~operation:`Normal_switch;
     (* FIXME: This value got allocated to a nonsense register and somehow the move was
        deleted. Very sus. Maybe coalescing went wrong? *)
     Function_builder.add_terminal
@@ -1824,9 +1921,8 @@ and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_lab
           unconditionally return false. *)
        constant
      | `Constant true | `Zero_flag -> `Zero_flag)
-;;
 
-let define_function t ~fun_name ~args ~body =
+and define_function t ~fun_name ~args ~body =
   (* TODO: Need a function prelude for e.g. the frame pointer *)
   let call_conv : Call_conv.t = Umber in
   let fun_builder =
@@ -1836,7 +1932,7 @@ let define_function t ~fun_name ~args ~body =
       compiler_bug
         [%message "Expected existing function builder" (global : Global.t option)]
   in
-  process_arguments ~fun_builder ~call_conv ~args;
+  retrieve_arguments ~fun_builder ~call_conv ~args;
   let return_value = codegen_expr t body ~fun_builder in
   Function_builder.add_code
     fun_builder
@@ -1939,7 +2035,8 @@ let codegen_stmt t (stmt : Mir.Stmt.t) =
     Function_builder.add_code
       t.main_function
       (Mov { dst = Memory (I64, Value (Global (name, Other))); src = expr_location })
-  | Fun_def { fun_name; args; body } -> define_function t ~fun_name ~args ~body
+  | Fun_def { fun_name; args; body } ->
+    define_function t ~fun_name ~args:(Nonempty.to_list args) ~body
   | Fun_decl _ | Extern_decl _ -> (* Already handled in the preprocessing step *) ()
 ;;
 
