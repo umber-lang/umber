@@ -63,12 +63,12 @@ umber_main#AdventOfCode2024_1:
            mov       qword [AdventOfCode2024_1.input], rax
            mov       rax, string.615481279
            call      Std.Prelude.print_string wrt ..plt
-           mov       qword [rsp], rax
+           mov       qword [rsp + 8], rax
            mov       rax, qword [AdventOfCode2024_1.input]
            call      AdventOfCode2024_1.solve_part_1
            call      Std.Prelude.print_int wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rsp + 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       qword [rsp + 24], rax
            mov       rax, string.307328105
@@ -76,12 +76,12 @@ umber_main#AdventOfCode2024_1:
            mov       rbx, rax
            mov       rax, qword [rsp + 24]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           mov       qword [rsp + 8], rax
+           mov       qword [rsp], rax
            mov       rax, qword [AdventOfCode2024_1.input]
            call      AdventOfCode2024_1.solve_part_2
            call      Std.Prelude.print_int wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp + 8]
+           mov       rax, qword [rsp]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       qword [rsp + 16], rax
            mov       rax, string.0
@@ -104,7 +104,7 @@ AdventOfCode2024_1.sum:
 
 AdventOfCode2024_1.#fun.6:
            sub       rsp, 24
-           mov       r13, rax
+           mov       r12, rax
            mov       qword [rsp], rbx
            mov       qword [rsp + 8], rdi
            mov       rdi, 24
@@ -114,7 +114,7 @@ AdventOfCode2024_1.#fun.6:
            mov       qword [rax + 8], AdventOfCode2024_1.#fun.5
            mov       r9, qword [rsp + 8]
            mov       qword [rax + 16], r9
-           mov       r9, qword [r13 + 16]
+           mov       r9, qword [r12 + 16]
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.List.count wrt ..plt
@@ -195,7 +195,7 @@ AdventOfCode2024_1.loop.1:
            mov       rax, qword [rax + 8]
            mov       rbx, char.32
            call      Std.Prelude.String.split wrt ..plt
-           mov       r13, rax
+           mov       r12, rax
            mov       rdi, 40
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 12289
@@ -205,7 +205,7 @@ AdventOfCode2024_1.loop.1:
            mov       qword [rax + 24], Std.Prelude.Operators.not#closure
            mov       qword [rax + 32], Std.Prelude.String.is_empty#closure
            mov       rbx, rax
-           mov       rax, r13
+           mov       rax, r12
            call      Std.Prelude.List.filter wrt ..plt
            mov       rbx, Std.Prelude.Int.of_string#closure
            call      Std.Prelude.List.map wrt ..plt
@@ -249,7 +249,7 @@ AdventOfCode2024_1.loop.1:
            jnz       .cond_assign.if_none_matched#7
 .cond_assign.vars0#5:
            mov       r9, qword [rsp + 8]
-           mov       r14, qword [r9 + 8]
+           mov       r12, qword [r9 + 8]
            mov       r9, qword [rsp + 8]
            mov       r9, qword [r9 + 16]
            mov       r13, qword [r9 + 8]
@@ -259,7 +259,7 @@ AdventOfCode2024_1.loop.1:
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
-           mov       qword [rax + 8], r14
+           mov       qword [rax + 8], r12
            mov       qword [rax + 16], r13
            mov       rbx, qword [rsp]
            call      Std.Prelude.Operators.__#358075620 wrt ..plt

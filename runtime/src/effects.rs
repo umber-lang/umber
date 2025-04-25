@@ -109,13 +109,13 @@ unsafe extern "C" fn umber_fiber_destroy(fiber: *mut Fiber) {
 unsafe extern "C" fn umber_find_handler(
     mut current_fiber: *mut Fiber,
     effect_op_id: EffectOpId,
-    handling_fiber: *mut *mut Fiber,
+    new_fiber: *mut *mut Fiber,
 ) -> Handler {
     loop {
         match search_fiber_for_handler(current_fiber, effect_op_id) {
             Some(handler) => {
+                (*new_fiber) = (*current_fiber).parent;
                 (*current_fiber).parent = ptr::null_mut();
-                (*handling_fiber) = current_fiber;
                 return handler;
             }
             None => current_fiber = (*current_fiber).parent,

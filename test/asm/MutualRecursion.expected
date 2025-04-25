@@ -35,34 +35,34 @@ umber_main#MutualRecursion:
            mov       qword [MutualRecursion.f], r9
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
-           mov       r14, rax
-           mov       word [r14], 0
-           mov       word [r14 + 2], 2
-           mov       qword [r14 + 8], int.17
+           mov       r13, rax
+           mov       word [r13], 0
+           mov       word [r13 + 2], 2
+           mov       qword [r13 + 8], int.17
            mov       r9, qword [Std.Prelude.List.Nil]
-           mov       qword [r14 + 16], r9
+           mov       qword [r13 + 16], r9
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       r12, rax
+           mov       word [r12], 0
+           mov       word [r12 + 2], 2
+           mov       qword [r12 + 8], r13
+           mov       r9, qword [Std.Prelude.List.Nil]
+           mov       qword [r12 + 16], r9
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       r13, rax
            mov       word [r13], 0
            mov       word [r13 + 2], 2
-           mov       qword [r13 + 8], r14
-           mov       r9, qword [Std.Prelude.List.Nil]
-           mov       qword [r13 + 16], r9
-           mov       rdi, 24
-           call      umber_gc_alloc wrt ..plt
-           mov       r14, rax
-           mov       word [r14], 0
-           mov       word [r14 + 2], 2
            mov       r9, qword [MutualRecursion.Leaf]
-           mov       qword [r14 + 8], r9
-           mov       qword [r14 + 16], r13
+           mov       qword [r13 + 8], r9
+           mov       qword [r13 + 16], r12
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
            mov       qword [rax + 8], int.1
-           mov       qword [rax + 16], r14
+           mov       qword [rax + 16], r13
            call      MutualRecursion.sum_tree
            call      Std.Prelude.print_int wrt ..plt
            mov       r9, rax
@@ -72,12 +72,12 @@ umber_main#MutualRecursion:
 
 MutualRecursion.Node:
            sub       rsp, 8
-           mov       r13, rax
+           mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
-           mov       qword [rax + 8], r13
+           mov       qword [rax + 8], r12
            mov       qword [rax + 16], rbx
            add       rsp, 8
            ret       

@@ -417,6 +417,10 @@ module Effect_branch = struct
        - Then masking basically adds an extra duplicate effect, causing it to skip
        - In the runtime.... need to record some handler state that says "skip the next one"
          Pretty awkward to have to create a fiber to do that though...
+
+       Wait, I realized I implemented deep handlers incorrectly - they aren't supposed to
+       handle the effects from their branches - only the effects from resume are sent to
+       the same handler. And this does mean that it can't be resumed under another handler
     *)
     let resume_type : Internal_type.t =
       Function ([ operation_result_type ], result_effects, result_type)
@@ -649,6 +653,7 @@ module Expr = struct
                        ] ))
               , result_type ))
           | Match (expr, branches) ->
+            (* FIXME: Make the branch effects just go into the result. *)
             collect_effects ~names ~types (fun ~add_effects ->
               let expr, expr_type, expr_effects = of_untyped ~names ~types ~f_name expr in
               add_effects expr_effects (Node.span expr);

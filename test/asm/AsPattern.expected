@@ -48,17 +48,17 @@ umber_main#AsPattern:
            mov       qword [r13 + 16], r9
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
-           mov       r14, rax
-           mov       word [r14], 0
-           mov       word [r14 + 2], 2
-           mov       qword [r14 + 8], string.538056974
-           mov       qword [r14 + 16], r13
+           mov       r12, rax
+           mov       word [r12], 0
+           mov       word [r12 + 2], 2
+           mov       qword [r12 + 8], string.538056974
+           mov       qword [r12 + 16], r13
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
            mov       qword [rax + 8], string.135690797
-           mov       qword [rax + 16], r14
+           mov       qword [rax + 16], r12
            mov       r9, AsPattern.#fun.1#closure
            mov       rbx, rax
            mov       rax, r9
@@ -108,15 +108,15 @@ AsPattern.iter_pairs:
            mov       r9, qword [rbx + 16]
            mov       qword [rsp + 24], r9
            mov       r9, qword [rbx + 16]
-           mov       qword [rsp + 8], r9
+           mov       qword [rsp], r9
            mov       rax, qword [rsp + 16]
            mov       rbx, qword [rbx + 8]
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rsp]
            mov       rdi, qword [r9 + 8]
            mov       r9, qword [rsp + 16]
            call      qword [r9 + 8]
-           mov       qword [rsp], rax
-           mov       r9, qword [rsp + 8]
+           mov       qword [rsp + 8], rax
+           mov       r9, qword [rsp]
            mov       rax, qword [r9 + 8]
            mov       r9, qword [rsp + 24]
            mov       rbx, qword [r9 + 16]
@@ -125,7 +125,7 @@ AsPattern.iter_pairs:
            mov       rax, qword [rsp + 16]
            call      AsPattern.iter_pairs
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rsp + 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            jmp       .cond_assign.merge#12
 .cond_assign.merge#12:

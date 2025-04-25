@@ -1,0 +1,56 @@
+           default   rel
+           global    umber_main#RecursiveEffectDecl
+           global    umber_resume_wrapper:weak
+           global    RecursiveEffectDecl.go
+           extern    umber_find_handler
+           extern    umber_fiber_reparent
+           extern    umber_gc_alloc
+
+           section   .text
+
+umber_main#RecursiveEffectDecl:
+           sub       rsp, 8
+           add       rsp, 8
+           ret       
+
+RecursiveEffectDecl.go:
+           sub       rsp, 8
+           mov       qword [rsp], rax
+           sub       rsp, 16
+           mov       rdi, r14
+           mov       rsi, 984085721
+           mov       rdx, rsp
+           call      umber_find_handler wrt ..plt
+           mov       r12, rax
+           mov       r13, qword [rsp]
+           add       rsp, 16
+           mov       rdi, 32
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 32784
+           mov       word [rax + 2], 3
+           mov       qword [rax + 8], umber_resume_wrapper
+           mov       qword [rax + 16], r14
+           mov       qword [rax + 24], .perform_effect.resume_here#0
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           mov       qword [r14 + 8], rsp
+           mov       r14, r13
+           mov       rsp, qword [r14 + 8]
+           jmp       r12
+.perform_effect.resume_here#0:
+           add       rsp, 8
+           ret       
+
+umber_resume_wrapper:
+           sub       rsp, 8
+           mov       r13, rax
+           mov       rdi, qword [r13 + 16]
+           mov       rsi, r14
+           call      umber_fiber_reparent wrt ..plt
+           mov       qword [r14 + 8], rsp
+           mov       r14, qword [r13 + 16]
+           mov       rsp, qword [r14 + 8]
+           mov       rax, rbx
+           add       rsp, 8
+           jmp       qword [r13 + 24]
+

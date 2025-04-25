@@ -22,16 +22,16 @@ umber_main#OpSectionLeft:
            sub       rsp, 24
            mov       rax, OpSectionLeft.__#892202222#closure
            call      OpSectionLeft.apply
-           mov       qword [rsp], rax
+           mov       qword [rsp + 8], rax
            mov       rax, string.51739196
            call      Std.Prelude.print wrt ..plt
-           mov       qword [rsp + 8], rax
-           mov       rax, qword [rsp]
+           mov       qword [rsp], rax
+           mov       rax, qword [rsp + 8]
            mov       rbx, string.525968662
-           mov       r9, qword [rsp]
+           mov       r9, qword [rsp + 8]
            call      qword [r9 + 8]
            mov       rbx, rax
-           mov       rax, qword [rsp + 8]
+           mov       rax, qword [rsp]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       r9, rax
            mov       qword [OpSectionLeft.#binding.1], r9

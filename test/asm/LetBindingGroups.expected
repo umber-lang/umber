@@ -45,20 +45,20 @@ umber_main#LetBindingGroups:
            mov       rax, int.5
            mov       rbx, int.3
            call      Std.Prelude.Operators.__#294461388 wrt ..plt
-           mov       qword [rsp], rax
+           mov       qword [rsp + 32], rax
            mov       rax, qword [rsp + 8]
            call      Std.Prelude.print_int wrt ..plt
-           mov       qword [rsp + 24], rax
+           mov       qword [rsp + 16], rax
            mov       rax, string.0
            call      Std.Prelude.print wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp + 24]
+           mov       rax, qword [rsp + 16]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           mov       qword [rsp + 16], rax
-           mov       rax, qword [rsp]
+           mov       qword [rsp + 24], rax
+           mov       rax, qword [rsp + 32]
            call      Std.Prelude.print_int wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp + 16]
+           mov       rax, qword [rsp + 24]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       qword [LetBindingGroups._.1], rax
            mov       qword [LetBindingGroups.a], int.1
@@ -80,12 +80,12 @@ umber_main#LetBindingGroups:
            mov       rax, int.1
            mov       rbx, int.2
            call      Std.Prelude.Operators.__#664800900 wrt ..plt
-           mov       qword [rsp + 32], rax
+           mov       qword [rsp], rax
            mov       rax, int.3
            mov       rbx, int.4
            call      Std.Prelude.Operators.__#664800900 wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp + 32]
+           mov       rax, qword [rsp]
            call      Std.Prelude.Operators.__#323999091 wrt ..plt
            mov       qword [LetBindingGroups._.2], rax
            mov       rax, qword [LetBindingGroups.a]

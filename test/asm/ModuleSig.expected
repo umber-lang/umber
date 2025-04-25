@@ -49,31 +49,31 @@ ModuleSig.Range...__#13270071:
 
 ModuleSig.Range.between:
            sub       rsp, 8
-           mov       r13, rax
+           mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
-           mov       qword [rax + 8], r13
+           mov       qword [rax + 8], r12
            mov       qword [rax + 16], rbx
            add       rsp, 8
            ret       
 
 ModuleSig.Range.elem:
            sub       rsp, 24
-           mov       qword [rsp + 16], rax
-           mov       qword [rsp], rbx
-           mov       r9, qword [rsp]
+           mov       qword [rsp], rax
+           mov       qword [rsp + 8], rbx
+           mov       r9, qword [rsp + 8]
            mov       rax, qword [r9 + 8]
-           mov       rbx, qword [rsp + 16]
+           mov       rbx, qword [rsp]
            call      Std.Prelude.Operators.__#845057057 wrt ..plt
-           mov       qword [rsp + 8], rax
-           mov       r9, qword [rsp]
+           mov       qword [rsp + 16], rax
+           mov       r9, qword [rsp + 8]
            mov       rbx, qword [r9 + 16]
-           mov       rax, qword [rsp + 16]
+           mov       rax, qword [rsp]
            call      Std.Prelude.Operators.__#845057057 wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp + 8]
+           mov       rax, qword [rsp + 16]
            call      Std.Prelude.Operators.__#5678180 wrt ..plt
            add       rsp, 24
            ret       

@@ -134,12 +134,12 @@ umber_main#Operators:
 
 Operators.#fun.1:
            sub       rsp, 8
-           mov       r13, rax
+           mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
-           mov       r9, qword [r13 + 16]
+           mov       r9, qword [r12 + 16]
            mov       qword [rax + 8], r9
            mov       qword [rax + 16], rbx
            add       rsp, 8
@@ -147,7 +147,7 @@ Operators.#fun.1:
 
 Operators.__#765322566:
            sub       rsp, 8
-           mov       r13, rax
+           mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 12289
@@ -155,7 +155,7 @@ Operators.__#765322566:
            mov       qword [rax + 8], Operators.#fun.2
            mov       qword [rax + 16], rbx
            mov       rbx, rax
-           mov       rax, r13
+           mov       rax, r12
            call      Std.Prelude.List.concat_map wrt ..plt
            add       rsp, 8
            ret       
@@ -204,14 +204,14 @@ Operators.#fun.5:
 
 Operators.#fun.2:
            sub       rsp, 8
-           mov       r13, rax
+           mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 12289
            mov       word [rax + 2], 2
            mov       qword [rax + 8], Operators.#fun.1
            mov       qword [rax + 16], rbx
-           mov       r9, qword [r13 + 16]
+           mov       r9, qword [r12 + 16]
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.List.map wrt ..plt

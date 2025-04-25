@@ -50,40 +50,40 @@ umber_main#AdventOfCode2024_2:
            mov       rax, int.0
            mov       rbx, int.0
            call      AdventOfCode2024_2.loop.1
-           mov       qword [rsp + 32], rax
+           mov       qword [rsp + 24], rax
            mov       rax, string.615481279
            call      Std.Prelude.print_string wrt ..plt
            mov       qword [rsp + 16], rax
-           mov       r9, qword [rsp + 32]
+           mov       r9, qword [rsp + 24]
            mov       rax, qword [r9 + 8]
            call      Std.Prelude.print_int wrt ..plt
            mov       rbx, rax
            mov       rax, qword [rsp + 16]
-           call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           mov       qword [rsp + 24], rax
-           mov       rax, string.0
-           call      Std.Prelude.print wrt ..plt
-           mov       rbx, rax
-           mov       rax, qword [rsp + 24]
-           call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           mov       qword [rsp + 8], rax
-           mov       rax, string.225694010
-           call      Std.Prelude.print_string wrt ..plt
-           mov       rbx, rax
-           mov       rax, qword [rsp + 8]
-           call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           mov       qword [rsp], rax
-           mov       r9, qword [rsp + 32]
-           mov       rax, qword [r9 + 16]
-           call      Std.Prelude.print_int wrt ..plt
-           mov       rbx, rax
-           mov       rax, qword [rsp]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       qword [rsp + 40], rax
            mov       rax, string.0
            call      Std.Prelude.print wrt ..plt
            mov       rbx, rax
            mov       rax, qword [rsp + 40]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rsp], rax
+           mov       rax, string.225694010
+           call      Std.Prelude.print_string wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rsp + 8], rax
+           mov       r9, qword [rsp + 24]
+           mov       rax, qword [r9 + 16]
+           call      Std.Prelude.print_int wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 8]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rsp + 32], rax
+           mov       rax, string.0
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rsp + 32]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       r9, rax
            mov       qword [AdventOfCode2024_2.#binding.2], r9
@@ -92,28 +92,28 @@ umber_main#AdventOfCode2024_2:
 
 AdventOfCode2024_2.Report.check_loop.1:
            sub       rsp, 56
-           mov       qword [rsp + 24], rax
-           mov       qword [rsp + 16], rbx
-           mov       qword [rsp + 32], rdi
-           mov       qword [rsp + 48], rsi
-           mov       qword [rsp + 8], rdx
-           mov       qword [rsp + 40], rcx
+           mov       qword [rsp + 32], rax
+           mov       qword [rsp + 48], rbx
+           mov       qword [rsp + 40], rdi
+           mov       qword [rsp], rsi
+           mov       qword [rsp + 16], rdx
+           mov       qword [rsp + 8], rcx
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
-           mov       r9, qword [rsp + 48]
+           mov       r9, qword [rsp]
            mov       qword [rax + 8], r9
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rsp + 16]
            mov       qword [rax + 16], r9
-           mov       rbx, qword [rsp + 24]
+           mov       rbx, qword [rsp + 32]
            call      AdventOfCode2024_2.Report.level_pair_is_safe
            cmp       rax, 3
            jnz       .cond_assign.if_none_matched#3
 .cond_assign.vars0#1:
            jmp       .cond_assign.body#2
 .cond_assign.body#2:
-           mov       r9, qword [rsp + 40]
+           mov       r9, qword [rsp + 8]
            cmp       r9, 1
            jnz       .cond_assign.if_none_matched#7
 .cond_assign.vars0#5:
@@ -126,23 +126,23 @@ AdventOfCode2024_2.Report.check_loop.1:
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 1
-           mov       r9, qword [rsp + 48]
+           mov       r9, qword [rsp]
            mov       qword [rax + 8], r9
-           mov       r9, qword [rsp + 24]
+           mov       r9, qword [rsp + 32]
            mov       rdi, rax
-           mov       rsi, qword [rsp + 8]
-           mov       r10, qword [rsp + 40]
+           mov       rsi, qword [rsp + 16]
+           mov       r10, qword [rsp + 8]
            mov       rdx, qword [r10 + 8]
-           mov       r10, qword [rsp + 40]
+           mov       r10, qword [rsp + 8]
            mov       rcx, qword [r10 + 16]
            mov       rax, r9
-           mov       rbx, qword [rsp + 16]
+           mov       rbx, qword [rsp + 48]
            call      AdventOfCode2024_2.Report.check_loop.1
            jmp       .cond_assign.merge#8
 .cond_assign.merge#8:
            jmp       .cond_assign.merge#27
 .cond_assign.if_none_matched#3:
-           mov       r9, qword [rsp + 16]
+           mov       r9, qword [rsp + 48]
            cmp       r9, 1
            jnz       .cond_assign.if_none_matched#12
 .cond_assign.vars0#10:
@@ -151,7 +151,7 @@ AdventOfCode2024_2.Report.check_loop.1:
            mov       rax, 1
            jmp       .cond_assign.merge#26
 .cond_assign.if_none_matched#12:
-           mov       r9, qword [rsp + 40]
+           mov       r9, qword [rsp + 8]
            cmp       r9, 1
            jnz       .cond_assign.if_none_matched#16
 .cond_assign.vars0#14:
@@ -160,53 +160,53 @@ AdventOfCode2024_2.Report.check_loop.1:
            mov       rax, 3
            jmp       .cond_assign.merge#25
 .cond_assign.if_none_matched#16:
-           mov       rax, qword [rsp + 24]
+           mov       rax, qword [rsp + 32]
            mov       rbx, qword [AdventOfCode2024_2.Report.MustBeAllSafe]
-           mov       rdi, qword [rsp + 32]
-           mov       r9, qword [rsp + 40]
+           mov       rdi, qword [rsp + 40]
+           mov       r9, qword [rsp + 8]
            mov       rdx, qword [r9 + 8]
-           mov       r9, qword [rsp + 40]
+           mov       r9, qword [rsp + 8]
            mov       rcx, qword [r9 + 16]
-           mov       rsi, qword [rsp + 48]
+           mov       rsi, qword [rsp]
            call      AdventOfCode2024_2.Report.check_loop.1
-           mov       qword [rsp], rax
-           mov       r9, qword [rsp + 32]
+           mov       qword [rsp + 24], rax
+           mov       r9, qword [rsp + 40]
            test      r9, 1
            jz        .non_constant_tag_equals.is_block#22
 .codegen_and.mid#23:
            jmp       .non_constant_tag_equals.end#21
 .non_constant_tag_equals.is_block#22:
-           mov       r9, qword [rsp + 32]
+           mov       r9, qword [rsp + 40]
            cmp       word [r9], 0
            jmp       .non_constant_tag_equals.end#21
 .non_constant_tag_equals.end#21:
            jnz       .cond_assign.if_none_matched#20
 .cond_assign.vars0#18:
-           mov       r9, qword [rsp + 32]
+           mov       r9, qword [rsp + 40]
            mov       rsi, qword [r9 + 8]
            jmp       .cond_assign.body#19
 .cond_assign.body#19:
            mov       rbx, qword [AdventOfCode2024_2.Report.MustBeAllSafe]
            mov       rdi, qword [Std.Prelude.Option.None]
-           mov       rax, qword [rsp + 24]
-           mov       rdx, qword [rsp + 8]
-           mov       rcx, qword [rsp + 40]
+           mov       rax, qword [rsp + 32]
+           mov       rdx, qword [rsp + 16]
+           mov       rcx, qword [rsp + 8]
            call      AdventOfCode2024_2.Report.check_loop.1
            jmp       .cond_assign.merge#24
 .cond_assign.if_none_matched#20:
-           mov       rax, qword [rsp + 24]
+           mov       rax, qword [rsp + 32]
            mov       rbx, qword [AdventOfCode2024_2.Report.MustBeAllSafe]
            mov       rdi, qword [Std.Prelude.Option.None]
-           mov       rsi, qword [rsp + 8]
-           mov       r9, qword [rsp + 40]
+           mov       rsi, qword [rsp + 16]
+           mov       r9, qword [rsp + 8]
            mov       rdx, qword [r9 + 8]
-           mov       r9, qword [rsp + 40]
+           mov       r9, qword [rsp + 8]
            mov       rcx, qword [r9 + 16]
            call      AdventOfCode2024_2.Report.check_loop.1
            jmp       .cond_assign.merge#24
 .cond_assign.merge#24:
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rsp + 24]
            call      Std.Prelude.Operators.__#323999091 wrt ..plt
            jmp       .cond_assign.merge#25
 .cond_assign.merge#25:
@@ -257,7 +257,7 @@ AdventOfCode2024_2.Report.level_pair_is_safe:
 AdventOfCode2024_2.Report.is_safe:
            sub       rsp, 40
            mov       qword [rsp + 32], rax
-           mov       qword [rsp + 16], rbx
+           mov       qword [rsp], rbx
            mov       r9, qword [rsp + 32]
            cmp       r9, 1
            jnz       .cond_assign.cond1#1
@@ -291,18 +291,18 @@ AdventOfCode2024_2.Report.is_safe:
 .cond_assign.if_none_matched#5:
            mov       r9, qword [rsp + 32]
            mov       r9, qword [r9 + 16]
-           mov       qword [rsp + 8], r9
+           mov       qword [rsp + 16], r9
            mov       r9, qword [rsp + 32]
            mov       r9, qword [r9 + 16]
-           mov       qword [rsp], r9
+           mov       qword [rsp + 8], r9
            mov       rax, qword [AdventOfCode2024_2.Report.Increasing]
-           mov       rbx, qword [rsp + 16]
+           mov       rbx, qword [rsp]
            mov       rdi, qword [Std.Prelude.Option.None]
            mov       r9, qword [rsp + 32]
            mov       rsi, qword [r9 + 8]
-           mov       r9, qword [rsp]
-           mov       rdx, qword [r9 + 8]
            mov       r9, qword [rsp + 8]
+           mov       rdx, qword [r9 + 8]
+           mov       r9, qword [rsp + 16]
            mov       rcx, qword [r9 + 16]
            call      AdventOfCode2024_2.Report.check_loop.1
            mov       qword [rsp + 24], rax
@@ -310,11 +310,11 @@ AdventOfCode2024_2.Report.is_safe:
            mov       rdi, qword [Std.Prelude.Option.None]
            mov       r9, qword [rsp + 32]
            mov       rsi, qword [r9 + 8]
-           mov       r9, qword [rsp]
-           mov       rdx, qword [r9 + 8]
            mov       r9, qword [rsp + 8]
+           mov       rdx, qword [r9 + 8]
+           mov       r9, qword [rsp + 16]
            mov       rcx, qword [r9 + 16]
-           mov       rbx, qword [rsp + 16]
+           mov       rbx, qword [rsp]
            call      AdventOfCode2024_2.Report.check_loop.1
            mov       rbx, rax
            mov       rax, qword [rsp + 24]
@@ -356,8 +356,8 @@ AdventOfCode2024_2.loop.1:
 .cond_assign.if_none_matched#3:
            mov       rax, qword [rax + 8]
            call      AdventOfCode2024_2.Report.parse
-           mov       qword [rsp], rax
-           mov       rax, qword [rsp]
+           mov       qword [rsp + 8], rax
+           mov       rax, qword [rsp + 8]
            mov       rbx, qword [AdventOfCode2024_2.Report.MustBeAllSafe]
            call      AdventOfCode2024_2.Report.is_safe
            cmp       rax, 3
@@ -368,15 +368,15 @@ AdventOfCode2024_2.loop.1:
            mov       rax, qword [rsp + 24]
            mov       rbx, int.1
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
-           mov       qword [rsp + 8], rax
+           mov       qword [rsp], rax
            jmp       .cond_assign.merge#8
 .cond_assign.if_none_matched#7:
            mov       r9, qword [rsp + 24]
-           mov       qword [rsp + 8], r9
+           mov       qword [rsp], r9
            jmp       .cond_assign.merge#8
 .cond_assign.merge#8:
            mov       rbx, qword [AdventOfCode2024_2.Report.AllowOneUnsafe]
-           mov       rax, qword [rsp]
+           mov       rax, qword [rsp + 8]
            call      AdventOfCode2024_2.Report.is_safe
            cmp       rax, 3
            jnz       .cond_assign.if_none_matched#12
@@ -392,7 +392,7 @@ AdventOfCode2024_2.loop.1:
            jmp       .cond_assign.merge#13
 .cond_assign.merge#13:
            mov       rbx, rax
-           mov       rax, qword [rsp + 8]
+           mov       rax, qword [rsp]
            call      AdventOfCode2024_2.loop.1
            jmp       .cond_assign.merge#14
 .cond_assign.merge#14:
@@ -429,7 +429,7 @@ AdventOfCode2024_2.Report.pairs:
            mov       rax, qword [Std.Prelude.List.Nil]
            jmp       .cond_assign.merge#12
 .cond_assign.if_none_matched#5:
-           mov       r14, qword [r13 + 16]
+           mov       r12, qword [r13 + 16]
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       qword [rsp], rax
@@ -437,12 +437,12 @@ AdventOfCode2024_2.Report.pairs:
            mov       word [r9], 0
            mov       r9, qword [rsp]
            mov       word [r9 + 2], 2
-           mov       r10, qword [r13 + 8]
-           mov       r9, qword [rsp]
-           mov       qword [r9 + 8], r10
-           mov       r9, qword [r14 + 8]
+           mov       r9, qword [r13 + 8]
            mov       r10, qword [rsp]
-           mov       qword [r10 + 16], r9
+           mov       qword [r10 + 8], r9
+           mov       r10, qword [r12 + 8]
+           mov       r9, qword [rsp]
+           mov       qword [r9 + 16], r10
            mov       rax, qword [r13 + 16]
            call      AdventOfCode2024_2.Report.pairs
            mov       rbx, rax

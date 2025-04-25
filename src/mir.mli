@@ -32,6 +32,9 @@ module Expr : sig
         ; if_none_matched : cond_if_none_matched
         }
     | Handle_effects of
+        (* FIXME: I think vars might just have to be the vars used by the handled expr,
+           not including the branches. Make that clear. *)
+        
         { vars : (Mir_name.t * Mir_name.t) list
         ; handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
         ; expr : t

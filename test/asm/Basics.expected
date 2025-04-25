@@ -56,15 +56,15 @@ umber_main#Basics:
 
 Basics.Point3:
            sub       rsp, 8
-           mov       r14, rax
-           mov       r13, rdi
+           mov       r13, rax
+           mov       r12, rdi
            mov       rdi, 32
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 3
-           mov       qword [rax + 8], r14
+           mov       qword [rax + 8], r13
            mov       qword [rax + 16], rbx
-           mov       qword [rax + 24], r13
+           mov       qword [rax + 24], r12
            add       rsp, 8
            ret       
 

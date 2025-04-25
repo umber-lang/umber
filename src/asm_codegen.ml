@@ -2065,9 +2065,9 @@ let compile_to_object_file program ~output_file =
     Asm_helpers.compile_to_object_file ~input_file:tempfile ~output_file)
 ;;
 
-let compile_entry_module ~module_paths ~entry_file =
+let compile_entry_module_internal ~module_paths =
   let t = create ~main_function_name:(Label_name.of_string "main") in
-  (* Set up the main fiber. *)
+  (* Set up the main fiber. Save the original stack pointer in it. *)
   let main_fiber =
     declare_and_call_extern_c_function
       t
@@ -2081,6 +2081,10 @@ let compile_entry_module ~module_paths ~entry_file =
        { dst = Simple_value Current_fiber.value
        ; src = Simple_value (Register (Virtual main_fiber))
        });
+  Function_builder.add_code
+    t.main_function
+    (Mov
+       { dst = Memory Current_fiber.saved_rsp; src = Simple_value (Register (Real Rsp)) });
   set_rsp_for_fiber_just_created ~fun_builder:t.main_function;
   ignore
     (declare_and_call_extern_c_function
@@ -2108,6 +2112,19 @@ let compile_entry_module ~module_paths ~entry_file =
          ; call_conv = Umber
          ; arity = 0
          }));
+  (* Clean up the main fiber and restore the stack pointer. *)
+  Function_builder.add_code
+    t.main_function
+    (Mov
+       { dst = Simple_value (Register (Real Rsp)); src = Memory Current_fiber.saved_rsp });
+  let (_ : Virtual_register.t) =
+    declare_and_call_extern_c_function
+      t
+      ~fun_builder:t.main_function
+      ~fun_name:(Label_name.of_string "umber_fiber_destroy")
+      ~args:[ Simple_value Current_fiber.value ]
+  in
+  (* Return 0 back to libc's _start. *)
   Function_builder.add_code
     t.main_function
     (Mov
@@ -2115,7 +2132,13 @@ let compile_entry_module ~module_paths ~entry_file =
        ; src = Simple_value (Constant (Int 0))
        });
   Function_builder.add_terminal t.main_function Ret;
-  compile_to_object_file (to_program t) ~output_file:entry_file
+  to_program t
+;;
+
+let compile_entry_module ~module_paths ~entry_file =
+  compile_to_object_file
+    (compile_entry_module_internal ~module_paths)
+    ~output_file:entry_file
 ;;
 
 let%expect_test "hello world" =
@@ -2240,78 +2263,26 @@ let%expect_test "hello world, from MIR" =
                resq      1 |}]
 ;;
 
-(* FIXME: Cleanup *)
-(* let compile_entry_module_edited ~module_paths =
-  let t = create ~main_function_name:(Label_name.of_string "main") in
-  (* Set up the main fiber. *)
-  let main_fiber =
-    declare_and_call_extern_c_function
-      t
-      ~fun_builder:t.main_function
-      ~fun_name:(Label_name.of_string "umber_fiber_create")
-      ~args:[ Simple_value (Constant (Int 0)) ]
-  in
-  Function_builder.add_code
-    t.main_function
-    (Mov
-       { dst = Simple_value Current_fiber.value
-       ; src = Simple_value (Register (Virtual main_fiber))
-       });
-  set_rsp_for_fiber_just_created ~fun_builder:t.main_function;
-  ignore
-    (declare_and_call_extern_c_function
-       t
-       ~fun_builder:t.main_function
-       ~fun_name:(Label_name.of_string "umber_gc_init")
-       ~args:[]
-      : Virtual_register.t);
-  (* Call the main functions of all linked modules. *)
-  List.iter module_paths ~f:(fun module_path ->
-    let fun_name = main_function_name ~module_path in
-    let mir_name =
-      Mir_name.create_exportable_name
-        (Value_name.Absolute.of_relative_unchecked
-           (Value_name.Relative.of_string (Label_name.to_string fun_name)))
-    in
-    Hashtbl.add_exn
-      t.globals
-      ~key:mir_name
-      ~data:(Other_file (Umber_function { label_name = fun_name; arity = 0 }));
-    Function_builder.add_code
-      t.main_function
-      (Call
-         { fun_ = Simple_value (Global (fun_name, Extern_proc))
-         ; call_conv = Umber
-         ; arity = 0
-         }));
-  Function_builder.add_code
-    t.main_function
-    (Mov
-       { dst = Simple_value (Register (Real (Call_conv.return_value_register C)))
-       ; src = Simple_value (Constant (Int 0))
-       });
-  Function_builder.add_terminal t.main_function Ret;
-  to_program t |> Asm_program.pp Format.std_formatter
-;;
-
 let%expect_test "entry module" =
   let prelude_module_path =
     Module_path.of_module_names_unchecked
       [ Module_name.of_string_unchecked "Std"; Module_name.of_string_unchecked "Prelude" ]
   in
-  compile_entry_module_edited
+  compile_entry_module_internal
     ~module_paths:
       [ prelude_module_path
       ; Module_path.of_module_names_unchecked [ Module_name.of_string_unchecked "Read" ]
-      ];
+      ]
+  |> Asm_program.pp Format.std_formatter;
   [%expect
     {|
                default   rel
                global    main
                extern    umber_main#Std.Prelude
-               extern    umber_main#Read
+               extern    umber_fiber_destroy
                extern    umber_fiber_create
                extern    umber_gc_init
+               extern    umber_main#Read
 
                section   .text
 
@@ -2320,12 +2291,16 @@ let%expect_test "entry module" =
                mov       rdi, 0
                call      umber_fiber_create wrt ..plt
                mov       r14, rax
+               mov       qword [r14 + 8], rsp
                mov       r9, qword [r14 + 16]
                lea       rsp, byte [r14 + r9]
                call      umber_gc_init wrt ..plt
                call      umber_main#Std.Prelude wrt ..plt
                call      umber_main#Read wrt ..plt
+               mov       rsp, qword [r14 + 8]
+               mov       rdi, r14
+               call      umber_fiber_destroy wrt ..plt
                mov       rax, 0
                add       rsp, 8
                ret |}]
-;; *)
+;;
