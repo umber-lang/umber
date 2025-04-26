@@ -645,7 +645,8 @@ module Expr = struct
         }
     | Handle_effects of
         { vars : (Mir_name.t * Mir_name.t) list
-        ; handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
+        ; value_handler : (Mir_name.t * t) option
+        ; effect_handlers : effect_handler Nonempty.t
         ; expr : t
         }
     | Perform_effect of
@@ -656,6 +657,13 @@ module Expr = struct
         { continuation : t
         ; arg : t
         }
+
+  and effect_handler =
+    { effect_op : Effect_op_id.t
+    ; args : Mir_name.t Nonempty.t
+    ; resume : Mir_name.t
+    ; handler : t
+    }
 
   and cond =
     (* TODO: In practice, the expressions in conditions have to be simple names. Maybe we
@@ -692,12 +700,16 @@ module Expr = struct
                 | Otherwise t -> Otherwise (map t ~f)
                 | Use_bindings bindings -> Use_bindings (List.map bindings ~f:(map ~f)))
            }
-       | Handle_effects { vars; handlers; expr } ->
+       | Handle_effects { vars; value_handler; effect_handlers; expr } ->
          Handle_effects
            { vars
-           ; handlers =
-               Nonempty.map handlers ~f:(fun (effect_op, args, handler) ->
-                 effect_op, args, map handler ~f)
+           ; value_handler =
+               Option.map value_handler ~f:(fun (arg, expr) -> arg, map expr ~f)
+           ; effect_handlers =
+               Nonempty.map
+                 effect_handlers
+                 ~f:(fun { effect_op; args; resume; handler } ->
+                 { effect_op; args; resume; handler = map handler ~f })
            ; expr = map ~f expr
            }
        | Perform_effect { effect_op; args } ->
@@ -1014,33 +1026,37 @@ module Expr = struct
          `Rewritten_partial_application expr_as_lambda)
   ;;
 
+  let process_argument ~ctx ~bindings ~arg ~arg_type =
+    Node.with_value arg ~f:(fun arg ->
+      let arg =
+        Simple_pattern.flatten_typed_pattern_no_unions arg ~label:"argument patterns"
+      in
+      match arg with
+      | Catch_all (Some arg_name) ->
+        (* Special-case named catch-all patterns (the dominant case) to skip the
+                [lambda_arg] step and use the name directly. *)
+        let ctx, arg_name = Context.add_value_name ctx arg_name in
+        (ctx, bindings), arg_name
+      | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
+        let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
+        let add_let acc name mir_expr = (name, mir_expr) :: acc in
+        let ctx, bindings =
+          fold_pattern_bindings
+            ~ctx
+            arg
+            (Name arg_name)
+            arg_type
+            ~init:bindings
+            ~add_let
+            ~add_name:Context.add_value_name
+        in
+        (ctx, bindings), arg_name)
+  ;;
+
   let process_arguments ~ctx ~args ~arg_types =
     Nonempty.zip_exn args arg_types
     |> Nonempty.fold_map ~init:(ctx, []) ~f:(fun (ctx, bindings) (arg, arg_type) ->
-         Node.with_value arg ~f:(fun arg ->
-           let arg =
-             Simple_pattern.flatten_typed_pattern_no_unions arg ~label:"argument patterns"
-           in
-           match arg with
-           | Catch_all (Some arg_name) ->
-             (* Special-case named catch-all patterns (the dominant case) to skip the
-                    [lambda_arg] step and use the name directly. *)
-             let ctx, arg_name = Context.add_value_name ctx arg_name in
-             (ctx, bindings), arg_name
-           | Catch_all None | Constant _ | As _ | Cnstr_appl _ ->
-             let ctx, arg_name = Context.add_value_name ctx Constant_names.lambda_arg in
-             let add_let acc name mir_expr = (name, mir_expr) :: acc in
-             let ctx, bindings =
-               fold_pattern_bindings
-                 ~ctx
-                 arg
-                 (Name arg_name)
-                 arg_type
-                 ~init:bindings
-                 ~add_let
-                 ~add_name:Context.add_value_name
-             in
-             (ctx, bindings), arg_name))
+         process_argument ~ctx ~bindings ~arg ~arg_type)
   ;;
 
   let of_typed_expr
@@ -1146,39 +1162,68 @@ module Expr = struct
       | ( Handle
             { expr = input_expr; expr_type = input_type; value_branch; effect_branches }
         , output_type ) ->
-        let ctx_for_input_expr, closed_over, (_close_over_name : Mir_name.t -> Mir_name.t)
-          =
-          find_closed_over_names
-            ~ctx
-            ~parent_ctx:ctx
-            ~recursively_bound_names:Mir_name.Set.empty
-        in
-        let input_expr =
-          (* FIXME: This doesn't seem right. e.g. if we let a continuation escape and then
-             call it, it shouldn't call back into the value branch here. The value branch
-             is part of the handler. *)
-          (* Desugar the value branch to a let binding. *)
-          match value_branch with
-          | None -> input_expr
-          | Some (pat, value_branch_expr) ->
-            let span = Span.combine (Node.span pat) (Node.span value_branch_expr) in
-            Node.create
-              (Typed.Expr.Let
-                 { rec_ = false
-                 ; bindings = [ pat, None, input_expr ]
-                 ; body = value_branch_expr
-                 })
-              span
-        in
-        let input_expr =
-          Node.with_value input_expr ~f:(fun expr ->
-            of_typed_expr ~ctx:ctx_for_input_expr expr (fst input_type))
-        in
         (match Nonempty.of_list effect_branches with
-         | None -> input_expr
+         | None ->
+           (* If there are no effect branches, we can just do a simple translation. *)
+           let input_expr =
+             (* FIXME: This doesn't seem right. e.g. if we let a continuation escape and then
+             call it, it shouldn't call back into the value branch here. The value branch
+             is part of the handler.
+             
+             This desugaring is wrong - the value branch's effects aren't handled.
+             *)
+             match value_branch with
+             | None ->
+               (* This shouldn't actually be reachable - it implies a handle expression
+                  with no branches at all. *)
+               input_expr
+             | Some (pat, value_branch_expr) ->
+               (* Translate the value branch to a simple let binding. *)
+               let span = Span.combine (Node.span pat) (Node.span value_branch_expr) in
+               Node.create
+                 (Typed.Expr.Let
+                    { rec_ = false
+                    ; bindings = [ pat, None, input_expr ]
+                    ; body = value_branch_expr
+                    })
+                 span
+           in
+           Node.with_value input_expr ~f:(fun expr ->
+             of_typed_expr ~ctx expr (fst input_type))
          | Some effect_branches ->
+           (* Track the names used by the inner expression. *)
+           let ( ctx_for_input_expr
+               , closed_over
+               , (_close_over_name : Mir_name.t -> Mir_name.t) )
+             =
+             find_closed_over_names
+               ~ctx
+               ~parent_ctx:ctx
+               ~recursively_bound_names:Mir_name.Set.empty
+           in
+           let input_expr =
+             Node.with_value input_expr ~f:(fun expr ->
+               of_typed_expr ~ctx:ctx_for_input_expr expr (fst input_type))
+           in
            let closed_over = !closed_over in
-           let handlers =
+           let value_handler =
+             Option.map value_branch ~f:(fun (pat, expr) ->
+               let pat, pat_type = Node.split pat in
+               let (ctx, bindings), arg =
+                 Node.with_value pat_type ~f:(fun (pat_type, constraints) ->
+                   if not (List.is_empty constraints)
+                   then
+                     compiler_bug
+                       [%message "Type constraints in handler value branch pattern"];
+                   process_argument ~ctx ~bindings:[] ~arg:pat ~arg_type:pat_type)
+               in
+               let expr =
+                 Node.with_value expr ~f:(fun expr ->
+                   add_let_bindings ~bindings ~body:(of_typed_expr ~ctx expr output_type))
+               in
+               arg, expr)
+           in
+           let effect_handlers =
              Nonempty.map effect_branches ~f:(fun (effect_branch, handler_expr) ->
                Node.with_value2
                  effect_branch
@@ -1209,14 +1254,20 @@ module Expr = struct
                               [%message "Type constraints in effect operation args"];
                           type_))
                  in
-                 let handler_expr =
+                 let ctx, resume = Context.add_value_name ctx Value_name.resume_keyword in
+                 let handler =
                    add_let_bindings
                      ~bindings
                      ~body:(of_typed_expr ~ctx handler_expr output_type)
                  in
-                 effect_op, args, handler_expr))
+                 { effect_op; args; resume; handler }))
            in
-           Handle_effects { vars = Map.to_alist closed_over; handlers; expr = input_expr })
+           Handle_effects
+             { vars = Map.to_alist closed_over
+             ; value_handler
+             ; effect_handlers
+             ; expr = input_expr
+             })
       | Let { rec_; bindings; body }, body_type ->
         let ctx_for_body, bindings =
           Nonempty.fold_map

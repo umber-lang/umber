@@ -36,7 +36,8 @@ module Expr : sig
            not including the branches. Make that clear. *)
         
         { vars : (Mir_name.t * Mir_name.t) list
-        ; handlers : (Effect_op_id.t * Mir_name.t Nonempty.t * t) Nonempty.t
+        ; value_handler : (Mir_name.t * t) option
+        ; effect_handlers : effect_handler Nonempty.t
         ; expr : t
         }
     | Perform_effect of
@@ -47,6 +48,13 @@ module Expr : sig
         { continuation : t
         ; arg : t
         }
+
+  and effect_handler =
+    { effect_op : Effect_op_id.t
+    ; args : Mir_name.t Nonempty.t
+    ; resume : Mir_name.t
+    ; handler : t
+    }
 
   and cond =
     | Equals of t * Literal.t

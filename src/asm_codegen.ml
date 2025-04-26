@@ -37,6 +37,12 @@ open struct
   module Global_decl = Global_decl
 end
 
+let mir_name_of_label_name label_name =
+  Mir_name.create_exportable_name
+    (Value_name.Absolute.of_relative_unchecked
+       (Value_name.Relative.of_string (Label_name.to_string label_name)))
+;;
+
 module Unique_counter () : sig
   type t [@@deriving compare, equal, sexp_of]
 
@@ -1175,15 +1181,10 @@ let codegen_fun_call t fun_name args ~fun_builder =
 
 let declare_and_call_extern_c_function t ~fun_builder ~fun_name:label_name ~args =
   let arity = List.length args in
-  let mir_name =
-    Mir_name.create_exportable_name
-      (Value_name.Absolute.of_relative_unchecked
-         (Value_name.Relative.of_string (Label_name.to_string label_name)))
-  in
   ignore
     (Hashtbl.add
        t.globals
-       ~key:mir_name
+       ~key:(mir_name_of_label_name label_name)
        ~data:
          (Other_file (C_function { label_name; arity; local_wrapper_function = None }))
       : [ `Ok | `Duplicate ]);
@@ -1312,24 +1313,28 @@ let merge_branches
 ;;
 
 (** This needs to be kept in sync with the definition of [Fiber] in [effects.rs]*)
-module Current_fiber : sig
-  val value : Register.t Simple_value.t
-  val parent : Register.t Memory.t
-  val saved_rsp : Register.t Memory.t
-  val total_size : Register.t Memory.t
-  val handler_count : Register.t Memory.t
-  val get_handler_effect_op_id : int -> Register.t Memory.t
-  val get_handler_pointer : int -> Register.t Memory.t
+module Fiber_layout : sig
+  val current : Register.t Simple_value.t
+  val parent : Register.t Simple_value.t -> Register.t Memory.t
+  val saved_rsp : Register.t Simple_value.t -> Register.t Memory.t
+  val total_size : Register.t Simple_value.t -> Register.t Memory.t
+  val handler_count : Register.t Simple_value.t -> Register.t Memory.t
+  val get_handler_effect_op_id : Register.t Simple_value.t -> int -> Register.t Memory.t
+  val get_handler_pointer : Register.t Simple_value.t -> int -> Register.t Memory.t
 end = struct
-  let value : Register.t Simple_value.t = Register (Real Call_conv.Umber.fiber_register)
-  let get_field i = Memory.offset value I64 i
-  let parent = get_field 0
-  let saved_rsp = get_field 1
-  let total_size = get_field 2
-  let handler_count = get_field 3
+  let current : Register.t Simple_value.t = Register (Real Call_conv.Umber.fiber_register)
+  let get_field fiber i = Memory.offset fiber I64 i
+  let parent fiber = get_field fiber 0
+  let saved_rsp fiber = get_field fiber 1
+  let total_size fiber = get_field fiber 2
+  let handler_count fiber = get_field fiber 3
   let number_of_header_fields = 4
-  let get_handler_effect_op_id i = get_field (number_of_header_fields + (2 * i))
-  let get_handler_pointer i = get_field (number_of_header_fields + (2 * i) + 1)
+
+  let get_handler_effect_op_id fiber i =
+    get_field fiber (number_of_header_fields + (2 * i))
+  ;;
+
+  let get_handler_pointer fiber i = get_field fiber (number_of_header_fields + (2 * i) + 1)
 end
 
 let set_rsp_for_fiber_just_created ~fun_builder =
@@ -1338,13 +1343,13 @@ let set_rsp_for_fiber_just_created ~fun_builder =
     fun_builder
     (Mov
        { dst = Simple_value (Register (Virtual fiber_size))
-       ; src = Memory Current_fiber.total_size
+       ; src = Memory (Fiber_layout.total_size Fiber_layout.current)
        });
   Function_builder.add_code
     fun_builder
     (Lea
        { dst = Real Rsp
-       ; src = I8, Add (Value Current_fiber.value, Value (Register (Virtual fiber_size)))
+       ; src = I8, Add (Value Fiber_layout.current, Value (Register (Virtual fiber_size)))
        })
 ;;
 
@@ -1357,14 +1362,14 @@ let switch_to_fiber ~fun_builder ~new_fiber ~operation =
      Function_builder.add_code
        fun_builder
        (Mov
-          { dst = Memory Current_fiber.saved_rsp
+          { dst = Memory (Fiber_layout.saved_rsp Fiber_layout.current)
           ; src = Simple_value (Register (Real Rsp))
           })
    | `Destroy_child -> ());
   (* Switch to the new fiber. *)
   Function_builder.add_code
     fun_builder
-    (Mov { dst = Simple_value Current_fiber.value; src = new_fiber });
+    (Mov { dst = Simple_value Fiber_layout.current; src = new_fiber });
   match operation with
   | `Create_child ->
     (* For newly created fibers, set the stack pointer to the end of the fiber. *)
@@ -1375,7 +1380,7 @@ let switch_to_fiber ~fun_builder ~new_fiber ~operation =
       fun_builder
       (Mov
          { dst = Simple_value (Register (Real Rsp))
-         ; src = Memory Current_fiber.saved_rsp
+         ; src = Memory (Fiber_layout.saved_rsp Fiber_layout.current)
          })
 ;;
 
@@ -1435,7 +1440,7 @@ let define_umber_resume_wrapper t =
         t
         ~fun_builder
         ~fun_name:(Label_name.of_string "umber_fiber_reparent")
-        ~args:[ fiber_to_resume; Simple_value Current_fiber.value ]
+        ~args:[ fiber_to_resume; Simple_value Fiber_layout.current ]
     in
     (* FIXME: What about the return address of the resumption? If we don't perform any
      effects, we need to somehow end up back here. How? Ah, I think reparenting the fibers
@@ -1571,7 +1576,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          (body_end_label, body_value)
          (otherwise_end_label, otherwise_value)
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
-  | Handle_effects { vars; handlers; expr = inner_expr } ->
+  | Handle_effects { vars; value_handler; effect_handlers; expr = inner_expr } ->
     (* FIXME: Make sure the new stack ends up 16-byte aligned. Ah, I think we'll actually
        be fine because each handler takes up 16 bytes. *)
     (* FIXME: Need to add function prologues to check for stack overflow. *)
@@ -1583,35 +1588,39 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~fun_name:(Label_name.of_string "umber_fiber_create")
         ~args:[ Simple_value (Register (Real Call_conv.Umber.fiber_register)) ]
     in
+    let new_fiber : Register.t Simple_value.t = Register (Virtual new_fiber) in
     (* [parent] and [total_size] are set by the runtime. We need to set [handler_count]
        and [parent_rsp]. *)
-    let handler_count = Nonempty.length handlers in
-    let handler_labels =
-      Array.init handler_count ~f:(fun i ->
+    let effect_handler_count = Nonempty.length effect_handlers in
+    let effect_handler_labels =
+      Array.init effect_handler_count ~f:(fun i ->
         Function_builder.create_label fun_builder "handle_effects.handler%d" i)
+    in
+    let effect_handlers_end_label =
+      Function_builder.create_label fun_builder "handle_effects.end_handlers"
     in
     let end_label = Function_builder.create_label fun_builder "handle_effects.end" in
     (* Set up the handlers. *)
     Function_builder.add_code
       fun_builder
       (Mov
-         { dst = Memory Current_fiber.handler_count
-         ; src = Simple_value (Constant (Int handler_count))
+         { dst = Memory (Fiber_layout.handler_count new_fiber)
+         ; src = Simple_value (Constant (Int effect_handler_count))
          });
     Nonempty.iteri
-      handlers
-      ~f:(fun i (effect_op_id, (_ : Mir_name.t Nonempty.t), (_ : Mir.Expr.t)) ->
+      effect_handlers
+      ~f:(fun i { effect_op; args = _; resume = _; handler = _ } ->
       Function_builder.add_code
         fun_builder
         (Mov
-           { dst = Memory (Current_fiber.get_handler_effect_op_id i)
-           ; src = Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op_id)))
+           { dst = Memory (Fiber_layout.get_handler_effect_op_id new_fiber i)
+           ; src = Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op)))
            });
       Function_builder.add_code
         fun_builder
         (Mov
-           { dst = Memory (Current_fiber.get_handler_pointer i)
-           ; src = Simple_value (Global (handler_labels.(i), Other))
+           { dst = Memory (Fiber_layout.get_handler_pointer new_fiber i)
+           ; src = Simple_value (Global (effect_handler_labels.(i), Other))
            }));
     (* Set up the arguments to pass to the inner expression. It's important that we move
        the values *before* switching fibers so any references to the stack are correct. *)
@@ -1625,11 +1634,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     let inner_label =
       Function_builder.create_label fun_builder ~global:true "handle_effects.inner"
     in
-    let inner_fun_name =
-      Mir_name.create_exportable_name
-        (Value_name.Absolute.of_relative_unchecked
-           (Value_name.Relative.of_string (Label_name.to_string inner_label)))
-    in
+    let inner_fun_name = mir_name_of_label_name inner_label in
     let inner_fun_builder =
       Function_builder.create inner_label ~arity:(List.length args_for_inner)
     in
@@ -1643,7 +1648,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     (* Switch to the newly created fiber. *)
     switch_to_fiber
       ~fun_builder
-      ~new_fiber:(Simple_value (Register (Virtual new_fiber)))
+      ~new_fiber:(Simple_value new_fiber)
       ~operation:`Create_child;
     (* Call the function for the inner expression we just defined. *)
     Function_builder.add_code
@@ -1653,30 +1658,64 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          ; call_conv = Umber
          ; arity = List.length args_for_inner
          });
-    let final_result = Function_builder.pick_register fun_builder in
+    let inner_result = Function_builder.pick_register fun_builder in
     Function_builder.add_code
       fun_builder
       (Mov
-         { src = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
-         ; dst = final_result
+         { dst = inner_result
+         ; src = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
          });
     (* At this point, since the inner function has returned a regular value, it won't be
        resumed again. Destroy the fiber and switch back to the parent fiber. *)
-    (* FIXME: Also have to insert this cleanup code in the resume wrapper. *)
     let (_ : Virtual_register.t) =
       declare_and_call_extern_c_function
         t
         ~fun_builder
         ~fun_name:(Label_name.of_string "umber_fiber_destroy")
-        ~args:[ Simple_value Current_fiber.value ]
+        ~args:[ Simple_value Fiber_layout.current ]
     in
     switch_to_fiber
       ~fun_builder
-      ~new_fiber:(Memory Current_fiber.parent)
+      ~new_fiber:(Memory (Fiber_layout.parent Fiber_layout.current))
       ~operation:`Destroy_child;
+    (* Run the return value handler, if there is one. *)
+    let value_handler_result =
+      match value_handler with
+      | None -> inner_result
+      | Some (arg, value_handler_expr) ->
+        Function_builder.add_local fun_builder arg inner_result;
+        codegen_expr t value_handler_expr ~fun_builder
+    in
+    let final_result = Function_builder.pick_register fun_builder in
+    Function_builder.add_code
+      fun_builder
+      (Mov { dst = final_result; src = value_handler_result });
     Function_builder.add_terminal
       fun_builder
       (Jump (Simple_value (Global (end_label, Other))));
+    (* Generate the effect handlers. *)
+    let continuation = Function_builder.pick_register fun_builder in
+    Nonempty.iteri effect_handlers ~f:(fun i { effect_op = _; args; resume; handler } ->
+      Function_builder.position_at_label fun_builder effect_handler_labels.(i);
+      retrieve_arguments
+        ~fun_builder
+        ~args:(Nonempty.to_list args @ [ resume ])
+        ~call_conv:Umber;
+      let handler_value = codegen_expr t handler ~fun_builder in
+      Function_builder.add_code
+        fun_builder
+        (Mov { dst = final_result; src = handler_value });
+      Function_builder.add_code
+        fun_builder
+        (Mov
+           { dst = continuation
+           ; src =
+               Function_builder.find_local fun_builder resume
+               |> Option.value_exn ~here:[%here]
+           });
+      Function_builder.add_terminal
+        fun_builder
+        (Jump (Simple_value (Global (effect_handlers_end_label, Other)))));
     (* FIXME: Stack variables are invalidated after this point, because rsp has changed.
        How can we get the codegen to understand this? Technically the stack variables are
        still accessible, we just need to find the old rsp. Maybe we could put in a special
@@ -1711,19 +1750,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        - Hmm, the resume wrapper could edit it? That's the place that should be returned to
        - reparenting could do it if we pass in a label to return to
      *)
-    (* FIXME: This is wrong! We don't know where we'll jump back to, since the fiber might
-       have been reparented so then we'd need to return somewhere else. e.g. if a
-       continuation gets called and just returns a value, we need to return back to it. *)
-    Nonempty.iteri handlers ~f:(fun i ((_ : Mir.Effect_op_id.t), args, handler_expr) ->
-      Function_builder.position_at_label fun_builder handler_labels.(i);
-      retrieve_arguments ~fun_builder ~args:(Nonempty.to_list args) ~call_conv:Umber;
-      let handler_value = codegen_expr t handler_expr ~fun_builder in
-      Function_builder.add_code
-        fun_builder
-        (Mov { dst = final_result; src = handler_value });
-      Function_builder.add_terminal
-        fun_builder
-        (Jump (Simple_value (Global (end_label, Other)))));
     (* FIXME: All this messing around with rsp doesn't work properly. e.g. we do
        `sub rsp, 8` at function start, then save/load it when switching fibers, then
        `add rsp, 8` at function end. This doesn't sync up, and it makes the stack get
@@ -1738,12 +1764,25 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        
        Ah, we should put the pc to return to on the fiber stack so ret between fibers works.
        *)
-    (* After the handler expression finishes, switch back to the parent fiber. *)
+    (* After a handler expression returns, destroy the child fiber. *)
+    Function_builder.position_at_label fun_builder effect_handlers_end_label;
+    (* FIXME: To run the effect handler, we should have already switched to the parent
+       fiber. Think about how perform should handle this - we don't actually know where
+       the child fiber is to destroy it. Maybe load it out of the resumption? *)
+    let child_fiber =
+      load_block_field fun_builder continuation (Mir.Block_index.of_int 1)
+    in
+    let (_ : Virtual_register.t) =
+      declare_and_call_extern_c_function
+        t
+        ~fun_builder
+        ~fun_name:(Label_name.of_string "umber_fiber_destroy")
+        ~args:[ child_fiber ]
+    in
+    Function_builder.add_terminal
+      fun_builder
+      (Jump (Simple_value (Global (end_label, Other))));
     Function_builder.position_at_label fun_builder end_label;
-    switch_to_fiber
-      ~fun_builder
-      ~new_fiber:(Memory Current_fiber.parent)
-      ~operation:`Destroy_child;
     final_result
   | Perform_effect { effect_op; args } ->
     (* Evaluate the arguments before doing anything. *)
@@ -1764,15 +1803,15 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~fun_builder
         ~fun_name:(Label_name.of_string "umber_find_handler")
         ~args:
-          [ Simple_value Current_fiber.value
+          [ Simple_value Fiber_layout.current
           ; Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op)))
           ; Simple_value (Register (Real Rsp))
           ]
     in
-    let handling_fiber = Function_builder.pick_register fun_builder in
+    let fiber_to_switch_to = Function_builder.pick_register fun_builder in
     Function_builder.add_code
       fun_builder
-      (Mov { dst = handling_fiber; src = Memory (I64, Value (Register (Real Rsp))) });
+      (Mov { dst = fiber_to_switch_to; src = Memory (I64, Value (Register (Real Rsp))) });
     Function_builder.add_code
       fun_builder
       (Add
@@ -1807,7 +1846,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~tag:Cnstr_tag.continuation
         ~fields:
           [ Simple_value (Global (define_umber_resume_wrapper t, Other))
-          ; Simple_value Current_fiber.value
+          ; Simple_value Fiber_layout.current
           ; Simple_value (Global (continuation_label, Other))
           ]
     in
@@ -1815,17 +1854,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     (* FIXME: Stack arguments won't work with the updated rsp. Maybe reg alloc could
        notice when we set rsp and then adjust later spills to look up the parent stack? *)
     move_values_for_call fun_builder ~call_conv:Umber ~args:(Nonempty.to_list args);
-    switch_to_fiber ~fun_builder ~new_fiber:handling_fiber ~operation:`Normal_switch;
+    switch_to_fiber ~fun_builder ~new_fiber:fiber_to_switch_to ~operation:`Normal_switch;
     (* FIXME: This value got allocated to a nonsense register and somehow the move was
        deleted. Very sus. Maybe coalescing went wrong? *)
     Function_builder.add_terminal
       fun_builder
       (Jump (Simple_value (Register (Virtual handler))));
     (* Set up the logic to run upon resuming. *)
-    (* FIXME: Resumption needs to reparent the fiber list. Make a function to do this.
-       Also, the continuation needs to be effectively a separate function - calling it
-       needs to work. I think the logic will always be the same, so it could be shared and
-       put in a weak symbol. *)
     Function_builder.position_at_label fun_builder continuation_label;
     let output_register = Function_builder.pick_register fun_builder in
     Function_builder.add_code
@@ -2067,24 +2102,20 @@ let compile_to_object_file program ~output_file =
 
 let compile_entry_module_internal ~module_paths =
   let t = create ~main_function_name:(Label_name.of_string "main") in
-  (* Set up the main fiber. Save the original stack pointer in it. *)
+  (* Set up the main fiber. Save the stack pointer as the address of the parent fiber. *)
   let main_fiber =
     declare_and_call_extern_c_function
       t
       ~fun_builder:t.main_function
       ~fun_name:(Label_name.of_string "umber_fiber_create")
-      ~args:[ Simple_value (Constant (Int 0)) ]
+      ~args:[ Simple_value (Register (Real Rsp)) ]
   in
   Function_builder.add_code
     t.main_function
     (Mov
-       { dst = Simple_value Current_fiber.value
+       { dst = Simple_value Fiber_layout.current
        ; src = Simple_value (Register (Virtual main_fiber))
        });
-  Function_builder.add_code
-    t.main_function
-    (Mov
-       { dst = Memory Current_fiber.saved_rsp; src = Simple_value (Register (Real Rsp)) });
   set_rsp_for_fiber_just_created ~fun_builder:t.main_function;
   ignore
     (declare_and_call_extern_c_function
@@ -2096,14 +2127,9 @@ let compile_entry_module_internal ~module_paths =
   (* Call the main functions of all linked modules. *)
   List.iter module_paths ~f:(fun module_path ->
     let fun_name = main_function_name ~module_path in
-    let mir_name =
-      Mir_name.create_exportable_name
-        (Value_name.Absolute.of_relative_unchecked
-           (Value_name.Relative.of_string (Label_name.to_string fun_name)))
-    in
     Hashtbl.add_exn
       t.globals
-      ~key:mir_name
+      ~key:(mir_name_of_label_name fun_name)
       ~data:(Other_file (Umber_function { label_name = fun_name; arity = 0 }));
     Function_builder.add_code
       t.main_function
@@ -2116,13 +2142,15 @@ let compile_entry_module_internal ~module_paths =
   Function_builder.add_code
     t.main_function
     (Mov
-       { dst = Simple_value (Register (Real Rsp)); src = Memory Current_fiber.saved_rsp });
+       { dst = Simple_value (Register (Real Rsp))
+       ; src = Memory (Fiber_layout.parent Fiber_layout.current)
+       });
   let (_ : Virtual_register.t) =
     declare_and_call_extern_c_function
       t
       ~fun_builder:t.main_function
       ~fun_name:(Label_name.of_string "umber_fiber_destroy")
-      ~args:[ Simple_value Current_fiber.value ]
+      ~args:[ Simple_value Fiber_layout.current ]
   in
   (* Return 0 back to libc's _start. *)
   Function_builder.add_code
@@ -2196,11 +2224,7 @@ let%expect_test "hello world" =
 
 let%expect_test "hello world, from MIR" =
   let name_table = Mir_name.Name_table.create () in
-  let print_name =
-    Mir_name.create_exportable_name
-      (Value_name.Absolute.of_relative_unchecked
-         (Value_name.Relative.of_string "Std.Prelude.print"))
-  in
+  let print_name = mir_name_of_label_name (Label_name.of_string "Std.Prelude.print") in
   let hello_world : Mir.t =
     [ Extern_decl
         { name = print_name
@@ -2288,16 +2312,15 @@ let%expect_test "entry module" =
 
     main:
                sub       rsp, 8
-               mov       rdi, 0
+               mov       rdi, rsp
                call      umber_fiber_create wrt ..plt
                mov       r14, rax
-               mov       qword [r14 + 8], rsp
                mov       r9, qword [r14 + 16]
                lea       rsp, byte [r14 + r9]
                call      umber_gc_init wrt ..plt
                call      umber_main#Std.Prelude wrt ..plt
                call      umber_main#Read wrt ..plt
-               mov       rsp, qword [r14 + 8]
+               mov       rsp, qword [r14]
                mov       rdi, r14
                call      umber_fiber_destroy wrt ..plt
                mov       rax, 0
