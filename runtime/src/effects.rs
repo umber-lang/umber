@@ -68,8 +68,8 @@ struct Fiber {
 }
 
 unsafe fn get_handler(fiber: *mut Fiber, i: usize) -> (EffectOpId, Handler) {
-    let effect_op_id = fiber.add(size_of::<Fiber>() + 2 * i) as *const EffectOpId;
-    let handler = fiber.add(size_of::<Fiber>() + 2 * i) as *const Handler;
+    let effect_op_id = (fiber as *const EffectOpId).add(4 + 2 * i);
+    let handler = (fiber as *const Handler).add(4 + 2 * i + 1);
     (*effect_op_id, *handler)
 }
 
@@ -125,14 +125,14 @@ unsafe extern "C" fn umber_find_handler(
 
 #[no_mangle]
 unsafe extern "C" fn umber_fiber_reparent(
-    mut current_fiber: *mut Fiber,
+    mut child_fiber: *mut Fiber,
     new_parent_fiber: *mut Fiber,
 ) {
     loop {
-        if (*current_fiber).parent.is_null() {
-            (*current_fiber).parent = new_parent_fiber;
+        if (*child_fiber).parent.is_null() {
+            (*child_fiber).parent = new_parent_fiber;
             return;
         }
-        current_fiber = (*current_fiber).parent;
+        child_fiber = (*child_fiber).parent;
     }
 }

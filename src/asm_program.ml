@@ -369,6 +369,7 @@ module Instr = struct
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
+      | Push of 'reg Value.t
       | Sub of
           { dst : 'reg Value.t
           ; src : 'reg Value.t
@@ -402,6 +403,9 @@ module Instr = struct
         in
         let src = Memory.map_simple_values src ~f in
         Lea { dst; src }
+      | Push a ->
+        let a = Value.map_simple_values a ~f in
+        Push a
       | Cmp (a, b) ->
         let a = Value.map_simple_values a ~f in
         let b = Value.map_simple_values b ~f in
@@ -458,6 +462,9 @@ module Instr = struct
         in
         let init, src = Memory.fold_map_simple_values src ~init ~f:(f ~op:Use) in
         init, Lea { dst; src }
+      | Push a ->
+        let init, a = fold_map_value a ~init ~f ~op:Use in
+        init, Push a
       | Cmp (a, b) ->
         let init, a = fold_map_value a ~init ~f ~op:Use in
         let init, b = fold_map_value b ~init ~f ~op:Use in
@@ -482,7 +489,7 @@ module Instr = struct
         | Add { dst; src } | And { dst; src } | Sub { dst; src } | Mov { dst; src } ->
           [ dst; src ]
         | Cmp (a, b) | Test (a, b) -> [ a; b ]
-        | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
+        | Push x | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
         | Lea { dst; src } -> [ Simple_value (Register dst); Memory src ]
       in
       pp_line fmt name args ~f:Value.pp

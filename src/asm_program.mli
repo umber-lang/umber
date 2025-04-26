@@ -152,6 +152,7 @@ module Instr : sig
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
+      | Push of 'reg Value.t
       | Sub of
           { dst : 'reg Value.t
           ; src : 'reg Value.t

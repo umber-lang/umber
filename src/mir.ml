@@ -1229,25 +1229,17 @@ module Expr = struct
                  effect_branch
                  handler_expr
                  ~f:(fun
-                      { effect_pattern = { operation; args }; arg_types; resume_type }
+                      { effect_pattern = { operation; args }; arg_types; resume_type = _ }
                       handler_expr
                     ->
+                 (* TODO: If we don't need [resume_type] here, it might just be unused. *)
                  let effect_op = Effect_op_id.create ~effect_operation_name:operation in
                  let (ctx, bindings), args =
                    process_arguments
                      ~ctx
-                       (* TODO: Get a proper span on the resume keyword. Maybe the whole
-                        effect pattern would do. *)
-                     ~args:
-                       (Nonempty.append
-                          args
-                          [ Node.dummy_span
-                              (Typed.Pattern.Catch_all (Some Value_name.resume_keyword))
-                          ])
+                     ~args
                      ~arg_types:
-                       (Nonempty.map
-                          (Nonempty.append arg_types [ resume_type ])
-                          ~f:(fun (type_, constraints) ->
+                       (Nonempty.map arg_types ~f:(fun (type_, constraints) ->
                           if not (List.is_empty constraints)
                           then
                             compiler_bug
