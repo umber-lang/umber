@@ -9,7 +9,8 @@
            section   .text
 
 umber_main#Cat:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, 1
            call      Std.Prelude.read_line wrt ..plt
            cmp       rax, 1
@@ -28,7 +29,7 @@ umber_main#Cat:
            jmp       .cond_assign.merge#4
 .cond_assign.merge#4:
            mov       qword [Cat.#binding.1], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

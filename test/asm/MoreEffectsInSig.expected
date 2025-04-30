@@ -7,30 +7,35 @@
            section   .text
 
 umber_main#MoreEffectsInSig:
-           sub       rsp, 8
-           add       rsp, 8
+           push      rbp
+           mov       rbp, rsp
+           pop       rbp
            ret       
 
 MoreEffectsInSig.more_effects_in_sig:
-           sub       rsp, 8
-           add       rsp, 8
+           push      rbp
+           mov       rbp, rsp
+           pop       rbp
            ret       
 
 MoreEffectsInSig.equivalent_with_different_vars:
-           sub       rsp, 24
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
            mov       r9, rax
-           mov       qword [rsp], rbx
+           mov       qword [rbp - 16], rbx
            mov       rax, r9
            mov       rbx, 1
            call      qword [r9 + 8]
-           mov       qword [rsp + 8], rax
-           mov       rax, qword [rsp]
+           mov       qword [rbp - 8], rax
+           mov       rax, qword [rbp - 16]
            mov       rbx, 1
-           mov       r9, qword [rsp]
+           mov       r9, qword [rbp - 16]
            call      qword [r9 + 8]
            mov       rbx, rax
-           mov       rax, qword [rsp + 8]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           add       rsp, 24
+           add       rsp, 16
+           pop       rbp
            ret       
 

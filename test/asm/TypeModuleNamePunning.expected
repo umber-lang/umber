@@ -11,12 +11,13 @@
            section   .text
 
 umber_main#TypeModuleNamePunning:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       qword [TypeModuleNamePunning.int], int.5
            mov       qword [TypeModuleNamePunning.int__#433785839], int.5
            mov       qword [TypeModuleNamePunning.string], string.1010221259
            mov       qword [TypeModuleNamePunning.float], float.5.000000
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

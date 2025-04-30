@@ -7,12 +7,13 @@
            section   .text
 
 umber_main#HelloWorld:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, string.337107678
            call      Std.Prelude.print wrt ..plt
            mov       r9, rax
            mov       qword [HelloWorld.#binding.1], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

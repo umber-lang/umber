@@ -6,16 +6,17 @@
            section   .text
 
 umber_main#ExternInt:
-           sub       rsp, 8
-           add       rsp, 8
+           push      rbp
+           mov       rbp, rsp
+           pop       rbp
            ret       
 
 ExternInt.plus:
-           sub       rsp, 8
-           mov       r9, rax
-           mov       rdi, r9
+           push      rbp
+           mov       rbp, rsp
+           mov       rdi, rax
            mov       rsi, rbx
            call      umber_int_add wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 

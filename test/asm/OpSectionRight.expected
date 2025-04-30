@@ -16,7 +16,9 @@
            section   .text
 
 umber_main#OpSectionRight:
-           sub       rsp, 24
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
            mov       rax, string.901559560
            call      Std.Prelude.print wrt ..plt
            mov       rbx, int.5
@@ -24,44 +26,47 @@ umber_main#OpSectionRight:
            mov       r13, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
-           mov       qword [rsp + 8], rax
-           mov       r9, qword [rsp + 8]
+           mov       qword [rbp - 8], rax
+           mov       r9, qword [rbp - 8]
            mov       word [r9], 12289
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rbp - 8]
            mov       word [r9 + 2], 2
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rbp - 8]
            mov       qword [r9 + 8], OpSectionRight.#fun.1
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rbp - 8]
            mov       qword [r9 + 16], r13
            mov       rax, string.51739196
            call      Std.Prelude.print wrt ..plt
-           mov       qword [rsp], rax
-           mov       rax, qword [rsp + 8]
+           mov       qword [rbp - 16], rax
+           mov       rax, qword [rbp - 8]
            mov       rbx, int.6
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rbp - 8]
            call      qword [r9 + 8]
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 16]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       r9, rax
            mov       qword [OpSectionRight.#binding.1], r9
-           add       rsp, 24
+           add       rsp, 16
+           pop       rbp
            ret       
 
 OpSectionRight.~__~#114261348:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
            call      Std.Prelude.print_int wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 OpSectionRight.#fun.1:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r9, rbx
            mov       rbx, qword [rax + 16]
            mov       rax, r9
            call      OpSectionRight.~__~#114261348
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

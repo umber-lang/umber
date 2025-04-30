@@ -24,29 +24,21 @@
            section   .text
 
 umber_main#MutualRecursion:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       qword [MutualRecursion.Leaf], 1
            mov       rax, int.5
            mov       rbx, int.5
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
-           mov       r9, rax
-           mov       qword [MutualRecursion.number], r9
+           mov       qword [MutualRecursion.number], rax
            mov       r9, qword [Std.Prelude.List.Nil]
            mov       qword [MutualRecursion.f], r9
-           mov       rdi, 24
-           call      umber_gc_alloc wrt ..plt
-           mov       r13, rax
-           mov       word [r13], 0
-           mov       word [r13 + 2], 2
-           mov       qword [r13 + 8], int.17
-           mov       r9, qword [Std.Prelude.List.Nil]
-           mov       qword [r13 + 16], r9
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       r12, rax
            mov       word [r12], 0
            mov       word [r12 + 2], 2
-           mov       qword [r12 + 8], r13
+           mov       qword [r12 + 8], int.17
            mov       r9, qword [Std.Prelude.List.Nil]
            mov       qword [r12 + 16], r9
            mov       rdi, 24
@@ -54,24 +46,33 @@ umber_main#MutualRecursion:
            mov       r13, rax
            mov       word [r13], 0
            mov       word [r13 + 2], 2
+           mov       qword [r13 + 8], r12
+           mov       r9, qword [Std.Prelude.List.Nil]
+           mov       qword [r13 + 16], r9
+           mov       rdi, 24
+           call      umber_gc_alloc wrt ..plt
+           mov       r12, rax
+           mov       word [r12], 0
+           mov       word [r12 + 2], 2
            mov       r9, qword [MutualRecursion.Leaf]
-           mov       qword [r13 + 8], r9
-           mov       qword [r13 + 16], r12
+           mov       qword [r12 + 8], r9
+           mov       qword [r12 + 16], r13
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 2
            mov       qword [rax + 8], int.1
-           mov       qword [rax + 16], r13
+           mov       qword [rax + 16], r12
            call      MutualRecursion.sum_tree
            call      Std.Prelude.print_int wrt ..plt
            mov       r9, rax
            mov       qword [MutualRecursion.#binding.1], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
 MutualRecursion.Node:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
@@ -79,13 +80,15 @@ MutualRecursion.Node:
            mov       word [rax + 2], 2
            mov       qword [rax + 8], r12
            mov       qword [rax + 16], rbx
-           add       rsp, 8
+           pop       rbp
            ret       
 
 MutualRecursion.even:
-           sub       rsp, 8
-           mov       qword [rsp], rax
-           mov       rax, qword [rsp]
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       rax, qword [rbp - 8]
            mov       rbx, int.0
            call      Std.Prelude.Operators.__#664800900 wrt ..plt
            cmp       rax, 3
@@ -97,19 +100,22 @@ MutualRecursion.even:
            jmp       .cond_assign.merge#4
 .cond_assign.if_none_matched#3:
            mov       rbx, int.1
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#72260286 wrt ..plt
            call      MutualRecursion.odd
            jmp       .cond_assign.merge#4
 .cond_assign.merge#4:
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
 MutualRecursion.loop.1:
-           sub       rsp, 24
-           mov       qword [rsp], rax
-           mov       qword [rsp + 8], rbx
-           mov       r9, qword [rsp + 8]
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       qword [rbp - 16], rbx
+           mov       r9, qword [rbp - 16]
            cmp       r9, 1
            jnz       .cond_assign.if_none_matched#3
 .cond_assign.vars0#1:
@@ -117,26 +123,29 @@ MutualRecursion.loop.1:
 .cond_assign.body#2:
            jmp       .cond_assign.merge#4
 .cond_assign.if_none_matched#3:
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rbp - 16]
            mov       rax, qword [r9 + 8]
            call      MutualRecursion.sum_tree
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rbp - 16]
            mov       rbx, qword [r9 + 16]
            call      MutualRecursion.loop.1
-           mov       qword [rsp], rax
+           mov       qword [rbp - 8], rax
            jmp       .cond_assign.merge#4
 .cond_assign.merge#4:
-           mov       rax, qword [rsp]
-           add       rsp, 24
+           mov       rax, qword [rbp - 8]
+           add       rsp, 16
+           pop       rbp
            ret       
 
 MutualRecursion.odd:
-           sub       rsp, 8
-           mov       qword [rsp], rax
-           mov       rax, qword [rsp]
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       rax, qword [rbp - 8]
            mov       rbx, int.0
            call      Std.Prelude.Operators.__#664800900 wrt ..plt
            cmp       rax, 3
@@ -148,18 +157,21 @@ MutualRecursion.odd:
            jmp       .cond_assign.merge#4
 .cond_assign.if_none_matched#3:
            mov       rbx, int.1
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#72260286 wrt ..plt
            call      MutualRecursion.even
            jmp       .cond_assign.merge#4
 .cond_assign.merge#4:
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
 MutualRecursion.sum_tree:
-           sub       rsp, 8
-           mov       qword [rsp], rax
-           mov       r9, qword [rsp]
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       r9, qword [rbp - 8]
            cmp       r9, 1
            jnz       .cond_assign.if_none_matched#3
 .cond_assign.vars0#1:
@@ -168,26 +180,28 @@ MutualRecursion.sum_tree:
            mov       rax, int.0
            jmp       .cond_assign.merge#4
 .cond_assign.if_none_matched#3:
-           mov       r9, qword [rsp]
+           mov       r9, qword [rbp - 8]
            mov       rax, qword [r9 + 16]
            call      MutualRecursion.sum_forest
-           mov       r9, qword [rsp]
+           mov       r9, qword [rbp - 8]
            mov       r9, qword [r9 + 8]
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
            jmp       .cond_assign.merge#4
 .cond_assign.merge#4:
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
 MutualRecursion.sum_forest:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r9, int.0
            mov       rbx, rax
            mov       rax, r9
            call      MutualRecursion.loop.1
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

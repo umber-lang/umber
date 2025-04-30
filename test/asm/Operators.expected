@@ -52,7 +52,9 @@
            section   .text
 
 umber_main#Operators:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
            mov       rax, string.640172348
            mov       rbx, qword [Std.Prelude.List.Nil]
            call      Std.Prelude.Operators.__#358075620 wrt ..plt
@@ -60,7 +62,7 @@ umber_main#Operators:
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.Operators.__#358075620 wrt ..plt
-           mov       qword [rsp], rax
+           mov       qword [rbp - 8], rax
            mov       rax, string.120385329
            mov       rbx, qword [Std.Prelude.List.Nil]
            call      Std.Prelude.Operators.__#358075620 wrt ..plt
@@ -73,7 +75,7 @@ umber_main#Operators:
            mov       rax, r9
            call      Std.Prelude.Operators.__#358075620 wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Operators.__#765322566
            mov       qword [Operators.unicode_my_dudes], rax
            mov       rax, qword [Operators.unicode_my_dudes]
@@ -129,11 +131,13 @@ umber_main#Operators:
            call      Std.Prelude.print wrt ..plt
            mov       r9, rax
            mov       qword [Operators.#binding.2], r9
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
 Operators.#fun.1:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
@@ -142,11 +146,12 @@ Operators.#fun.1:
            mov       r9, qword [r12 + 16]
            mov       qword [rax + 8], r9
            mov       qword [rax + 16], rbx
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.__#765322566:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
@@ -157,53 +162,59 @@ Operators.__#765322566:
            mov       rbx, rax
            mov       rax, r12
            call      Std.Prelude.List.concat_map wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.~~~:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, 1
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.#fun.4:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r9, rbx
            mov       rbx, qword [rax + 16]
            mov       rax, r9
            call      Std.Prelude.Operators.__#294461388 wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.left_section:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r9, qword [Operators.left_section.1]
            mov       r10, qword [Operators.left_section.1]
            mov       rbx, rax
            mov       rax, r10
            call      qword [r9 + 8]
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.right_section:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r9, qword [Operators.right_section.1]
            mov       r10, qword [Operators.right_section.1]
            mov       rbx, rax
            mov       rax, r10
            call      qword [r9 + 8]
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.#fun.5:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, qword [rax + 16]
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.#fun.2:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
@@ -215,37 +226,41 @@ Operators.#fun.2:
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.List.map wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.#fun.3:
-           sub       rsp, 24
-           mov       qword [rsp + 8], rax
-           mov       r9, qword [rsp + 8]
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 16], rax
+           mov       r9, qword [rbp - 16]
            mov       rax, qword [r9 + 8]
            call      Std.Prelude.print wrt ..plt
-           mov       qword [rsp], rax
-           mov       r9, qword [rsp + 8]
+           mov       qword [rbp - 8], rax
+           mov       r9, qword [rbp - 16]
            mov       rax, qword [r9 + 16]
            call      Std.Prelude.print wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           add       rsp, 24
+           add       rsp, 16
+           pop       rbp
            ret       
 
 Operators..:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            call      Std.Prelude.Operators.. wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Operators.#fun.3#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
            call      Operators.#fun.3
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

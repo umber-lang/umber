@@ -23,7 +23,8 @@
            section   .text
 
 umber_main#WeirdFunCalls:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, string.661034699
            call      Std.Prelude.print wrt ..plt
            mov       qword [WeirdFunCalls.#binding.1], rax
@@ -50,58 +51,63 @@ umber_main#WeirdFunCalls:
            call      qword [r9 + 8]
            mov       r9, rax
            mov       qword [WeirdFunCalls.#binding.3], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
 WeirdFunCalls.fun_call:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, WeirdFunCalls.#fun.2#closure
-           add       rsp, 8
+           pop       rbp
            ret       
 
 WeirdFunCalls.#fun.2:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, string.37409044
            call      Std.Prelude.print wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 WeirdFunCalls.print_twice:
-           sub       rsp, 24
-           mov       qword [rsp + 8], rax
-           mov       rax, qword [rsp + 8]
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.print wrt ..plt
-           mov       qword [rsp], rax
-           mov       rax, qword [rsp + 8]
+           mov       qword [rbp - 16], rax
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.print wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 16]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           add       rsp, 24
+           add       rsp, 16
+           pop       rbp
            ret       
 
 WeirdFunCalls.print_twice#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
            call      WeirdFunCalls.print_twice
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Std.Prelude.print#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
            call      Std.Prelude.print
-           add       rsp, 8
+           pop       rbp
            ret       
 
 WeirdFunCalls.#fun.2#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
            call      WeirdFunCalls.#fun.2
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

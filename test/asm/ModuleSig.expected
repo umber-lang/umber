@@ -19,7 +19,9 @@
            section   .text
 
 umber_main#ModuleSig:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
            mov       rax, int.1
            mov       rbx, int.10
            call      ModuleSig.Range.between
@@ -30,25 +32,28 @@ umber_main#ModuleSig:
            mov       qword [ModuleSig.is_10_in_range], rax
            mov       rax, qword [ModuleSig.is_10_in_range]
            call      Std.Prelude.print_bool wrt ..plt
-           mov       qword [rsp], rax
+           mov       qword [rbp - 8], rax
            mov       rax, string.0
            call      Std.Prelude.print wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       r9, rax
            mov       qword [ModuleSig.#binding.1], r9
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
 ModuleSig.Range...__#13270071:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            call      ModuleSig.Range.between
-           add       rsp, 8
+           pop       rbp
            ret       
 
 ModuleSig.Range.between:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r12, rax
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
@@ -56,26 +61,29 @@ ModuleSig.Range.between:
            mov       word [rax + 2], 2
            mov       qword [rax + 8], r12
            mov       qword [rax + 16], rbx
-           add       rsp, 8
+           pop       rbp
            ret       
 
 ModuleSig.Range.elem:
-           sub       rsp, 24
-           mov       qword [rsp], rax
-           mov       qword [rsp + 8], rbx
-           mov       r9, qword [rsp + 8]
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 32
+           mov       qword [rbp - 24], rax
+           mov       qword [rbp - 16], rbx
+           mov       r9, qword [rbp - 16]
            mov       rax, qword [r9 + 8]
-           mov       rbx, qword [rsp]
+           mov       rbx, qword [rbp - 24]
            call      Std.Prelude.Operators.__#845057057 wrt ..plt
-           mov       qword [rsp + 16], rax
-           mov       r9, qword [rsp + 8]
+           mov       qword [rbp - 8], rax
+           mov       r9, qword [rbp - 16]
            mov       rbx, qword [r9 + 16]
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 24]
            call      Std.Prelude.Operators.__#845057057 wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp + 16]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#5678180 wrt ..plt
-           add       rsp, 24
+           add       rsp, 32
+           pop       rbp
            ret       
 
            section   .rodata

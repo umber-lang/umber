@@ -24,7 +24,8 @@
            section   .text
 
 umber_main#Text:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rdi, 24
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
@@ -48,7 +49,7 @@ umber_main#Text:
            mov       qword [Text.hello], string.178290272
            mov       qword [Text.dec_code_exclam], string.900478420
            mov       qword [Text.spacing], string.566536425
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

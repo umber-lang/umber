@@ -10,14 +10,16 @@
            section   .text
 
 umber_main#Constructors:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       qword [Constructors.A.Foo], 1
            mov       qword [Constructors.B.Foo], 1
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Constructors.Wrap.my_id:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r13, rax
            mov       rdi, 16
            call      umber_gc_alloc wrt ..plt
@@ -25,24 +27,26 @@ Constructors.Wrap.my_id:
            mov       word [rax + 2], 1
            mov       r9, qword [r13 + 8]
            mov       qword [rax + 8], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Constructors.B.of_a:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, qword [Constructors.B.Foo]
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Constructors.Wrap.Wrap:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r13, rax
            mov       rdi, 16
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 1
            mov       qword [rax + 8], r13
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .bss

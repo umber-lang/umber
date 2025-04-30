@@ -7,20 +7,22 @@
            section   .text
 
 umber_main#Option:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       qword [Option.None], 1
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Option.Some:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r13, rax
            mov       rdi, 16
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 1
            mov       qword [rax + 8], r13
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .bss

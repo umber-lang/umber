@@ -19,28 +19,33 @@
            section   .text
 
 umber_main#OpSectionLeft:
-           sub       rsp, 24
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
            mov       rax, OpSectionLeft.__#892202222#closure
            call      OpSectionLeft.apply
-           mov       qword [rsp + 8], rax
+           mov       qword [rbp - 16], rax
            mov       rax, string.51739196
            call      Std.Prelude.print wrt ..plt
-           mov       qword [rsp], rax
-           mov       rax, qword [rsp + 8]
+           mov       qword [rbp - 8], rax
+           mov       rax, qword [rbp - 16]
            mov       rbx, string.525968662
-           mov       r9, qword [rsp + 8]
+           mov       r9, qword [rbp - 16]
            call      qword [r9 + 8]
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       r9, rax
            mov       qword [OpSectionLeft.#binding.1], r9
-           add       rsp, 24
+           add       rsp, 16
+           pop       rbp
            ret       
 
 OpSectionLeft.apply:
-           sub       rsp, 8
-           mov       qword [rsp], rax
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
            mov       rax, string.238791689
            call      Std.Prelude.print wrt ..plt
            mov       rbx, string.352391525
@@ -51,25 +56,30 @@ OpSectionLeft.apply:
            mov       word [rax], 12289
            mov       word [rax + 2], 3
            mov       qword [rax + 8], OpSectionLeft.#fun.1
-           mov       r9, qword [rsp]
+           mov       r9, qword [rbp - 8]
            mov       qword [rax + 16], r9
            mov       qword [rax + 24], r13
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
 OpSectionLeft.__#892202222:
-           sub       rsp, 8
-           mov       qword [rsp], rbx
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rbx
            mov       rbx, string.741609073
            call      Std.Prelude.Operators.__#411843497 wrt ..plt
-           mov       rbx, qword [rsp]
+           mov       rbx, qword [rbp - 8]
            call      Std.Prelude.Operators.__#411843497 wrt ..plt
            call      Std.Prelude.print wrt ..plt
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
 OpSectionLeft.#fun.1:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r10, qword [rax + 16]
            mov       r11, qword [rax + 16]
            mov       r9, qword [rax + 24]
@@ -77,16 +87,16 @@ OpSectionLeft.#fun.1:
            mov       rax, r11
            mov       rbx, r9
            call      qword [r10 + 8]
-           add       rsp, 8
+           pop       rbp
            ret       
 
 OpSectionLeft.__#892202222#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rdi
+           push      rbp
+           mov       rbp, rsp
            mov       rax, rbx
-           mov       rbx, r9
+           mov       rbx, rdi
            call      OpSectionLeft.__#892202222
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

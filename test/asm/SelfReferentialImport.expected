@@ -8,19 +8,21 @@
            section   .text
 
 umber_main#SelfReferentialImport:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, 1
            call      SelfReferentialImport.goose
            mov       r9, rax
            mov       qword [SelfReferentialImport.#binding.1], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
 SelfReferentialImport.goose:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, string.850259642
            call      Std.Prelude.print wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

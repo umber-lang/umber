@@ -27,7 +27,8 @@
            section   .text
 
 umber_main#Functions:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, int.5
            mov       rbx, float.10000000000000.000000
            mov       rdi, int.__89#116887268
@@ -47,48 +48,52 @@ umber_main#Functions:
            call      Functions.id
            mov       r9, rax
            mov       qword [Functions.still_zero_wow], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Functions.id:
-           sub       rsp, 8
-           add       rsp, 8
+           push      rbp
+           mov       rbp, rsp
+           pop       rbp
            ret       
 
 Functions.#fun.1:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, int.9999
            call      Functions.sqr
            mov       r9, 1
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Functions.sqr:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r9, rax
            mov       rbx, rax
            mov       rax, r9
            call      Std.Prelude.Operators.__#294461388 wrt ..plt
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Functions.lots_of_args:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, 1
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Functions.#fun.1#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rsi
+           push      rbp
+           mov       rbp, rsp
            mov       rax, rbx
            mov       rbx, rdi
-           mov       rdi, r9
+           mov       rdi, rsi
            call      Functions.#fun.1
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

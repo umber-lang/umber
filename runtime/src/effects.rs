@@ -96,7 +96,7 @@ unsafe fn search_fiber_for_handler(fiber: *mut Fiber, effect_op_id: EffectOpId) 
 // TODO: This needs to be divisble by 16. Pick a big number here so we always have enough
 // and don't have to implement stack overflow checks and reallocation yet. Should do that
 // properly eventually.
-const DEFAULT_FIBER_SIZE: usize = 256 * 8 * 2 * 16;
+const DEFAULT_FIBER_SIZE: usize = 256 * 8 * 2 * 16 * 2;
 
 #[no_mangle]
 unsafe extern "C" fn umber_fiber_create(parent: *mut Fiber) -> *mut Fiber {

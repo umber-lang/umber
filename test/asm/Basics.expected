@@ -22,7 +22,8 @@
            section   .text
 
 umber_main#Basics:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       qword [Basics.Red], 1
            mov       qword [Basics.Blue], 3
            mov       qword [Basics.Green], 1
@@ -51,11 +52,12 @@ umber_main#Basics:
            jmp       .cond_assign.merge#4
 .cond_assign.merge#4:
            mov       qword [Basics._.1], r9
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Basics.Point3:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r13, rax
            mov       r12, rdi
            mov       rdi, 32
@@ -65,29 +67,31 @@ Basics.Point3:
            mov       qword [rax + 8], r13
            mov       qword [rax + 16], rbx
            mov       qword [rax + 24], r12
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Basics.Expanded:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r13, rax
            mov       rdi, 16
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 1
            mov       word [rax + 2], 1
            mov       qword [rax + 8], r13
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Basics.Regular:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       r13, rax
            mov       rdi, 16
            call      umber_gc_alloc wrt ..plt
            mov       word [rax], 0
            mov       word [rax + 2], 1
            mov       qword [rax + 8], r13
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

@@ -19,39 +19,44 @@
            section   .text
 
 umber_main#Classics:
-           sub       rsp, 24
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
            mov       rax, string.1030076252
            call      Std.Prelude.print wrt ..plt
-           mov       qword [rsp], rax
+           mov       qword [rbp - 8], rax
            mov       rax, int.5
            call      Classics.fact
            call      Std.Prelude.print_int wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           mov       qword [rsp + 8], rax
+           mov       qword [rbp - 16], rax
            mov       rax, string.0
            call      Std.Prelude.print wrt ..plt
            mov       rbx, rax
-           mov       rax, qword [rsp + 8]
+           mov       rax, qword [rbp - 16]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
            mov       r9, rax
            mov       qword [Classics.#binding.1], r9
-           add       rsp, 24
+           add       rsp, 16
+           pop       rbp
            ret       
 
 Classics.fib:
-           sub       rsp, 24
-           mov       qword [rsp], rax
-           mov       r10, qword [int.0 + 8]
-           mov       r9, qword [rsp]
-           cmp       qword [r9 + 8], r10
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       r9, qword [int.0 + 8]
+           mov       r10, qword [rbp - 8]
+           cmp       qword [r10 + 8], r9
            jnz       .cond_assign.cond1#1
 .cond_assign.vars0#2:
            jmp       .cond_assign.body#4
 .cond_assign.cond1#1:
            mov       r10, qword [int.1 + 8]
-           mov       r9, qword [rsp]
+           mov       r9, qword [rbp - 8]
            cmp       qword [r9 + 8], r10
            jnz       .cond_assign.if_none_matched#5
 .cond_assign.vars1#3:
@@ -60,35 +65,38 @@ Classics.fib:
            mov       rax, int.1
            jmp       .cond_assign.merge#6
 .cond_assign.if_none_matched#5:
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            mov       rbx, int.1
            call      Std.Prelude.Operators.__#72260286 wrt ..plt
            call      Classics.fib
-           mov       qword [rsp + 8], rax
+           mov       qword [rbp - 16], rax
            mov       rbx, int.2
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#72260286 wrt ..plt
            call      Classics.fib
            mov       rbx, rax
-           mov       rax, qword [rsp + 8]
+           mov       rax, qword [rbp - 16]
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
            jmp       .cond_assign.merge#6
 .cond_assign.merge#6:
-           add       rsp, 24
+           add       rsp, 16
+           pop       rbp
            ret       
 
 Classics.fact:
-           sub       rsp, 8
-           mov       qword [rsp], rax
-           mov       r10, qword [int.0 + 8]
-           mov       r9, qword [rsp]
-           cmp       qword [r9 + 8], r10
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       r9, qword [int.0 + 8]
+           mov       r10, qword [rbp - 8]
+           cmp       qword [r10 + 8], r9
            jnz       .cond_assign.cond1#1
 .cond_assign.vars0#2:
            jmp       .cond_assign.body#4
 .cond_assign.cond1#1:
            mov       r10, qword [int.1 + 8]
-           mov       r9, qword [rsp]
+           mov       r9, qword [rbp - 8]
            cmp       qword [r9 + 8], r10
            jnz       .cond_assign.if_none_matched#5
 .cond_assign.vars1#3:
@@ -97,16 +105,17 @@ Classics.fact:
            mov       rax, int.1
            jmp       .cond_assign.merge#6
 .cond_assign.if_none_matched#5:
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            mov       rbx, int.1
            call      Std.Prelude.Operators.__#72260286 wrt ..plt
            call      Classics.fact
            mov       rbx, rax
-           mov       rax, qword [rsp]
+           mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#294461388 wrt ..plt
            jmp       .cond_assign.merge#6
 .cond_assign.merge#6:
-           add       rsp, 8
+           add       rsp, 16
+           pop       rbp
            ret       
 
            section   .rodata

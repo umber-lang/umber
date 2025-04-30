@@ -13,30 +13,32 @@
            section   .text
 
 umber_main#Keywords:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       qword [Keywords.__#705098952], 1
            mov       qword [Keywords.__#373726558], 1
            mov       qword [Keywords.__?#967420102], 1
            mov       qword [Keywords.left], 1
            mov       qword [Keywords.middle], 1
            mov       qword [Keywords.right], 1
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Keywords.let__s_go#117710912:
-           sub       rsp, 8
+           push      rbp
+           mov       rbp, rsp
            mov       rax, Keywords.let__s_go#117710912#closure
            mov       rbx, 1
            call      qword [Keywords.let__s_go#117710912#closure + 8]
-           add       rsp, 8
+           pop       rbp
            ret       
 
 Keywords.let__s_go#117710912#closure_wrapper_fun:
-           sub       rsp, 8
-           mov       r9, rbx
-           mov       rax, r9
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
            call      Keywords.let__s_go#117710912
-           add       rsp, 8
+           pop       rbp
            ret       
 
            section   .rodata

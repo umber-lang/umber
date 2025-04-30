@@ -4,7 +4,8 @@
            section   .text
 
 umber_main#Empty:
-           sub       rsp, 8
-           add       rsp, 8
+           push      rbp
+           mov       rbp, rsp
+           pop       rbp
            ret       
 
