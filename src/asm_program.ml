@@ -293,6 +293,11 @@ module Memory = struct
   let rec pp_expr fmt expr =
     match expr with
     | Value value -> Simple_value.pp fmt value
+    | Add (lhs, Value (Constant (Int offset))) when offset < 0 ->
+      (* Special-case subtraction of constants. *)
+      pp_expr fmt lhs;
+      Format.pp_print_string fmt " - ";
+      Int.pp fmt (-offset)
     | Add (lhs, rhs) ->
       pp_expr fmt lhs;
       Format.pp_print_string fmt " + ";

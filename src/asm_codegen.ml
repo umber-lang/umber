@@ -474,8 +474,8 @@ end = struct
     let spilled_memory_locations =
       Nonempty.to_list newly_spilled_registers
       |> List.mapi ~f:(fun i reg ->
-           let rsp : Register.t Simple_value.t = Register (Real Rsp) in
-           reg, Memory.offset rsp I64 (i + already_spilled_count))
+           let rbp : Register.t Simple_value.t = Register (Real Rbp) in
+           reg, Memory.offset rbp I64 ~-(i + 1 + already_spilled_count))
       |> Virtual_register.Map.of_alist_exn
     in
     List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
