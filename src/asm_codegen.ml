@@ -146,7 +146,23 @@ end = struct
          | [] -> compiler_bug [%message "Empty cfg component"])
   ;;
 
-  module Interference_graph = Graph.Imperative.Graph.Concrete (Register)
+  module Live_range = struct
+    module Id = Unique_counter ()
+
+    module T = struct
+      type t =
+        { register : Register.t
+        ; id : Id.t
+        }
+      [@@deriving equal, compare, hash, sexp_of, fields]
+    end
+
+    include T
+    include Comparable.Make_plain (T)
+    include Hashable.Make_plain (T)
+  end
+
+  module Interference_graph = Graph.Imperative.Graph.Concrete (Live_range)
 
   module Instr_register_ops = struct
     let use_mem =
@@ -211,25 +227,43 @@ end = struct
     ;;
   end
 
-  let create_interference_graph ~cfg ~(basic_blocks : _ Basic_block.t list) =
+  (* FIXME: You can't just mint new live ranges whenever - there has to be a corresponding
+     move to another register. We could have a separate function add moves - let's have
+     this function just understand them. *)
+  let create_interference_graph
+    ~cfg
+    ~(basic_blocks : Register.t Basic_block.t list)
+    ~live_range_counter
+    =
     (* To create a lifetime interference graph from a control-flow graph (CFG), we have
        to do a backwards traversal over the control flow graph, starting at the return
        points and moving backwards through jumps. At each step, whenever we encounter a
        use of a register, we know it must be live. We can trace each use back to an
        assignment to find the lifetime of the value in the register. *)
-    let basic_blocks =
+    let old_basic_blocks =
       List.map basic_blocks ~f:(fun bb -> bb.label, bb) |> Label_name.Table.of_alist_exn
+    in
+    let new_basic_blocks : Live_range.t Basic_block.t Label_name.Table.t =
+      Label_name.Table.create ()
     in
     let graph = Interference_graph.create () in
     let record_register_use live_registers value =
       (* When a variable is used, we know it must be live at this point. *)
       let live_registers =
-        Simple_value.fold_registers value ~init:live_registers ~f:Set.add
+        Simple_value.fold_registers
+          value
+          ~init:live_registers
+          ~f:
+            (Map.update ~f:(function
+              | None -> Live_range.Id.Counter.next live_range_counter
+              | Some existing -> existing))
       in
-      Set.iter live_registers ~f:(fun reg1 ->
-        Set.iter live_registers ~f:(fun reg2 ->
-          if not (Register.equal reg1 reg2)
-          then Interference_graph.add_edge graph reg1 reg2));
+      Map.iteri live_registers ~f:(fun ~key:reg1 ~data:id1 ->
+        Map.iteri live_registers ~f:(fun ~key:reg2 ~data:id2 ->
+          let range1 : Live_range.t = { register = reg1; id = id1 } in
+          let range2 : Live_range.t = { register = reg2; id = id2 } in
+          if not (Live_range.equal range1 range2)
+          then Interference_graph.add_edge graph range1 range2));
       live_registers
     in
     let record_register_assignment live_registers value =
@@ -239,14 +273,18 @@ end = struct
       (* When a variable is assigned to, it doesn't have to be live before this point
          anymore. There is a "hole" in the lifetime between the assignment and the
          previous use where the register isn't needed. *)
-      Simple_value.fold_registers value ~init:live_registers ~f:Set.remove
+      Simple_value.fold_registers value ~init:live_registers ~f:Map.remove
     in
-    let (_ : Register.Set.t) =
-      fold_cfg_backwards ~cfg ~init:Register.Set.empty ~f:(fun live_registers cfg_node ->
+    (* TODO: Technically, nothing should be live at function start. We should have the
+       entry node implicitly assign all the arg registers and that's about it. *)
+    let (_ : Live_range.Id.t Register.Map.t) =
+      fold_cfg_backwards ~cfg ~init:Register.Map.empty ~f:(fun live_registers cfg_node ->
         eprint_s
           [%here]
           [%lazy_message
-            "Walking cfg node" (cfg_node : Cfg_node.t) (live_registers : Register.Set.t)];
+            "Walking cfg node"
+              (cfg_node : Cfg_node.t)
+              (live_registers : Live_range.Id.t Register.Map.t)];
         match cfg_node with
         | Ret ->
           (* Ret implicitly uses the return register. *)
@@ -257,55 +295,97 @@ end = struct
             (Register (Real (Call_conv.return_value_register Umber)))
         | Label label ->
           let ({ label = _; code; terminal } : _ Basic_block.t) =
-            Hashtbl.find_exn basic_blocks label
+            Hashtbl.find_exn old_basic_blocks label
           in
           let record_register_ops live_registers ops =
             List.fold_right ops ~init:live_registers ~f:(fun (op, value) live_registers ->
               match (op : Register_op.t) with
-              | Use -> record_register_use live_registers value
-              | Assignment -> record_register_assignment live_registers value
-              | Use_and_assignment ->
-                let live_registers = record_register_assignment live_registers value in
-                record_register_use live_registers value)
+              | Use | Use_and_assignment ->
+                (* [Use_and_assignment] works the same as [Use]. If there is an existing
+                   live range, we'll keep using it. If no existing live range exists,
+                   we'll create one. [Use_and_assignment] maintains a contiguous live
+                   range. *)
+                (* TODO: Maybe we don't need this [Use_and_assignment] distinction? Might
+                   still be good for clarity though. *)
+                record_register_use live_registers value
+              | Assignment -> record_register_assignment live_registers value)
           in
           let live_registers =
             record_register_ops live_registers (Instr_register_ops.of_terminal terminal)
           in
-          List.fold_right code ~init:live_registers ~f:(fun instr live_registers ->
-            record_register_ops live_registers (Instr_register_ops.of_nonterminal instr)))
+          let terminal =
+            Instr.Terminal.map_registers terminal ~f:(fun register : Live_range.t ->
+              { register; id = Map.find_exn live_registers register })
+          in
+          let code, live_registers =
+            List.fold_right
+              code
+              ~init:([], live_registers)
+              ~f:(fun instr (code, live_registers_after) ->
+              let live_registers_before =
+                record_register_ops
+                  live_registers_after
+                  (Instr_register_ops.of_nonterminal instr)
+              in
+              (* For this to work, it's important that within a single instruction, there
+                 is only one relevant live range per register. *)
+              ( Instr.Nonterminal.map_args instr ~f:(fun arg ->
+                  Simple_value.map_registers arg ~f:(fun register : Live_range.t ->
+                    let id =
+                      match Map.find live_registers_before register with
+                      | Some id -> id
+                      | None ->
+                        (match Map.find live_registers_after register with
+                         | Some id -> id
+                         | None ->
+                           (* It's possible to reach here if a variable is unused so it was
+                              never live. This happens for fake moves used for clobbering.
+                              Just make up a new live range. *)
+                           Live_range.Id.Counter.next live_range_counter)
+                    in
+                    { register; id }))
+                :: code
+              , live_registers_before ))
+          in
+          Hashtbl.set new_basic_blocks ~key:label ~data:{ label; code; terminal };
+          live_registers)
     in
-    graph
+    let basic_blocks =
+      List.map basic_blocks ~f:(fun { label; _ } ->
+        Hashtbl.find_exn new_basic_blocks label)
+    in
+    graph, basic_blocks
   ;;
 
   (** Find cases where multiple registers do not interfere with each other and are
       related by moves, and coalesce them into one virtual register.*)
-  let coalesce_registers
-    ~(basic_blocks : Register.t Basic_block.t list)
+  let coalesce_ranges
+    ~(basic_blocks : Live_range.t Basic_block.t list)
     ~interference_graph
     =
-    let coalesced_registers = Virtual_register.Table.create () in
+    let coalesced_ranges = Live_range.Id.Table.create () in
     List.iter basic_blocks ~f:(fun { label = _; code; terminal = _ } ->
       List.iter code ~f:(fun instr ->
         match instr with
-        | Mov
-            { src = Simple_value (Register src_reg)
-            ; dst = Simple_value (Register dst_reg)
-            } ->
-          (match src_reg, dst_reg with
-           | Real _, Real _ -> ()
-           | (Virtual reg_to_coalesce as node), ((Real _ | Virtual _) as other_reg)
-           | (Real _ as other_reg), (Virtual reg_to_coalesce as node) ->
-             if not (Interference_graph.mem_edge interference_graph src_reg dst_reg)
-             then (
+        | Mov { src = Simple_value (Register src); dst = Simple_value (Register dst) } ->
+          (match src, dst with
+           | { register = Real _; _ }, { register = Real _; _ } -> ()
+           | ( { register = Virtual _; id = to_coalesce }
+             , ({ register = Real _ | Virtual _; _ } as other) )
+           | ( ({ register = Real _; _ } as other)
+             , { register = Virtual _; id = to_coalesce } ) ->
+             if not (Interference_graph.mem_edge interference_graph src dst)
+             then
                ignore
-                 (Hashtbl.add coalesced_registers ~key:reg_to_coalesce ~data:other_reg
-                   : [ `Ok | `Duplicate ]);
-               if Interference_graph.mem_vertex interference_graph node
+                 (Hashtbl.add coalesced_ranges ~key:to_coalesce ~data:other
+                   : [ `Ok | `Duplicate ])
+               (* FIXME: cleanup *)
+               (* if Interference_graph.mem_vertex interference_graph node
                then (
                  let neighbours = Interference_graph.succ interference_graph node in
                  List.iter neighbours ~f:(fun neighbour ->
                    Interference_graph.add_edge interference_graph other_reg neighbour);
-                 Interference_graph.remove_vertex interference_graph node)))
+                 Interference_graph.remove_vertex interference_graph node) *))
         | _ -> ()));
     let basic_blocks =
       List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
@@ -313,20 +393,28 @@ end = struct
           List.filter_map code ~f:(fun instr ->
             let instr =
               Instr.Nonterminal.map_args instr ~f:(fun value ->
-                Simple_value.map_registers value ~f:(fun reg ->
-                  match reg with
-                  | Real _ -> reg
-                  | Virtual virtual_reg ->
-                    Hashtbl.find coalesced_registers virtual_reg
-                    |> Option.value ~default:reg))
+                Simple_value.map_registers value ~f:(fun range ->
+                  Hashtbl.find coalesced_ranges range.id |> Option.value ~default:range))
             in
+            (* FIXME: Put this back the way it was - it doesn't make sense to coalesce two
+           real registers. Real registers just can't be spilled at all so it doesn't
+           matter. Just eliminate real register copies below when they are the same
+           register.  
+           
+              Hmm, maybe we don't even need the live ranges here.
+
+              Would it make more sense to remove no-op moves at the end? Maybe you could
+              end up with no-op copies later? 
+           *)
             (* Drop no-op moves which may have appeared due to coalescing. *)
             match instr with
+            | Mov { src = Simple_value (Register src); dst = Simple_value (Register dst) }
+              when Live_range.equal src dst -> None
             | Mov
-                { src = Simple_value (Register src_reg)
-                ; dst = Simple_value (Register dst_reg)
+                { src = Simple_value (Register { register = Real src; _ })
+                ; dst = Simple_value (Register { register = Real dst; _ })
                 }
-              when Register.equal src_reg dst_reg -> None
+              when Asm_program.Register.equal src dst -> None
             | _ -> Some instr)
         in
         { label; code; terminal })
@@ -335,94 +423,110 @@ end = struct
       [%here]
       [%lazy_message
         "After coalescing"
-          (coalesced_registers : Register.t Virtual_register.Table.t)
-          (basic_blocks : Register.t Basic_block.t list)];
+          (coalesced_ranges : Live_range.t Live_range.Id.Table.t)
+          (basic_blocks : Live_range.t Basic_block.t list)];
     basic_blocks
   ;;
 
   let color_interference_graph
     ~interference_graph
+    ~basic_blocks
     ~all_available_registers
-    ~already_spilled
+    ~ranges_not_to_spill
     =
     (* See https://web.eecs.umich.edu/~mahlke/courses/583f12/reading/chaitin82.pdf for
        a description of the algorithm we are roughly following. *)
     let k = Set.length all_available_registers in
-    let vertex_states = Virtual_register.Table.create () in
+    let vertex_states = Live_range.Table.create () in
     let ignored_stack = Stack.create () in
     let degree vertex =
-      List.count (Interference_graph.succ interference_graph vertex) ~f:(function
+      List.count (Interference_graph.succ interference_graph vertex) ~f:(fun range ->
+        match range.register with
         | Real _ -> true
-        | Virtual v ->
-          (match Hashtbl.find vertex_states v with
+        | Virtual _ ->
+          (match Hashtbl.find vertex_states range with
            | None -> true
            | Some (`Ignored | `Spilled) -> false))
     in
     let rec remove_low_degree_vertices () =
       let any_removed = ref false in
       Interference_graph.iter_vertex
-        (function
-         | Real _ -> ()
-         | Virtual virtual_reg as vertex ->
-           (match Hashtbl.find vertex_states virtual_reg with
-            | Some (`Ignored | `Spilled) -> ()
-            | None ->
-              if degree vertex < k
-              then (
-                (* The vertex has [degree < k]. It doesn't affect colorability and can be
+        (fun vertex ->
+          match vertex.register with
+          | Real _ -> ()
+          | Virtual _ ->
+            (match Hashtbl.find vertex_states vertex with
+             | Some (`Ignored | `Spilled) -> ()
+             | None ->
+               if degree vertex < k
+               then (
+                 (* The vertex has [degree < k]. It doesn't affect colorability and can be
                    trivially given a color later. *)
-                any_removed := true;
-                Stack.push ignored_stack virtual_reg;
-                Hashtbl.set vertex_states ~key:virtual_reg ~data:`Ignored)
-              else
-                (* The vertex has a [degree >= k]. It may still be possible to k-color
+                 any_removed := true;
+                 Stack.push ignored_stack vertex;
+                 Hashtbl.set vertex_states ~key:vertex ~data:`Ignored)
+               else
+                 (* The vertex has a [degree >= k]. It may still be possible to k-color
                    the graph if some of its neighbours share colors. *)
-                ()))
+                 ()))
         interference_graph;
       if !any_removed then remove_low_degree_vertices ()
     in
     (* TODO: Could use better heuristics to pick a register to spill rather, considering
        the cost of spilling. See how Chaitin did it. *)
-    let pick_a_register_to_spill () =
+    let pick_a_range_to_spill ~occurence_counts =
+      let spill_cost vertex =
+        float (Option.value (Map.find occurence_counts vertex) ~default:0)
+        /. float (degree vertex)
+      in
       Interference_graph.fold_vertex
-        (fun vertex current_max ->
-          match vertex with
-          | Real _ -> current_max
-          | Virtual virtual_reg as vertex ->
-            (match Hashtbl.find vertex_states virtual_reg with
-             | Some (`Ignored | `Spilled) -> current_max
+        (fun vertex current_min_cost ->
+          match vertex.register with
+          | Real _ -> current_min_cost
+          | Virtual _ ->
+            (match Hashtbl.find vertex_states vertex with
+             | Some (`Ignored | `Spilled) -> current_min_cost
              | None ->
                assert_or_compiler_bug (degree vertex >= k) ~here:[%here];
-               (* Do not spill registers that were already spilled. This is important to avoid
-                a death spiral of nontermination. *)
-               if Hash_set.mem already_spilled virtual_reg
-               then current_max
+               (* FIXME: Not working anymore - remove ? *)
+               (* Do not spill registers that were already spilled. This is important to
+                  avoid a death spiral of nontermination. *)
+               if Hash_set.mem ranges_not_to_spill vertex
+               then current_min_cost
                else (
                  eprint_s
                    [%here]
                    [%lazy_message
                      "Considering spilling"
-                       (virtual_reg : Virtual_register.t)
-                       (current_max : (Virtual_register.t * int) option)];
-                 match current_max with
-                 | None -> Some (virtual_reg, degree vertex)
-                 | Some (_, max_degree) ->
-                   let this_degree = degree vertex in
-                   if this_degree > max_degree
-                   then Some (virtual_reg, max_degree)
-                   else current_max)))
+                       (vertex : Live_range.t)
+                       (current_min_cost : (Live_range.t * float) option)];
+                 match current_min_cost with
+                 | None -> Some (vertex, spill_cost vertex)
+                 | Some (_, min_cost) ->
+                   let this_cost = spill_cost vertex in
+                   if Float.O.(this_cost < min_cost)
+                   then Some (vertex, this_cost)
+                   else current_min_cost)))
         interference_graph
         None
+    in
+    let occurence_counts =
+      (* Count up all occurences (uses+assignments) of each live range as the cost. *)
+      lazy
+        (List.fold basic_blocks ~init:Live_range.Map.empty ~f:(fun acc bb ->
+           Basic_block.fold_registers bb ~init:acc ~f:(fun acc live_range ->
+             Map.update acc live_range ~f:(Option.value_map ~default:1 ~f:(( + ) 1)))))
     in
     let rec loop () =
       remove_low_degree_vertices ();
       (* All remaining nodes have degree >= k. While this remains true, spill. *)
-      match pick_a_register_to_spill () with
-      | Some (reg_to_spill, (_degree : int)) ->
+      match pick_a_range_to_spill ~occurence_counts:(force occurence_counts) with
+      | Some (range_to_spill, cost) ->
         eprint_s
           [%here]
-          [%lazy_message "Decided to spill" (reg_to_spill : Virtual_register.t)];
-        Hashtbl.set vertex_states ~key:reg_to_spill ~data:`Spilled;
+          [%lazy_message
+            "Decided to spill" (range_to_spill : Live_range.t) (cost : float)];
+        Hashtbl.set vertex_states ~key:range_to_spill ~data:`Spilled;
         loop ()
       | None -> ()
     in
@@ -441,67 +545,79 @@ end = struct
       Error spilled_registers
     | None ->
       (* Color the trivial nodes. *)
-      let coloring = Virtual_register.Table.create () in
-      let vertex_color (reg : Register.t) =
-        match reg with
+      let coloring = Live_range.Table.create () in
+      let vertex_color (vertex : Live_range.t) =
+        match vertex.register with
         | Real reg -> Some reg
-        | Virtual virtual_reg -> Hashtbl.find coloring virtual_reg
+        | Virtual _ -> Hashtbl.find coloring vertex
       in
-      Stack.iter ignored_stack ~f:(fun virtual_reg ->
+      Stack.iter ignored_stack ~f:(fun vertex ->
         (* Pick a color. *)
         let neighbouring_colors =
-          Interference_graph.succ interference_graph (Virtual virtual_reg)
+          Interference_graph.succ interference_graph vertex
           |> List.filter_map ~f:vertex_color
           |> Asm_program.Register.Set.of_list
         in
         let color =
           Set.choose_exn (Set.diff all_available_registers neighbouring_colors)
         in
-        Hashtbl.add_exn coloring ~key:virtual_reg ~data:color);
+        Hashtbl.add_exn coloring ~key:vertex ~data:color);
       Ok coloring
   ;;
 
+  (* FIXME: I'm sus of this "re-loading" rax right after function calls. The fact that it
+     treats a register as always containing the same variable is not good. I think there's
+     a bug here - we only consider uses/assignments of registers that show up in the
+     source, but uses/assignments by e.g. call are not included. I think that's causing
+     the weird behavior.
+     
+     If it properly handled "call" then it would store rax every time after a function
+     returns. 
+
+     How should I be handling this? Consider each assignment to a real register a
+     different variable? Could number each one, maybe.
+     
+     Each live range should be given a unique ID, and that should be used instead of the
+     virtual register as the candidate for spilling/interference. *)
   (** Replace all mentions of spilled registers with memory loads and stores. *)
   let update_code_to_spill_registers
-    ~(basic_blocks : Register.t Basic_block.t list)
-    ~newly_spilled_registers
+    ~(basic_blocks : Live_range.t Basic_block.t list)
+    ~newly_spilled_ranges
     ~already_spilled_count
-    ~create_register
+    ~(create_live_range : Asm_program.Register.t option -> Live_range.t)
     =
     (* TODO: We don't necessarily need to give each spilled register its own stack slot.
        If their lifetimes don't overlap, two variables could use the same one. But this is
        pretty hard to think about. *)
     let spilled_memory_locations =
-      Nonempty.to_list newly_spilled_registers
-      |> List.mapi ~f:(fun i reg ->
-           let rsp : Register.t Simple_value.t = Register (Real Rsp) in
-           reg, Memory.offset rsp I64 (i + already_spilled_count))
-      |> Virtual_register.Map.of_alist_exn
+      Nonempty.to_list newly_spilled_ranges
+      |> List.mapi ~f:(fun i range ->
+           let rbp : _ Simple_value.t = Register (create_live_range (Some Rbp)) in
+           range, Memory.offset rbp I64 (i + already_spilled_count))
+      |> Live_range.Map.of_alist_exn
     in
     List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
         List.concat_map code ~f:(fun instr ->
           let (spilled_uses, spilled_assignments), instr =
+            (* FIXME: Need to use instr reg ops here to handle call correctly. *)
             Instr.Nonterminal.fold_map_args instr ~init:([], []) ~f:(fun acc value ~op ->
-              Simple_value.fold_map_registers value ~init:acc ~f:(fun acc reg ->
-                match reg with
-                | Real _ -> acc, reg
-                | Virtual vreg ->
-                  if Nonempty.mem
-                       newly_spilled_registers
-                       vreg
-                       ~equal:Virtual_register.equal
+              Simple_value.fold_map_registers value ~init:acc ~f:(fun acc range ->
+                match range.register with
+                | Real _ -> acc, range
+                | Virtual _ ->
+                  if Nonempty.mem newly_spilled_ranges range ~equal:Live_range.equal
                   then (
-                    let tmp : Register.t = Virtual (create_register ()) in
+                    let tmp = create_live_range None in
                     let spilled_uses, spilled_assignments = acc in
                     match op with
-                    | Use -> ((vreg, tmp) :: spilled_uses, spilled_assignments), tmp
+                    | Use -> ((range, tmp) :: spilled_uses, spilled_assignments), tmp
                     | Assignment ->
-                      (spilled_uses, (vreg, tmp) :: spilled_assignments), tmp
+                      (spilled_uses, (range, tmp) :: spilled_assignments), tmp
                     | Use_and_assignment ->
-                      ( ((vreg, tmp) :: spilled_uses, (vreg, tmp) :: spilled_assignments)
+                      ( ((range, tmp) :: spilled_uses, (range, tmp) :: spilled_assignments)
                       , tmp ))
-                  else acc, reg))
+                  else acc, range))
           in
           (* TODO: We could be smarter and elide some of these loads if they are read from
              multiple times. That would require reasoning about lifetimes here. *)
@@ -583,7 +699,7 @@ end = struct
     let all_available_registers =
       Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
     in
-    let try_find_coloring ~cfg ~basic_blocks ~already_spilled =
+    let try_find_coloring ~cfg ~basic_blocks ~live_range_counter ~ranges_not_to_spill =
       eprint_s
         [%here]
         [%lazy_message
@@ -591,7 +707,9 @@ end = struct
             ~cfg:
               (Cfg.fold_edges (fun label1 label2 acc -> (label1, label2) :: acc) cfg []
                 : (Cfg_node.t * Cfg_node.t) list)];
-      let interference_graph = create_interference_graph ~cfg ~basic_blocks in
+      let interference_graph, basic_blocks =
+        create_interference_graph ~cfg ~basic_blocks ~live_range_counter
+      in
       eprint_s
         [%here]
         [%lazy_message
@@ -601,11 +719,20 @@ end = struct
                  (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
                  interference_graph
                  []
-                : (Register.t * Register.t) list)];
-      let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
+                : (Live_range.t * Live_range.t) list)];
+      let coalesced_basic_blocks = coalesce_ranges ~basic_blocks ~interference_graph in
       (* FIXME: Not sure what happened but this interference graph definitely doesn't
-         match the code after coalescing. Broken merge logic? *)
-      let interference_graph = create_interference_graph ~cfg ~basic_blocks in
+         match the code after coalescing. Broken merge logic? Also hacky to just throw
+         away all the lifetime information and then compute it again... *)
+      let interference_graph, coalesced_basic_blocks =
+        create_interference_graph
+          ~cfg
+          ~basic_blocks:
+            (List.map
+               coalesced_basic_blocks
+               ~f:(Basic_block.map_registers ~f:Live_range.register))
+          ~live_range_counter
+      in
       eprint_s
         [%here]
         [%lazy_message
@@ -615,51 +742,73 @@ end = struct
                  (fun reg1 reg2 acc -> (reg1, reg2) :: acc)
                  interference_graph
                  []
-                : (Register.t * Register.t) list)];
-      ( color_interference_graph
+                : (Live_range.t * Live_range.t) list)];
+      (* FIXME: It is super hacky to decide to return the basic blocks after mangling them
+         just a little. *)
+      match
+        color_interference_graph
           ~interference_graph
+          ~basic_blocks:coalesced_basic_blocks
           ~all_available_registers
-          ~already_spilled
-      , basic_blocks )
+          ~ranges_not_to_spill
+      with
+      | Ok coloring -> Ok (coloring, coalesced_basic_blocks)
+      | Error newly_spilled_ranges -> Error (newly_spilled_ranges, basic_blocks)
     in
-    let new_temp_registers = Virtual_register.Hash_set.create () in
+    (* FIXME: I think the live range ids keep getting renumbered which makes
+       ranges_not_to_spill useless. Either make the ids stable or come up with a better
+       way of realizing that spilling won't help. *)
+    let ranges_not_to_spill = Live_range.Hash_set.create () in
+    let live_range_counter = Live_range.Id.Counter.create () in
     let rec loop ~cfg ~basic_blocks ~already_spilled_count =
-      let result, basic_blocks =
-        try_find_coloring ~cfg ~basic_blocks ~already_spilled:new_temp_registers
-      in
-      match result with
-      | Error newly_spilled_registers ->
+      match
+        try_find_coloring ~cfg ~basic_blocks ~live_range_counter ~ranges_not_to_spill
+      with
+      | Error (newly_spilled_ranges, basic_blocks) ->
         eprint_s
           [%here]
           [%lazy_message
-            "Coloring failed, spilling registers"
-              (newly_spilled_registers : Virtual_register.t Nonempty.t)];
+            "Coloring failed, spilling ranges"
+              (newly_spilled_ranges : Live_range.t Nonempty.t)];
+        Nonempty.iter newly_spilled_ranges ~f:(Hash_set.add ranges_not_to_spill);
         let basic_blocks =
           update_code_to_spill_registers
             ~basic_blocks
-            ~newly_spilled_registers
+            ~newly_spilled_ranges
             ~already_spilled_count
-            ~create_register:(fun () ->
-            let tmp = Virtual_register.Counter.next register_counter in
-            Hash_set.add new_temp_registers tmp;
-            tmp)
+            ~create_live_range:(fun real_register ->
+            let id = Live_range.Id.Counter.next live_range_counter in
+            let register : Register.t =
+              match real_register with
+              | Some reg -> Real reg
+              | None ->
+                let virtual_reg = Virtual_register.Counter.next register_counter in
+                Virtual virtual_reg
+            in
+            let range : Live_range.t = { register; id } in
+            Hash_set.add ranges_not_to_spill range;
+            range)
         in
         let already_spilled_count =
-          already_spilled_count + Nonempty.length newly_spilled_registers
+          already_spilled_count + Nonempty.length newly_spilled_ranges
         in
-        loop ~cfg ~basic_blocks ~already_spilled_count
-      | Ok coloring ->
+        loop
+          ~cfg
+          ~basic_blocks:
+            (List.map basic_blocks ~f:(Basic_block.map_registers ~f:Live_range.register))
+          ~already_spilled_count
+      | Ok (coloring, basic_blocks) ->
         eprint_s
           [%here]
           [%lazy_message
-            "Coloring succeeded"
-              (coloring : Asm_program.Register.t Virtual_register.Table.t)];
+            "Coloring succeeded" (coloring : Asm_program.Register.t Live_range.Table.t)];
         let basic_blocks =
           List.map basic_blocks ~f:(fun bb ->
-            Basic_block.map_registers bb ~f:(function
+            Basic_block.map_registers bb ~f:(fun range ->
+              match range.register with
               | Real reg -> reg
-              | Virtual virtual_reg ->
-                (match Hashtbl.find coloring virtual_reg with
+              | Virtual _ ->
+                (match Hashtbl.find coloring range with
                  | Some reg -> reg
                  | None ->
                    (* If a register wasn't in the interference graph, we can safely pick
