@@ -129,6 +129,12 @@ end = struct
     cfg
   ;;
 
+  (* TODO: This logic doesn't seem quite right - it will put in some arbitrary ordering
+     between parallel branches on whose assignments go first, which isn't correct. I'm not
+     sure exactly what the right thing to do is here, but might involve multiple passes
+     where you initially track what each block uses/assigns and then union the information.
+     
+     Lookup "dominator tree". *)
   let fold_cfg_backwards ~cfg ~init ~f =
     Cfg.Topologically_sorted_components.scc_array cfg
     |> Array.fold ~init ~f:(fun acc component ->
@@ -161,6 +167,7 @@ end = struct
 
     let of_nonterminal (instr : _ Instr.Nonterminal.t) =
       match instr with
+      | Pop x -> assign x
       | Push x -> use x
       | Cmp (a, b) | Test (a, b) -> use a @ use b
       | Mov { dst; src } -> use src @ assign dst
@@ -540,29 +547,31 @@ end = struct
     match basic_blocks with
     | [] -> compiler_bug [%message "Empty function"]
     | entry_bb :: all_but_entry ->
-      let allocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
-        Sub
-          { dst = Simple_value (Register Rsp)
-          ; src = Simple_value (Constant (Int stack_space))
-          }
+      let prologue : Asm_program.Register.t Instr.Nonterminal.t list =
+        [ Push (Simple_value (Register Rbp))
+        ; Mov { dst = Simple_value (Register Rbp); src = Simple_value (Register Rsp) }
+        ; Sub
+            { dst = Simple_value (Register Rsp)
+            ; src = Simple_value (Constant (Int stack_space))
+            }
+        ]
       in
-      let deallocate_stack : Asm_program.Register.t Instr.Nonterminal.t =
-        Add
-          { dst = Simple_value (Register Rsp)
-          ; src = Simple_value (Constant (Int stack_space))
-          }
+      let epilogue : Asm_program.Register.t Instr.Nonterminal.t list =
+        [ Add
+            { dst = Simple_value (Register Rsp)
+            ; src = Simple_value (Constant (Int stack_space))
+            }
+        ; Pop (Simple_value (Register Rbp))
+        ]
       in
       (match List.split_last all_but_entry with
        | None ->
-         [ { entry_bb with
-             code = allocate_stack :: (entry_bb.code @ [ deallocate_stack ])
-           }
-         ]
+         [ { entry_bb with code = List.concat [ prologue; entry_bb.code; epilogue ] } ]
        | Some (other_bbs, exit_bb) ->
          List.concat
-           [ [ { entry_bb with code = allocate_stack :: entry_bb.code } ]
+           [ [ { entry_bb with code = prologue @ entry_bb.code } ]
            ; other_bbs
-           ; [ { exit_bb with code = exit_bb.code @ [ deallocate_stack ] } ]
+           ; [ { exit_bb with code = exit_bb.code @ epilogue } ]
            ])
   ;;
 
@@ -750,6 +759,7 @@ end = struct
       ~test:a_b
       ~lea:(fun _ ~dst:(_ : Register.t) ~src:(_ : _ Memory.t) -> instr)
       ~call:(fun _ ~fun_:_ ~call_conv:_ ~arity:_ -> instr)
+      ~pop:(fun _ _ -> instr)
       ~push:(fun _ _ -> instr)
   ;;
 
@@ -935,7 +945,7 @@ let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list
   let arg_registers, clobbered_arg_registers =
     Call_conv.arg_registers call_conv |> Nonempty.to_list |> Fn.flip List.split_n n_args
   in
-  let clobbered_registers =
+  let _clobbered_registers =
     clobbered_arg_registers @ Call_conv.non_arg_caller_save_registers call_conv
   in
   if n_args > List.length arg_registers
@@ -953,15 +963,25 @@ let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list
   List.iter2_exn temporaries_to_move arg_registers ~f:(fun tmp arg_register ->
     Function_builder.add_code
       fun_builder
-      (Mov { src = tmp; dst = Simple_value (Register (Real arg_register)) }));
-  (* In case we are using any clobbered registers, move from them to new temporary
+      (Mov { src = tmp; dst = Simple_value (Register (Real arg_register)) }))
+;;
+
+(* FIXME: I'm not sure if this is actually needed - does it even do anything? The new
+     virtual registers will always be unused so die just immediately. But it creates a lot
+     more work for register allocation.
+     
+     I suspect this might not have done anything, except maybe given regalloc an out to
+     move to other registers between live ranges.
+
+     Oh, maybe we have to insert moves between the live ranges??
+  *)
+(* In case we are using any clobbered registers, move from them to new temporary
      registers. Any useless moves will get removed by the register allocator later. *)
-  List.iter clobbered_registers ~f:(fun reg ->
+(* List.iter clobbered_registers ~f:(fun reg ->
     let tmp = Function_builder.pick_register fun_builder in
     Function_builder.add_code
       fun_builder
-      (Mov { src = Simple_value (Register (Real reg)); dst = tmp }))
-;;
+      (Mov { src = Simple_value (Register (Real reg)); dst = tmp })) *)
 
 let codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args =
   move_values_for_call fun_builder ~call_conv ~args;
@@ -1322,6 +1342,7 @@ let merge_branches
 module Fiber_layout : sig
   val current : Register.t Simple_value.t
   val parent : Register.t Simple_value.t -> Register.t Memory.t
+  val saved_rbp : Register.t Simple_value.t -> Register.t Memory.t
   val saved_rsp : Register.t Simple_value.t -> Register.t Memory.t
   val total_size : Register.t Simple_value.t -> Register.t Memory.t
   val handler_count : Register.t Simple_value.t -> Register.t Memory.t
@@ -1331,10 +1352,11 @@ end = struct
   let current : Register.t Simple_value.t = Register (Real Call_conv.Umber.fiber_register)
   let get_field fiber i = Memory.offset fiber I64 i
   let parent fiber = get_field fiber 0
-  let saved_rsp fiber = get_field fiber 1
-  let total_size fiber = get_field fiber 2
-  let handler_count fiber = get_field fiber 3
-  let number_of_header_fields = 4
+  let saved_rbp fiber = get_field fiber 1
+  let saved_rsp fiber = get_field fiber 2
+  let total_size fiber = get_field fiber 3
+  let handler_count fiber = get_field fiber 4
+  let number_of_header_fields = 5
 
   let get_handler_effect_op_id fiber i =
     get_field fiber (number_of_header_fields + (2 * i))
@@ -1368,6 +1390,12 @@ let switch_to_fiber ~fun_builder ~new_fiber ~operation =
      Function_builder.add_code
        fun_builder
        (Mov
+          { dst = Memory (Fiber_layout.saved_rbp Fiber_layout.current)
+          ; src = Simple_value (Register (Real Rbp))
+          });
+     Function_builder.add_code
+       fun_builder
+       (Mov
           { dst = Memory (Fiber_layout.saved_rsp Fiber_layout.current)
           ; src = Simple_value (Register (Real Rsp))
           })
@@ -1382,6 +1410,12 @@ let switch_to_fiber ~fun_builder ~new_fiber ~operation =
     set_rsp_for_fiber_just_created ~fun_builder
   | `Destroy_child | `Normal_switch ->
     (* For resuming existing fibers, load the previously saved stack pointer. *)
+    Function_builder.add_code
+      fun_builder
+      (Mov
+         { dst = Simple_value (Register (Real Rbp))
+         ; src = Memory (Fiber_layout.saved_rbp Fiber_layout.current)
+         });
     Function_builder.add_code
       fun_builder
       (Mov
@@ -1749,6 +1783,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          inconsistencies
          => ok, we make them functions, should be fine then? Might have to add an option
             to say whether the function needs alignment or not (the handlers don't)
+            Wait, the problem with making them functions is Ret won't work properly....
+            But, they can't share stack addresses with the parent, it's dynamic, can't be
+            done without rbp.
+         => Which is easier? adding rbp on every fun prologue/epilogue and fiber switch
+            OR making these functions and... passing the args how? In a closure could work
+            Registers won't work. Stack could work but it's dynamic again. Maybe rbp is the
+            way. 
 
        Mitigated:
        - umber_resume_wrapper needs to put its own address on the parent stack (done)
@@ -2378,20 +2419,26 @@ let%expect_test "hello world, from MIR" =
                section   .text
 
     umber_main#HelloWorld:
+               push      rbp
+               mov       rbp, rsp
                sub       rsp, 8
                mov       rdi, string.210886959
                call      umber_print_endline wrt ..plt
                mov       r9, rax
                mov       qword [HelloWorld.#binding.1], r9
                add       rsp, 8
+               pop       rbp
                ret
 
     Std.Prelude.print:
+               push      rbp
+               mov       rbp, rsp
                sub       rsp, 8
                mov       r9, rax
                mov       rdi, r9
                call      umber_print_endline wrt ..plt
                add       rsp, 8
+               pop       rbp
                ret
 
                section   .rodata
@@ -2432,11 +2479,13 @@ let%expect_test "entry module" =
                section   .text
 
     main:
+               push      rbp
+               mov       rbp, rsp
                sub       rsp, 8
                mov       rdi, rsp
                call      umber_fiber_create wrt ..plt
                mov       r14, rax
-               mov       r9, qword [r14 + 16]
+               mov       r9, qword [r14 + 24]
                lea       rsp, byte [r14 + r9]
                call      umber_gc_init wrt ..plt
                call      umber_main#Std.Prelude wrt ..plt
@@ -2446,5 +2495,6 @@ let%expect_test "entry module" =
                call      umber_fiber_destroy wrt ..plt
                mov       rax, 0
                add       rsp, 8
+               pop       rbp
                ret |}]
 ;;

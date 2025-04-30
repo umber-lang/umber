@@ -330,6 +330,12 @@ module Value = struct
     | Simple_value value -> Simple_value (f value)
     | Memory mem -> Memory (Memory.map_simple_values mem ~f)
   ;;
+
+  let fold_simple_values t ~init ~f =
+    match t with
+    | Simple_value value -> f init value
+    | Memory mem -> Memory.fold_simple_values mem ~init ~f
+  ;;
 end
 
 module Register_op = struct
@@ -369,6 +375,7 @@ module Instr = struct
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
+      | Pop of 'reg Value.t
       | Push of 'reg Value.t
       | Sub of
           { dst : 'reg Value.t
@@ -403,6 +410,9 @@ module Instr = struct
         in
         let src = Memory.map_simple_values src ~f in
         Lea { dst; src }
+      | Pop a ->
+        let a = Value.map_simple_values a ~f in
+        Pop a
       | Push a ->
         let a = Value.map_simple_values a ~f in
         Push a
@@ -420,6 +430,34 @@ module Instr = struct
         Test (a, b)
       | Call { fun_; call_conv; arity } ->
         Call { fun_ = Value.map_simple_values fun_ ~f; call_conv; arity }
+    ;;
+
+    let fold_args t ~init ~f =
+      match t with
+      | Add { dst; src } ->
+        let init = Value.fold_simple_values dst ~init ~f in
+        Value.fold_simple_values src ~init ~f
+      | And { dst; src } ->
+        let init = Value.fold_simple_values dst ~init ~f in
+        Value.fold_simple_values src ~init ~f
+      | Mov { dst; src } ->
+        let init = Value.fold_simple_values dst ~init ~f in
+        Value.fold_simple_values src ~init ~f
+      | Lea { dst; src } ->
+        let init = f init (Register dst) in
+        Memory.fold_simple_values src ~init ~f
+      | Pop a -> Value.fold_simple_values a ~init ~f
+      | Push a -> Value.fold_simple_values a ~init ~f
+      | Cmp (a, b) ->
+        let init = Value.fold_simple_values a ~init ~f in
+        Value.fold_simple_values b ~init ~f
+      | Sub { dst; src } ->
+        let init = Value.fold_simple_values dst ~init ~f in
+        Value.fold_simple_values src ~init ~f
+      | Test (a, b) ->
+        let init = Value.fold_simple_values a ~init ~f in
+        Value.fold_simple_values b ~init ~f
+      | Call { fun_; call_conv = _; arity = _ } -> Value.fold_simple_values fun_ ~init ~f
     ;;
 
     let fold_map_args t ~init ~(f : _ -> _ -> op:Register_op.t -> _) =
@@ -462,6 +500,9 @@ module Instr = struct
         in
         let init, src = Memory.fold_map_simple_values src ~init ~f:(f ~op:Use) in
         init, Lea { dst; src }
+      | Pop a ->
+        let init, a = fold_map_value a ~init ~f ~op:Assignment in
+        init, Pop a
       | Push a ->
         let init, a = fold_map_value a ~init ~f ~op:Use in
         init, Push a
@@ -489,7 +530,7 @@ module Instr = struct
         | Add { dst; src } | And { dst; src } | Sub { dst; src } | Mov { dst; src } ->
           [ dst; src ]
         | Cmp (a, b) | Test (a, b) -> [ a; b ]
-        | Push x | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
+        | Push x | Pop x | Call { fun_ = x; call_conv = _; arity = _ } -> [ x ]
         | Lea { dst; src } -> [ Simple_value (Register dst); Memory src ]
       in
       pp_line fmt name args ~f:Value.pp
@@ -512,6 +553,14 @@ module Instr = struct
       | Jump value ->
         Jump (Value.map_simple_values value ~f:(Simple_value.map_registers ~f))
       | (Jump_if _ | Ret) as t -> t
+    ;;
+
+    let fold_registers t ~init ~f =
+      match t with
+      | Jump value ->
+        Value.fold_simple_values value ~init ~f:(fun init arg ->
+          Simple_value.fold_registers arg ~init ~f)
+      | Jump_if _ | Ret -> init
     ;;
 
     let pp fmt t =
@@ -550,6 +599,15 @@ module Basic_block = struct
     in
     let terminal = Instr.Terminal.map_registers terminal ~f in
     { label; code; terminal }
+  ;;
+
+  let fold_registers { label = _; code; terminal } ~init ~f =
+    let init =
+      List.fold code ~init ~f:(fun init instr ->
+        Instr.Nonterminal.fold_args instr ~init ~f:(fun init arg ->
+          Simple_value.fold_registers arg ~init ~f))
+    in
+    Instr.Terminal.fold_registers terminal ~init ~f
   ;;
 
   let pp fmt { label; code; terminal } =

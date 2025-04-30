@@ -152,6 +152,7 @@ module Instr : sig
           { dst : 'reg Value.t
           ; src : 'reg Value.t
           }
+      | Pop of 'reg Value.t
       | Push of 'reg Value.t
       | Sub of
           { dst : 'reg Value.t
@@ -195,6 +196,8 @@ module Instr : sig
           ; else_ : Label_name.t
           }
     [@@deriving sexp_of]
+
+    val map_registers : 'r1 t -> f:('r1 -> 'r2) -> 'r2 t
   end
 end
 
@@ -207,6 +210,7 @@ module Basic_block : sig
   [@@deriving sexp_of]
 
   val map_registers : 'r1 t -> f:('r1 -> 'r2) -> 'r2 t
+  val fold_registers : 'reg t -> init:'acc -> f:('acc -> 'reg -> 'acc) -> 'acc
 end
 
 module Data_decl : sig

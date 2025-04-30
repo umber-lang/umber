@@ -59,17 +59,25 @@ struct Handler(*const c_void);
 //      for the remaining unreleased resources (we'd need drop glue code for each
 //      "perform" position in the program.)
 
-#[repr(C, align(16))]
+#[repr(C)]
 struct Fiber {
     parent: *mut Fiber,
+    saved_rbp: *const c_void,
     saved_rsp: *const c_void,
     total_size: u64,
     handler_count: u64,
 }
 
+impl Fiber {
+    const HEADER_SIZE: usize = size_of::<Self>();
+}
+
+const _: () = assert!(Fiber::HEADER_SIZE == 5 * 8);
+
 unsafe fn get_handler(fiber: *mut Fiber, i: usize) -> (EffectOpId, Handler) {
-    let effect_op_id = (fiber as *const EffectOpId).add(4 + 2 * i);
-    let handler = (fiber as *const Handler).add(4 + 2 * i + 1);
+    let header_end = (fiber as *const c_void).add(Fiber::HEADER_SIZE);
+    let effect_op_id = (header_end as *const EffectOpId).add(2 * i);
+    let handler = (header_end as *const Handler).add(2 * i + 1);
     (*effect_op_id, *handler)
 }
 
@@ -95,6 +103,7 @@ unsafe extern "C" fn umber_fiber_create(parent: *mut Fiber) -> *mut Fiber {
     // Malloc will always give us 16-byte aligned data as long as the size requested is at
     // least 16 bytes.
     let fiber = malloc(DEFAULT_FIBER_SIZE) as *mut Fiber;
+    assert!(fiber as usize % 16 == 0);
     (*fiber).parent = parent;
     (*fiber).total_size = DEFAULT_FIBER_SIZE as u64;
     fiber
