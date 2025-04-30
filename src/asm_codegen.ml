@@ -539,9 +539,9 @@ end = struct
     =
     let stack_space =
       (* When entering a function, rsp will be misaligned due to the call instruction
-         pushing the return address. So we need to add an odd number of words to it to get
-         back to an even alignment. *)
-      let n = if spilled_count mod 2 = 1 then spilled_count else spilled_count + 1 in
+         pushing the return address. But, it gets realigned by pushing the frame pointer.
+         So, to ensure 16-byte alignment we need to allocate an even number of words. *)
+      let n = if spilled_count mod 2 = 0 then spilled_count else spilled_count + 1 in
       8 * n
     in
     match basic_blocks with
@@ -550,19 +550,26 @@ end = struct
       let prologue : Asm_program.Register.t Instr.Nonterminal.t list =
         [ Push (Simple_value (Register Rbp))
         ; Mov { dst = Simple_value (Register Rbp); src = Simple_value (Register Rsp) }
-        ; Sub
-            { dst = Simple_value (Register Rsp)
-            ; src = Simple_value (Constant (Int stack_space))
-            }
         ]
       in
       let epilogue : Asm_program.Register.t Instr.Nonterminal.t list =
-        [ Add
-            { dst = Simple_value (Register Rsp)
-            ; src = Simple_value (Constant (Int stack_space))
-            }
-        ; Pop (Simple_value (Register Rbp))
-        ]
+        [ Pop (Simple_value (Register Rbp)) ]
+      in
+      let prologue, epilogue =
+        if stack_space = 0
+        then prologue, epilogue
+        else
+          ( prologue
+            @ [ Sub
+                  { dst = Simple_value (Register Rsp)
+                  ; src = Simple_value (Constant (Int stack_space))
+                  }
+              ]
+          , Add
+              { dst = Simple_value (Register Rsp)
+              ; src = Simple_value (Constant (Int stack_space))
+              }
+            :: epilogue )
       in
       (match List.split_last all_but_entry with
        | None ->
@@ -2421,23 +2428,18 @@ let%expect_test "hello world, from MIR" =
     umber_main#HelloWorld:
                push      rbp
                mov       rbp, rsp
-               sub       rsp, 8
                mov       rdi, string.210886959
                call      umber_print_endline wrt ..plt
                mov       r9, rax
                mov       qword [HelloWorld.#binding.1], r9
-               add       rsp, 8
                pop       rbp
                ret
 
     Std.Prelude.print:
                push      rbp
                mov       rbp, rsp
-               sub       rsp, 8
-               mov       r9, rax
-               mov       rdi, r9
+               mov       rdi, rax
                call      umber_print_endline wrt ..plt
-               add       rsp, 8
                pop       rbp
                ret
 
@@ -2481,7 +2483,6 @@ let%expect_test "entry module" =
     main:
                push      rbp
                mov       rbp, rsp
-               sub       rsp, 8
                mov       rdi, rsp
                call      umber_fiber_create wrt ..plt
                mov       r14, rax
@@ -2494,7 +2495,6 @@ let%expect_test "entry module" =
                mov       rdi, r14
                call      umber_fiber_destroy wrt ..plt
                mov       rax, 0
-               add       rsp, 8
                pop       rbp
                ret |}]
 ;;
