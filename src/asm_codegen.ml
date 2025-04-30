@@ -343,7 +343,7 @@ end = struct
   let color_interference_graph
     ~interference_graph
     ~all_available_registers
-    ~already_spilled
+    ~registers_not_to_spill
     =
     (* See https://web.eecs.umich.edu/~mahlke/courses/583f12/reading/chaitin82.pdf for
        a description of the algorithm we are roughly following. *)
@@ -395,7 +395,7 @@ end = struct
                assert_or_compiler_bug (degree vertex >= k) ~here:[%here];
                (* Do not spill registers that were already spilled. This is important to avoid
                 a death spiral of nontermination. *)
-               if Hash_set.mem already_spilled virtual_reg
+               if Hash_set.mem registers_not_to_spill virtual_reg
                then current_max
                else (
                  eprint_s
@@ -590,7 +590,7 @@ end = struct
     let all_available_registers =
       Call_conv.all_available_registers Umber |> Asm_program.Register.Set.of_list
     in
-    let try_find_coloring ~cfg ~basic_blocks ~already_spilled =
+    let try_find_coloring ~cfg ~basic_blocks ~registers_not_to_spill =
       eprint_s
         [%here]
         [%lazy_message
@@ -626,13 +626,13 @@ end = struct
       ( color_interference_graph
           ~interference_graph
           ~all_available_registers
-          ~already_spilled
+          ~registers_not_to_spill
       , basic_blocks )
     in
-    let new_temp_registers = Virtual_register.Hash_set.create () in
+    let registers_not_to_spill = Virtual_register.Hash_set.create () in
     let rec loop ~cfg ~basic_blocks ~already_spilled_count =
       let result, basic_blocks =
-        try_find_coloring ~cfg ~basic_blocks ~already_spilled:new_temp_registers
+        try_find_coloring ~cfg ~basic_blocks ~registers_not_to_spill
       in
       match result with
       | Error newly_spilled_registers ->
@@ -648,12 +648,13 @@ end = struct
             ~already_spilled_count
             ~create_register:(fun () ->
             let tmp = Virtual_register.Counter.next register_counter in
-            Hash_set.add new_temp_registers tmp;
+            Hash_set.add registers_not_to_spill tmp;
             tmp)
         in
         let already_spilled_count =
           already_spilled_count + Nonempty.length newly_spilled_registers
         in
+        Nonempty.iter newly_spilled_registers ~f:(Hash_set.add registers_not_to_spill);
         loop ~cfg ~basic_blocks ~already_spilled_count
       | Ok coloring ->
         eprint_s
