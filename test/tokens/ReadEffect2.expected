@@ -63,10 +63,10 @@ ARROW
 L_PAREN
 R_PAREN
 R_PAREN
-(LOWER_NAME print_int)
+(LOWER_NAME ignore)
 (INT 5)
 LET
-UNDERSCORE
+(LOWER_NAME no_effects)
 EQUALS
 HANDLE
 (INT 5)
@@ -79,7 +79,7 @@ GREATER_THAN
 ARROW
 (INT 6)
 LET
-UNDERSCORE
+(LOWER_NAME resumed_twice)
 EQUALS
 HANDLE
 (LOWER_NAME read_and_add)
@@ -95,7 +95,7 @@ ARROW
 RESUME
 (INT 1)
 LET
-(LOWER_NAME _value_branch)
+(LOWER_NAME value_branch)
 EQUALS
 HANDLE
 (LOWER_NAME foo)
@@ -120,7 +120,7 @@ ARROW
 RESUME
 (INT 0)
 LET
-(LOWER_NAME _nested_handler)
+(LOWER_NAME nested_handler)
 EQUALS
 HANDLE
 L_PAREN
@@ -171,7 +171,8 @@ ARROW
 L_PAREN
 R_PAREN
 LET
-UNDERSCORE
+L_PAREN
+R_PAREN
 EQUALS
 (LOWER_NAME higher_order_handler)
 L_PAREN
@@ -186,4 +187,28 @@ L_PAREN
 R_PAREN
 R_PAREN
 R_PAREN
+LET
+(LOWER_NAME test)
+(LOWER_NAME msg)
+(LOWER_NAME result)
+EQUALS
+(LOWER_NAME print_string)
+L_PAREN
+(LOWER_NAME msg)
+(OPERATOR ++)
+(STRING ": ")
+R_PAREN
+(OPERATOR ";")
+(LOWER_NAME print_int)
+(LOWER_NAME no_effects)
+(OPERATOR ";")
+(LOWER_NAME print)
+(STRING "")
+LET
+L_PAREN
+R_PAREN
+EQUALS
+(LOWER_NAME test)
+(STRING "No effects")
+(LOWER_NAME no_effects)
 EOF

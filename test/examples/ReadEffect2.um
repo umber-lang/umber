@@ -8,23 +8,23 @@ let read_and_add () = ask () + ask ()
 
 let run_both f g x = (f x, g x)
 
-let foo () = run_both (\x -> x + read_and_add ()) print_int 5
+let foo () = run_both (\x -> x + read_and_add ()) ignore 5
 
 # TODO: Add warning for unreachable handler branches
-let _ =
+let no_effects =
   handle 5
   | <ask ()> -> 6
 
-let _ =
+let resumed_twice =
   handle read_and_add ()
   | <ask ()> -> resume 1
 
-let _value_branch =
+let value_branch =
   handle foo ()
   | (x, ()) -> x
   | <ask ()> -> resume 0
 
-let _nested_handler =
+let nested_handler =
   handle
     (handle ask ()
      | x -> x + 1
@@ -35,5 +35,14 @@ let higher_order_handler f =
   handle f ()
   | <ask ()> -> ()
 
-let _ =
+let () =
   higher_order_handler (\() -> ignore (ask ()))
+
+let test msg result =  print_string (msg ++ ": "); print_int no_effects; print ""
+
+# FIXME: Enable printing for the rest of the tests, they're broken rn
+let () =
+  test "No effects" no_effects
+  #test "Resumed twice" resumed_twice
+  #test "Value branch" value_branch;
+  #test "Nested handler" nested_handler

@@ -10,7 +10,7 @@
     (Fun_call Std.Prelude.Operators.+
      ((Fun_call ReadEffect2.ask ((Make_block (tag 0))))
       (Fun_call ReadEffect2.ask ((Make_block (tag 0)))))))))
- (Value_def ReadEffect2._.1
+ (Value_def ReadEffect2.resumed_twice
   (Handle_effects (vars ()) (value_handler ())
    (effect_handlers
     (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
@@ -31,14 +31,14 @@
     (Fun_call Std.Prelude.Operators.+
      ((Name ReadEffect2.x.2)
       (Fun_call ReadEffect2.read_and_add ((Make_block (tag 0)))))))))
- (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_decl ((name Std.Prelude.ignore) (arity 1)))
  (Fun_def
   ((fun_name ReadEffect2.foo) (args (ReadEffect2.#lambda_arg.3))
    (body
     (Fun_call ReadEffect2.run_both
-     ((Name ReadEffect2.#fun.1) (Name Std.Prelude.print_int)
+     ((Name ReadEffect2.#fun.1) (Name Std.Prelude.ignore)
       (Primitive (Int 5)))))))
- (Value_def ReadEffect2._value_branch
+ (Value_def ReadEffect2.value_branch
   (Handle_effects (vars ())
    (value_handler
     ((ReadEffect2.#lambda_arg.4
@@ -60,15 +60,14 @@
         (args (ReadEffect2.#lambda_arg.6)) (resume ReadEffect2.resume.3)
         (handler (Make_block (tag 0))))))
      (expr (Fun_call ReadEffect2.f.3 ((Make_block (tag 0)))))))))
- (Fun_decl ((name Std.Prelude.ignore) (arity 1)))
  (Fun_def
   ((fun_name ReadEffect2.#fun.2) (args (ReadEffect2.#lambda_arg.7))
    (body
     (Fun_call Std.Prelude.ignore
      ((Fun_call ReadEffect2.ask ((Make_block (tag 0)))))))))
- (Value_def ReadEffect2._.2
+ (Value_def ReadEffect2.#binding.1
   (Fun_call ReadEffect2.higher_order_handler ((Name ReadEffect2.#fun.2))))
- (Value_def ReadEffect2._.3
+ (Value_def ReadEffect2.no_effects
   (Handle_effects (vars ()) (value_handler ())
    (effect_handlers
     (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
@@ -78,7 +77,26 @@
  (Fun_def
   ((fun_name ReadEffect2.read) (args (ReadEffect2.#arg0.2))
    (body (Fun_call ReadEffect2.ask ((Name ReadEffect2.#arg0.2))))))
- (Value_def ReadEffect2._nested_handler
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print_string) (arity 1)))
+ (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_def
+  ((fun_name ReadEffect2.test)
+   (args (ReadEffect2.msg.1 ReadEffect2.result.1))
+   (body
+    (Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call "Std.Prelude.Operators.;"
+       ((Fun_call Std.Prelude.print_string
+         ((Fun_call Std.Prelude.Operators.++
+           ((Name ReadEffect2.msg.1) (Primitive (String ": "))))))
+        (Fun_call Std.Prelude.print_int ((Name ReadEffect2.no_effects)))))
+      (Fun_call Std.Prelude.print ((Primitive (String "")))))))))
+ (Value_def ReadEffect2.#binding.2
+  (Fun_call ReadEffect2.test
+   ((Primitive (String "No effects")) (Name ReadEffect2.no_effects))))
+ (Value_def ReadEffect2.nested_handler
   (Handle_effects (vars ()) (value_handler ())
    (effect_handlers
     (((effect_op ((name ReadEffect2.ask) (hash 847057113)))

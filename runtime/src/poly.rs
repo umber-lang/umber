@@ -43,9 +43,7 @@ impl PartialOrd for BlockPtr {
 
 #[no_mangle]
 pub extern "C" fn umber_eq(x: BlockPtr, y: BlockPtr) -> BlockPtr {
-    BlockPtr {
-        constant_cnstr: ConstantCnstr::new_bool(x == y),
-    }
+    BlockPtr::new_bool(x == y)
 }
 
 #[no_mangle]

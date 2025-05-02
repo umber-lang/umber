@@ -1,42 +1,51 @@
            default   rel
            global    umber_main#ReadEffect2
            global    umber_resume_wrapper:weak
+           global    ReadEffect2.no_effects
            global    ReadEffect2.higher_order_handler.handle_effects.inner#3
-           global    ReadEffect2.ask
-           global    ReadEffect2._.1
-           global    ReadEffect2.read_and_add
-           global    ReadEffect2.#fun.1
-           global    ReadEffect2._.2
-           global    umber_main#ReadEffect2.handle_effects.inner#15
-           global    ReadEffect2.run_both
+           global    ReadEffect2.#binding.2
            global    umber_main#ReadEffect2.handle_effects.inner#3
-           global    ReadEffect2.higher_order_handler
            global    ReadEffect2.read
            global    umber_main#ReadEffect2.handle_effects.inner#7
            global    umber_main#ReadEffect2.handle_effects.inner#15.handle_effects.inner#3
-           global    ReadEffect2._nested_handler
-           global    ReadEffect2.#fun.2
            global    ReadEffect2.foo
-           global    ReadEffect2._.3
-           global    ReadEffect2._value_branch
+           global    ReadEffect2.test
            global    umber_main#ReadEffect2.handle_effects.inner#11
+           global    ReadEffect2.#binding.1
+           global    ReadEffect2.value_branch
+           global    ReadEffect2.ask
+           global    ReadEffect2.nested_handler
+           global    ReadEffect2.read_and_add
+           global    ReadEffect2.#fun.1
+           global    ReadEffect2.resumed_twice
+           global    umber_main#ReadEffect2.handle_effects.inner#15
+           global    ReadEffect2.run_both
+           global    ReadEffect2.higher_order_handler
+           global    ReadEffect2.#fun.2
            global    ReadEffect2.#fun.2#closure:weak
            global    ReadEffect2.#fun.2#closure_wrapper_fun:weak
-           global    Std.Prelude.print_int#closure:weak
-           global    Std.Prelude.print_int#closure_wrapper_fun:weak
+           global    Std.Prelude.ignore#closure:weak
+           global    Std.Prelude.ignore#closure_wrapper_fun:weak
            global    ReadEffect2.#fun.1#closure:weak
            global    ReadEffect2.#fun.1#closure_wrapper_fun:weak
            global    int.5:weak
            global    int.7:weak
            global    int.1:weak
+           global    string.1007110160:weak
            global    int.0:weak
+           global    string.0:weak
            global    int.6:weak
+           global    string.868872898:weak
            extern    umber_fiber_destroy
-           extern    umber_gc_alloc
-           extern    umber_fiber_find_handler_and_detach
+           extern    Std.Prelude.Operators.__#411843497
            extern    umber_fiber_create
            extern    Std.Prelude.Operators.__#1049114386
+           extern    umber_gc_alloc
+           extern    Std.Prelude.print_string
+           extern    umber_fiber_find_handler_and_detach
+           extern    Std.Prelude.print
            extern    umber_fiber_reparent
+           extern    Std.Prelude.Operators.__#506761450
            extern    Std.Prelude.ignore
            extern    Std.Prelude.print_int
 
@@ -84,7 +93,7 @@ umber_main#ReadEffect2:
            call      umber_fiber_destroy wrt ..plt
            jmp       .handle_effects.end#2
 .handle_effects.end#2:
-           mov       qword [ReadEffect2._.1], rax
+           mov       qword [ReadEffect2.resumed_twice], rax
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
            push      .handle_effects.end#6
@@ -123,10 +132,10 @@ umber_main#ReadEffect2:
            call      umber_fiber_destroy wrt ..plt
            jmp       .handle_effects.end#6
 .handle_effects.end#6:
-           mov       qword [ReadEffect2._value_branch], rax
+           mov       qword [ReadEffect2.value_branch], rax
            mov       rax, ReadEffect2.#fun.2#closure
            call      ReadEffect2.higher_order_handler
-           mov       qword [ReadEffect2._.2], rax
+           mov       qword [ReadEffect2.#binding.1], rax
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
            push      .handle_effects.end#10
@@ -162,7 +171,11 @@ umber_main#ReadEffect2:
            call      umber_fiber_destroy wrt ..plt
            jmp       .handle_effects.end#10
 .handle_effects.end#10:
-           mov       qword [ReadEffect2._.3], rax
+           mov       qword [ReadEffect2.no_effects], rax
+           mov       rax, string.1007110160
+           mov       rbx, qword [ReadEffect2.no_effects]
+           call      ReadEffect2.test
+           mov       qword [ReadEffect2.#binding.2], rax
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
            push      .handle_effects.end#14
@@ -199,7 +212,7 @@ umber_main#ReadEffect2:
            call      umber_fiber_destroy wrt ..plt
            jmp       .handle_effects.end#14
 .handle_effects.end#14:
-           mov       qword [ReadEffect2._nested_handler], rax
+           mov       qword [ReadEffect2.nested_handler], rax
            add       rsp, 32
            pop       rbp
            ret       
@@ -211,6 +224,77 @@ ReadEffect2.higher_order_handler.handle_effects.inner#3:
            mov       rax, r9
            mov       rbx, 1
            call      qword [r9 + 8]
+           pop       rbp
+           ret       
+
+umber_main#ReadEffect2.handle_effects.inner#3:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, 1
+           call      ReadEffect2.read_and_add
+           pop       rbp
+           ret       
+
+ReadEffect2.read:
+           push      rbp
+           mov       rbp, rsp
+           call      ReadEffect2.ask
+           pop       rbp
+           ret       
+
+umber_main#ReadEffect2.handle_effects.inner#7:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, 1
+           call      ReadEffect2.foo
+           pop       rbp
+           ret       
+
+umber_main#ReadEffect2.handle_effects.inner#15.handle_effects.inner#3:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, 1
+           call      ReadEffect2.ask
+           pop       rbp
+           ret       
+
+ReadEffect2.foo:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, ReadEffect2.#fun.1#closure
+           mov       rbx, Std.Prelude.ignore#closure
+           mov       rdi, int.5
+           call      ReadEffect2.run_both
+           pop       rbp
+           ret       
+
+ReadEffect2.test:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       rbx, string.868872898
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           call      Std.Prelude.print_string wrt ..plt
+           mov       qword [rbp - 16], rax
+           mov       rax, qword [ReadEffect2.no_effects]
+           call      Std.Prelude.print_int wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rbp - 16]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rbp - 8], rax
+           mov       rax, string.0
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rbp - 8]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 16
+           pop       rbp
+           ret       
+
+umber_main#ReadEffect2.handle_effects.inner#11:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, int.5
            pop       rbp
            ret       
 
@@ -352,14 +436,6 @@ ReadEffect2.run_both:
            pop       rbp
            ret       
 
-umber_main#ReadEffect2.handle_effects.inner#3:
-           push      rbp
-           mov       rbp, rsp
-           mov       rax, 1
-           call      ReadEffect2.read_and_add
-           pop       rbp
-           ret       
-
 ReadEffect2.higher_order_handler:
            push      rbp
            mov       rbp, rsp
@@ -406,52 +482,12 @@ ReadEffect2.higher_order_handler:
            pop       rbp
            ret       
 
-ReadEffect2.read:
-           push      rbp
-           mov       rbp, rsp
-           call      ReadEffect2.ask
-           pop       rbp
-           ret       
-
-umber_main#ReadEffect2.handle_effects.inner#7:
-           push      rbp
-           mov       rbp, rsp
-           mov       rax, 1
-           call      ReadEffect2.foo
-           pop       rbp
-           ret       
-
-umber_main#ReadEffect2.handle_effects.inner#15.handle_effects.inner#3:
-           push      rbp
-           mov       rbp, rsp
-           mov       rax, 1
-           call      ReadEffect2.ask
-           pop       rbp
-           ret       
-
 ReadEffect2.#fun.2:
            push      rbp
            mov       rbp, rsp
            mov       rax, 1
            call      ReadEffect2.ask
            call      Std.Prelude.ignore wrt ..plt
-           pop       rbp
-           ret       
-
-ReadEffect2.foo:
-           push      rbp
-           mov       rbp, rsp
-           mov       rax, ReadEffect2.#fun.1#closure
-           mov       rbx, Std.Prelude.print_int#closure
-           mov       rdi, int.5
-           call      ReadEffect2.run_both
-           pop       rbp
-           ret       
-
-umber_main#ReadEffect2.handle_effects.inner#11:
-           push      rbp
-           mov       rbp, rsp
-           mov       rax, int.5
            pop       rbp
            ret       
 
@@ -463,11 +499,11 @@ ReadEffect2.#fun.2#closure_wrapper_fun:
            pop       rbp
            ret       
 
-Std.Prelude.print_int#closure_wrapper_fun:
+Std.Prelude.ignore#closure_wrapper_fun:
            push      rbp
            mov       rbp, rsp
            mov       rax, rbx
-           call      Std.Prelude.print_int
+           call      Std.Prelude.ignore
            pop       rbp
            ret       
 
@@ -519,26 +555,41 @@ int.1:
            dw        1
            dd        0
            dq        1
+string.1007110160:
+           dw        32772
+           dw        2
+           dd        0
+           db        `No effects\x0\x0\x0\x0\x0\x5`
 int.0:
            dw        32769
            dw        1
            dd        0
            dq        0
+string.0:
+           dw        32772
+           dw        1
+           dd        0
+           db        `\x0\x0\x0\x0\x0\x0\x0\x7`
 int.6:
            dw        32769
            dw        1
            dd        0
            dq        6
+string.868872898:
+           dw        32772
+           dw        1
+           dd        0
+           db        `: \x0\x0\x0\x0\x0\x5`
 ReadEffect2.#fun.2#closure:
            dw        12289
            dw        1
            dd        0
            dq        ReadEffect2.#fun.2#closure_wrapper_fun
-Std.Prelude.print_int#closure:
+Std.Prelude.ignore#closure:
            dw        12289
            dw        1
            dd        0
-           dq        Std.Prelude.print_int#closure_wrapper_fun
+           dq        Std.Prelude.ignore#closure_wrapper_fun
 ReadEffect2.#fun.1#closure:
            dw        12289
            dw        1
@@ -547,14 +598,16 @@ ReadEffect2.#fun.1#closure:
 
            section   .bss
            sectalign 8
-ReadEffect2._.1:
+ReadEffect2.no_effects:
            resq      1
-ReadEffect2._.2:
+ReadEffect2.#binding.2:
            resq      1
-ReadEffect2._nested_handler:
+ReadEffect2.#binding.1:
            resq      1
-ReadEffect2._.3:
+ReadEffect2.value_branch:
            resq      1
-ReadEffect2._value_branch:
+ReadEffect2.nested_handler:
+           resq      1
+ReadEffect2.resumed_twice:
            resq      1
 
