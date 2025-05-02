@@ -6,7 +6,7 @@ mod block;
 mod bool;
 mod char;
 mod closure;
-mod effects;
+mod fiber;
 mod float;
 mod gc;
 mod int;
