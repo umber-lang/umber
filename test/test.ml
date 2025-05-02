@@ -16,7 +16,6 @@ let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests 
 (* TODO: enable these for mir. *)
 let type_only_tests =
   [ "LetPattern" (* unions in toplevel let bindings *)
-  ; "Effects" (* effects *)
   ; "ReraiseExn" (* effects *)
   ; "State" (* effects *)
   ; "Iter" (* effects *)

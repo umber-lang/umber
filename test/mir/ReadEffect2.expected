@@ -1,0 +1,97 @@
+((Fun_def
+  ((fun_name ReadEffect2.ask) (args (ReadEffect2.#arg0.1))
+   (body
+    (Perform_effect (effect_op ((name ReadEffect2.ask) (hash 847057113)))
+     (args ((Name ReadEffect2.#arg0.1)))))))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_def
+  ((fun_name ReadEffect2.read_and_add) (args (ReadEffect2.#lambda_arg.1))
+   (body
+    (Fun_call Std.Prelude.Operators.+
+     ((Fun_call ReadEffect2.ask ((Make_block (tag 0))))
+      (Fun_call ReadEffect2.ask ((Make_block (tag 0)))))))))
+ (Value_def ReadEffect2._.1
+  (Handle_effects (vars ()) (value_handler ())
+   (effect_handlers
+    (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
+      (args (ReadEffect2.#lambda_arg.2)) (resume ReadEffect2.resume.1)
+      (handler (Fun_call ReadEffect2.resume.1 ((Primitive (Int 1))))))))
+   (expr (Fun_call ReadEffect2.read_and_add ((Make_block (tag 0)))))))
+ (Fun_def
+  ((fun_name ReadEffect2.run_both)
+   (args (ReadEffect2.f.1 ReadEffect2.g.1 ReadEffect2.x.1))
+   (body
+    (Make_block (tag 0)
+     (fields
+      ((Fun_call ReadEffect2.f.1 ((Name ReadEffect2.x.1)))
+       (Fun_call ReadEffect2.g.1 ((Name ReadEffect2.x.1)))))))))
+ (Fun_def
+  ((fun_name ReadEffect2.#fun.1) (args (ReadEffect2.x.2))
+   (body
+    (Fun_call Std.Prelude.Operators.+
+     ((Name ReadEffect2.x.2)
+      (Fun_call ReadEffect2.read_and_add ((Make_block (tag 0)))))))))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_def
+  ((fun_name ReadEffect2.foo) (args (ReadEffect2.#lambda_arg.3))
+   (body
+    (Fun_call ReadEffect2.run_both
+     ((Name ReadEffect2.#fun.1) (Name Std.Prelude.print_int)
+      (Primitive (Int 5)))))))
+ (Value_def ReadEffect2._value_branch
+  (Handle_effects (vars ())
+   (value_handler
+    ((ReadEffect2.#lambda_arg.4
+      (Let ReadEffect2.x.3
+       (Get_block_field 0 (Name ReadEffect2.#lambda_arg.4))
+       (Name ReadEffect2.x.3)))))
+   (effect_handlers
+    (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
+      (args (ReadEffect2.#lambda_arg.5)) (resume ReadEffect2.resume.2)
+      (handler (Fun_call ReadEffect2.resume.2 ((Primitive (Int 0))))))))
+   (expr (Fun_call ReadEffect2.foo ((Make_block (tag 0)))))))
+ (Fun_def
+  ((fun_name ReadEffect2.higher_order_handler) (args (ReadEffect2.f.2))
+   (body
+    (Handle_effects (vars ((ReadEffect2.f.2 ReadEffect2.f.3)))
+     (value_handler ())
+     (effect_handlers
+      (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
+        (args (ReadEffect2.#lambda_arg.6)) (resume ReadEffect2.resume.3)
+        (handler (Make_block (tag 0))))))
+     (expr (Fun_call ReadEffect2.f.3 ((Make_block (tag 0)))))))))
+ (Fun_decl ((name Std.Prelude.ignore) (arity 1)))
+ (Fun_def
+  ((fun_name ReadEffect2.#fun.2) (args (ReadEffect2.#lambda_arg.7))
+   (body
+    (Fun_call Std.Prelude.ignore
+     ((Fun_call ReadEffect2.ask ((Make_block (tag 0)))))))))
+ (Value_def ReadEffect2._.2
+  (Fun_call ReadEffect2.higher_order_handler ((Name ReadEffect2.#fun.2))))
+ (Value_def ReadEffect2._.3
+  (Handle_effects (vars ()) (value_handler ())
+   (effect_handlers
+    (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
+      (args (ReadEffect2.#lambda_arg.8)) (resume ReadEffect2.resume.4)
+      (handler (Primitive (Int 6))))))
+   (expr (Primitive (Int 5)))))
+ (Fun_def
+  ((fun_name ReadEffect2.read) (args (ReadEffect2.#arg0.2))
+   (body (Fun_call ReadEffect2.ask ((Name ReadEffect2.#arg0.2))))))
+ (Value_def ReadEffect2._nested_handler
+  (Handle_effects (vars ()) (value_handler ())
+   (effect_handlers
+    (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
+      (args (ReadEffect2.#lambda_arg.10)) (resume ReadEffect2.resume.6)
+      (handler (Fun_call ReadEffect2.resume.6 ((Primitive (Int 7))))))))
+   (expr
+    (Handle_effects (vars ())
+     (value_handler
+      ((ReadEffect2.x.4
+        (Fun_call Std.Prelude.Operators.+
+         ((Name ReadEffect2.x.4) (Primitive (Int 1)))))))
+     (effect_handlers
+      (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
+        (args (ReadEffect2.#lambda_arg.9)) (resume ReadEffect2.resume.5)
+        (handler (Fun_call ReadEffect2.resume.5 ((Primitive (Int 5))))))))
+     (expr (Fun_call ReadEffect2.ask ((Make_block (tag 0))))))))))

@@ -96,15 +96,6 @@
     (diff? asm/CrossModuleUsage.expected asm/CrossModuleUsage.out)
     (diff? llvm/CrossModuleUsage.expected llvm/CrossModuleUsage.out)
     (diff? output/CrossModuleUsage.expected output/CrossModuleUsage.out)))))
-(rule (alias runtest) (deps (package umber) (glob_files input/Effects.txt))
- (action
-  (progn (run %{dep:test.exe} %{dep:examples/Effects.um})
-   (concurrent (diff? tokens/Effects.expected tokens/Effects.out)
-    (diff? ast/Effects.expected ast/Effects.out)
-    (diff? mir/Effects.expected mir/Effects.out)
-    (diff? asm/Effects.expected asm/Effects.out)
-    (diff? llvm/Effects.expected llvm/Effects.out)
-    (diff? output/Effects.expected output/Effects.out)))))
 (rule (alias runtest) (deps (package umber) (glob_files input/Empty.txt))
  (action
   (progn (run %{dep:test.exe} %{dep:examples/Empty.um})
@@ -803,6 +794,16 @@
     (diff? asm/ReadEffect.expected asm/ReadEffect.out)
     (diff? llvm/ReadEffect.expected llvm/ReadEffect.out)
     (diff? output/ReadEffect.expected output/ReadEffect.out)))))
+(rule (alias runtest)
+ (deps (package umber) (glob_files input/ReadEffect2.txt))
+ (action
+  (progn (run %{dep:test.exe} %{dep:examples/ReadEffect2.um})
+   (concurrent (diff? tokens/ReadEffect2.expected tokens/ReadEffect2.out)
+    (diff? ast/ReadEffect2.expected ast/ReadEffect2.out)
+    (diff? mir/ReadEffect2.expected mir/ReadEffect2.out)
+    (diff? asm/ReadEffect2.expected asm/ReadEffect2.out)
+    (diff? llvm/ReadEffect2.expected llvm/ReadEffect2.out)
+    (diff? output/ReadEffect2.expected output/ReadEffect2.out)))))
 (rule (alias runtest)
  (deps (package umber) (glob_files input/RecursiveEffectDecl.txt))
  (action
