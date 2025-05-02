@@ -1,4 +1,4 @@
-use crate::block::{BlockPtr, ConstantCnstr, Value};
+use crate::block::{BlockPtr, Value};
 use core::cmp::{Ordering, PartialEq};
 
 impl PartialEq for BlockPtr {
