@@ -3,8 +3,8 @@
            global    umber_resume_wrapper:weak
            global    ReadEffect.#binding.1
            global    ReadEffect.seven
-           global    ReadEffect.seven.handle_effects.inner#3
            global    ReadEffect.ask
+           global    ReadEffect.seven.handle_effects.inner#2
            global    string.0:weak
            global    int.1:weak
            global    int.2:weak
@@ -42,10 +42,9 @@ umber_main#ReadEffect:
 ReadEffect.seven:
            push      rbp
            mov       rbp, rsp
-           sub       rsp, 16
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
-           push      .handle_effects.end#2
+           push      .handle_effects.end#1
            mov       qword [rax + 32], 1
            mov       qword [rax + 40], 347799204
            mov       qword [rax + 48], .handle_effects.handler0#0
@@ -55,13 +54,14 @@ ReadEffect.seven:
            mov       r9, qword [r14 + 24]
            lea       rsp, byte [r14 + r9]
            mov       rbp, rsp
-           call      ReadEffect.seven.handle_effects.inner#3
-           mov       rdi, r14
+           call      ReadEffect.seven.handle_effects.inner#2
+           mov       r9, r14
            mov       r14, qword [r14]
            mov       rbp, qword [r14 + 8]
            mov       rsp, qword [r14 + 16]
            sub       rsp, 8
            mov       r12, rax
+           mov       rdi, r9
            call      umber_fiber_destroy wrt ..plt
            mov       rbx, int.1
            mov       rax, r12
@@ -70,38 +70,15 @@ ReadEffect.seven:
            ret       
 .handle_effects.handler0#0:
            sub       rsp, 8
-           mov       qword [rbp - 8], rax
-           mov       rax, qword [rbp - 8]
+           mov       r9, rax
+           mov       rax, r9
            mov       rbx, int.2
-           mov       r9, qword [rbp - 8]
            call      qword [r9 + 8]
            mov       rbx, int.1
            call      Std.Prelude.Operators.__#1049114386 wrt ..plt
            add       rsp, 8
            ret       
-.handle_effects.end_handlers#1:
-           mov       r9, qword [rbp - 8]
-           mov       rdi, qword [r9 + 16]
-           call      umber_fiber_destroy wrt ..plt
-           jmp       .handle_effects.end#2
-.handle_effects.end#2:
-           add       rsp, 16
-           pop       rbp
-           ret       
-
-ReadEffect.seven.handle_effects.inner#3:
-           push      rbp
-           mov       rbp, rsp
-           sub       rsp, 16
-           mov       rax, 1
-           call      ReadEffect.ask
-           mov       qword [rbp - 8], rax
-           mov       rax, 1
-           call      ReadEffect.ask
-           mov       rbx, rax
-           mov       rax, qword [rbp - 8]
-           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
-           add       rsp, 16
+.handle_effects.end#1:
            pop       rbp
            ret       
 
@@ -134,6 +111,22 @@ ReadEffect.ask:
            mov       rsp, qword [r14 + 16]
            jmp       r13
 .perform_effect.resume_here#0:
+           add       rsp, 16
+           pop       rbp
+           ret       
+
+ReadEffect.seven.handle_effects.inner#2:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       rax, 1
+           call      ReadEffect.ask
+           mov       qword [rbp - 8], rax
+           mov       rax, 1
+           call      ReadEffect.ask
+           mov       rbx, rax
+           mov       rax, qword [rbp - 8]
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
            add       rsp, 16
            pop       rbp
            ret       

@@ -1683,9 +1683,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       Array.init effect_handler_count ~f:(fun i ->
         Function_builder.create_label fun_builder "handle_effects.handler%d" i)
     in
-    let effect_handlers_end_label =
-      Function_builder.create_label fun_builder "handle_effects.end_handlers"
-    in
     let end_label = Function_builder.create_label fun_builder "handle_effects.end" in
     (* Make is so the value branch can return to the end label. *)
     Function_builder.add_code
@@ -1855,9 +1852,9 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     (* Generate the effect handlers. *)
     let continuation = Function_builder.pick_register fun_builder in
     Nonempty.iteri effect_handlers ~f:(fun i { effect_op = _; args; resume; handler } ->
-      (* FIXME: I think the codegen is maybe gonna do something dodgy with re-using
-         registers before the [handle] and in the handler branches. e.g. it might confuse
-         whatever rax, rbx, etc. previously stored with the new values loaded here. *)
+      (* TODO: I think the only reason the codegen doesn't reuse registers for values
+         before the handler is because all the registesr are clobbered by the call to the
+         inner function above. This is very fragile. *)
       Function_builder.position_at_label fun_builder effect_handler_labels.(i);
       (* Now that we are back on the original fiber, realign the stack. *)
       Function_builder.add_code
@@ -1893,84 +1890,11 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
            ; src = Simple_value (Constant (Int 8))
            });
       Function_builder.add_terminal fun_builder Ret);
-    (* FIXME: Stack variables are invalidated after this point, because rsp has changed.
-       How can we get the codegen to understand this? Technically the stack variables are
-       still accessible, we just need to find the old rsp. Maybe we could put in a special
-       instruction to make the code load from a parent fiber? Or to not hold variables in
-       the stack across this point?
-       
-       Oh, we should treat creating a new fiber like calling a function!
-       - Have a set calling convention for passing arguments (?)
-       - That means we'd have to identify all the variables needed to pass...
-       - Variables passed on the stack would be a bit tricky - I guess we could copy them
-         to the new fiber stack? Or in the child fiber, we could rewrite the memory
-         accesses to first load the parent's rsp (seems maybe better)
-       - A regular call wouldn't quite work though, since we need to put the return address
-         on the new stack.
-
-       So, Handle_effects: [requires seeing all captured variables]
-       - Allocate new fiber
-       - Set fiber's parent to this fiber
-       - Set up arguments for function call
-       - Switch to new fiber (save rsp, set r14, set rsp)
-       - Call inner expr ()
-       - In the inner expr, when loading stack arguments, first load from the parent's
-         saved rsp
-       - (After inner expr return) destroy the fiber, switch to parent (load rsp, set r14)
-
-       Normal return:
-       - Normal function return leads back to the correct place
-
-       One problem: shouldn't the return address change if you call the continuation from
-       somewhere else?
-       - Maybe we need to edit the return address when reparenting?
-       - Hmm, the resume wrapper could edit it? That's the place that should be returned to
-       - reparenting could do it if we pass in a label to return to
-      
-
-      Example: handle 5 | x -> x + 1 
-
-      parent: handle_effects.end,
-      child:  after_inner,
-     *)
-    (* FIXME: All this messing around with rsp doesn't work properly. e.g. we do
-       `sub rsp, 8` at function start, then save/load it when switching fibers, then
-       `add rsp, 8` at function end. This doesn't sync up, and it makes the stack get
-       kinda messed up and then `ret` jumps to somewhere garbage. Need to properly think
-       about how this should work.
-       
-       The rsp we save needs to be an appropriate place to reload from. One thing is we
-       need to ensure proper 16-byte alignment. That's relatively easy. The main problem
-       is that we maintain the invariant by adding to rsp at function end. If we switch to
-       another fiber I think we also need to reset that state - we aren't ever going to
-       jump back to the same instruction location. 
-       
-       Ah, we should put the pc to return to on the fiber stack so ret between fibers works.
-       *)
-    (* After a handler expression returns, destroy the child fiber. *)
-    Function_builder.position_at_label fun_builder effect_handlers_end_label;
-    (* FIXME: To run the effect handler, we should have already switched to the parent
-       fiber. Think about how perform should handle this - we don't actually know where
-       the child fiber is to destroy it. Maybe load it out of the resumption? *)
-    let child_fiber =
-      load_block_field fun_builder continuation (Mir.Block_index.of_int 1)
-    in
-    let (_ : Virtual_register.t) =
-      declare_and_call_extern_c_function
-        t
-        ~fun_builder
-        ~fun_name:(Label_name.of_string "umber_fiber_destroy")
-        ~args:[ child_fiber ]
-    in
-    Function_builder.add_terminal
-      fun_builder
-      (Jump (Simple_value (Global (end_label, Other))));
+    (* Finally, return the computed value. *)
     Function_builder.position_at_label fun_builder end_label;
-    (* FIXME: Need to return back to somewhere dynamically. I guess we should codegen all
-       the handlers like functions too, maybe? It's tricky to keep track of the stack
-       state. We can't just push stuff on the stack because it's mess up local variable
-       addressing. Although, I guess we could use the frame pointer for that! *)
-    Simple_value (Register (Real (Call_conv.return_value_register Umber)))
+    Function_builder.move_to_new_register
+      fun_builder
+      (Simple_value (Register (Real (Call_conv.return_value_register Umber))))
   | Perform_effect { effect_op; args } ->
     (* Evaluate the arguments before doing anything. *)
     let args = Nonempty.map args ~f:(codegen_expr t ~fun_builder) in

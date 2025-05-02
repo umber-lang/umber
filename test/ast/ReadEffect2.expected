@@ -26,7 +26,7 @@ let resumed_twice : Int =
 let value_branch : Int =
   handle foo () : (Int, ())
   | (x, ()) -> x
-  | <ask ()> -> resume 0
+  | <ask ()> -> resume -1
 
 let nested_handler : Int =
   handle
@@ -43,10 +43,14 @@ let higher_order_handler : (() -> <Read, a> ()) -> <a> () =
 
 let () = higher_order_handler ((\() -> ignore (ask () : Int)) : () -> <Read> ())
 
-let test : String, Any -> () =
+let test : String, Int -> () =
   \msg result ->
     print_string (msg ++ ": " : String);
-    print_int no_effects;
+    print_int result;
     print ""
 
-let () = test "No effects" no_effects
+let () =
+  test "No effects" no_effects;
+  test "Resumed twice" resumed_twice;
+  test "Value branch" value_branch;
+  test "Nested handler" nested_handler

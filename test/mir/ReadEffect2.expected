@@ -48,7 +48,7 @@
    (effect_handlers
     (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
       (args (ReadEffect2.#lambda_arg.5)) (resume ReadEffect2.resume.2)
-      (handler (Fun_call ReadEffect2.resume.2 ((Primitive (Int 0))))))))
+      (handler (Fun_call ReadEffect2.resume.2 ((Primitive (Int -1))))))))
    (expr (Fun_call ReadEffect2.foo ((Make_block (tag 0)))))))
  (Fun_def
   ((fun_name ReadEffect2.higher_order_handler) (args (ReadEffect2.f.2))
@@ -91,11 +91,8 @@
        ((Fun_call Std.Prelude.print_string
          ((Fun_call Std.Prelude.Operators.++
            ((Name ReadEffect2.msg.1) (Primitive (String ": "))))))
-        (Fun_call Std.Prelude.print_int ((Name ReadEffect2.no_effects)))))
+        (Fun_call Std.Prelude.print_int ((Name ReadEffect2.result.1)))))
       (Fun_call Std.Prelude.print ((Primitive (String "")))))))))
- (Value_def ReadEffect2.#binding.2
-  (Fun_call ReadEffect2.test
-   ((Primitive (String "No effects")) (Name ReadEffect2.no_effects))))
  (Value_def ReadEffect2.nested_handler
   (Handle_effects (vars ()) (value_handler ())
    (effect_handlers
@@ -112,4 +109,18 @@
       (((effect_op ((name ReadEffect2.ask) (hash 847057113)))
         (args (ReadEffect2.#lambda_arg.9)) (resume ReadEffect2.resume.5)
         (handler (Fun_call ReadEffect2.resume.5 ((Primitive (Int 5))))))))
-     (expr (Fun_call ReadEffect2.ask ((Make_block (tag 0))))))))))
+     (expr (Fun_call ReadEffect2.ask ((Make_block (tag 0)))))))))
+ (Value_def ReadEffect2.#binding.2
+  (Fun_call "Std.Prelude.Operators.;"
+   ((Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call "Std.Prelude.Operators.;"
+       ((Fun_call ReadEffect2.test
+         ((Primitive (String "No effects")) (Name ReadEffect2.no_effects)))
+        (Fun_call ReadEffect2.test
+         ((Primitive (String "Resumed twice"))
+          (Name ReadEffect2.resumed_twice)))))
+      (Fun_call ReadEffect2.test
+       ((Primitive (String "Value branch")) (Name ReadEffect2.value_branch)))))
+    (Fun_call ReadEffect2.test
+     ((Primitive (String "Nested handler"))
+      (Name ReadEffect2.nested_handler)))))))

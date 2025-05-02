@@ -22,7 +22,7 @@ let resumed_twice =
 let value_branch =
   handle foo ()
   | (x, ()) -> x
-  | <ask ()> -> resume 0
+  | <ask ()> -> resume -1
 
 let nested_handler =
   handle
@@ -38,11 +38,10 @@ let higher_order_handler f =
 let () =
   higher_order_handler (\() -> ignore (ask ()))
 
-let test msg result =  print_string (msg ++ ": "); print_int no_effects; print ""
+let test msg result = print_string (msg ++ ": "); print_int result; print ""
 
-# FIXME: Enable printing for the rest of the tests, they're broken rn
 let () =
-  test "No effects" no_effects
-  #test "Resumed twice" resumed_twice
-  #test "Value branch" value_branch;
-  #test "Nested handler" nested_handler
+  test "No effects" no_effects;
+  test "Resumed twice" resumed_twice;
+  test "Value branch" value_branch;
+  test "Nested handler" nested_handler

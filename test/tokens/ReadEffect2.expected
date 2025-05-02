@@ -118,7 +118,7 @@ R_PAREN
 GREATER_THAN
 ARROW
 RESUME
-(INT 0)
+(INT -1)
 LET
 (LOWER_NAME nested_handler)
 EQUALS
@@ -200,7 +200,7 @@ L_PAREN
 R_PAREN
 (OPERATOR ";")
 (LOWER_NAME print_int)
-(LOWER_NAME no_effects)
+(LOWER_NAME result)
 (OPERATOR ";")
 (LOWER_NAME print)
 (STRING "")
@@ -211,4 +211,16 @@ EQUALS
 (LOWER_NAME test)
 (STRING "No effects")
 (LOWER_NAME no_effects)
+(OPERATOR ";")
+(LOWER_NAME test)
+(STRING "Resumed twice")
+(LOWER_NAME resumed_twice)
+(OPERATOR ";")
+(LOWER_NAME test)
+(STRING "Value branch")
+(LOWER_NAME value_branch)
+(OPERATOR ";")
+(LOWER_NAME test)
+(STRING "Nested handler")
+(LOWER_NAME nested_handler)
 EOF

@@ -2,14 +2,14 @@
            global    umber_main#ReadEffect2
            global    umber_resume_wrapper:weak
            global    ReadEffect2.no_effects
-           global    ReadEffect2.higher_order_handler.handle_effects.inner#3
+           global    umber_main#ReadEffect2.handle_effects.inner#11.handle_effects.inner#2
            global    ReadEffect2.#binding.2
-           global    umber_main#ReadEffect2.handle_effects.inner#3
            global    ReadEffect2.read
-           global    umber_main#ReadEffect2.handle_effects.inner#7
-           global    umber_main#ReadEffect2.handle_effects.inner#15.handle_effects.inner#3
            global    ReadEffect2.foo
+           global    umber_main#ReadEffect2.handle_effects.inner#5
            global    ReadEffect2.test
+           global    umber_main#ReadEffect2.handle_effects.inner#8
+           global    ReadEffect2.higher_order_handler.handle_effects.inner#2
            global    umber_main#ReadEffect2.handle_effects.inner#11
            global    ReadEffect2.#binding.1
            global    ReadEffect2.value_branch
@@ -18,10 +18,10 @@
            global    ReadEffect2.read_and_add
            global    ReadEffect2.#fun.1
            global    ReadEffect2.resumed_twice
-           global    umber_main#ReadEffect2.handle_effects.inner#15
            global    ReadEffect2.run_both
            global    ReadEffect2.higher_order_handler
            global    ReadEffect2.#fun.2
+           global    umber_main#ReadEffect2.handle_effects.inner#2
            global    ReadEffect2.#fun.2#closure:weak
            global    ReadEffect2.#fun.2#closure_wrapper_fun:weak
            global    Std.Prelude.ignore#closure:weak
@@ -29,12 +29,15 @@
            global    ReadEffect2.#fun.1#closure:weak
            global    ReadEffect2.#fun.1#closure_wrapper_fun:weak
            global    int.5:weak
-           global    int.7:weak
            global    int.1:weak
-           global    string.1007110160:weak
-           global    int.0:weak
            global    string.0:weak
+           global    string.931878710:weak
+           global    int.7:weak
+           global    int.__1#1027118000:weak
+           global    string.1007110160:weak
+           global    string.983022309:weak
            global    int.6:weak
+           global    string.723483344:weak
            global    string.868872898:weak
            extern    umber_fiber_destroy
            extern    Std.Prelude.Operators.__#411843497
@@ -57,7 +60,7 @@ umber_main#ReadEffect2:
            sub       rsp, 32
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
-           push      .handle_effects.end#2
+           push      .handle_effects.end#1
            mov       qword [rax + 32], 1
            mov       qword [rax + 40], 847057113
            mov       qword [rax + 48], .handle_effects.handler0#0
@@ -67,46 +70,40 @@ umber_main#ReadEffect2:
            mov       r9, qword [r14 + 24]
            lea       rsp, byte [r14 + r9]
            mov       rbp, rsp
-           call      umber_main#ReadEffect2.handle_effects.inner#3
+           call      umber_main#ReadEffect2.handle_effects.inner#2
            mov       rdi, r14
            mov       r14, qword [r14]
            mov       rbp, qword [r14 + 8]
            mov       rsp, qword [r14 + 16]
            sub       rsp, 8
-           mov       qword [rbp - 16], rax
+           mov       r13, rax
            call      umber_fiber_destroy wrt ..plt
-           mov       rax, qword [rbp - 16]
+           mov       rax, r13
            add       rsp, 8
            ret       
 .handle_effects.handler0#0:
            sub       rsp, 8
-           mov       qword [rbp - 8], rax
-           mov       rax, qword [rbp - 8]
+           mov       r9, rax
+           mov       rax, r9
            mov       rbx, int.1
-           mov       r9, qword [rbp - 8]
            call      qword [r9 + 8]
            add       rsp, 8
            ret       
-.handle_effects.end_handlers#1:
-           mov       r9, qword [rbp - 8]
-           mov       rdi, qword [r9 + 16]
-           call      umber_fiber_destroy wrt ..plt
-           jmp       .handle_effects.end#2
-.handle_effects.end#2:
+.handle_effects.end#1:
            mov       qword [ReadEffect2.resumed_twice], rax
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
-           push      .handle_effects.end#6
+           push      .handle_effects.end#4
            mov       qword [rax + 32], 1
            mov       qword [rax + 40], 847057113
-           mov       qword [rax + 48], .handle_effects.handler0#4
+           mov       qword [rax + 48], .handle_effects.handler0#3
            mov       qword [r14 + 8], rbp
            mov       qword [r14 + 16], rsp
            mov       r14, rax
            mov       r9, qword [r14 + 24]
            lea       rsp, byte [r14 + r9]
            mov       rbp, rsp
-           call      umber_main#ReadEffect2.handle_effects.inner#7
+           call      umber_main#ReadEffect2.handle_effects.inner#5
            mov       rdi, r14
            mov       r14, qword [r14]
            mov       rbp, qword [r14 + 8]
@@ -117,31 +114,55 @@ umber_main#ReadEffect2:
            mov       rax, qword [r13 + 8]
            add       rsp, 8
            ret       
-.handle_effects.handler0#4:
+.handle_effects.handler0#3:
            sub       rsp, 8
-           mov       qword [rbp - 32], rax
-           mov       rax, qword [rbp - 32]
-           mov       rbx, int.0
-           mov       r9, qword [rbp - 32]
+           mov       r9, rax
+           mov       rax, r9
+           mov       rbx, int.__1#1027118000
            call      qword [r9 + 8]
            add       rsp, 8
            ret       
-.handle_effects.end_handlers#5:
-           mov       r9, qword [rbp - 32]
-           mov       rdi, qword [r9 + 16]
-           call      umber_fiber_destroy wrt ..plt
-           jmp       .handle_effects.end#6
-.handle_effects.end#6:
+.handle_effects.end#4:
            mov       qword [ReadEffect2.value_branch], rax
            mov       rax, ReadEffect2.#fun.2#closure
            call      ReadEffect2.higher_order_handler
            mov       qword [ReadEffect2.#binding.1], rax
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
+           push      .handle_effects.end#7
+           mov       qword [rax + 32], 1
+           mov       qword [rax + 40], 847057113
+           mov       qword [rax + 48], .handle_effects.handler0#6
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, rax
+           mov       r9, qword [r14 + 24]
+           lea       rsp, byte [r14 + r9]
+           mov       rbp, rsp
+           call      umber_main#ReadEffect2.handle_effects.inner#8
+           mov       rdi, r14
+           mov       r14, qword [r14]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           sub       rsp, 8
+           mov       r13, rax
+           call      umber_fiber_destroy wrt ..plt
+           mov       rax, r13
+           add       rsp, 8
+           ret       
+.handle_effects.handler0#6:
+           sub       rsp, 8
+           mov       rax, int.6
+           add       rsp, 8
+           ret       
+.handle_effects.end#7:
+           mov       qword [ReadEffect2.no_effects], rax
+           mov       rdi, r14
+           call      umber_fiber_create wrt ..plt
            push      .handle_effects.end#10
            mov       qword [rax + 32], 1
            mov       qword [rax + 40], 847057113
-           mov       qword [rax + 48], .handle_effects.handler0#8
+           mov       qword [rax + 48], .handle_effects.handler0#9
            mov       qword [r14 + 8], rbp
            mov       qword [r14 + 16], rsp
            mov       r14, rax
@@ -159,47 +180,7 @@ umber_main#ReadEffect2:
            mov       rax, r13
            add       rsp, 8
            ret       
-.handle_effects.handler0#8:
-           sub       rsp, 8
-           mov       rax, int.6
-           mov       qword [rbp - 24], rax
-           add       rsp, 8
-           ret       
-.handle_effects.end_handlers#9:
-           mov       r9, qword [rbp - 24]
-           mov       rdi, qword [r9 + 16]
-           call      umber_fiber_destroy wrt ..plt
-           jmp       .handle_effects.end#10
-.handle_effects.end#10:
-           mov       qword [ReadEffect2.no_effects], rax
-           mov       rax, string.1007110160
-           mov       rbx, qword [ReadEffect2.no_effects]
-           call      ReadEffect2.test
-           mov       qword [ReadEffect2.#binding.2], rax
-           mov       rdi, r14
-           call      umber_fiber_create wrt ..plt
-           push      .handle_effects.end#14
-           mov       qword [rax + 32], 1
-           mov       qword [rax + 40], 847057113
-           mov       qword [rax + 48], .handle_effects.handler0#12
-           mov       qword [r14 + 8], rbp
-           mov       qword [r14 + 16], rsp
-           mov       r14, rax
-           mov       r9, qword [r14 + 24]
-           lea       rsp, byte [r14 + r9]
-           mov       rbp, rsp
-           call      umber_main#ReadEffect2.handle_effects.inner#15
-           mov       rdi, r14
-           mov       r14, qword [r14]
-           mov       rbp, qword [r14 + 8]
-           mov       rsp, qword [r14 + 16]
-           sub       rsp, 8
-           mov       r13, rax
-           call      umber_fiber_destroy wrt ..plt
-           mov       rax, r13
-           add       rsp, 8
-           ret       
-.handle_effects.handler0#12:
+.handle_effects.handler0#9:
            sub       rsp, 8
            mov       r9, rax
            mov       rax, r9
@@ -207,53 +188,49 @@ umber_main#ReadEffect2:
            call      qword [r9 + 8]
            add       rsp, 8
            ret       
-.handle_effects.end_handlers#13:
-           mov       rdi, qword [r9 + 16]
-           call      umber_fiber_destroy wrt ..plt
-           jmp       .handle_effects.end#14
-.handle_effects.end#14:
+.handle_effects.end#10:
            mov       qword [ReadEffect2.nested_handler], rax
+           mov       rax, string.1007110160
+           mov       rbx, qword [ReadEffect2.no_effects]
+           call      ReadEffect2.test
+           mov       qword [rbp - 24], rax
+           mov       rax, string.931878710
+           mov       rbx, qword [ReadEffect2.resumed_twice]
+           call      ReadEffect2.test
+           mov       rbx, rax
+           mov       rax, qword [rbp - 24]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rbp - 16], rax
+           mov       rax, string.983022309
+           mov       rbx, qword [ReadEffect2.value_branch]
+           call      ReadEffect2.test
+           mov       rbx, rax
+           mov       rax, qword [rbp - 16]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rbp - 8], rax
+           mov       rax, string.723483344
+           mov       rbx, qword [ReadEffect2.nested_handler]
+           call      ReadEffect2.test
+           mov       rbx, rax
+           mov       rax, qword [rbp - 8]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       r9, rax
+           mov       qword [ReadEffect2.#binding.2], r9
            add       rsp, 32
            pop       rbp
            ret       
 
-ReadEffect2.higher_order_handler.handle_effects.inner#3:
-           push      rbp
-           mov       rbp, rsp
-           mov       r9, rax
-           mov       rax, r9
-           mov       rbx, 1
-           call      qword [r9 + 8]
-           pop       rbp
-           ret       
-
-umber_main#ReadEffect2.handle_effects.inner#3:
+umber_main#ReadEffect2.handle_effects.inner#11.handle_effects.inner#2:
            push      rbp
            mov       rbp, rsp
            mov       rax, 1
-           call      ReadEffect2.read_and_add
+           call      ReadEffect2.ask
            pop       rbp
            ret       
 
 ReadEffect2.read:
            push      rbp
            mov       rbp, rsp
-           call      ReadEffect2.ask
-           pop       rbp
-           ret       
-
-umber_main#ReadEffect2.handle_effects.inner#7:
-           push      rbp
-           mov       rbp, rsp
-           mov       rax, 1
-           call      ReadEffect2.foo
-           pop       rbp
-           ret       
-
-umber_main#ReadEffect2.handle_effects.inner#15.handle_effects.inner#3:
-           push      rbp
-           mov       rbp, rsp
-           mov       rax, 1
            call      ReadEffect2.ask
            pop       rbp
            ret       
@@ -268,15 +245,24 @@ ReadEffect2.foo:
            pop       rbp
            ret       
 
+umber_main#ReadEffect2.handle_effects.inner#5:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, 1
+           call      ReadEffect2.foo
+           pop       rbp
+           ret       
+
 ReadEffect2.test:
            push      rbp
            mov       rbp, rsp
-           sub       rsp, 16
+           sub       rsp, 32
+           mov       qword [rbp - 24], rbx
            mov       rbx, string.868872898
            call      Std.Prelude.Operators.__#411843497 wrt ..plt
            call      Std.Prelude.print_string wrt ..plt
            mov       qword [rbp - 16], rax
-           mov       rax, qword [ReadEffect2.no_effects]
+           mov       rax, qword [rbp - 24]
            call      Std.Prelude.print_int wrt ..plt
            mov       rbx, rax
            mov       rax, qword [rbp - 16]
@@ -287,14 +273,65 @@ ReadEffect2.test:
            mov       rbx, rax
            mov       rax, qword [rbp - 8]
            call      Std.Prelude.Operators.__#506761450 wrt ..plt
-           add       rsp, 16
+           add       rsp, 32
+           pop       rbp
+           ret       
+
+umber_main#ReadEffect2.handle_effects.inner#8:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, int.5
+           pop       rbp
+           ret       
+
+ReadEffect2.higher_order_handler.handle_effects.inner#2:
+           push      rbp
+           mov       rbp, rsp
+           mov       r9, rax
+           mov       rax, r9
+           mov       rbx, 1
+           call      qword [r9 + 8]
            pop       rbp
            ret       
 
 umber_main#ReadEffect2.handle_effects.inner#11:
            push      rbp
            mov       rbp, rsp
-           mov       rax, int.5
+           mov       rdi, r14
+           call      umber_fiber_create wrt ..plt
+           push      .handle_effects.end#1
+           mov       qword [rax + 32], 1
+           mov       qword [rax + 40], 847057113
+           mov       qword [rax + 48], .handle_effects.handler0#0
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, rax
+           mov       r9, qword [r14 + 24]
+           lea       rsp, byte [r14 + r9]
+           mov       rbp, rsp
+           call      umber_main#ReadEffect2.handle_effects.inner#11.handle_effects.inner#2
+           mov       r9, r14
+           mov       r14, qword [r14]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           sub       rsp, 8
+           mov       r12, rax
+           mov       rdi, r9
+           call      umber_fiber_destroy wrt ..plt
+           mov       rbx, int.1
+           mov       rax, r12
+           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
+           add       rsp, 8
+           ret       
+.handle_effects.handler0#0:
+           sub       rsp, 8
+           mov       r9, rax
+           mov       rax, r9
+           mov       rbx, int.5
+           call      qword [r9 + 8]
+           add       rsp, 8
+           ret       
+.handle_effects.end#1:
            pop       rbp
            ret       
 
@@ -361,54 +398,6 @@ ReadEffect2.#fun.1:
            pop       rbp
            ret       
 
-umber_main#ReadEffect2.handle_effects.inner#15:
-           push      rbp
-           mov       rbp, rsp
-           sub       rsp, 16
-           mov       rdi, r14
-           call      umber_fiber_create wrt ..plt
-           push      .handle_effects.end#2
-           mov       qword [rax + 32], 1
-           mov       qword [rax + 40], 847057113
-           mov       qword [rax + 48], .handle_effects.handler0#0
-           mov       qword [r14 + 8], rbp
-           mov       qword [r14 + 16], rsp
-           mov       r14, rax
-           mov       r9, qword [r14 + 24]
-           lea       rsp, byte [r14 + r9]
-           mov       rbp, rsp
-           call      umber_main#ReadEffect2.handle_effects.inner#15.handle_effects.inner#3
-           mov       rdi, r14
-           mov       r14, qword [r14]
-           mov       rbp, qword [r14 + 8]
-           mov       rsp, qword [r14 + 16]
-           sub       rsp, 8
-           mov       r12, rax
-           call      umber_fiber_destroy wrt ..plt
-           mov       rbx, int.1
-           mov       rax, r12
-           call      Std.Prelude.Operators.__#1049114386 wrt ..plt
-           add       rsp, 8
-           ret       
-.handle_effects.handler0#0:
-           sub       rsp, 8
-           mov       qword [rbp - 8], rax
-           mov       rax, qword [rbp - 8]
-           mov       rbx, int.5
-           mov       r9, qword [rbp - 8]
-           call      qword [r9 + 8]
-           add       rsp, 8
-           ret       
-.handle_effects.end_handlers#1:
-           mov       r9, qword [rbp - 8]
-           mov       rdi, qword [r9 + 16]
-           call      umber_fiber_destroy wrt ..plt
-           jmp       .handle_effects.end#2
-.handle_effects.end#2:
-           add       rsp, 16
-           pop       rbp
-           ret       
-
 ReadEffect2.run_both:
            push      rbp
            mov       rbp, rsp
@@ -439,12 +428,11 @@ ReadEffect2.run_both:
 ReadEffect2.higher_order_handler:
            push      rbp
            mov       rbp, rsp
-           sub       rsp, 16
            mov       r13, rax
            mov       rdi, r14
            call      umber_fiber_create wrt ..plt
            mov       r9, rax
-           push      .handle_effects.end#2
+           push      .handle_effects.end#1
            mov       qword [r9 + 32], 1
            mov       qword [r9 + 40], 847057113
            mov       qword [r9 + 48], .handle_effects.handler0#0
@@ -455,30 +443,25 @@ ReadEffect2.higher_order_handler:
            mov       r9, qword [r14 + 24]
            lea       rsp, byte [r14 + r9]
            mov       rbp, rsp
-           call      ReadEffect2.higher_order_handler.handle_effects.inner#3
-           mov       rdi, r14
+           call      ReadEffect2.higher_order_handler.handle_effects.inner#2
+           mov       r9, r14
            mov       r14, qword [r14]
            mov       rbp, qword [r14 + 8]
            mov       rsp, qword [r14 + 16]
            sub       rsp, 8
            mov       r13, rax
+           mov       rdi, r9
            call      umber_fiber_destroy wrt ..plt
            mov       rax, r13
            add       rsp, 8
            ret       
 .handle_effects.handler0#0:
            sub       rsp, 8
-           mov       qword [rbp - 8], rax
+           mov       r9, rax
            mov       rax, 1
            add       rsp, 8
            ret       
-.handle_effects.end_handlers#1:
-           mov       r9, qword [rbp - 8]
-           mov       rdi, qword [r9 + 16]
-           call      umber_fiber_destroy wrt ..plt
-           jmp       .handle_effects.end#2
-.handle_effects.end#2:
-           add       rsp, 16
+.handle_effects.end#1:
            pop       rbp
            ret       
 
@@ -488,6 +471,14 @@ ReadEffect2.#fun.2:
            mov       rax, 1
            call      ReadEffect2.ask
            call      Std.Prelude.ignore wrt ..plt
+           pop       rbp
+           ret       
+
+umber_main#ReadEffect2.handle_effects.inner#2:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, 1
+           call      ReadEffect2.read_and_add
            pop       rbp
            ret       
 
@@ -545,36 +536,51 @@ int.5:
            dw        1
            dd        0
            dq        5
-int.7:
-           dw        32769
-           dw        1
-           dd        0
-           dq        7
 int.1:
            dw        32769
            dw        1
            dd        0
            dq        1
-string.1007110160:
-           dw        32772
-           dw        2
-           dd        0
-           db        `No effects\x0\x0\x0\x0\x0\x5`
-int.0:
-           dw        32769
-           dw        1
-           dd        0
-           dq        0
 string.0:
            dw        32772
            dw        1
            dd        0
            db        `\x0\x0\x0\x0\x0\x0\x0\x7`
+string.931878710:
+           dw        32772
+           dw        2
+           dd        0
+           db        `Resumed twice\x0\x0\x2`
+int.7:
+           dw        32769
+           dw        1
+           dd        0
+           dq        7
+int.__1#1027118000:
+           dw        32769
+           dw        1
+           dd        0
+           dq        -1
+string.1007110160:
+           dw        32772
+           dw        2
+           dd        0
+           db        `No effects\x0\x0\x0\x0\x0\x5`
+string.983022309:
+           dw        32772
+           dw        2
+           dd        0
+           db        `Value branch\x0\x0\x0\x3`
 int.6:
            dw        32769
            dw        1
            dd        0
            dq        6
+string.723483344:
+           dw        32772
+           dw        2
+           dd        0
+           db        `Nested handler\x0\x1`
 string.868872898:
            dw        32772
            dw        1
