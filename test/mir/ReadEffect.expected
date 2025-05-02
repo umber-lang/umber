@@ -1,0 +1,33 @@
+((Fun_def
+  ((fun_name ReadEffect.ask) (args (ReadEffect.#arg0.1))
+   (body
+    (Perform_effect (effect_op ((name ReadEffect.ask) (hash 347799204)))
+     (args ((Name ReadEffect.#arg0.1)))))))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_def
+  ((fun_name ReadEffect.seven) (args (ReadEffect.#lambda_arg.1))
+   (body
+    (Handle_effects (vars ())
+     (value_handler
+      ((ReadEffect.x.1
+        (Fun_call Std.Prelude.Operators.+
+         ((Name ReadEffect.x.1) (Primitive (Int 1)))))))
+     (effect_handlers
+      (((effect_op ((name ReadEffect.ask) (hash 347799204)))
+        (args (ReadEffect.#lambda_arg.2)) (resume ReadEffect.resume.1)
+        (handler
+         (Fun_call Std.Prelude.Operators.+
+          ((Fun_call ReadEffect.resume.1 ((Primitive (Int 2))))
+           (Primitive (Int 1))))))))
+     (expr
+      (Fun_call Std.Prelude.Operators.+
+       ((Fun_call ReadEffect.ask ((Make_block (tag 0))))
+        (Fun_call ReadEffect.ask ((Make_block (tag 0)))))))))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Value_def ReadEffect.#binding.1
+  (Fun_call "Std.Prelude.Operators.;"
+   ((Fun_call Std.Prelude.print_int
+     ((Fun_call ReadEffect.seven ((Make_block (tag 0))))))
+    (Fun_call Std.Prelude.print ((Primitive (String ""))))))))

@@ -249,12 +249,11 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
            Ok (module_path, mir, asm)))
       ~generating_llvm:
         (run_stage ~f:(fun (module_path, mir, asm) ->
-           let%map.Result codegen =
-             Codegen.of_mir ~module_path ~source_filename:filename mir
-           in
-           maybe_output Llvm ~f:(fun out ->
-             fprintf out "%s\n" (Codegen.to_string codegen));
-           module_path, asm))
+           Codegen.of_mir ~module_path ~source_filename:filename mir
+           |> Result.iter ~f:(fun codegen ->
+                maybe_output Llvm ~f:(fun out ->
+                  fprintf out "%s\n" (Codegen.to_string codegen)));
+           Ok (module_path, asm)))
       ~linking:
         (run_stage ~f:(fun (module_path, asm) ->
            match Output.find_target output Exe with

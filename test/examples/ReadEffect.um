@@ -1,0 +1,10 @@
+effect Read = {
+  val ask : () -> Int
+}
+
+let seven () =
+  handle ask () + ask ()
+  | x -> x + 1
+  | <ask ()> -> resume 2 + 1
+
+let () = print_int (seven ()); print ""

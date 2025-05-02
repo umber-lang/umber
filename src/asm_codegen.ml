@@ -695,6 +695,10 @@ module Function_builder : sig
   val create_label : ?global:bool -> t -> ('a, unit, string, Label_name.t) format4 -> 'a
   val pick_register : t -> Register.t Value.t
   val pick_register' : t -> Virtual_register.t
+
+  (* TODO: Most uses of [pick_register] should probably use [move_to_new_register] instead. *)
+  val move_to_new_register : t -> Register.t Value.t -> Register.t Value.t
+  val move_to_new_register' : t -> Register.t Value.t -> Virtual_register.t
   val name : t -> Label_name.t
   val arity : t -> int
 
@@ -795,6 +799,18 @@ end = struct
             ~current_label:(t.current_label : Label_name.t)
             (bb : Block_builder.t)
             (error : Error.t)]
+  ;;
+
+  let move_to_new_register t src =
+    let dst = pick_register t in
+    add_code t (Mov { dst; src });
+    dst
+  ;;
+
+  let move_to_new_register' t src =
+    let dst = pick_register' t in
+    add_code t (Mov { dst = Simple_value (Register (Virtual dst)); src });
+    dst
   ;;
 
   let create fun_name ~arity =
@@ -1163,18 +1179,12 @@ let lookup_name_for_value t name ~fun_builder : _ Value.t =
        wrapper_closure label_name ~arity)
 ;;
 
-let load_mem_offset fun_builder (value : _ Value.t) size offset : _ Value.t =
+let load_mem_offset fun_builder (value : Register.t Value.t) size offset : _ Value.t =
   let simple_value =
     match value with
     | Simple_value v -> v
     | Memory mem ->
-      let tmp : Register.t Simple_value.t =
-        Register (Virtual (Function_builder.pick_register' fun_builder))
-      in
-      Function_builder.add_code
-        fun_builder
-        (Mov { dst = Simple_value tmp; src = Memory mem });
-      tmp
+      Register (Virtual (Function_builder.move_to_new_register' fun_builder (Memory mem)))
   in
   Memory (Memory.offset simple_value size offset)
 ;;
@@ -1373,7 +1383,7 @@ end = struct
   let get_handler_pointer fiber i = get_field fiber (number_of_header_fields + (2 * i) + 1)
 end
 
-let set_rsp_for_fiber_just_created ~fun_builder =
+let setup_stack_pointers_for_fiber_just_created ~fun_builder =
   let fiber_size = Function_builder.pick_register' fun_builder in
   Function_builder.add_code
     fun_builder
@@ -1386,6 +1396,12 @@ let set_rsp_for_fiber_just_created ~fun_builder =
     (Lea
        { dst = Real Rsp
        ; src = I8, Add (Value Fiber_layout.current, Value (Register (Virtual fiber_size)))
+       });
+  Function_builder.add_code
+    fun_builder
+    (Mov
+       { dst = Simple_value (Register (Real Rbp))
+       ; src = Simple_value (Register (Real Rsp))
        })
 ;;
 
@@ -1415,7 +1431,7 @@ let switch_to_fiber ~fun_builder ~new_fiber ~operation =
   match operation with
   | `Create_child ->
     (* For newly created fibers, set the stack pointer to the end of the fiber. *)
-    set_rsp_for_fiber_just_created ~fun_builder
+    setup_stack_pointers_for_fiber_just_created ~fun_builder
   | `Destroy_child | `Normal_switch ->
     (* For resuming existing fibers, load the previously saved stack pointer. *)
     Function_builder.add_code
@@ -1481,11 +1497,9 @@ let define_umber_resume_wrapper t =
       |> Nonempty.to_list
       |> Fn.flip List.take arity
       |> List.map ~f:(fun reg ->
-           let virtual_reg = Function_builder.pick_register fun_builder in
-           Function_builder.add_code
+           Function_builder.move_to_new_register
              fun_builder
-             (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
-           virtual_reg)
+             (Simple_value (Register (Real reg))))
     in
     let continuation, arg =
       match args with
@@ -1511,11 +1525,6 @@ let define_umber_resume_wrapper t =
     Function_builder.add_code
       fun_builder
       (Push (Simple_value (Global (end_label, Other))));
-    (* FIXME: What about the return address of the resumption? If we don't perform any
-     effects, we need to somehow end up back here. How? Ah, I think reparenting the fibers
-     should do it. One problem - when a function returns normally, we need to make sure it
-     correctly goes back to the parent fiber. Check for fiber stack underflow? Maybe
-     just store the correct return addresses on the stack? *)
     switch_to_fiber ~fun_builder ~new_fiber:fiber_to_resume ~operation:`Normal_switch;
     Function_builder.add_code
       fun_builder
@@ -1657,8 +1666,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          (otherwise_end_label, otherwise_value)
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
   | Handle_effects { vars; value_handler; effect_handlers; expr = inner_expr } ->
-    (* FIXME: Make sure the new stack ends up 16-byte aligned. Ah, I think we'll actually
-       be fine because each handler takes up 16 bytes. *)
     (* FIXME: Need to add function prologues to check for stack overflow. *)
     (* Allocate a new fiber, with its parent set to the current fiber. *)
     let new_fiber =
@@ -1681,12 +1688,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     in
     let end_label = Function_builder.create_label fun_builder "handle_effects.end" in
     (* Make is so the value branch can return to the end label. *)
-    (* FIXME: This will completely mess up any previous stack variables and also break the
-       stack's alignment. Maybe we could teach reg alloc to understand it though.
-       
-       We could manually fix the alignment here, and could use rbp-relative indexing to
-       make stack variable tracking easier?
-    *)
     Function_builder.add_code
       fun_builder
       (Push (Simple_value (Global (end_label, Other))));
@@ -1739,13 +1740,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          { fun_ = Simple_value (Global (inner_fun, Other))
          ; call_conv = Umber
          ; arity = List.length args_for_inner
-         });
-    let inner_result = Function_builder.pick_register fun_builder in
-    Function_builder.add_code
-      fun_builder
-      (Mov
-         { dst = inner_result
-         ; src = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
          });
     (* FIXME: Create functions for the value and effect handler branches. Needed to make
        it easier for reg alloc to understand the control flow - we need "ret". Doesn't make
@@ -1806,17 +1800,35 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     *)
     (* At this point, since the inner function has returned a regular value, it won't be
        resumed again. Destroy the fiber and switch back to the parent fiber. *)
-    let (_ : Virtual_register.t) =
-      declare_and_call_extern_c_function
-        t
-        ~fun_builder
-        ~fun_name:(Label_name.of_string "umber_fiber_destroy")
-        ~args:[ Simple_value Fiber_layout.current ]
+    let child_fiber =
+      Function_builder.move_to_new_register
+        fun_builder
+        (Simple_value Fiber_layout.current)
     in
     switch_to_fiber
       ~fun_builder
       ~new_fiber:(Memory (Fiber_layout.parent Fiber_layout.current))
       ~operation:`Destroy_child;
+    (* Now that we're back on the parent fiber, realign the stack and get ahold of the
+       return value. *)
+    Function_builder.add_code
+      fun_builder
+      (Sub
+         { dst = Simple_value (Register (Real Rsp))
+         ; src = Simple_value (Constant (Int 8))
+         });
+    let inner_result =
+      Function_builder.move_to_new_register
+        fun_builder
+        (Simple_value (Register (Real (Call_conv.return_value_register Umber))))
+    in
+    let (_ : Virtual_register.t) =
+      declare_and_call_extern_c_function
+        t
+        ~fun_builder
+        ~fun_name:(Label_name.of_string "umber_fiber_destroy")
+        ~args:[ child_fiber ]
+    in
     (* Run the return value handler, if there is one. *)
     let value_handler_result =
       match value_handler with
@@ -1831,6 +1843,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          { dst = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
          ; src = value_handler_result
          });
+    (* Undo the stack alignment adjustment from above. *)
+    Function_builder.add_code
+      fun_builder
+      (Add
+         { dst = Simple_value (Register (Real Rsp))
+         ; src = Simple_value (Constant (Int 8))
+         });
     (* Return back up the stack of handler calls. *)
     Function_builder.add_terminal fun_builder Ret;
     (* Generate the effect handlers. *)
@@ -1840,6 +1859,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          registers before the [handle] and in the handler branches. e.g. it might confuse
          whatever rax, rbx, etc. previously stored with the new values loaded here. *)
       Function_builder.position_at_label fun_builder effect_handler_labels.(i);
+      (* Now that we are back on the original fiber, realign the stack. *)
+      Function_builder.add_code
+        fun_builder
+        (Sub
+           { dst = Simple_value (Register (Real Rsp))
+           ; src = Simple_value (Constant (Int 8))
+           });
       retrieve_arguments
         ~fun_builder
         ~args:(resume :: Nonempty.to_list args)
@@ -1858,6 +1884,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
            ; src =
                Function_builder.find_local fun_builder resume
                |> Option.value_exn ~here:[%here]
+           });
+      (* Undo the stack alignment adjustment from above. *)
+      Function_builder.add_code
+        fun_builder
+        (Add
+           { dst = Simple_value (Register (Real Rsp))
+           ; src = Simple_value (Constant (Int 8))
            });
       Function_builder.add_terminal fun_builder Ret);
     (* FIXME: Stack variables are invalidated after this point, because rsp has changed.
@@ -1893,6 +1926,12 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
        - Maybe we need to edit the return address when reparenting?
        - Hmm, the resume wrapper could edit it? That's the place that should be returned to
        - reparenting could do it if we pass in a label to return to
+      
+
+      Example: handle 5 | x -> x + 1 
+
+      parent: handle_effects.end,
+      child:  after_inner,
      *)
     (* FIXME: All this messing around with rsp doesn't work properly. e.g. we do
        `sub rsp, 8` at function start, then save/load it when switching fibers, then
@@ -1949,7 +1988,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
       declare_and_call_extern_c_function
         t
         ~fun_builder
-        ~fun_name:(Label_name.of_string "umber_find_handler")
+        ~fun_name:(Label_name.of_string "umber_fiber_find_handler_and_detach")
         ~args:
           [ Simple_value Fiber_layout.current
           ; Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op)))
@@ -2286,7 +2325,7 @@ let compile_entry_module_internal ~module_paths =
        { dst = Simple_value Fiber_layout.current
        ; src = Simple_value (Register (Virtual main_fiber))
        });
-  set_rsp_for_fiber_just_created ~fun_builder:t.main_function;
+  setup_stack_pointers_for_fiber_just_created ~fun_builder:t.main_function;
   ignore
     (declare_and_call_extern_c_function
        t
@@ -2489,6 +2528,7 @@ let%expect_test "entry module" =
                mov       r14, rax
                mov       r9, qword [r14 + 24]
                lea       rsp, byte [r14 + r9]
+               mov       rbp, rsp
                call      umber_gc_init wrt ..plt
                call      umber_main#Std.Prelude wrt ..plt
                call      umber_main#Read wrt ..plt

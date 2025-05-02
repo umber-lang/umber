@@ -794,6 +794,16 @@
     (diff? llvm/Paths.expected llvm/Paths.out)
     (diff? output/Paths.expected output/Paths.out)))))
 (rule (alias runtest)
+ (deps (package umber) (glob_files input/ReadEffect.txt))
+ (action
+  (progn (run %{dep:test.exe} %{dep:examples/ReadEffect.um})
+   (concurrent (diff? tokens/ReadEffect.expected tokens/ReadEffect.out)
+    (diff? ast/ReadEffect.expected ast/ReadEffect.out)
+    (diff? mir/ReadEffect.expected mir/ReadEffect.out)
+    (diff? asm/ReadEffect.expected asm/ReadEffect.out)
+    (diff? llvm/ReadEffect.expected llvm/ReadEffect.out)
+    (diff? output/ReadEffect.expected output/ReadEffect.out)))))
+(rule (alias runtest)
  (deps (package umber) (glob_files input/RecursiveEffectDecl.txt))
  (action
   (progn (run %{dep:test.exe} %{dep:examples/RecursiveEffectDecl.um})

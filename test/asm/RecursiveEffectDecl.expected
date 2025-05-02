@@ -2,7 +2,7 @@
            global    umber_main#RecursiveEffectDecl
            global    umber_resume_wrapper:weak
            global    RecursiveEffectDecl.go
-           extern    umber_find_handler
+           extern    umber_fiber_find_handler_and_detach
            extern    umber_fiber_reparent
            extern    umber_gc_alloc
 
@@ -23,7 +23,7 @@ RecursiveEffectDecl.go:
            mov       rdi, r14
            mov       rsi, 984085721
            mov       rdx, rsp
-           call      umber_find_handler wrt ..plt
+           call      umber_fiber_find_handler_and_detach wrt ..plt
            mov       r13, rax
            mov       r9, qword [rsp]
            mov       qword [rbp - 16], r9

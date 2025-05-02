@@ -1,3 +1,0 @@
-("Compilation error"
- ((kind Codegen_error) (msg "LLVM codegen failed")
-  (filename RecursiveEffectDecl.um) (exn (Failure "TODO: effects in llvm"))))

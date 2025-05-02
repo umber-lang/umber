@@ -1,3 +1,5 @@
+# TODO: Rename this test to Read2 or something
+
 effect Read = {
   val ask : () -> Int
 }
