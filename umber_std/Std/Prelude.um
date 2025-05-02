@@ -132,6 +132,12 @@ module : {
 
     val infixl 0 (|>) : a, (a -> b) -> b
 
+    # TODO: Semicolon being an operator is neat, but causes a couple problems:
+    # - We have to special-case it in the formatter, which is a bit hacky. It also means
+    #   if you make an operator that's the semicolon, but does something different, it 
+    #   would be incredibly confusing and the formatter would play along.
+    # - We can't support trailing semicolons as valid syntax.
+    # This should probably be a special syntactic form. 
     val infixl 0 (;) : (), a -> a
 
     val infixl 5 (++) : String, String -> String
