@@ -31,3 +31,32 @@ let fib = match
     res
 
 let () = print_int (fib 6)
+
+
+# TODO: Think about what to do with first-class mutability
+# Maybe mostly copying Koka is fine... so
+# - Record fields can be mutable
+# - First-class mutable variables (or just use ref, easier)
+# - We give these operations a Mut effect
+# - Add a `mut` keyword which can be used in types to say which values could be mutated
+# - The `mut` effect cannot be handled and is implemented directly
+# module State : {
+#   type Ref a
+
+#   effect State = {
+#     val ref : a -> Ref a
+#     val get : Ref a -> a
+#     val set : Ref a -> a -> ()
+#   }
+
+#   val (:=) : Ref a -> a -> ()
+#   val run : (() -> <State, e> a) -> <e> a
+# } = {
+#   type Ref a = Int
+
+#   let (:=) = set
+
+#   let run f =
+#     handle f ()
+#     | <ref x> -> # ??? - I think we need some special support in the compiler for this
+# }

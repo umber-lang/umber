@@ -4,8 +4,27 @@ effect Yield a = {
 
 type Iter a = () -> <Yield a> ()
 
+effect Panic = {
+  val panic : String -> Never
+}
+
+let for_each : (() -> <Yield b, a> c), (b -> <a> ()) -> (() -> <a> c) =
+  \iter f ->
+    (\() ->
+      (handle iter () : f
+      | <yield x> ->
+        f x;
+        (resume () : h))
+        : c)
+      : () -> <a> c
+
 let repeat : a -> <Yield a> Never =
   \x ->
     yield x;
     (repeat x : b)
       : Never
+
+let handle_panic : (() -> <Panic, a> ()) -> <a> () =
+  \f ->
+    handle f ()
+    | <panic msg> -> print ("Panicked: " ++ msg : String)

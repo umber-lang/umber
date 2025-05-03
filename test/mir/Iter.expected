@@ -1,0 +1,50 @@
+((Fun_def
+  ((fun_name Iter.yield) (args (Iter.#arg0.1))
+   (body
+    (Perform_effect (effect_op ((name Iter.yield) (hash 612621654)))
+     (args ((Name Iter.#arg0.1)))))))
+ (Fun_def
+  ((fun_name Iter.panic) (args (Iter.#arg0.2))
+   (body
+    (Perform_effect (effect_op ((name Iter.panic) (hash 203248854)))
+     (args ((Name Iter.#arg0.2)))))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_def
+  ((fun_name Iter.#fun.1) (args (Iter.#closure_env.1 Iter.#lambda_arg.1))
+   (body
+    (Let Iter.iter.2 (Get_block_field 2 (Name Iter.#closure_env.1))
+     (Let Iter.f.2 (Get_block_field 1 (Name Iter.#closure_env.1))
+      (Handle_effects (vars ((Iter.iter.2 Iter.iter.3))) (value_handler ())
+       (effect_handlers
+        (((effect_op ((name Iter.yield) (hash 612621654))) (args (Iter.x.1))
+          (resume Iter.resume.1)
+          (handler
+           (Fun_call "Std.Prelude.Operators.;"
+            ((Fun_call Iter.f.2 ((Name Iter.x.1)))
+             (Fun_call Iter.resume.1 ((Make_block (tag 0))))))))))
+       (expr (Fun_call Iter.iter.3 ((Make_block (tag 0)))))))))))
+ (Fun_def
+  ((fun_name Iter.for_each) (args (Iter.iter.1 Iter.f.1))
+   (body
+    (Make_block (tag 12289)
+     (fields ((Name Iter.#fun.1) (Name Iter.f.1) (Name Iter.iter.1)))))))
+ (Fun_def
+  ((fun_name Iter.repeat) (args (Iter.x.2))
+   (body
+    (Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call Iter.yield ((Name Iter.x.2)))
+      (Fun_call Iter.repeat ((Name Iter.x.2))))))))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
+ (Fun_def
+  ((fun_name Iter.handle_panic) (args (Iter.f.3))
+   (body
+    (Handle_effects (vars ((Iter.f.3 Iter.f.4))) (value_handler ())
+     (effect_handlers
+      (((effect_op ((name Iter.panic) (hash 203248854))) (args (Iter.msg.1))
+        (resume Iter.resume.2)
+        (handler
+         (Fun_call Std.Prelude.print
+          ((Fun_call Std.Prelude.Operators.++
+            ((Primitive (String "Panicked: ")) (Name Iter.msg.1)))))))))
+     (expr (Fun_call Iter.f.4 ((Make_block (tag 0))))))))))

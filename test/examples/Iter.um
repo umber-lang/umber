@@ -1,49 +1,85 @@
-# FIXME: I thought this might make a good example to put in the README, but it has several
-# problems:
-#
-# - It's really awkward to write "map"-style combinators that re-raise/re-perform the same
-#   effects using deep handlers. You need to pass values out to perform the effect. Either
-#   shallow handlers or a way to mask effects is surely needed (maybe both). If installing
-#   handlers is going to be expensive, doing it once per iteration seems really bad, so
-#   maybe masks are the way to go (assuming masks aren't expensive).
-# - It's unclear whether we want lazy or eager iterators. Using either one, we currently
-#   can't easily allow iteration to produce any other effects, because we can't refer to
-#   effect variables in the `Iter` type.
-# - We might need a lighter-weight syntax for creating thunks than `(\() -> ...)`. That
-#   looks pretty noisy. Maybe `'(...)` could be good.
-
 effect Yield a = {
   val yield : a -> ()
 }
 
 type Iter a = () -> <Yield a> ()
 
-# let map : Iter a -> (a -> b) -> Iter b =
-#   \iter f ->
-#     \() ->
-#       handle iter ()
-#       | <yield x> ->
-#         yield (f x);
-#         resume ()
+effect Panic = {
+  val panic : String -> Never
+}
 
-# Above doesn't work, you have to write something like this instead:
-# Actually, since it requires returning `resume`, is this even possible? It's tripping the
-# occurs check when we try to return `resume`.
-# let map : Iter a, (a -> b) -> Iter b =
-#   \iter f ->
-#     \() ->
-#       let loop () =
-#         let (x, k) =
-#           handle iter ()
-#           | <yield x> -> (x, resume)
-#         in
-#         yield (f x);
-#         loop ()
-#       in
-#       loop ()
+# FIXME: This fails typing apparently due to missing handling for constraining effect args
+# let map iter f =
+#   \() ->
+#     handle iter ()
+#     | <yield x> ->
+#       yield (f x);
+#       resume ()
+
+let for_each iter f =
+  \() ->
+    handle iter ()
+    | <yield x> ->
+      f x;
+      resume ()
 
 let repeat x =
   yield x;
   repeat x
 
 # let twos = map (\() -> repeat 1) (+ 1)
+
+# FIXME: This doesn't work due to deep handler semantics - the resumption uses the same
+# handler. Maybe we need some first-class way to add state to handlers...
+# Or we bite the bullet and add shallow handlers.
+# let take iter n =
+#   \() ->
+#     match compare n 0
+#     | Equal -> ()
+#     | Less -> panic "`take` got an integer < 0"
+#     | Greater ->
+#       handle iter ()
+#       | <yield x> ->
+#         yield x;
+#         take resume (n - 1)
+
+# TODO: We're gonna need some default handlers installed by the runtime to make any of
+# this sane. Decide whether we're gonna require a main function or not:
+# 
+# - What kind of toplevel values would be allowed? Ideally, it'd just be things that are
+#   pure and can be run at compile-time. Running things at compile-time is beyond current
+#   abilities though. Tricky to avoid non-termination? I guess you could decide you just
+#   don't care, like Zig. If I write an interpreter I could put all the toplevel things
+#   through that.
+# - The main function would allow some effects, by implicitly having a handler inserted.
+#   These would be some primitive effects e.g. Io, Panic, and maybe State. Are we going
+#   through with having all IO going through handlers? I guess it's fine.
+# 
+# State, though. That going through handlers is really rough:
+# - The implementation is ugly and allocates a ton.
+# - It is really hard to use when you can't have mutable variables and you need to express
+#   all your state in one type.
+# - It isn't composable - you can't compose effects with different type parameters
+#   generally, which is a bit of a problem.
+# 
+# Ideas for State:
+# - Go the Koka way, have builtin marker effects for reading/writing mutable state and
+#   heap variables. Koka has val/var which is a bit of a mess. Doesn't matter for us since
+#   we don't plan on having multiple resumptions.
+# - If we allow mutable variables, we need to think about pointers onto the stack and
+#   locality.
+# - If we use reference cells, it's kinda a bit gross?
+# 
+# You could something more sane with State without it being first-class if you basically
+# had a bunch of Ref "ids" to variables?
+# 
+# We need to make `extern` as being properly unsafe, since having effects there could be
+# bad.
+let handle_panic f =
+  handle f ()
+  | <panic msg> -> print ("Panicked: " ++ msg)
+
+# let () = 
+#   handle_panic (\() ->
+#     for_each (take twos 2) print
+#   )
