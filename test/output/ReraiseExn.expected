@@ -1,0 +1,3 @@
+Not raising: 1
+Correctly raised
+Unhandled exception: Reraised: My exception

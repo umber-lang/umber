@@ -8,7 +8,7 @@ effect Exn = {
   val raise : Exn -> Never
 }
 
-let _ =
+let not_raising =
   handle
     if True then 1 else raise "exn"  
   | <raise _> -> 2
@@ -23,14 +23,16 @@ let reraise msg f =
   | Ok value -> value
   | Error exn -> raise (msg ++ ": " ++ exn)
 
-let _ =
+let print_unhandled exn = print ("Unhandled exception: " ++ exn)
+
+let () =
   handle
     reraise "Reraised" (\() ->
       if True then
         raise "My exception"
       else 42)
   | value -> print_int value
-  | <raise exn> -> print ("Unhandled exception: " ++ exn) 
+  | <raise exn> -> print_unhandled exn
 
 # FIXME: This type:
 # `(() -> <Exn, a> b), (String -> <a> b) -> <a> b`
@@ -58,3 +60,11 @@ let this_should_not_raise () =
 
 let this_should_raise () =
   catch fail (\(_ : Exn) -> raise "outer exception")
+
+let test msg result = print_string (msg ++ ": "); print_int result; print ""
+
+let () = 
+  test "Not raising" not_raising;
+  this_should_not_raise ();
+  (handle this_should_raise ()
+   | <raise exn> -> print "Correctly raised")

@@ -8,7 +8,7 @@ effect Exn = {
   val raise : Exn -> Never
 }
 
-let _ : Int =
+let not_raising : Int =
   handle
     (match True
     | True -> 1
@@ -28,7 +28,10 @@ let reraise : String, (() -> <Exn, a> b) -> <Exn, a> b =
     | Error exn -> raise ((msg ++ ": " : String) ++ exn : String))
       : b
 
-let _ : () =
+let print_unhandled : String -> () =
+  \exn -> print ("Unhandled exception: " ++ exn : String)
+
+let () =
   handle
     reraise
       "Reraised"
@@ -40,7 +43,7 @@ let _ : () =
         : () -> <Exn, a> Int)
       : Int
   | value -> print_int value
-  | <raise exn> -> print ("Unhandled exception: " ++ exn : String)
+  | <raise exn> -> print_unhandled exn
 
 let catch : (() -> <Exn, a> b), (String -> <a> b) -> <a> b =
   \f exn_handler ->
@@ -60,5 +63,17 @@ let this_should_not_raise : () -> () = \() -> catch fail ((\(_ : Exn) -> ()) : E
 let this_should_raise : () -> <Exn> Never =
   \() ->
     catch
-      fail ((\(_ : Exn) -> raise "outer exception" : Never) : Exn -> <Exn, a> Never)
+      fail ((\(_ : Exn) -> raise "outer exception" : Never) : Exn -> <Exn, c> Never)
       : Never
+
+let test : String, Int -> () =
+  \msg result ->
+    print_string (msg ++ ": " : String);
+    print_int result;
+    print ""
+
+let () =
+  test "Not raising" not_raising;
+  this_should_not_raise ();
+  (handle this_should_raise ()
+  | <raise exn> -> print "Correctly raised")

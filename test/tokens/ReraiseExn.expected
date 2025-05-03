@@ -25,7 +25,7 @@ ARROW
 (UPPER_NAME Never)
 R_BRACE
 LET
-UNDERSCORE
+(LOWER_NAME not_raising)
 EQUALS
 HANDLE
 IF
@@ -88,7 +88,18 @@ L_PAREN
 (LOWER_NAME exn)
 R_PAREN
 LET
-UNDERSCORE
+(LOWER_NAME print_unhandled)
+(LOWER_NAME exn)
+EQUALS
+(LOWER_NAME print)
+L_PAREN
+(STRING "Unhandled exception: ")
+(OPERATOR ++)
+(LOWER_NAME exn)
+R_PAREN
+LET
+L_PAREN
+R_PAREN
 EQUALS
 HANDLE
 (LOWER_NAME reraise)
@@ -117,12 +128,8 @@ LESS_THAN
 (LOWER_NAME exn)
 GREATER_THAN
 ARROW
-(LOWER_NAME print)
-L_PAREN
-(STRING "Unhandled exception: ")
-(OPERATOR ++)
+(LOWER_NAME print_unhandled)
 (LOWER_NAME exn)
-R_PAREN
 LET
 (LOWER_NAME catch)
 (LOWER_NAME f)
@@ -201,5 +208,48 @@ R_PAREN
 ARROW
 (LOWER_NAME raise)
 (STRING "outer exception")
+R_PAREN
+LET
+(LOWER_NAME test)
+(LOWER_NAME msg)
+(LOWER_NAME result)
+EQUALS
+(LOWER_NAME print_string)
+L_PAREN
+(LOWER_NAME msg)
+(OPERATOR ++)
+(STRING ": ")
+R_PAREN
+(OPERATOR ";")
+(LOWER_NAME print_int)
+(LOWER_NAME result)
+(OPERATOR ";")
+(LOWER_NAME print)
+(STRING "")
+LET
+L_PAREN
+R_PAREN
+EQUALS
+(LOWER_NAME test)
+(STRING "Not raising")
+(LOWER_NAME not_raising)
+(OPERATOR ";")
+(LOWER_NAME this_should_not_raise)
+L_PAREN
+R_PAREN
+(OPERATOR ";")
+L_PAREN
+HANDLE
+(LOWER_NAME this_should_raise)
+L_PAREN
+R_PAREN
+PIPE
+LESS_THAN
+(LOWER_NAME raise)
+(LOWER_NAME exn)
+GREATER_THAN
+ARROW
+(LOWER_NAME print)
+(STRING "Correctly raised")
 R_PAREN
 EOF

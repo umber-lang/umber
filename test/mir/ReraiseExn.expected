@@ -1,0 +1,146 @@
+((Fun_def
+  ((fun_name ReraiseExn.Ok) (args (ReraiseExn.#arg0.1))
+   (body (Make_block (tag 0) (fields ((Name ReraiseExn.#arg0.1)))))))
+ (Fun_def
+  ((fun_name ReraiseExn.Error) (args (ReraiseExn.#arg0.2))
+   (body (Make_block (tag 1) (fields ((Name ReraiseExn.#arg0.2)))))))
+ (Fun_def
+  ((fun_name ReraiseExn.raise) (args (ReraiseExn.#arg0.3))
+   (body
+    (Perform_effect (effect_op ((name ReraiseExn.raise) (hash 445520799)))
+     (args ((Name ReraiseExn.#arg0.3)))))))
+ (Fun_def
+  ((fun_name ReraiseExn.fail) (args (ReraiseExn.#lambda_arg.1))
+   (body (Fun_call ReraiseExn.raise ((Primitive (String failure)))))))
+ (Fun_def
+  ((fun_name ReraiseExn.catch)
+   (args (ReraiseExn.f.1 ReraiseExn.exn_handler.1))
+   (body
+    (Let ReraiseExn.match.1
+     (Handle_effects (vars ((ReraiseExn.f.1 ReraiseExn.f.2)))
+      (value_handler
+       ((ReraiseExn.x.1
+         (Make_block (tag 0) (fields ((Name ReraiseExn.x.1)))))))
+      (effect_handlers
+       (((effect_op ((name ReraiseExn.raise) (hash 445520799)))
+         (args (ReraiseExn.exn.1)) (resume ReraiseExn.resume.1)
+         (handler (Make_block (tag 1) (fields ((Name ReraiseExn.exn.1))))))))
+      (expr (Fun_call ReraiseExn.f.2 ((Make_block (tag 0))))))
+     (Cond_assign (vars (ReraiseExn.x.2))
+      (conds
+       (((Non_constant_tag_equals (Name ReraiseExn.match.1) 0)
+         ((Get_block_field 0 (Name ReraiseExn.match.1))))))
+      (body (Name ReraiseExn.x.2))
+      (if_none_matched
+       (Otherwise
+        (Let ReraiseExn.exn.2 (Get_block_field 0 (Name ReraiseExn.match.1))
+         (Fun_call ReraiseExn.exn_handler.1 ((Name ReraiseExn.exn.2)))))))))))
+ (Fun_def
+  ((fun_name ReraiseExn.#fun.1) (args (ReraiseExn.#lambda_arg.3))
+   (body (Make_block (tag 0)))))
+ (Fun_def
+  ((fun_name ReraiseExn.this_should_not_raise)
+   (args (ReraiseExn.#lambda_arg.2))
+   (body
+    (Fun_call ReraiseExn.catch
+     ((Name ReraiseExn.fail) (Name ReraiseExn.#fun.1))))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_decl ((name Std.Prelude.print_string) (arity 1)))
+ (Fun_decl ((name Std.Prelude.Operators.++) (arity 2)))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Fun_decl ((name Std.Prelude.print) (arity 1)))
+ (Fun_def
+  ((fun_name ReraiseExn.test) (args (ReraiseExn.msg.1 ReraiseExn.result.1))
+   (body
+    (Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call "Std.Prelude.Operators.;"
+       ((Fun_call Std.Prelude.print_string
+         ((Fun_call Std.Prelude.Operators.++
+           ((Name ReraiseExn.msg.1) (Primitive (String ": "))))))
+        (Fun_call Std.Prelude.print_int ((Name ReraiseExn.result.1)))))
+      (Fun_call Std.Prelude.print ((Primitive (String "")))))))))
+ (Fun_def
+  ((fun_name ReraiseExn.#fun.2) (args (ReraiseExn.#lambda_arg.5))
+   (body
+    (Fun_call ReraiseExn.raise ((Primitive (String "outer exception")))))))
+ (Fun_def
+  ((fun_name ReraiseExn.this_should_raise) (args (ReraiseExn.#lambda_arg.4))
+   (body
+    (Fun_call ReraiseExn.catch
+     ((Name ReraiseExn.fail) (Name ReraiseExn.#fun.2))))))
+ (Value_def ReraiseExn.not_raising
+  (Handle_effects (vars ()) (value_handler ())
+   (effect_handlers
+    (((effect_op ((name ReraiseExn.raise) (hash 445520799)))
+      (args (ReraiseExn.#lambda_arg.6)) (resume ReraiseExn.resume.2)
+      (handler (Primitive (Int 2))))))
+   (expr
+    (Cond_assign (conds (((Constant_tag_equals (Make_block (tag 1)) 1) ())))
+     (body (Primitive (Int 1)))
+     (if_none_matched
+      (Otherwise (Fun_call ReraiseExn.raise ((Primitive (String exn))))))))))
+ (Value_def ReraiseExn.#binding.1
+  (Fun_call "Std.Prelude.Operators.;"
+   ((Fun_call "Std.Prelude.Operators.;"
+     ((Fun_call ReraiseExn.test
+       ((Primitive (String "Not raising")) (Name ReraiseExn.not_raising)))
+      (Fun_call ReraiseExn.this_should_not_raise ((Make_block (tag 0))))))
+    (Handle_effects (vars ()) (value_handler ())
+     (effect_handlers
+      (((effect_op ((name ReraiseExn.raise) (hash 445520799)))
+        (args (ReraiseExn.exn.3)) (resume ReraiseExn.resume.3)
+        (handler
+         (Fun_call Std.Prelude.print
+          ((Primitive (String "Correctly raised"))))))))
+     (expr (Fun_call ReraiseExn.this_should_raise ((Make_block (tag 0)))))))))
+ (Fun_def
+  ((fun_name ReraiseExn.reraise) (args (ReraiseExn.msg.2 ReraiseExn.f.3))
+   (body
+    (Let ReraiseExn.result.2
+     (Handle_effects (vars ((ReraiseExn.f.3 ReraiseExn.f.4)))
+      (value_handler
+       ((ReraiseExn.value.1
+         (Make_block (tag 0) (fields ((Name ReraiseExn.value.1)))))))
+      (effect_handlers
+       (((effect_op ((name ReraiseExn.raise) (hash 445520799)))
+         (args (ReraiseExn.exn.4)) (resume ReraiseExn.resume.4)
+         (handler (Make_block (tag 1) (fields ((Name ReraiseExn.exn.4))))))))
+      (expr (Fun_call ReraiseExn.f.4 ((Make_block (tag 0))))))
+     (Cond_assign (vars (ReraiseExn.value.2))
+      (conds
+       (((Non_constant_tag_equals (Name ReraiseExn.result.2) 0)
+         ((Get_block_field 0 (Name ReraiseExn.result.2))))))
+      (body (Name ReraiseExn.value.2))
+      (if_none_matched
+       (Otherwise
+        (Let ReraiseExn.exn.5 (Get_block_field 0 (Name ReraiseExn.result.2))
+         (Fun_call ReraiseExn.raise
+          ((Fun_call Std.Prelude.Operators.++
+            ((Fun_call Std.Prelude.Operators.++
+              ((Name ReraiseExn.msg.2) (Primitive (String ": "))))
+             (Name ReraiseExn.exn.5)))))))))))))
+ (Fun_def
+  ((fun_name ReraiseExn.print_unhandled) (args (ReraiseExn.exn.6))
+   (body
+    (Fun_call Std.Prelude.print
+     ((Fun_call Std.Prelude.Operators.++
+       ((Primitive (String "Unhandled exception: ")) (Name ReraiseExn.exn.6))))))))
+ (Fun_def
+  ((fun_name ReraiseExn.#fun.3) (args (ReraiseExn.#lambda_arg.7))
+   (body
+    (Cond_assign (conds (((Constant_tag_equals (Make_block (tag 1)) 1) ())))
+     (body (Fun_call ReraiseExn.raise ((Primitive (String "My exception")))))
+     (if_none_matched (Otherwise (Primitive (Int 42))))))))
+ (Value_def ReraiseExn.#binding.2
+  (Handle_effects (vars ())
+   (value_handler
+    ((ReraiseExn.value.3
+      (Fun_call Std.Prelude.print_int ((Name ReraiseExn.value.3))))))
+   (effect_handlers
+    (((effect_op ((name ReraiseExn.raise) (hash 445520799)))
+      (args (ReraiseExn.exn.7)) (resume ReraiseExn.resume.5)
+      (handler
+       (Fun_call ReraiseExn.print_unhandled ((Name ReraiseExn.exn.7)))))))
+   (expr
+    (Fun_call ReraiseExn.reraise
+     ((Primitive (String Reraised)) (Name ReraiseExn.#fun.3)))))))

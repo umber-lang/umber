@@ -1,0 +1,681 @@
+           default   rel
+           global    umber_main#ReraiseExn
+           global    umber_resume_wrapper:weak
+           global    ReraiseExn.#fun.1
+           global    ReraiseExn.this_should_not_raise
+           global    umber_main#ReraiseExn.handle_effects.inner#5
+           global    ReraiseExn.#binding.2
+           global    ReraiseExn.raise
+           global    ReraiseExn.Error
+           global    umber_main#ReraiseExn.handle_effects.inner#8
+           global    ReraiseExn.not_raising
+           global    ReraiseExn.reraise
+           global    ReraiseExn.#fun.3
+           global    umber_main#ReraiseExn.handle_effects.inner#2
+           global    ReraiseExn.catch.handle_effects.inner#2
+           global    ReraiseExn.catch
+           global    ReraiseExn.#binding.1
+           global    ReraiseExn.this_should_raise
+           global    ReraiseExn.reraise.handle_effects.inner#2
+           global    ReraiseExn.print_unhandled
+           global    ReraiseExn.#fun.2
+           global    ReraiseExn.Ok
+           global    ReraiseExn.test
+           global    ReraiseExn.fail
+           global    ReraiseExn.fail#closure:weak
+           global    ReraiseExn.fail#closure_wrapper_fun:weak
+           global    ReraiseExn.#fun.3#closure:weak
+           global    ReraiseExn.#fun.3#closure_wrapper_fun:weak
+           global    ReraiseExn.#fun.2#closure:weak
+           global    ReraiseExn.#fun.2#closure_wrapper_fun:weak
+           global    ReraiseExn.#fun.1#closure:weak
+           global    ReraiseExn.#fun.1#closure_wrapper_fun:weak
+           global    int.1:weak
+           global    string.0:weak
+           global    string.426370453:weak
+           global    string.83376017:weak
+           global    string.877105949:weak
+           global    string.892266407:weak
+           global    string.446105866:weak
+           global    string.694723911:weak
+           global    int.2:weak
+           global    string.533214215:weak
+           global    int.42:weak
+           global    string.999502222:weak
+           global    string.868872898:weak
+           extern    umber_fiber_destroy
+           extern    umber_gc_alloc
+           extern    Std.Prelude.Operators.__#411843497
+           extern    Std.Prelude.print_string
+           extern    umber_fiber_find_handler_and_detach
+           extern    umber_fiber_create
+           extern    Std.Prelude.print
+           extern    umber_fiber_reparent
+           extern    Std.Prelude.Operators.__#506761450
+           extern    Std.Prelude.print_int
+
+           section   .text
+
+umber_main#ReraiseExn:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       rdi, r14
+           call      umber_fiber_create wrt ..plt
+           push      .handle_effects.end#1
+           mov       qword [rax + 32], 1
+           mov       qword [rax + 40], 445520799
+           mov       qword [rax + 48], .handle_effects.handler0#0
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, rax
+           mov       r9, qword [r14 + 24]
+           lea       rsp, byte [r14 + r9]
+           mov       rbp, rsp
+           call      umber_main#ReraiseExn.handle_effects.inner#2
+           mov       rdi, r14
+           mov       r14, qword [r14]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           sub       rsp, 8
+           mov       r13, rax
+           call      umber_fiber_destroy wrt ..plt
+           mov       rax, r13
+           add       rsp, 8
+           ret       
+.handle_effects.handler0#0:
+           sub       rsp, 8
+           mov       rax, int.2
+           add       rsp, 8
+           ret       
+.handle_effects.end#1:
+           mov       qword [ReraiseExn.not_raising], rax
+           mov       rax, string.694723911
+           mov       rbx, qword [ReraiseExn.not_raising]
+           call      ReraiseExn.test
+           mov       qword [rbp - 8], rax
+           mov       rax, 1
+           call      ReraiseExn.this_should_not_raise
+           mov       rbx, rax
+           mov       rax, qword [rbp - 8]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       r9, rax
+           mov       rdi, r14
+           call      umber_fiber_create wrt ..plt
+           push      .handle_effects.end#4
+           mov       qword [rax + 32], 1
+           mov       qword [rax + 40], 445520799
+           mov       qword [rax + 48], .handle_effects.handler0#3
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, rax
+           mov       r9, qword [r14 + 24]
+           lea       rsp, byte [r14 + r9]
+           mov       rbp, rsp
+           call      umber_main#ReraiseExn.handle_effects.inner#5
+           mov       rdi, r14
+           mov       r14, qword [r14]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           sub       rsp, 8
+           mov       r13, rax
+           call      umber_fiber_destroy wrt ..plt
+           mov       rax, r13
+           add       rsp, 8
+           ret       
+.handle_effects.handler0#3:
+           sub       rsp, 8
+           mov       rax, string.446105866
+           call      Std.Prelude.print wrt ..plt
+           add       rsp, 8
+           ret       
+.handle_effects.end#4:
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [ReraiseExn.#binding.1], rax
+           mov       rdi, r14
+           call      umber_fiber_create wrt ..plt
+           push      .handle_effects.end#7
+           mov       qword [rax + 32], 1
+           mov       qword [rax + 40], 445520799
+           mov       qword [rax + 48], .handle_effects.handler0#6
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, rax
+           mov       r9, qword [r14 + 24]
+           lea       rsp, byte [r14 + r9]
+           mov       rbp, rsp
+           call      umber_main#ReraiseExn.handle_effects.inner#8
+           mov       rdi, r14
+           mov       r14, qword [r14]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           sub       rsp, 8
+           mov       r13, rax
+           call      umber_fiber_destroy wrt ..plt
+           mov       rax, r13
+           call      Std.Prelude.print_int wrt ..plt
+           add       rsp, 8
+           ret       
+.handle_effects.handler0#6:
+           sub       rsp, 8
+           mov       rax, rbx
+           call      ReraiseExn.print_unhandled
+           add       rsp, 8
+           ret       
+.handle_effects.end#7:
+           mov       r9, rax
+           mov       qword [ReraiseExn.#binding.2], r9
+           add       rsp, 16
+           pop       rbp
+           ret       
+
+ReraiseExn.#fun.1:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, 1
+           pop       rbp
+           ret       
+
+ReraiseExn.this_should_not_raise:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, ReraiseExn.fail#closure
+           mov       rbx, ReraiseExn.#fun.1#closure
+           call      ReraiseExn.catch
+           pop       rbp
+           ret       
+
+umber_main#ReraiseExn.handle_effects.inner#5:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, 1
+           call      ReraiseExn.this_should_raise
+           pop       rbp
+           ret       
+
+ReraiseExn.raise:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           sub       rsp, 16
+           mov       rdi, r14
+           mov       rsi, 445520799
+           mov       rdx, rsp
+           call      umber_fiber_find_handler_and_detach wrt ..plt
+           mov       r13, rax
+           mov       r9, qword [rsp]
+           mov       qword [rbp - 16], r9
+           add       rsp, 16
+           mov       rdi, 32
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 32784
+           mov       word [rax + 2], 3
+           mov       qword [rax + 8], umber_resume_wrapper
+           mov       qword [rax + 16], r14
+           mov       qword [rax + 24], .perform_effect.resume_here#0
+           mov       rbx, qword [rbp - 8]
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, qword [rbp - 16]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           jmp       r13
+.perform_effect.resume_here#0:
+           add       rsp, 16
+           pop       rbp
+           ret       
+
+ReraiseExn.Error:
+           push      rbp
+           mov       rbp, rsp
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 1
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           pop       rbp
+           ret       
+
+umber_main#ReraiseExn.handle_effects.inner#8:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, string.426370453
+           mov       rbx, ReraiseExn.#fun.3#closure
+           call      ReraiseExn.reraise
+           pop       rbp
+           ret       
+
+ReraiseExn.reraise:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       rdi, r14
+           call      umber_fiber_create wrt ..plt
+           mov       r9, rax
+           push      .handle_effects.end#1
+           mov       qword [r9 + 32], 1
+           mov       qword [r9 + 40], 445520799
+           mov       qword [r9 + 48], .handle_effects.handler0#0
+           mov       rax, rbx
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, r9
+           mov       r9, qword [r14 + 24]
+           lea       rsp, byte [r14 + r9]
+           mov       rbp, rsp
+           call      ReraiseExn.reraise.handle_effects.inner#2
+           mov       rdi, r14
+           mov       r14, qword [r14]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           sub       rsp, 8
+           mov       r13, rax
+           call      umber_fiber_destroy wrt ..plt
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+.handle_effects.handler0#0:
+           sub       rsp, 8
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 1
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], rbx
+           add       rsp, 8
+           ret       
+.handle_effects.end#1:
+           mov       r9, rax
+           mov       qword [rbp - 16], r9
+           mov       r9, qword [rbp - 16]
+           test      r9, 1
+           jz        .non_constant_tag_equals.is_block#8
+.codegen_and.mid#9:
+           jmp       .non_constant_tag_equals.end#7
+.non_constant_tag_equals.is_block#8:
+           mov       r9, qword [rbp - 16]
+           cmp       word [r9], 0
+           jmp       .non_constant_tag_equals.end#7
+.non_constant_tag_equals.end#7:
+           jnz       .cond_assign.if_none_matched#6
+.cond_assign.vars0#4:
+           mov       r9, qword [rbp - 16]
+           mov       r12, qword [r9 + 8]
+           jmp       .cond_assign.body#5
+.cond_assign.body#5:
+           jmp       .cond_assign.merge#10
+.cond_assign.if_none_matched#6:
+           mov       rbx, string.868872898
+           mov       rax, qword [rbp - 8]
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           mov       r9, qword [rbp - 16]
+           mov       rbx, qword [r9 + 8]
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           call      ReraiseExn.raise
+           mov       r12, rax
+           jmp       .cond_assign.merge#10
+.cond_assign.merge#10:
+           mov       rax, r12
+           add       rsp, 16
+           pop       rbp
+           ret       
+
+ReraiseExn.#fun.3:
+           push      rbp
+           mov       rbp, rsp
+           jmp       .cond_assign.body#2
+.cond_assign.body#2:
+           mov       rax, string.877105949
+           call      ReraiseExn.raise
+           jmp       .cond_assign.merge#4
+.cond_assign.if_none_matched#3:
+           mov       rax, int.42
+           jmp       .cond_assign.merge#4
+.cond_assign.merge#4:
+           pop       rbp
+           ret       
+
+umber_main#ReraiseExn.handle_effects.inner#2:
+           push      rbp
+           mov       rbp, rsp
+           jmp       .cond_assign.body#2
+.cond_assign.body#2:
+           mov       rax, int.1
+           jmp       .cond_assign.merge#4
+.cond_assign.if_none_matched#3:
+           mov       rax, string.999502222
+           call      ReraiseExn.raise
+           jmp       .cond_assign.merge#4
+.cond_assign.merge#4:
+           pop       rbp
+           ret       
+
+ReraiseExn.catch.handle_effects.inner#2:
+           push      rbp
+           mov       rbp, rsp
+           mov       r9, rax
+           mov       rax, r9
+           mov       rbx, 1
+           call      qword [r9 + 8]
+           pop       rbp
+           ret       
+
+ReraiseExn.catch:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 32
+           mov       qword [rbp - 24], rax
+           mov       qword [rbp - 8], rbx
+           mov       rdi, r14
+           call      umber_fiber_create wrt ..plt
+           mov       r9, rax
+           push      .handle_effects.end#1
+           mov       qword [r9 + 32], 1
+           mov       qword [r9 + 40], 445520799
+           mov       qword [r9 + 48], .handle_effects.handler0#0
+           mov       rax, qword [rbp - 24]
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r14, r9
+           mov       r9, qword [r14 + 24]
+           lea       rsp, byte [r14 + r9]
+           mov       rbp, rsp
+           call      ReraiseExn.catch.handle_effects.inner#2
+           mov       rdi, r14
+           mov       r14, qword [r14]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           sub       rsp, 8
+           mov       r13, rax
+           call      umber_fiber_destroy wrt ..plt
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           add       rsp, 8
+           ret       
+.handle_effects.handler0#0:
+           sub       rsp, 8
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 1
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], rbx
+           add       rsp, 8
+           ret       
+.handle_effects.end#1:
+           mov       qword [rbp - 16], rax
+           mov       r9, qword [rbp - 16]
+           test      r9, 1
+           jz        .non_constant_tag_equals.is_block#8
+.codegen_and.mid#9:
+           jmp       .non_constant_tag_equals.end#7
+.non_constant_tag_equals.is_block#8:
+           mov       r9, qword [rbp - 16]
+           cmp       word [r9], 0
+           jmp       .non_constant_tag_equals.end#7
+.non_constant_tag_equals.end#7:
+           jnz       .cond_assign.if_none_matched#6
+.cond_assign.vars0#4:
+           mov       r9, qword [rbp - 16]
+           mov       r12, qword [r9 + 8]
+           jmp       .cond_assign.body#5
+.cond_assign.body#5:
+           jmp       .cond_assign.merge#10
+.cond_assign.if_none_matched#6:
+           mov       rax, qword [rbp - 8]
+           mov       r9, qword [rbp - 16]
+           mov       rbx, qword [r9 + 8]
+           mov       r9, qword [rbp - 8]
+           call      qword [r9 + 8]
+           mov       r12, rax
+           jmp       .cond_assign.merge#10
+.cond_assign.merge#10:
+           mov       rax, r12
+           add       rsp, 32
+           pop       rbp
+           ret       
+
+ReraiseExn.this_should_raise:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, ReraiseExn.fail#closure
+           mov       rbx, ReraiseExn.#fun.2#closure
+           call      ReraiseExn.catch
+           pop       rbp
+           ret       
+
+ReraiseExn.reraise.handle_effects.inner#2:
+           push      rbp
+           mov       rbp, rsp
+           mov       r9, rax
+           mov       rax, r9
+           mov       rbx, 1
+           call      qword [r9 + 8]
+           pop       rbp
+           ret       
+
+ReraiseExn.print_unhandled:
+           push      rbp
+           mov       rbp, rsp
+           mov       r9, string.892266407
+           mov       rbx, rax
+           mov       rax, r9
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           call      Std.Prelude.print wrt ..plt
+           pop       rbp
+           ret       
+
+ReraiseExn.#fun.2:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, string.533214215
+           call      ReraiseExn.raise
+           pop       rbp
+           ret       
+
+ReraiseExn.Ok:
+           push      rbp
+           mov       rbp, rsp
+           mov       r13, rax
+           mov       rdi, 16
+           call      umber_gc_alloc wrt ..plt
+           mov       word [rax], 0
+           mov       word [rax + 2], 1
+           mov       qword [rax + 8], r13
+           pop       rbp
+           ret       
+
+ReraiseExn.test:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 32
+           mov       qword [rbp - 24], rbx
+           mov       rbx, string.868872898
+           call      Std.Prelude.Operators.__#411843497 wrt ..plt
+           call      Std.Prelude.print_string wrt ..plt
+           mov       qword [rbp - 16], rax
+           mov       rax, qword [rbp - 24]
+           call      Std.Prelude.print_int wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rbp - 16]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           mov       qword [rbp - 8], rax
+           mov       rax, string.0
+           call      Std.Prelude.print wrt ..plt
+           mov       rbx, rax
+           mov       rax, qword [rbp - 8]
+           call      Std.Prelude.Operators.__#506761450 wrt ..plt
+           add       rsp, 32
+           pop       rbp
+           ret       
+
+ReraiseExn.fail:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, string.83376017
+           call      ReraiseExn.raise
+           pop       rbp
+           ret       
+
+ReraiseExn.fail#closure_wrapper_fun:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
+           call      ReraiseExn.fail
+           pop       rbp
+           ret       
+
+ReraiseExn.#fun.3#closure_wrapper_fun:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
+           call      ReraiseExn.#fun.3
+           pop       rbp
+           ret       
+
+ReraiseExn.#fun.2#closure_wrapper_fun:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
+           call      ReraiseExn.#fun.2
+           pop       rbp
+           ret       
+
+ReraiseExn.#fun.1#closure_wrapper_fun:
+           push      rbp
+           mov       rbp, rsp
+           mov       rax, rbx
+           call      ReraiseExn.#fun.1
+           pop       rbp
+           ret       
+
+umber_resume_wrapper:
+           push      rbp
+           mov       rbp, rsp
+           sub       rsp, 16
+           mov       qword [rbp - 8], rax
+           mov       r9, qword [rbp - 8]
+           mov       rdi, qword [r9 + 16]
+           mov       rsi, r14
+           call      umber_fiber_reparent wrt ..plt
+           push      .end#0
+           mov       qword [r14 + 8], rbp
+           mov       qword [r14 + 16], rsp
+           mov       r9, qword [rbp - 8]
+           mov       r14, qword [r9 + 16]
+           mov       rbp, qword [r14 + 8]
+           mov       rsp, qword [r14 + 16]
+           mov       rax, rbx
+           jmp       qword [r9 + 24]
+.end#0:
+           add       rsp, 16
+           pop       rbp
+           ret       
+
+           section   .rodata
+           sectalign 8
+int.1:
+           dw        32769
+           dw        1
+           dd        0
+           dq        1
+string.0:
+           dw        32772
+           dw        1
+           dd        0
+           db        `\x0\x0\x0\x0\x0\x0\x0\x7`
+string.426370453:
+           dw        32772
+           dw        2
+           dd        0
+           db        `Reraised\x0\x0\x0\x0\x0\x0\x0\x7`
+string.83376017:
+           dw        32772
+           dw        1
+           dd        0
+           db        `failure\x0`
+string.877105949:
+           dw        32772
+           dw        2
+           dd        0
+           db        `My exception\x0\x0\x0\x3`
+string.892266407:
+           dw        32772
+           dw        3
+           dd        0
+           db        `Unhandled exception: \x0\x0\x2`
+string.446105866:
+           dw        32772
+           dw        3
+           dd        0
+           db        `Correctly raised\x0\x0\x0\x0\x0\x0\x0\x7`
+string.694723911:
+           dw        32772
+           dw        2
+           dd        0
+           db        `Not raising\x0\x0\x0\x0\x4`
+int.2:
+           dw        32769
+           dw        1
+           dd        0
+           dq        2
+string.533214215:
+           dw        32772
+           dw        2
+           dd        0
+           db        `outer exception\x0`
+int.42:
+           dw        32769
+           dw        1
+           dd        0
+           dq        42
+string.999502222:
+           dw        32772
+           dw        1
+           dd        0
+           db        `exn\x0\x0\x0\x0\x4`
+string.868872898:
+           dw        32772
+           dw        1
+           dd        0
+           db        `: \x0\x0\x0\x0\x0\x5`
+ReraiseExn.fail#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        ReraiseExn.fail#closure_wrapper_fun
+ReraiseExn.#fun.3#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        ReraiseExn.#fun.3#closure_wrapper_fun
+ReraiseExn.#fun.2#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        ReraiseExn.#fun.2#closure_wrapper_fun
+ReraiseExn.#fun.1#closure:
+           dw        12289
+           dw        1
+           dd        0
+           dq        ReraiseExn.#fun.1#closure_wrapper_fun
+
+           section   .bss
+           sectalign 8
+ReraiseExn.#binding.2:
+           resq      1
+ReraiseExn.not_raising:
+           resq      1
+ReraiseExn.#binding.1:
+           resq      1
+
