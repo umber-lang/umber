@@ -2,6 +2,16 @@
     "comments": {
         "lineComment": "#",
     },
+    "onEnterRules": [
+        {
+            "beforeText": "^\\s*#.*",
+            "action": {
+                "indent": "none",
+                "appendText": "# ",
+                "removeText": 0
+            }
+        }
+    ],
     // symbols used as brackets
     "brackets": [
         [
