@@ -450,7 +450,7 @@ let format_to_document
          (params :> Type_param_name.t list)
          ~f:(fun param -> Text (Type_param_name.to_string param)))
   in
-  let format_tuple args = parens (comma_separated args) in
+  let format_tuple args = Group (parens (comma_separated args)) in
   let rec format_type' ((type_, constraints) : _ Type_scheme.t) =
     if not (List.is_empty constraints) then failwith "TODO: formatting type constraints";
     format_type type_

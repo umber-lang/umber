@@ -13,3 +13,35 @@ let handle_state : a, (() -> <State a, b> c) -> <b> (a, c) =
       : h -> <d> (h, g))
       init
       : (a, c)
+
+let while : (() -> <a> Bool), (() -> <a> ()) -> <a> () =
+  \cond f ->
+    match cond () : Bool
+    | True ->
+      f ();
+      while cond f
+    | False -> ()
+
+let fib : Int -> Int =
+  match
+  | 0 | 1 -> 1
+  | n ->
+    let' (((_, _, res) : (Int, Int, Int)), (() : ())) =
+      handle_state
+        (1, 1, 1)
+        ((\() ->
+          while
+            ((\() ->
+              let' ((i : Int), (_ : Int), (_ : Int)) = get () in
+              i < n : Bool)
+              : () -> <State (Int, Int, Int), c> Bool)
+            ((\() ->
+              let' ((i : Int), (a : Int), (b : Int)) = get () in
+              let' c : Int = a + b in
+              set ((i + 1 : Int), b, c))
+              : () -> <State (Int, Int, Int), c> ()))
+          : () -> <State (Int, Int, Int), c> ())
+    in
+    res
+
+let () = print_int (fib 6 : Int)

@@ -17,7 +17,6 @@ let should_type_check test = not (List.mem ~equal:String.equal parse_only_tests 
 let type_only_tests =
   [ "LetPattern" (* unions in toplevel let bindings *)
   ; "ReraiseExn" (* effects *)
-  ; "State" (* effects *)
   ; "Iter" (* effects *)
   ]
 ;;

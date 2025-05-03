@@ -3,9 +3,31 @@ effect State a = {
   val set : a -> ()
 }
 
+# This allocates a closure per call to get or set, builds up a stack of these created
+# closures, then unravels them by threading the state through at the end, so it isn't
+# sensibily performant, but it works.
+# TODO: We probably need some kinda of first-class mutability support
 let handle_state init f =
   (handle f ()
   | x -> (\s -> (s, x))
   | <get ()> -> (\s -> (resume s) s)
   | <set s> -> (\_ -> (resume ()) s))
   init
+
+let while cond f = if cond () then f (); while cond f else ()
+
+# TODO: This gets an extra effect variable `c` which isn't needed. Ideally the effect
+# variable wouldn't be generated.
+let fib = match
+  | 0 | 1 -> 1
+  | n ->
+    let ((_, _, res), ()) =
+      handle_state (1, 1, 1) (\() ->
+        while (\() -> let (i, _, _) = get () in i < n) (\() ->
+          let (i, a, b) = get () in
+          let c = a + b in
+          set (i + 1, b, c)))
+    in
+    res
+
+let () = print_int (fib 6)

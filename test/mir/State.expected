@@ -1,0 +1,120 @@
+((Fun_def
+  ((fun_name State.get) (args (State.#arg0.1))
+   (body
+    (Perform_effect (effect_op ((name State.get) (hash 221380392)))
+     (args ((Name State.#arg0.1)))))))
+ (Fun_def
+  ((fun_name State.set) (args (State.#arg0.2))
+   (body
+    (Perform_effect (effect_op ((name State.set) (hash 275351816)))
+     (args ((Name State.#arg0.2)))))))
+ (Fun_def
+  ((fun_name State.#fun.1) (args (State.#closure_env.1 State.s.1))
+   (body
+    (Let State.x.2 (Get_block_field 1 (Name State.#closure_env.1))
+     (Make_block (tag 0) (fields ((Name State.s.1) (Name State.x.2))))))))
+ (Fun_def
+  ((fun_name State.#fun.3) (args (State.#closure_env.2 State.s.2))
+   (body
+    (Let State.resume.2 (Get_block_field 1 (Name State.#closure_env.2))
+     (Let State.#fun.2 (Fun_call State.resume.2 ((Name State.s.2)))
+      (Fun_call State.#fun.2 ((Name State.s.2))))))))
+ (Fun_def
+  ((fun_name State.#fun.5) (args (State.#closure_env.3 State.#lambda_arg.2))
+   (body
+    (Let State.resume.4 (Get_block_field 2 (Name State.#closure_env.3))
+     (Let State.s.4 (Get_block_field 1 (Name State.#closure_env.3))
+      (Let State.#fun.4 (Fun_call State.resume.4 ((Make_block (tag 0))))
+       (Fun_call State.#fun.4 ((Name State.s.4)))))))))
+ (Fun_def
+  ((fun_name State.handle_state) (args (State.init.1 State.f.1))
+   (body
+    (Let State.#fun.6
+     (Handle_effects (vars ((State.f.1 State.f.2)))
+      (value_handler
+       ((State.x.1
+         (Make_block (tag 12289)
+          (fields ((Name State.#fun.1) (Name State.x.1)))))))
+      (effect_handlers
+       (((effect_op ((name State.get) (hash 221380392)))
+         (args (State.#lambda_arg.1)) (resume State.resume.1)
+         (handler
+          (Make_block (tag 12289)
+           (fields ((Name State.#fun.3) (Name State.resume.1))))))
+        ((effect_op ((name State.set) (hash 275351816))) (args (State.s.3))
+         (resume State.resume.3)
+         (handler
+          (Make_block (tag 12289)
+           (fields
+            ((Name State.#fun.5) (Name State.s.3) (Name State.resume.3))))))))
+      (expr (Fun_call State.f.2 ((Make_block (tag 0))))))
+     (Fun_call State.#fun.6 ((Name State.init.1)))))))
+ (Fun_decl ((name "Std.Prelude.Operators.;") (arity 2)))
+ (Fun_def
+  ((fun_name State.while) (args (State.cond.1 State.f.3))
+   (body
+    (Let State.match.1 (Fun_call State.cond.1 ((Make_block (tag 0))))
+     (Cond_assign (conds (((Constant_tag_equals (Name State.match.1) 1) ())))
+      (body
+       (Fun_call "Std.Prelude.Operators.;"
+        ((Fun_call State.f.3 ((Make_block (tag 0))))
+         (Fun_call State.while ((Name State.cond.1) (Name State.f.3))))))
+      (if_none_matched (Otherwise (Make_block (tag 0)))))))))
+ (Fun_decl ((name Std.Prelude.Operators.<) (arity 2)))
+ (Fun_def
+  ((fun_name State.#fun.7) (args (State.#closure_env.4 State.#lambda_arg.4))
+   (body
+    (Let State.n.3 (Get_block_field 1 (Name State.#closure_env.4))
+     (Let State.#binding.1 (Fun_call State.get ((Make_block (tag 0))))
+      (Let State.i.1 (Get_block_field 0 (Name State.#binding.1))
+       (Fun_call Std.Prelude.Operators.< ((Name State.i.1) (Name State.n.3)))))))))
+ (Fun_decl ((name Std.Prelude.Operators.+) (arity 2)))
+ (Fun_def
+  ((fun_name State.#fun.8) (args (State.#lambda_arg.5))
+   (body
+    (Let State.#binding.2 (Fun_call State.get ((Make_block (tag 0))))
+     (Let State.i.2 (Get_block_field 0 (Name State.#binding.2))
+      (Let State.a.1 (Get_block_field 1 (Name State.#binding.2))
+       (Let State.b.1 (Get_block_field 2 (Name State.#binding.2))
+        (Let State.c.1
+         (Fun_call Std.Prelude.Operators.+
+          ((Name State.a.1) (Name State.b.1)))
+         (Fun_call State.set
+          ((Make_block (tag 0)
+            (fields
+             ((Fun_call Std.Prelude.Operators.+
+               ((Name State.i.2) (Primitive (Int 1))))
+              (Name State.b.1) (Name State.c.1))))))))))))))
+ (Fun_def
+  ((fun_name State.#fun.9) (args (State.#closure_env.5 State.#lambda_arg.3))
+   (body
+    (Let State.n.2 (Get_block_field 1 (Name State.#closure_env.5))
+     (Fun_call State.while
+      ((Make_block (tag 12289)
+        (fields ((Name State.#fun.7) (Name State.n.2))))
+       (Name State.#fun.8)))))))
+ (Fun_def
+  ((fun_name State.fib) (args (State.match.2))
+   (body
+    (Cond_assign
+     (conds
+      (((Equals (Name State.match.2) (Int 0)) ())
+       ((Equals (Name State.match.2) (Int 1)) ())))
+     (body (Primitive (Int 1)))
+     (if_none_matched
+      (Otherwise
+       (Let State.n.1 (Name State.match.2)
+        (Let State.#binding.3
+         (Fun_call State.handle_state
+          ((Make_block (tag 0)
+            (fields
+             ((Primitive (Int 1)) (Primitive (Int 1)) (Primitive (Int 1)))))
+           (Make_block (tag 12289)
+            (fields ((Name State.#fun.9) (Name State.n.1))))))
+         (Let State.res.1
+          (Get_block_field 2 (Get_block_field 0 (Name State.#binding.3)))
+          (Name State.res.1))))))))))
+ (Fun_decl ((name Std.Prelude.print_int) (arity 1)))
+ (Value_def State.#binding.4
+  (Fun_call Std.Prelude.print_int
+   ((Fun_call State.fib ((Primitive (Int 6))))))))

@@ -321,7 +321,11 @@ end = struct
         [%message "Name missing from context" (name : Value_name.Absolute.t) (t : t)]
   ;;
 
-  let peek_value_name t name = peek_value_name_internal t name |> Option.map ~f:fst
+  let peek_value_name t name =
+    peek_value_name_internal t name
+    |> Option.map ~f:(fun (mir_name, (_ : Name_kind.t)) ->
+         t.find_override name mir_name |> Option.value ~default:mir_name)
+  ;;
 
   let find_value_name_assert_internal t name ~name_kind_matches ~expected =
     let name, name_kind =
@@ -353,10 +357,11 @@ end = struct
   let with_find_override t ~f =
     { t with
       find_override =
-        (fun name name' ->
-          match t.find_override name name' with
-          | Some _ as name -> name
-          | None -> f name name')
+        (fun value_name mir_name ->
+          let mir_name =
+            t.find_override value_name mir_name |> Option.value ~default:mir_name
+          in
+          f value_name mir_name)
     }
   ;;
 
