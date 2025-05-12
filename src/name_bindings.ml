@@ -320,14 +320,26 @@ let core =
       { empty_bindings with
         types =
           List.fold
-            Intrinsics.all
+            Intrinsics.all_types
             ~init:empty_bindings.types
             ~f:(fun types (module Intrinsic) ->
             Map.set
               types
               ~key:Intrinsic.name
               ~data:(Some (Local (Type_entry.create Intrinsic.decl))))
+      ; effects =
+          List.fold
+            Intrinsics.all_effects
+            ~init:empty_bindings.effects
+            ~f:(fun effects (module Intrinsic) ->
+            Map.set
+              effects
+              ~key:Intrinsic.name
+              ~data:(Some (Local (Effect_entry.create Intrinsic.decl))))
       ; names =
+          (* TODO: It would be cleaner if [Intrinsics] exposed some way to get all the
+             names that it should have, rather than having to know that Bool is the only
+             variant type and needs constructors added here. *)
           List.fold
             Intrinsics.Bool.cnstrs
             ~init:empty_bindings.names

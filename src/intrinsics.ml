@@ -22,6 +22,11 @@ module type Variants = sig
   val decl : Module_path.absolute Type_decl.t
 end
 
+module type Effect = sig
+  val name : Effect_name.t
+  val decl : Module_path.absolute Effect.t
+end
+
 module Make_variants (T : sig
   val name : string
   val cnstrs : string list
@@ -49,11 +54,26 @@ end) : Type = struct
   let typ : _ Type_scheme.t = Type_app ((Module_path.Absolute.empty, name), []), []
 end
 
-module Make_abstract (T : sig
+module Make_abstract_type (T : sig
   val name : string
 end) : Type = Make_type (struct
   let name = T.name
   let decl = Unique_list.empty, Type_decl.Abstract
+end)
+
+module Make_effect (T : sig
+  val name : string
+  val decl : Module_path.absolute Effect.t
+end) : Effect = struct
+  let name = Effect_name.of_string_unchecked T.name
+  let decl = T.decl
+end
+
+module Make_abstract_effect (T : sig
+  val name : string
+end) : Effect = Make_effect (struct
+  let name = T.name
+  let decl : _ Effect.t = { params = Unique_list.empty; operations = None }
 end)
 
 module Bool = struct
@@ -70,19 +90,19 @@ module Bool = struct
   ;;
 end
 
-module Int = Make_abstract (struct
+module Int = Make_abstract_type (struct
   let name = "Int"
 end)
 
-module Float = Make_abstract (struct
+module Float = Make_abstract_type (struct
   let name = "Float"
 end)
 
-module Char = Make_abstract (struct
+module Char = Make_abstract_type (struct
   let name = "Char"
 end)
 
-module String = Make_abstract (struct
+module String = Make_abstract_type (struct
   let name = "String"
 end)
 
@@ -98,7 +118,11 @@ module Any = Make_type (struct
   let decl : _ Type_decl.t = Unique_list.empty, Alias (Intersection [])
 end)
 
-let all : (module Type) list =
+module Io = Make_abstract_effect (struct
+  let name = "Io"
+end)
+
+let all_types : (module Type) list =
   [ (module Bool)
   ; (module Int)
   ; (module Float)
@@ -108,3 +132,5 @@ let all : (module Type) list =
   ; (module Any)
   ]
 ;;
+
+let all_effects : (module Effect) list = [ (module Io) ]

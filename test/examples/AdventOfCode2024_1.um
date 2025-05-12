@@ -29,7 +29,7 @@ let () =
 # from stdin.
 
 let input =
-  let loop acc = 
+  let loop acc =
     match read_line ()
     | None -> List.reverse acc
     | Some line ->

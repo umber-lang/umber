@@ -12,7 +12,7 @@
      (Char ((Local (() Abstract)))) (Float ((Local (() Abstract))))
      (Never ((Local (() (Alias (Union ()))))))
      (String ((Local (() Abstract))))))
-   (effects ())
+   (effects ((Io ((Local ((params ()) (operations ())))))))
    (modules
     ((Std
       (Local
@@ -71,61 +71,62 @@
                        ((Function ((Type_app Float ())) (Effect_union ())
                          (Type_app Float ()))
                         ()))))))
-                  (print
-                   (Local
-                    ((type_
-                      (Scheme
-                       ((Function ((Type_app String ())) (Effect_union ())
-                         (Tuple ()))
-                        ())))
-                     (type_source Extern_declared)
-                     (extern_name umber_print_endline))))
+                  (print (Imported Std.Prelude.Io.print))
                   (ignore
                    (Local
                     ((type_
                       (Scheme
                        ((Function ((Var a)) (Effect_union ()) (Tuple ())) ()))))))
                   (compare (Imported Std.Prelude.Operators.compare))
-                  (print_int
-                   (Local
-                    ((type_
-                      (Scheme
-                       ((Function ((Type_app Int ())) (Effect_union ())
-                         (Tuple ()))
-                        ())))
-                     (type_source Extern_declared)
-                     (extern_name umber_print_int))))
-                  (read_line
-                   (Local
-                    ((type_
-                      (Scheme
-                       ((Function ((Tuple ())) (Effect_union ())
-                         (Type_app Std.Prelude.Option.Option
-                          ((Type_app String ()))))
-                        ())))
-                     (type_source Extern_declared)
-                     (extern_name umber_read_line))))
-                  (print_bool
-                   (Local
-                    ((type_
-                      (Scheme
-                       ((Function ((Type_app Bool ())) (Effect_union ())
-                         (Tuple ()))
-                        ())))
-                     (type_source Extern_declared)
-                     (extern_name umber_print_bool))))
-                  (print_string
-                   (Local
-                    ((type_
-                      (Scheme
-                       ((Function ((Type_app String ())) (Effect_union ())
-                         (Tuple ()))
-                        ())))
-                     (type_source Extern_declared)
-                     (extern_name umber_print_string))))))
-                (types ()) (effects ())
+                  (print_int (Imported Std.Prelude.Io.print_int))
+                  (read_line (Imported Std.Prelude.Io.read_line))
+                  (print_bool (Imported Std.Prelude.Io.print_bool))
+                  (print_string (Imported Std.Prelude.Io.print_string))))
+                (types ()) (effects ((Io ((Imported Std.Prelude.Io.Io)))))
                 (modules
-                 ((Int
+                 ((Io
+                   (Local
+                    (()
+                     ((names
+                       ((print
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app String ())) (Effect Io ())
+                               (Tuple ()))
+                              ()))))))
+                        (print_int
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app Int ())) (Effect Io ())
+                               (Tuple ()))
+                              ()))))))
+                        (read_line
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Tuple ())) (Effect Io ())
+                               (Type_app Std.Prelude.Option.Option
+                                ((Type_app String ()))))
+                              ()))))))
+                        (print_bool
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app Bool ())) (Effect Io ())
+                               (Tuple ()))
+                              ()))))))
+                        (print_string
+                         (Local
+                          ((type_
+                            (Scheme
+                             ((Function ((Type_app String ())) (Effect Io ())
+                               (Tuple ()))
+                              ()))))))))
+                      (types ()) (effects ((Io ((Imported Io)))))
+                      (modules ())))))
+                  (Int
                    (Local
                     (()
                      ((names
@@ -816,15 +817,7 @@
                        ())))
                     (type_source Extern_declared)
                     (extern_name umber_float_sqrt))))
-                 (print
-                  (Local
-                   ((type_
-                     (Scheme
-                      ((Function ((Type_app String ())) (Effect_union ())
-                        (Tuple ()))
-                       ())))
-                    (type_source Extern_declared)
-                    (extern_name umber_print_endline))))
+                 (print (Imported Std.Prelude.Io.print))
                  (ignore
                   (Local
                    ((type_
@@ -834,46 +827,65 @@
                        ())))
                     (type_source Let_inferred))))
                  (compare (Imported Std.Prelude.Operators.compare))
-                 (print_int
-                  (Local
-                   ((type_
-                     (Scheme
-                      ((Function ((Type_app Int ())) (Effect_union ())
-                        (Tuple ()))
-                       ())))
-                    (type_source Extern_declared)
-                    (extern_name umber_print_int))))
-                 (read_line
-                  (Local
-                   ((type_
-                     (Scheme
-                      ((Function ((Tuple ())) (Effect_union ())
-                        (Type_app Std.Prelude.Option.Option
-                         ((Type_app String ()))))
-                       ())))
-                    (type_source Extern_declared)
-                    (extern_name umber_read_line))))
-                 (print_bool
-                  (Local
-                   ((type_
-                     (Scheme
-                      ((Function ((Type_app Bool ())) (Effect_union ())
-                        (Tuple ()))
-                       ())))
-                    (type_source Extern_declared)
-                    (extern_name umber_print_bool))))
-                 (print_string
-                  (Local
-                   ((type_
-                     (Scheme
-                      ((Function ((Type_app String ())) (Effect_union ())
-                        (Tuple ()))
-                       ())))
-                    (type_source Extern_declared)
-                    (extern_name umber_print_string))))))
-               (types ()) (effects ())
+                 (print_int (Imported Std.Prelude.Io.print_int))
+                 (read_line (Imported Std.Prelude.Io.read_line))
+                 (print_bool (Imported Std.Prelude.Io.print_bool))
+                 (print_string (Imported Std.Prelude.Io.print_string))))
+               (types ()) (effects ((Io ((Imported Std.Prelude.Io.Io)))))
                (modules
-                ((Int
+                ((Io
+                  (Local
+                   (()
+                    ((names
+                      ((print
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app String ())) (Effect Io ())
+                              (Tuple ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_print_endline))))
+                       (print_int
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Int ())) (Effect Io ())
+                              (Tuple ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_print_int))))
+                       (read_line
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Tuple ())) (Effect Io ())
+                              (Type_app Std.Prelude.Option.Option
+                               ((Type_app String ()))))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_read_line))))
+                       (print_bool
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Bool ())) (Effect Io ())
+                              (Tuple ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_print_bool))))
+                       (print_string
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app String ())) (Effect Io ())
+                              (Tuple ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_print_string))))))
+                     (types ()) (effects ((Io ((Imported Io)))))
+                     (modules ())))))
+                 (Int
                   (Local
                    (()
                     ((names
@@ -926,6 +938,21 @@
                              ())))
                           (type_source Let_inferred))))))
                      (types ((Bool ((Imported Bool))))) (effects ())
+                     (modules ())))))
+                 (Char
+                  (Local
+                   (()
+                    ((names
+                      ((length_utf8
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function ((Type_app Char ())) (Effect_union ())
+                              (Type_app Int ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_char_length_utf8))))))
+                     (types ((Char ((Imported Char))))) (effects ())
                      (modules ())))))
                  (List
                   (Local
@@ -1053,11 +1080,11 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app Std.Prelude.List.List ((Var g)))
-                               (Function ((Var g)) (Effect_var c)
+                              ((Type_app Std.Prelude.List.List ((Var h)))
+                               (Function ((Var h)) (Effect_var c)
                                 (Type_app Bool ())))
                               (Effect_var c)
-                              (Type_app Std.Prelude.List.List ((Var g))))
+                              (Type_app Std.Prelude.List.List ((Var h))))
                              ())))
                           (type_source Let_inferred))))
                        (length
@@ -1232,13 +1259,12 @@
                          ((type_
                            (Scheme
                             ((Function
-                              ((Type_app String ()) (Var acc)
-                               (Function ((Var acc) (Type_app Char ()))
-                                (Effect_union ()) (Var acc)))
-                              (Effect_union ()) (Var acc))
+                              ((Type_app String ()) (Var a)
+                               (Function ((Var a) (Type_app Char ()))
+                                (Effect_var c) (Var a)))
+                              (Effect_var c) (Var a))
                              ())))
-                          (type_source Extern_declared)
-                          (extern_name umber_string_fold))))
+                          (type_source Let_inferred))))
                        (make
                         (Local
                          ((type_
@@ -1267,7 +1293,7 @@
                               (Effect_union ()) (Type_app Int ()))
                              ())))
                           (type_source Extern_declared)
-                          (extern_name umber_string_len))))
+                          (extern_name umber_string_length))))
                        (of_char
                         (Local
                          ((type_
@@ -1276,6 +1302,16 @@
                               (Type_app String ()))
                              ())))
                           (type_source Let_inferred))))
+                       (get_char
+                        (Local
+                         ((type_
+                           (Scheme
+                            ((Function
+                              ((Type_app String ()) (Type_app Int ()))
+                              (Effect_union ()) (Type_app Char ()))
+                             ())))
+                          (type_source Extern_declared)
+                          (extern_name umber_string_get_char))))
                        (is_empty
                         (Local
                          ((type_

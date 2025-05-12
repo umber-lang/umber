@@ -70,7 +70,7 @@ pub extern "C" fn umber_string_make(n_chars: BlockPtr, c: BlockPtr) -> BlockPtr 
 }
 
 #[no_mangle]
-pub extern "C" fn umber_string_len(s: BlockPtr) -> BlockPtr {
+pub extern "C" fn umber_string_length(s: BlockPtr) -> BlockPtr {
     BlockPtr::new_int(s.as_block().string_len() as i64)
 }
 
@@ -94,6 +94,13 @@ pub unsafe extern "C" fn umber_string_fold(s: BlockPtr, init: BlockPtr, fun: Clo
     s.as_str()
         .chars()
         .fold(init, |acc, c| umber_apply2(fun, acc, BlockPtr::new_char(c)))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn umber_string_get_char(s: BlockPtr, i: BlockPtr) -> BlockPtr {
+    let s = s.as_str();
+    let i = i.as_int() as usize;
+    BlockPtr::new_char(s[i..].chars().next().unwrap())
 }
 
 #[cfg(test)]

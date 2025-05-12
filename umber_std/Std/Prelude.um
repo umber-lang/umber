@@ -82,10 +82,13 @@ module : {
 
     val make : Int, Char -> String
     val of_char : Char -> String
+
+    # The length of the string in bytes as encoded in UTF8.
     val length : String -> Int
     val is_empty : String -> Bool
-    val fold : String, acc, (acc, Char -> acc) -> acc
     val split : String, Char -> List String
+
+    val fold : String, acc, (acc, Char -> acc) -> acc
   }
 
   module Operators : {
@@ -158,11 +161,17 @@ module : {
   val fst : (a, b) -> a
   val snd : (a, b) -> b
 
-  extern print : String -> () = "umber_print_endline"  # TODO: effects
-  extern print_string : String -> () = "umber_print_string"
-  extern print_int : Int -> () = "umber_print_int"
-  extern print_bool : Bool -> () = "umber_print_bool"
-  extern read_line : () -> Option String = "umber_read_line" 
+  module Io : {
+    import Io
+
+    val print : String -> <Io> ()
+    val print_string : String -> <Io> ()
+    val print_int : Int -> <Io> ()
+    val print_bool : Bool -> <Io> ()
+    val read_line : () -> <Io> Option String
+  }
+
+  import .Io._
 }
 
 # TODO: need some kind of syntax for re-exporting things easily
@@ -222,12 +231,18 @@ module Float = {
   extern pi : Float = "umber_float_pi"
 }
 
+module Char = {
+  import Char
+
+  extern length_utf8 : Char -> Int = "umber_char_length_utf8"
+}
+
 module String = {
   import String
 
   extern make : Int, Char -> String = "umber_string_make"
-  extern fold : String, acc, (acc, Char -> acc) -> acc = "umber_string_fold"
-  extern length : String -> Int = "umber_string_len"
+  extern length : String -> Int = "umber_string_length"
+  extern get_char : String, Int -> Char = "umber_string_get_char"
 
   let is_empty str = length str == 0
 
@@ -241,6 +256,15 @@ module String = {
         | Nil -> [ of_char c ]
         | Cons current_chunk chunks -> (current_chunk ++ of_char c) :: chunks)
     |> List.reverse
+
+  let fold s init f =
+    let loop s i len acc f =
+      if i >= len then acc
+      else
+        let c = get_char s i in
+        loop s (i + Char.length_utf8 c) len (f acc c) f
+    in
+    loop s 0 (length s) init f
 }
 
 import .Option.(None, Some)
@@ -404,8 +428,19 @@ let fst (a, _) = a
 let snd (_, b) = b
 
 extern sqrt : Float -> Float = "umber_float_sqrt"
-extern print : String -> () = "umber_print_endline"
-extern print_string : String -> () = "umber_print_string"
-extern print_int : Int -> () = "umber_print_int"
-extern print_bool : Bool -> () = "umber_print_bool"
-extern read_line : () -> Option String = "umber_read_line" 
+
+module Io = {
+  # Io is an abstract marker effect. Extern functions with side effects must be annotated
+  # with `Io` to signify this. There is no way to write a handler for `Io`. The `Io`
+  # effect is discharged by the runtime in the `main` function.
+  # TODO: Actual implement requiring `main`.
+  import Io
+
+  extern print : String -> <Io> () = "umber_print_endline"
+  extern print_string : String -> <Io> () = "umber_print_string"
+  extern print_int : Int -> <Io> () = "umber_print_int"
+  extern print_bool : Bool -> <Io> () = "umber_print_bool"
+  extern read_line : () -> <Io> Option String = "umber_read_line"
+}
+
+import .Io._

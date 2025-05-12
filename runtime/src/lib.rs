@@ -1,5 +1,6 @@
 #![allow(internal_features)]
 #![feature(lang_items)]
+#![feature(str_internals)]
 #![no_std]
 
 mod block;

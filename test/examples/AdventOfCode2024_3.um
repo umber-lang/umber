@@ -1,1 +1,35 @@
 # TODO: Implement some parser combinators using effects
+
+# FIXME: String Cursor?
+type Slice = (String, Int)
+
+type Instruction =
+  | Mul Int Int
+
+module Parse = {
+  effect Parse {
+    val satisfy : (Slice -> Option (a, Slice)) -> Option a
+    val choice : (() -> <Parse> a), (() -> <Parse> a) -> a
+  }
+
+  let (<|>) = choice
+
+  let any_char () = ignore (satisfy (\(s, i) -> Some ((), (s, i + 1))))
+
+  let char c = ignore (satisfy (\(s, i) ->
+    String.get))
+
+  let many parse =
+    let loop acc parse =
+      (\() -> let x = parse () in x :: acc)
+      <|>
+      (\() -> List.reverse acc)
+    in
+    loop acc parse
+
+  let instruction () =
+    
+  
+  let instructions () =
+    many (instruction <|> any_char)
+}

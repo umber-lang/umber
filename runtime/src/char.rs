@@ -23,6 +23,11 @@ impl BlockPtr {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn umber_char_length_utf8(c: BlockPtr) -> BlockPtr {
+    BlockPtr::new_int(c.as_char().len_utf8() as i64)
+}
+
 #[cfg(test)]
 mod test {
     use crate::{block::BlockPtr, gc::umber_gc_init};
