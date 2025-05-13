@@ -1,0 +1,83 @@
+# We need some kind of first-class mutability.
+# Goals:
+# - Local variables should be able to be stack-allocated
+# - It should not be possible to take references to the stack so that  switching fibers
+#   is trivial
+# - When mutability is internal (local) to a function, the function type shouldn't show it
+# - When mutation escapes a function, the function type should show it clearly - and it
+#   should show up in the list of effects, so that <> in a function type really means
+#   total, and you don't have to check anything else like if something is mutable
+# 
+# Ideas
+# - Most simply, you could just have a `mut` argument modifier and a Mut effect
+# - However, we may want some way to show what is being mutated (?)
+# - Koka does this with "heap" variables, and check locality by observing that a heap
+#   variable doesn't appear in a type. We could do this internally even if we don't
+#   display it in the type.
+# - I'm not sure how useful it is to see what can mutate what - you already know that a
+#   function can mutate things it is passed. Closures might mutate things in their
+#   environment though, which is hidden.
+#   e.g. in `foo : mut A, (mut B -> <Mut> ()) -> <Mut> ()`, the inner function could mutate
+#   either `A` or `B`. A more precise type could be:
+#   `foo : mut 'a A, (mut 'b B -> <Mut ('a | 'b))> ()) -> <Mut ('a | 'b)> ()`,
+#   ^ is this right??
+# 
+# - Notably, interior mutability should not be allowed, or if it is allowed, we still need
+#   to have a mut effect (We may want to allow it actually, not sure)
+# - Reading a mutable variable should also be effectful (Mut.Read, say)
+# - We need to support mutable fields in records, so we can just go with something like
+#   ref as well. Who cares that much about stack variables anyway. That could be added
+#   later. Alternatively, we could use Ref everywhere and have that be the primitive.
+# - Everything should be immutable by default. You need to have the variable at mut mode
+#   and the field marked mut to modify it. (What should the modes be?)
+# 
+# The most important consideration is how to handle data race safety. That's a must. The
+# thing to prevent is simultaneous access with at least one being a write. Ways to prevent
+# this are:
+# - Ownership + borrowing - mutability xor aliasing (see Rust)
+# - Reference capabilities (see Pony, Vale?) e.g. having mutable aliasing, but not across
+#   threads (actors).
+# 
+# Kinds of access
+# - Ownership/isolation - you are the only reference, can mutate or send
+# - Deep immutability - share/send away, but mutation is impossible
+# - Mutable aliased reference not shared between threads - can read/write, but not send
+# - Read-only reference - can't share it because it might be mutable, can read
+# 
+# Also need to consider that we want linearity anyway - we can integrate this with that
+# 
+# Thoughts
+# - Resumptions are not safe to send to other threads, I think? Well, actually maybe it's
+#   fine. I think because they are reparented it's ok, they can go into a new fiber on a
+#   different thread. Might depend on what things are captured in closures...
+# - We can have primitive operations for spinning up threads that do <Io>. The effect be
+#   something like Parallel
+
+type Info = String
+
+type Status =
+  | Started
+  | Stopped
+
+type MyState = {
+  info : Info,
+  mut status : Status,
+}
+
+type Ref a = { mut contents : a }
+
+# Thread APIs
+# 
+# - Should enforce structured concurrency
+# - So, needs to look something like "run all these, then join"
+# - Consider par_iter from rayon in Rust. Arrays work too though.
+# 
+# For thread safety, we need something equivalent to Send/Sync on these closures
+# 
+# The closures must be Send (a.k.a. portable). This means they must not capture anything
+# which is not 
+
+effect Parallel = {
+  val run_both : (() -> a), (() -> b) -> (a, b)
+  val run_all : Array a -> Int -> (a -> b) -> Array b
+}

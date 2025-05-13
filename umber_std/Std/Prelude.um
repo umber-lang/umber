@@ -433,7 +433,7 @@ module Io = {
   # Io is an abstract marker effect. Extern functions with side effects must be annotated
   # with `Io` to signify this. There is no way to write a handler for `Io`. The `Io`
   # effect is discharged by the runtime in the `main` function.
-  # TODO: Actual implement requiring `main`.
+  # TODO: Actually implement requiring `main`.
   import Io
 
   extern print : String -> <Io> () = "umber_print_endline"
