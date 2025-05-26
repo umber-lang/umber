@@ -1,38 +1,6 @@
 use core::{ffi::c_void, ptr};
 use libc::{free, malloc};
 
-/* FIXME: Consider the fiber state.
-   - Pointer to parent fibre.
-   - List of handlers (effect_op_id, handler address to jump to)
-   - Keep the address of the handler list in a register at all times e.g. r14
-
-   When handling:
-   - Allocate a new fiber
-   - Fill in the header (parent pointer, handlers)
-   - Set rsp to new stack location
-
-   When performing:
-   - Put perform args in the arg registers for calling a function
-   - Jump to handler list in r14 and linear search for matching effect_op_id
-   - If found, jump to handler and start executing.
-   - If not found, jump to parent fiber and continue.
-
-   When resuming:
-   - Set rax with the value to "return" from the perfom call
-   - Jump to continuation address
-
-   At main startup:
-   - Allocate a toplevel fibre (or might not be necessary?)
-
-*/
-
-// TODO: C function calls need to be done on the regular system stack - we need to save
-// rsp and set it to the top of the system stack. That means we also need to store that
-// in the runtime state. Use a static struct? Thread safety is sus, we really want this to
-// be thread local but Rust's support for that is only in std.
-//
-// Actually I'm confused why it'd be better to use a pinned register vs a static address.
-
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq)]
 struct EffectOpId(u64);

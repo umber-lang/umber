@@ -250,7 +250,7 @@ end = struct
         match cfg_node with
         | Ret ->
           (* Ret implicitly uses the return register. *)
-          (* FIXME: Decide if it actually matters if we track this or not. If it does,
+          (* TODO: Decide if it actually matters if we track this or not. If it does,
              construct a test case showing it. *)
           record_register_use
             live_registers
@@ -610,8 +610,9 @@ end = struct
                  []
                 : (Register.t * Register.t) list)];
       let basic_blocks = coalesce_registers ~basic_blocks ~interference_graph in
-      (* FIXME: Not sure what happened but this interference graph definitely doesn't
-         match the code after coalescing. Broken merge logic? *)
+      (* TODO: It's a bit weird that we update the interference graph while coalescing,
+         but then still need to re-create it from scratch later. This might just be
+         expected. It seems to be necessary for correctness, but I forget why. *)
       let interference_graph = create_interference_graph ~cfg ~basic_blocks in
       eprint_s
         [%here]
@@ -990,23 +991,6 @@ let move_values_for_call fun_builder ~call_conv ~(args : Register.t Value.t list
       (Mov { src = tmp; dst = Simple_value (Register (Real arg_register)) }))
 ;;
 
-(* FIXME: I'm not sure if this is actually needed - does it even do anything? The new
-     virtual registers will always be unused so die just immediately. But it creates a lot
-     more work for register allocation.
-     
-     I suspect this might not have done anything, except maybe given regalloc an out to
-     move to other registers between live ranges.
-
-     Oh, maybe we have to insert moves between the live ranges??
-  *)
-(* In case we are using any clobbered registers, move from them to new temporary
-     registers. Any useless moves will get removed by the register allocator later. *)
-(* List.iter clobbered_registers ~f:(fun reg ->
-    let tmp = Function_builder.pick_register fun_builder in
-    Function_builder.add_code
-      fun_builder
-      (Mov { src = Simple_value (Register (Real reg)); dst = tmp })) *)
-
 let codegen_fun_call_internal fun_builder ~fun_ ~call_conv ~args =
   move_values_for_call fun_builder ~call_conv ~args;
   Function_builder.add_code
@@ -1044,7 +1028,7 @@ let define_no_env_closure_wrapper_fun ~closure_wrapper_fun_name ~fun_name ~arity
            (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
          virtual_reg)
   in
-  (* FIXME: Handle using stack for args. *)
+  (* TODO: Handle using stack for args. *)
   let return_value =
     codegen_fun_call_internal
       fun_builder
@@ -1304,7 +1288,6 @@ let check_value_is_block fun_builder value =
   `Zero_flag
 ;;
 
-(* FIXME: Simplify with constraints? *)
 (** Insert code such that all the values end up in the same place. *)
 let merge_branches
   fun_builder
@@ -1314,14 +1297,10 @@ let merge_branches
   =
   let value =
     match value_a, value_b with
-    | Simple_value (Register a), Simple_value (Register b) ->
-      (* FIXME: Unclear if a might be used for something else useful in the b case? *)
-      if not (Register.equal a b)
-      then (
-        Function_builder.position_at_label fun_builder label_b;
-        Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b }));
+    | Simple_value (Register a), Simple_value (Register b) when Register.equal a b ->
       value_a
-    | Simple_value (Register _), (Simple_value (Global _ | Constant _) | Memory _) ->
+    | ( Simple_value (Register _)
+      , (Simple_value (Register _ | Global _ | Constant _) | Memory _) ) ->
       Function_builder.position_at_label fun_builder label_b;
       Function_builder.add_code fun_builder (Mov { dst = value_a; src = value_b });
       value_a
@@ -1405,8 +1384,6 @@ let setup_stack_pointers_for_fiber_just_created ~fun_builder =
        })
 ;;
 
-(* FIXME: Stack variables can't live across this point - how can we prevent this? *)
-(* FIXME: Need to push the return instruction pointer. *)
 let switch_to_fiber ~fun_builder ~new_fiber ~operation =
   (* Save the stack pointer of the current fiber, unless it's about to be destroyed. *)
   (match operation with
@@ -1469,20 +1446,6 @@ let retrieve_arguments ~fun_builder ~call_conv ~args =
    continuations as blocks. *)
 (* TODO: We could define this function once in the entry module rather than generating it
    multiple times. *)
-(* FIXME: This doesn't quite work:
-   - We adjust rsp at the end of the function, but after switching fibers, this is out of
-     sync.
-   - After resuming, we're going to run the inner computation some more but then eventually
-     exit out of the original handler block back into that code - wrong!
-   - We need calling resume to actually return back to the same place. Resume returns the
-     final result of calling the handler on the whole rest of the computation, including
-     the value branch. I think we might need to do a proper call/ret setup? The
-     recursive handling is kinda mind-bending to think about.
-   - Resume needs to go back to the perform call
-   
-   We need to build up a call stack with each resume, and end_label needs to return up the
-   stack. So the original return point also needs to be pushed.
-*)
 let define_umber_resume_wrapper t =
   match t.umber_resume_wrapper with
   | Some fun_builder -> Function_builder.name fun_builder
@@ -1532,17 +1495,6 @@ let define_umber_resume_wrapper t =
          { dst = Simple_value (Register (Real (Call_conv.return_value_register Umber)))
          ; src = arg
          });
-    (* FIXME: We never ret or add to rsp at the end of this function - where exactly are
-       we jumping back to? I think there might just be wasted stack space here.
-       
-       Changed it to use Call, consider if we even want to ever use indirect jumps. Maybe
-       it's just too annoying to get it working. Ugh, call doesn't work either because
-       we switch fibers during the function and don't switch back. Maybe we need to switch
-       back?
-       
-       This code only works as written because rax is the return value register and the
-       first argument register. Very sketchy.
-    *)
     Function_builder.add_terminal fun_builder (Jump resume_address);
     Function_builder.position_at_label fun_builder end_label;
     Function_builder.add_terminal fun_builder Ret;
@@ -1666,7 +1618,8 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          (otherwise_end_label, otherwise_value)
          ~merge_label:(Function_builder.create_label fun_builder "cond_assign.merge"))
   | Handle_effects { vars; value_handler; effect_handlers; expr = inner_expr } ->
-    (* FIXME: Need to add function prologues to check for stack overflow. *)
+    (* TODO: Need to add function prologues to check for stack overflow. At the moment I
+       hacked around this by just making the default stack size massive :) *)
     (* Allocate a new fiber, with its parent set to the current fiber. *)
     let new_fiber =
       declare_and_call_extern_c_function
@@ -1738,63 +1691,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          ; call_conv = Umber
          ; arity = List.length args_for_inner
          });
-    (* FIXME: Create functions for the value and effect handler branches. Needed to make
-       it easier for reg alloc to understand the control flow - we need "ret". Doesn't make
-       much difference otherwise. Ah, but have to make sure places that get here via jumps
-       instead of "call" have the correct stack alignment.
-       
-       Problem: I don't think they just be regular function calls, we need to do some
-       funky stuff.
-
-       - Set up and switch to child fiber
-       - Call inner on child fiber
-       - Perform effect: switch to parent fiber and call handler
-       - Resume continuation (but add 1 after)
-       - Perform effect
-       - Resume continuation (but add 1 after)
-       - Return value -> go back up the stack and return 7
-
-       Parent fiber : effect_handler_add_1, effect_handler_add_1
-       Child fiber  : value_handler
-
-       -- with value/effect handler functions ... ???
-       Parent fiber : ??, effect_handler_add_1, ??, effect_handler_add_1, ??, ...
-       Child fiber  : value_handler
-
-       Possibly we can get away with just using ret and the reg alloc will be a little
-       weird (it'll think it exits the function) but maybe it'll be ok?). Can try. Where
-       does the value branch return to? the end label! Push that.
-
-       I think we need functions... otherwise how do we explain to reg alloc that any reg
-       could have been clobbered? Oh, also we need to store the closed-over vars somewhere.
-       Can put them all on the stack? Seems reasonable. Need to track vars used by the
-       inner expr to be passed as vars and vars used by the handlers to be put on the
-       parent fiber stack.
-       => Well, wait, actually it might sort of work accidentally because we call the
-       inner expr function, I think it can figure out that everything gets clobbered there.
-       Very sketchy though. Also not sure what the cfg looks like if it can't see the jumps.
-
-       To fix:
-       - rsp to rbp based indexing and/or make handlers functions. Using rbp seems a bit
-         rough actually since it means we also have to fix that whenever we switch fibers,
-         right? We'd need to save it in the fiber as well. Another option is make reg alloc
-         understand push/pop. Might not be that bad... Could traverse the cfg and fail on
-         inconsistencies
-         => ok, we make them functions, should be fine then? Might have to add an option
-            to say whether the function needs alignment or not (the handlers don't)
-            Wait, the problem with making them functions is Ret won't work properly....
-            But, they can't share stack addresses with the parent, it's dynamic, can't be
-            done without rbp.
-         => Which is easier? adding rbp on every fun prologue/epilogue and fiber switch
-            OR making these functions and... passing the args how? In a closure could work
-            Registers won't work. Stack could work but it's dynamic again. Maybe rbp is the
-            way. 
-
-       Mitigated:
-       - umber_resume_wrapper needs to put its own address on the parent stack (done)
-       - What do we do with the return value from the return value branch? Oh, just return
-         it in rax!
-    *)
     (* At this point, since the inner function has returned a regular value, it won't be
        resumed again. Destroy the fiber and switch back to the parent fiber. *)
     let child_fiber =
@@ -1934,22 +1830,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
     let continuation_label =
       Function_builder.create_label fun_builder "perform_effect.resume_here"
     in
-    (* FIXME: continuations are first-class, and are coercible to functions. So they need
-       closures. The closures can be constant though. 
-       
-       Another problem is that calling a continuation isn't the same as calling a regular
-       function. Maybe we need wrapper functions.
-
-       Alternatively, we could identify when [resume] escapes and only allocate the
-       closure then. But that seems tricky.
-       
-       Ah, resume also needs a pointer to the source fiber - store that in the
-       contiuation. This is dynamic so they need to be dynamically allocated and created.
-       There should be some flag we set in the continuation to prevent it getting called
-       again. (Panic in that case).
-
-       I think we need a proper wrapper function to do the nontrivial resumption logic.
-    *)
     let continuation =
       box
         t
@@ -1961,15 +1841,13 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
           ; Simple_value (Global (continuation_label, Other))
           ]
     in
-    (* FIXME: Stack arguments won't work with the updated rsp. Maybe reg alloc could
+    (* TODO: Stack arguments won't work with the updated rsp. Maybe reg alloc could
        notice when we set rsp and then adjust later spills to look up the parent stack? *)
     move_values_for_call
       fun_builder
       ~call_conv:Umber
       ~args:(Simple_value (Register (Virtual continuation)) :: Nonempty.to_list args);
     switch_to_fiber ~fun_builder ~new_fiber:fiber_to_switch_to ~operation:`Normal_switch;
-    (* FIXME: This value got allocated to a nonsense register and somehow the move was
-       deleted. Very sus. Maybe coalescing went wrong? *)
     Function_builder.add_terminal
       fun_builder
       (Jump (Simple_value (Register (Virtual handler))));
