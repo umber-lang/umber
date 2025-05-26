@@ -1,25 +1,6 @@
 open Import
 open Names
 
-(* TODO: Do codegen directly to x86 assembly rather than going through LLVM.
-   
-   I feel that implementing a runtime for algebraic effects might be too
-   difficult/annoying with LLVM. The coroutine support might be able to do it, but
-   unclear. If I control everything then I can work at the bare metal. The difficulty will
-   involve more low-level concerns rather than trying to twist LLVM's APIs to do something
-   they were really not designed for.
-
-   Some problems:
-   - I have to rewrite the whole codegen backend
-   - I don't know asm much at all
-   - I need to think about register allocation
-   - I need to think about calling conventions and implement the C calling convention in
-     addition to my own one
-   - I can't get optimizations for free
-
-   Maybe I could try doing the coroutine thing and see if it works?
-*)
-
 open struct
   open Asm_program
   module Label_name = Label_name
