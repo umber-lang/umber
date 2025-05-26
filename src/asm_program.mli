@@ -170,7 +170,6 @@ module Instr : sig
       -> 'acc * 'r2 t
   end
 
-  (* FIXME: Terminal instructions now contain registers and need reg alloc. *)
   module Terminal : sig
     type 'reg t =
       | Ret

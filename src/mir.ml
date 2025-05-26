@@ -1164,12 +1164,6 @@ module Expr = struct
          | None ->
            (* If there are no effect branches, we can just do a simple translation. *)
            let input_expr =
-             (* FIXME: This doesn't seem right. e.g. if we let a continuation escape and then
-             call it, it shouldn't call back into the value branch here. The value branch
-             is part of the handler.
-             
-             This desugaring is wrong - the value branch's effects aren't handled.
-             *)
              match value_branch with
              | None ->
                (* This shouldn't actually be reachable - it implies a handle expression

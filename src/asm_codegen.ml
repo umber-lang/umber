@@ -308,6 +308,7 @@ end = struct
                  Interference_graph.remove_vertex interference_graph node)))
         | _ -> ()));
     let basic_blocks =
+      (* FIXME: Not handling registers in terminal instrs *)
       List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
         let code =
           List.filter_map code ~f:(fun instr ->
@@ -478,6 +479,7 @@ end = struct
            reg, Memory.offset rbp I64 ~-(i + 1 + already_spilled_count))
       |> Virtual_register.Map.of_alist_exn
     in
+    (* FIXME: Not handling registers in terminal instrs *)
     List.map basic_blocks ~f:(fun { label; code; terminal } : _ Basic_block.t ->
       let code =
         List.concat_map code ~f:(fun instr ->
@@ -1919,9 +1921,9 @@ and codegen_and ~fun_builder ~codegen_cond1 ~codegen_cond2 ~cond2_label ~end_lab
   | `Constant true -> codegen_cond2 ()
   | `Zero_flag ->
     (* FIXME: This is horrible because of the janky assumption that [else_] has to be the
-     next basic block. Come up with a proper fix for that. Probably need a distinction
-     between "abstract assembly" and the real assembly, with an explicit conversion process
-     that could sort out details like this. *)
+       next basic block. Come up with a proper fix for that. Probably need a distinction
+       between "abstract assembly" and the real assembly, with an explicit conversion
+       process that could sort out details like this. *)
     let mid_label = Function_builder.create_label fun_builder "codegen_and.mid" in
     Function_builder.add_terminal
       fun_builder
@@ -2003,10 +2005,7 @@ let define_extern_wrapper_function ~fun_name ~extern_name ~arity =
            (Mov { src = Simple_value (Register (Real reg)); dst = virtual_reg });
          virtual_reg)
   in
-  (* FIXME: Handle using stack for args. *)
-  (* (match result with
-   | Same_length | Right_trailing _ -> ()
-   | Left_trailing _ -> failwith "TODO: ran out of registers for args, use stack"); *)
+  (* TODO: Handle using stack for args. *)
   let return_value =
     codegen_fun_call_internal
       fun_builder
