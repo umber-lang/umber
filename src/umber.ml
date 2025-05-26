@@ -2,7 +2,6 @@ module Asm_codegen = Asm_codegen
 module Asm_program = Asm_program
 module Ast = Ast
 module Auto_format = Auto_format
-module Codegen = Codegen
 module Compilation_error = Compilation_error
 module Lexer = Lexer
 module Linking = Linking

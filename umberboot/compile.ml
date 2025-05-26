@@ -9,7 +9,6 @@ module Stage = struct
       | Type_checking
       | Generating_mir
       | Generating_asm
-      | Generating_llvm
       | Linking
     [@@deriving compare, variants, sexp]
   end
@@ -27,7 +26,6 @@ module Target = struct
       | Type_annotated_code
       | Names
       | Mir
-      | Llvm
       | Asm
       | Exe
     [@@deriving compare, variants, sexp]
@@ -41,7 +39,6 @@ module Target = struct
     | Untyped_ast -> Parsing
     | Typed_ast | Type_annotated_code | Names -> Type_checking
     | Mir -> Generating_mir
-    | Llvm -> Generating_llvm
     | Asm -> Generating_asm
     | Exe -> Linking
   ;;
@@ -111,7 +108,6 @@ end = struct
       flag "type-annotated-code" no_arg ~doc:"Pretty-print type-annotated code"
     and names = flag "names" no_arg ~doc:"Print name-resolver output (name bindings)"
     and mir = flag "mir" no_arg ~doc:"Print mid-level IR statements (MIR)"
-    and llvm = flag "llvm" no_arg ~doc:"Print LLVM IR"
     and asm = flag "asm" no_arg ~doc:"Print x86-64 assembly"
     and exe_filename =
       flag
@@ -130,7 +126,6 @@ end = struct
       ~type_annotated_code:(add type_annotated_code)
       ~names:(add names)
       ~mir:(add mir)
-      ~llvm:(add llvm)
       ~asm:(add asm)
       ~exe:(fun t variant ->
       match exe_filename with
@@ -246,13 +241,6 @@ let compile_internal ~filename ~output ~no_std ~parent ~on_error =
            let asm = Asm_codegen.convert_mir ~module_path mir in
            maybe_output Asm ~f:(fun out ->
              Asm_program.pp (Stdlib.Format.formatter_of_out_channel out) asm);
-           Ok (module_path, mir, asm)))
-      ~generating_llvm:
-        (run_stage ~f:(fun (module_path, mir, asm) ->
-           Codegen.of_mir ~module_path ~source_filename:filename mir
-           |> Result.iter ~f:(fun codegen ->
-                maybe_output Llvm ~f:(fun out ->
-                  fprintf out "%s\n" (Codegen.to_string codegen)));
            Ok (module_path, asm)))
       ~linking:
         (run_stage ~f:(fun (module_path, asm) ->

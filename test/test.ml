@@ -20,7 +20,6 @@ let should_make_mir test =
   should_type_check test && not (List.mem ~equal:String.equal type_only_tests test)
 ;;
 
-let should_make_llvm test = should_make_mir test
 let no_asm_tests = []
 
 let should_make_asm test =
@@ -57,13 +56,10 @@ let test ~in_file =
   let ast_file = concat_current "ast" out_filename in
   let mir_file = concat_current "mir" out_filename in
   let asm_file = concat_current "asm" out_filename in
-  let llvm_file = concat_current "llvm" out_filename in
   let output_file = concat_current "output" out_filename in
   let input_file = concat_current "input" (bare_filename ^ ".txt") in
   let tmp_exe_file = Filename_unix.temp_file ("umber_test." ^ filename) "" in
-  List.iter
-    [ tokens_file; ast_file; mir_file; asm_file; llvm_file; output_file ]
-    ~f:(fun file ->
+  List.iter [ tokens_file; ast_file; mir_file; asm_file; output_file ] ~f:(fun file ->
     (* Touch each file so that we always end up with at least an empty file for every
        target, even if we error out on an earlier case or otherwise don't generate some
        outputs. *)
@@ -78,7 +74,6 @@ let test ~in_file =
     List.fold_until
       ~init:base_targets
       [ should_make_mir, (Mir, File mir_file : target)
-      ; should_make_llvm, (Llvm, File llvm_file)
       ; should_make_asm, (Asm, File asm_file)
       ; should_make_exe, (Exe, File tmp_exe_file)
       ]
@@ -94,7 +89,6 @@ let test ~in_file =
       | Lexing -> tokens_file
       | Parsing | Type_checking -> ast_file
       | Generating_mir -> mir_file
-      | Generating_llvm -> llvm_file
       | Generating_asm -> asm_file
       | Linking -> output_file
     in

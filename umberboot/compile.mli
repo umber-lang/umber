@@ -10,7 +10,6 @@ module Stage : sig
     | Type_checking
     | Generating_mir
     | Generating_asm
-    | Generating_llvm
     | Linking
   [@@deriving compare, variants, sexp]
 end
@@ -25,7 +24,6 @@ module Target : sig
     | Type_annotated_code
     | Names
     | Mir
-    | Llvm
     | Asm
     | Exe
   [@@deriving compare, variants, sexp]

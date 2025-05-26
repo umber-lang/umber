@@ -1,4 +1,4 @@
-(data_only_dirs examples tokens ast mir asm llvm output)
+(data_only_dirs examples tokens ast mir asm output)
 
 (executables
  (names test gen_dune)

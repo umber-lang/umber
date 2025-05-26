@@ -20,9 +20,4 @@ let prelude_names =
   lazy (look_up_in_site Sources.Sites.stdlib ~file:"prelude_names.sexp" |> Sexp.load_sexp)
 ;;
 
-let prelude_llvm =
-  lazy
-    (look_up_in_site Sources.Sites.stdlib ~file:"prelude_llvm.ll" |> In_channel.read_all)
-;;
-
 let prelude_asm_file = lazy (look_up_in_site Sources.Sites.stdlib ~file:"prelude_asm.asm")
