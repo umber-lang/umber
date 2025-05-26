@@ -1861,11 +1861,6 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
          ; dst = output_register
          });
     output_register
-  | Resume _ ->
-    (* FIXME: I don't think there's much point in [Resume] being special since it needs to
-       be callable like a regular closure anyway. I guess maybe it lets the backend decide
-       the representation? *)
-    failwith "TODO: resume in asm"
 
 and codegen_cond t cond ~fun_builder =
   (* TODO: This just does basic constant folding so we don't generate invalid instructions

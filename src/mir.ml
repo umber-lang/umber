@@ -658,10 +658,6 @@ module Expr = struct
         { effect_op : Effect_op_id.t
         ; args : t Nonempty.t
         }
-    | Resume of
-        { continuation : t
-        ; arg : t
-        }
 
   and effect_handler =
     { effect_op : Effect_op_id.t
@@ -718,9 +714,7 @@ module Expr = struct
            ; expr = map ~f expr
            }
        | Perform_effect { effect_op; args } ->
-         Perform_effect { effect_op; args = Nonempty.map args ~f:(map ~f) }
-       | Resume { continuation; arg } ->
-         Resume { continuation = map ~f continuation; arg = map ~f arg })
+         Perform_effect { effect_op; args = Nonempty.map args ~f:(map ~f) })
   ;;
 
   module Fun_def = struct
@@ -740,7 +734,7 @@ module Expr = struct
       true
     | Fun_call _ | Let _
     | Make_block { tag = _; fields = _ :: _ }
-    | Cond_assign _ | Handle_effects _ | Perform_effect _ | Resume _ -> false
+    | Cond_assign _ | Handle_effects _ | Perform_effect _ -> false
   ;;
 
   (* TODO: consider merging making bindings with making conditions. If we extended
@@ -1123,8 +1117,7 @@ module Expr = struct
              | Get_block_field _
              | Cond_assign _
              | Handle_effects _
-             | Perform_effect _
-             | Resume _ ->
+             | Perform_effect _ ->
                let _, fun_name = Context.add_value_name ctx Constant_names.fun_ in
                Let (fun_name, fun_, Fun_call (fun_name, args))
              | Primitive _ | Make_block _ ->

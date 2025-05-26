@@ -1,6 +1,9 @@
 open Import
 open Names
 
+(* TODO: LLVM codegen is not being used at the moment. It should probably be deleted (with
+   a tagged revision left) so it can be easily recovered. *)
+
 (** See https://llvm.org/doxygen/namespacellvm_1_1CallingConv.html *)
 module Call_conv = struct
   let cc = 0
@@ -498,7 +501,7 @@ let rec codegen_expr t expr =
         associate_conds (next_cond_and_binding :: rest)
     in
     associate_conds conds
-  | Handle_effects _ | Perform_effect _ | Resume _ -> failwith "TODO: effects in llvm"
+  | Handle_effects _ | Perform_effect _ -> failwith "TODO: effects in llvm"
 
 and codegen_cond t cond =
   let make_icmp value value' = Llvm.build_icmp Eq value value' "equals" t.builder in

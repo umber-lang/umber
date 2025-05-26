@@ -44,10 +44,6 @@ module Expr : sig
         { effect_op : Effect_op_id.t
         ; args : t Nonempty.t
         }
-    | Resume of
-        { continuation : t
-        ; arg : t
-        }
 
   and effect_handler =
     { effect_op : Effect_op_id.t
