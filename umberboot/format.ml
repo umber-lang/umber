@@ -17,7 +17,10 @@ let command =
        match Parsing.parse_file filename with
        | Ok ast ->
          if debug
-         then print_s [%sexp (Pretty_ast.format_to_document ast : Auto_format.Document.t)]
+         then
+           print_s
+             [%sexp
+               (Pretty_ast.format_to_document ast : Pretty_ast.Auto_format.Document.t)]
          else (
            Pretty_ast.format ast |> Sequence.iter ~f:print_string;
            Out_channel.newline stdout)

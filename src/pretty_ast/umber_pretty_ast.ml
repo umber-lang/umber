@@ -2,6 +2,9 @@ open! Core
 open! Import
 open Names
 
+(* TODO: Split this into multiple files *)
+module Auto_format = Auto_format
+
 module Typed_to_untyped = struct
   let relativize_name_internal ~names name ~f ~to_string =
     Option.value_or_thunk (f names name) ~default:(fun () ->

@@ -1,5 +1,6 @@
 open! Core
 open! Import
+module Auto_format = Auto_format
 
 module Config : sig
   type t =
