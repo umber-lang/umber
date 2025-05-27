@@ -1,0 +1,8 @@
+(library
+ (name umber_typing)
+ (libraries core ocamlgraph umber_common umber_sites umber_syntax)
+ (preprocess
+  (pps sedlex.ppx ppx_jane))
+ (inline_tests)
+ (instrumentation
+  (backend bisect_ppx)))

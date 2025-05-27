@@ -1,0 +1,8 @@
+(library
+ (name umber_common)
+ (libraries core gen)
+ (preprocess
+  (pps ppx_jane))
+ (inline_tests)
+ (instrumentation
+  (backend bisect_ppx)))

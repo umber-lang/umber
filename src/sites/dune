@@ -1,0 +1,12 @@
+(library
+ (name umber_sites)
+ (libraries core core_unix.sys_unix dune-site umber_common)
+ (preprocess
+  (pps ppx_jane))
+ (inline_tests)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(generate_sites_module
+ (module sources)
+ (sites umber))

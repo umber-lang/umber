@@ -1,0 +1,8 @@
+(library
+ (name umber_mir)
+ (libraries core umber_common umber_typing)
+ (preprocess
+  (pps ppx_jane))
+ (inline_tests)
+ (instrumentation
+  (backend bisect_ppx)))

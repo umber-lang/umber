@@ -1,0 +1,14 @@
+(library
+ (name umber_backend)
+ (libraries
+  core
+  core_unix.sys_unix
+  shell
+  umber_common
+  umber_syntax
+  umber_mir)
+ (preprocess
+  (pps ppx_jane))
+ (inline_tests)
+ (instrumentation
+  (backend bisect_ppx)))

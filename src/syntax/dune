@@ -1,0 +1,14 @@
+(library
+ (name umber_syntax)
+ (libraries core menhirLib sedlex umber_common)
+ (preprocess
+  (pps sedlex.ppx ppx_jane))
+ (inline_tests)
+ (instrumentation
+  (backend bisect_ppx)))
+
+(menhir
+ (modules parser)
+ (flags --table --inspection)
+ (infer true)
+ (explain true))
