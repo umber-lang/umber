@@ -1,6 +1,5 @@
 open! Core
 open! Import
-module Auto_format = Auto_format
 
 module Config : sig
   type t =
@@ -17,8 +16,3 @@ val format_to_document
   :  ?config:Config.t
   -> Untyped_ast.Module.t
   -> Auto_format.Document.t
-
-(* TODO: Move to another file *)
-module Typed_to_untyped : sig
-  val convert_module : names:Name_bindings.t -> Typed_ast.Module.t -> Untyped_ast.Module.t
-end
