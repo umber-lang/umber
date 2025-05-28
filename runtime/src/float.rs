@@ -74,6 +74,13 @@ mod test {
             umber_float_mul(BlockPtr::new_float(5.), BlockPtr::new_float(7.)).as_float(),
             35.
         );
+    }
+
+    // This test doesn't work under MIRI (at least on x86) because libm::sqrt uses inline
+    // assembly in its implementation and MIRI doesn't support this.
+    #[cfg(not(miri))]
+    #[test]
+    fn sqrt() {
         assert_eq!(umber_float_sqrt(BlockPtr::new_float(4.)).as_float(), 2.);
     }
 }
