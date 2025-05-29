@@ -2,8 +2,8 @@ include Umber_common
 
 include struct
   open Umber_syntax
+  include Names
   module Literal = Literal
-  module Names = Names
 end
 
 include struct

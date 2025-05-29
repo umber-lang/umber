@@ -1,57 +1,5 @@
 open! Core
 open! Import
-open Names
-
-module Label_name = struct
-  module T = struct
-    type t = string [@@deriving sexp, compare, equal, hash]
-  end
-
-  include T
-  include Hashable.Make (T)
-
-  let of_string s =
-    (* See the NASM for docs for what constitutes a valid identifier:
-       https://www.nasm.us/xdoc/2.16.03/html/nasmdoc3.html#section-3.1 *)
-    let buffer = Buffer.create (String.length s) in
-    let escape_used = ref false in
-    let escaping_now = ref false in
-    String.iteri s ~f:(fun i c ->
-      let needs_escape =
-        if i = 0
-        then (
-          match c with
-          | 'a' .. 'z' | 'A' .. 'Z' | '.' | '_' | '?' -> false
-          | _ -> true)
-        else (
-          match c with
-          | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '$' | '#' | '@' | '~' | '.' | '?'
-            -> false
-          | _ -> true)
-      in
-      match !escaping_now, needs_escape with
-      | false, false -> (* No escaping needed. *) Buffer.add_char buffer c
-      | false, true ->
-        (* Start escaping. *)
-        escape_used := true;
-        escaping_now := true;
-        Buffer.add_string buffer "__"
-      | true, false ->
-        (* Stop escaping.*)
-        escaping_now := false;
-        Buffer.add_char buffer c
-      | true, true -> (* Keep escaping. *) ());
-    if !escape_used
-    then (
-      Buffer.add_char buffer '#';
-      Buffer.add_string buffer (Int.to_string (String.hash s)));
-    Buffer.contents buffer
-  ;;
-
-  let to_string = Fn.id
-  let of_mir_name = Mir_name.to_string >> of_string
-  let of_extern_name = Extern_name.to_string >> of_string
-end
 
 let pp_args fmt args ~f =
   Format.pp_print_list ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ") f fmt args
@@ -115,36 +63,6 @@ module Asm_literal = struct
   ;;
 end
 
-module Register = struct
-  module T = struct
-    (* TODO: Floating point registers xmm0 to xmm7 *)
-    type t =
-      | Rax
-      | Rcx
-      | Rdx
-      | Rbx
-      | Rsp
-      | Rbp
-      | Rsi
-      | Rdi
-      | R8
-      | R9
-      | R10
-      | R11
-      | R12
-      | R13
-      | R14
-      | R15
-    [@@deriving equal, compare, hash, sexp, variants, enumerate]
-  end
-
-  include T
-  include Comparable.Make (T)
-  include Hashable.Make (T)
-
-  let pp fmt t = Format.pp_print_string fmt (String.lowercase (Variants.to_name t))
-end
-
 module Call_conv = struct
   type t =
     | C
@@ -152,23 +70,23 @@ module Call_conv = struct
   [@@deriving sexp_of]
 
   (* TODO: Handle further arguments with the stack *)
-  let arg_registers t : Register.t Nonempty.t =
+  let arg_registers t : Register.Real.t Nonempty.t =
     match t with
     | C -> [ Rdi; Rsi; Rdx; Rcx; R8; R9 ]
     | Umber -> [ Rax; Rbx; Rdi; Rsi; Rdx; Rcx; R8; R9; R10; R11; R12; R13; R15 ]
   ;;
 
-  let non_arg_caller_save_registers t : Register.t list =
+  let non_arg_caller_save_registers t : Register.Real.t list =
     match t with
     | C -> [ Rax; R10; R11 ]
     | Umber -> []
   ;;
 
-  let return_value_register : t -> Register.t = function
+  let return_value_register : t -> Register.Real.t = function
     | C | Umber -> Rax
   ;;
 
-  let register_is_reserved t (reg : Register.t) =
+  let register_is_reserved t (reg : Register.Real.t) =
     match t, reg with
     | (C | Umber), (Rsp (* Stack pointer *) | Rbp (* Frame pointer *))
     | Umber, R14 (* Current fiber *) -> true
@@ -176,11 +94,11 @@ module Call_conv = struct
   ;;
 
   let all_available_registers t =
-    List.filter Register.all ~f:(not << register_is_reserved t)
+    List.filter Register.Real.all ~f:(not << register_is_reserved t)
   ;;
 
   module Umber = struct
-    let fiber_register : Register.t = R14
+    let fiber_register : Register.Real.t = R14
   end
 end
 
@@ -208,7 +126,7 @@ module Simple_value = struct
 
   let pp fmt t =
     match t with
-    | Register reg -> Register.pp fmt reg
+    | Register reg -> Register.Real.pp fmt reg
     | Global (name, kind) -> pp_global fmt name kind
     | Constant literal -> Asm_literal.pp fmt literal
   ;;
@@ -690,7 +608,7 @@ end
 type t =
   { globals : Global_decl.t list
   ; externs : Label_name.t list
-  ; text_section : Register.t Basic_block.t list
+  ; text_section : Register.Real.t Basic_block.t list
   ; rodata_section : Data_decl.t list
   ; bss_section : Bss_decl.t list
   }

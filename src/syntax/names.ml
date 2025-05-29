@@ -487,6 +487,7 @@ end = struct
   ;;
 end
 
+(* FIXME: Move this to the Umber_mir library. It doesn't make sense to be here. *)
 module Mir_name : sig
   type t [@@deriving compare, equal, hash, sexp_of]
 

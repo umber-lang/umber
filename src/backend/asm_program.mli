@@ -1,16 +1,5 @@
 open! Core
 open! Import
-open Names
-
-module Label_name : sig
-  type t [@@deriving compare, equal, sexp_of]
-
-  include Stringable.S with type t := t
-  include Hashable.S with type t := t
-
-  val of_mir_name : Mir_name.t -> t
-  val of_extern_name : Extern_name.t -> t
-end
 
 module Size : sig
   type t =
@@ -31,43 +20,19 @@ module Asm_literal : sig
   [@@deriving sexp_of, equal]
 end
 
-module Register : sig
-  type t =
-    | Rax
-    | Rcx
-    | Rdx
-    | Rbx
-    | Rsp
-    | Rbp
-    | Rsi
-    | Rdi
-    | R8
-    | R9
-    | R10
-    | R11
-    | R12
-    | R13
-    | R14
-    | R15
-  [@@deriving compare, equal, hash, sexp, enumerate]
-
-  include Comparable.S with type t := t
-  include Hashable.S with type t := t
-end
-
 module Call_conv : sig
   type t =
     | C
     | Umber
 
-  val arg_registers : t -> Register.t Nonempty.t
-  val non_arg_caller_save_registers : t -> Register.t list
-  val return_value_register : t -> Register.t
-  val register_is_reserved : t -> Register.t -> bool
-  val all_available_registers : t -> Register.t list
+  val arg_registers : t -> Register.Real.t Nonempty.t
+  val non_arg_caller_save_registers : t -> Register.Real.t list
+  val return_value_register : t -> Register.Real.t
+  val register_is_reserved : t -> Register.Real.t -> bool
+  val all_available_registers : t -> Register.Real.t list
 
   module Umber : sig
-    val fiber_register : Register.t
+    val fiber_register : Register.Real.t
   end
 end
 
@@ -246,7 +211,7 @@ end
 type t =
   { globals : Global_decl.t list
   ; externs : Label_name.t list
-  ; text_section : Register.t Basic_block.t list
+  ; text_section : Register.Real.t Basic_block.t list
   ; rodata_section : Data_decl.t list
   ; bss_section : Bss_decl.t list
   }

@@ -45,15 +45,7 @@ module Fold_action = struct
   ;;
 end
 
-module Option : sig
-  include module type of Option
-
-  val fold_until
-    :  'a t
-    -> init:'acc
-    -> f:('acc -> 'a -> ('acc, 'final) Fold_action.t)
-    -> ('acc, 'final) Fold_action.t
-end = struct
+module Option = struct
   include Option
 
   let fold_until t ~init ~f : _ Fold_action.t =
@@ -63,24 +55,7 @@ end = struct
   ;;
 end
 
-module List : sig
-  include module type of List
-
-  val iter_pairs : 'a t -> f:('a -> 'a -> unit) -> unit
-  val split_last : 'a t -> ('a t * 'a) option
-
-  val fold_until
-    :  'a t
-    -> init:'acc
-    -> f:('acc -> 'a -> ('acc, 'final) Fold_action.t)
-    -> ('acc, 'final) Fold_action.t
-
-  val fold_map_until
-    :  'a t
-    -> init:'acc
-    -> f:('acc -> 'a -> ('acc * 'b, 'final) Fold_action.t)
-    -> ('acc * 'b t, 'final * 'b t) Fold_action.t
-end = struct
+module List = struct
   include List
 
   let rec iter_pairs list ~f =
@@ -120,15 +95,7 @@ end = struct
   ;;
 end
 
-module Map : sig
-  include module type of Map
-
-  val fold_until
-    :  ('k, 'v, _) t
-    -> init:'acc
-    -> f:(key:'k -> data:'v -> 'acc -> ('acc, 'final) Fold_action.t)
-    -> ('acc, 'final) Fold_action.t
-end = struct
+module Map = struct
   include Map
 
   let fold_until t ~init ~f =
