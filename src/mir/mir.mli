@@ -1,13 +1,7 @@
 open! Core
 open! Import
 
-module Block_index : sig
-  type t [@@deriving sexp]
-
-  val of_int : int -> t
-  val to_int : t -> int
-end
-
+(* FIXME: Just use Mir_expr? *)
 module Expr : sig
   type t =
     | Primitive of Literal.t
@@ -65,23 +59,6 @@ module Expr : sig
       }
     [@@deriving sexp_of]
   end
-end
-
-module Fun_decl : sig
-  type t =
-    { name : Mir_name.t
-    ; arity : int
-    }
-  [@@deriving sexp_of]
-end
-
-module Extern_decl : sig
-  type t =
-    { name : Mir_name.t
-    ; extern_name : Extern_name.t
-    ; arity : int
-    }
-  [@@deriving sexp_of]
 end
 
 module Stmt : sig

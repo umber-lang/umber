@@ -1262,7 +1262,7 @@ let codegen_literal t (literal : Literal.t) : _ Value.t =
    to temporary registers multiple times. Alternatively we could inline the memory
    references with each use, but that would require some way to express that. *)
 let load_block_field fun_builder value index =
-  load_mem_offset fun_builder value I64 (Mir.Block_index.to_int index + 1)
+  load_mem_offset fun_builder value I64 (Block_index.to_int index + 1)
 ;;
 
 let check_value_is_block fun_builder value =
@@ -1455,10 +1455,10 @@ let define_umber_resume_wrapper t =
     in
     (* TODO: Centralize logic for continuation representation somewhere. *)
     let fiber_to_resume =
-      load_block_field fun_builder continuation (Mir.Block_index.of_int 1)
+      load_block_field fun_builder continuation (Block_index.of_int 1)
     in
     let resume_address =
-      load_block_field fun_builder continuation (Mir.Block_index.of_int 2)
+      load_block_field fun_builder continuation (Block_index.of_int 2)
     in
     let (_ : Virtual_register.t) =
       declare_and_call_extern_c_function
@@ -1863,10 +1863,10 @@ and codegen_cond t cond ~fun_builder =
     let expr_value = codegen_expr t expr ~fun_builder in
     let literal_value = codegen_literal t literal in
     let load_expr ~expr_value =
-      load_block_field fun_builder expr_value (Mir.Block_index.of_int 0)
+      load_block_field fun_builder expr_value (Block_index.of_int 0)
     in
     let load_literal ~literal_value =
-      load_block_field fun_builder literal_value (Mir.Block_index.of_int 0)
+      load_block_field fun_builder literal_value (Block_index.of_int 0)
     in
     (match literal with
      | Int _ | Char _ -> cmp (load_expr ~expr_value) (load_literal ~literal_value)
