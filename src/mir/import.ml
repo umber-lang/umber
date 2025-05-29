@@ -2,10 +2,10 @@ include Umber_common
 
 include struct
   open Umber_syntax
+  include Names
   module Effect = Effect
   module Fixity = Fixity
   module Literal = Literal
-  module Names = Names
   module Node = Node
   module Type_decl = Type_decl
   module Type_scheme = Type_scheme

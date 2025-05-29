@@ -1,17 +1,10 @@
 open! Core
 open! Import
-open Names
 
 module Block_index : sig
   type t [@@deriving sexp]
 
   val of_int : int -> t
-  val to_int : t -> int
-end
-
-module Effect_op_id : sig
-  type t
-
   val to_int : t -> int
 end
 

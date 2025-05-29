@@ -1639,7 +1639,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         fun_builder
         (Mov
            { dst = Memory (Fiber_layout.get_handler_effect_op_id new_fiber i)
-           ; src = Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op)))
+           ; src = Simple_value (Constant (Int (Effect_op_id.to_int effect_op)))
            });
       Function_builder.add_code
         fun_builder
@@ -1795,7 +1795,7 @@ let rec codegen_expr t (expr : Mir.Expr.t) ~(fun_builder : Function_builder.t) =
         ~fun_name:(Label_name.of_string "umber_fiber_find_handler_and_detach")
         ~args:
           [ Simple_value Fiber_layout.current
-          ; Simple_value (Constant (Int (Mir.Effect_op_id.to_int effect_op)))
+          ; Simple_value (Constant (Int (Effect_op_id.to_int effect_op)))
           ; Simple_value (Register (Real Rsp))
           ]
     in
